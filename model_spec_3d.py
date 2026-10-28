@@ -113,6 +113,27 @@ class Stage3D(BaseModel):
     loads: list[NodalLoad3D] = Field(default_factory=list)
 
 
+class Influence3D(BaseModel):
+    """影响线自由度（*INFLUENCE_3D <node> <dof>）。"""
+    node: int
+    dof: int = Field(ge=1, le=6)
+
+
+class Lane3D(BaseModel):
+    """车道荷载（*LANE_3D）。
+
+    CODE="JTG_D60" 时由内核按车道首末节点距离 L 自动取
+    qk=10.5 kN/m、Pk(L)（L≤5m:270kN，L≥50m:360kN，线性内插）。
+    """
+    nodes: list[int] = Field(min_length=2)   # 车道纵列节点（顺序即行车方向）
+    q: float = 0.0                           # N/m（CODE 模式下可缺省）
+    p: float = 0.0                           # N
+    dof: int = 3                             # 加载方向自由度（3=竖向）
+    impact: float = 1.0                      # 冲击系数
+    reduction: float = 1.0                   # 多车道横向折减
+    code: str = ""                           # "JTG_D60" 或空
+
+
 class ModelSpec3D(BaseModel):
     """三维模型完整规范。to_dat() 输出 fem_3d.hpp 可直接读取的 .dat。"""
     title: str = "untitled_3d"
@@ -124,6 +145,8 @@ class ModelSpec3D(BaseModel):
     boundaries: list[Boundary3D] = Field(default_factory=list)
     loads: list[NodalLoad3D] = Field(default_factory=list)  # 仅静力求解用
     stages: list[Stage3D] = Field(default_factory=list)
+    influences: list[Influence3D] = Field(default_factory=list)
+    lanes: list[Lane3D] = Field(default_factory=list)
 
     # -------------------------------------------------- 校验
     @model_validator(mode="after")
@@ -192,6 +215,13 @@ class ModelSpec3D(BaseModel):
             for ld in s.loads:
                 if ld.node not in node_ids:
                     raise ValueError(f"阶段 {s.id} 荷载引用了不存在的节点 {ld.node}")
+        for inf in self.influences:
+            if inf.node not in node_ids:
+                raise ValueError(f"影响线引用了不存在的节点 {inf.node}")
+        for lane in self.lanes:
+            for nd in lane.nodes:
+                if nd not in node_ids:
+                    raise ValueError(f"车道引用了不存在的节点 {nd}")
         return self
 
     def _etype(self, etype_id: int) -> ElemTypeDef3D:
@@ -306,6 +336,25 @@ class ModelSpec3D(BaseModel):
             for ld in s.loads:
                 L.append(f"*STAGE_LOAD")
                 L.append(f"{s.id} NODE={ld.node} DOF={ld.dof} VALUE={fmt(ld.value)}")
+
+        for inf in self.influences:
+            L.append("*INFLUENCE_3D")
+            L.append(f"{inf.node} {inf.dof}")
+
+        for lane in self.lanes:
+            L.append("*LANE_3D")
+            parts = ["NODES=" + ",".join(str(i) for i in lane.nodes)]
+            if lane.code:
+                parts.append(f"CODE={lane.code}")
+            else:
+                parts.append(f"Q={fmt(lane.q)}")
+                parts.append(f"P={fmt(lane.p)}")
+            parts.append(f"DOF={lane.dof}")
+            if lane.impact != 1.0:
+                parts.append(f"IMPACT={fmt(lane.impact)}")
+            if lane.reduction != 1.0:
+                parts.append(f"REDUCTION={fmt(lane.reduction)}")
+            L.append(" ".join(parts))
 
         L.append("*END")
         return "\n".join(L) + "\n"

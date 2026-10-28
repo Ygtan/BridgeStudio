@@ -27,6 +27,8 @@ from model_spec_3d import (
     Boundary3D,
     Element3D,
     ElemTypeDef3D,
+    Influence3D,
+    Lane3D,
     Material3D,
     ModelSpec3D,
     Node3D,
@@ -71,6 +73,8 @@ def build_box_grillage_3d(
     dens: float = 2500.0,
     q_deck: float = 100e3,               # 全宽桥面均布荷载 N/m（含自重），向下
     td: float = 0.6,                     # 支承断面横隔板厚度 m
+    staged: bool = False,                # True=逐跨浇筑三阶段；False=一次成桥
+    lane_code: str = "",                 # "JTG_D60"=中线车道自动荷载 + 跨中影响线
     title: str = "三跨连续箱梁 3D 梁格",
 ) -> ModelSpec3D:
     """生成三跨连续箱梁空间梁格模型。"""
@@ -169,14 +173,67 @@ def build_box_grillage_3d(
         left = (xs[i] - xs[i - 1]) / 2 if i > 0 else 0.0
         right = (xs[i + 1] - xs[i]) / 2 if i < len(xs) - 1 else 0.0
         trib.append(left + right)
-    loads = []
-    for li in range(n_lines):
-        for i in range(len(xs)):
-            loads.append(NodalLoad3D(node=node_id(li, i), dof=3,
-                                     value=-q_line * trib[i]))
 
-    # ---- 施工阶段 1：一次成桥，全部单元激活 ----
-    stage1 = Stage3D(id=1, activate=[e.id for e in elements], loads=loads)
+    # ---- 施工阶段 ----
+    if staged:
+        # 逐跨浇筑：阶段 k 激活第 k 跨内全部构件，荷载只挂本跨
+        # （单元按跨度分段：纵梁按段中点、横梁按节点归属）
+        sup_x = [xs[i] for i in support_idx]
+        def span_of_x(x: float) -> int:
+            for k in range(len(spans)):
+                if x <= sup_x[k + 1] + 1e-6:
+                    return k
+            return len(spans) - 1
+
+        stages = []
+        for k in range(len(spans)):
+            act = []
+            for e in elements:
+                if e.id < 500:                    # 纵梁：按段中点定位
+                    li = e.id // 100 - 1
+                    i = e.id - (li + 1) * 100 - 1
+                    xm = (xs[i] + xs[i + 1]) / 2
+                else:                             # 横梁：按两端节点 x 定位
+                    n1 = next(n for n in nodes if n.id == e.n1)
+                    xm = n1.x
+                if span_of_x(xm) == k:
+                    act.append(e.id)
+            # 本跨受荷宽度（跨界节点只取跨内半段）
+            loads_k = []
+            x_lo, x_hi = sup_x[k], sup_x[k + 1]
+            for li in range(n_lines):
+                for i in range(len(xs)):
+                    if not (x_lo - 1e-6 <= xs[i] <= x_hi + 1e-6):
+                        continue
+                    left = (xs[i] - xs[i - 1]) / 2 if i > 0 else 0.0
+                    right = (xs[i + 1] - xs[i]) / 2 if i < len(xs) - 1 else 0.0
+                    w = 0.0
+                    if i > 0 and xs[i] - left / 2 >= x_lo - 1e-6:
+                        w += left
+                    if i < len(xs) - 1 and xs[i] + right / 2 <= x_hi + 1e-6:
+                        w += right
+                    if w > 0:
+                        loads_k.append(NodalLoad3D(node=node_id(li, i), dof=3,
+                                                   value=-q_line * w))
+            stages.append(Stage3D(id=k + 1, activate=act, loads=loads_k))
+    else:
+        loads = []
+        for li in range(n_lines):
+            for i in range(len(xs)):
+                loads.append(NodalLoad3D(node=node_id(li, i), dof=3,
+                                         value=-q_line * trib[i]))
+        stages = [Stage3D(id=1, activate=[e.id for e in elements], loads=loads)]
+
+    # ---- 车道荷载与影响线（可选）----
+    influences = []
+    lanes = []
+    if lane_code:
+        c_line = n_lines // 2
+        mid_i = (support_idx[1] + support_idx[2]) // 2      # 中跨跨中
+        influences.append(Influence3D(node=node_id(c_line, mid_i), dof=3))
+        lanes.append(Lane3D(
+            nodes=[node_id(c_line, i) for i in range(len(xs))],
+            dof=3, code=lane_code))
 
     return ModelSpec3D(
         title=title,
@@ -186,5 +243,7 @@ def build_box_grillage_3d(
         etypes=etypes,
         elements=elements,
         boundaries=boundaries,
-        stages=[stage1],
+        stages=stages,
+        influences=influences,
+        lanes=lanes,
     )

@@ -37,7 +37,8 @@ def main() -> int:
     check("区块①②③④⑤齐全",
           all(any(m in s for s in _subs) for m in _marks),
           " / ".join(_subs))
-    check("⑥已合并消失", not any("⑥" in s for s in _subs), "桥梁区块已并入①")
+    check("⑥三维梁格区块存在", any("三维梁格" in s for s in _subs),
+          "新增的三维梁格独立区块")
     check("默认模型是单梁", at.session_state["doc"].kind == "beam",
           at.session_state["doc"].summary()["title"])
 
@@ -86,6 +87,26 @@ def main() -> int:
     print("\n[FEM 求解按钮]")
     _solve_btns = [b.label for b in at.button if "FEM-Eigen" in b.label]
     check("⑤求解按钮存在", bool(_solve_btns), str(_solve_btns))
+
+    print("\n[⑥ 三维梁格求解]")
+    _g3d_btn = next((b for b in at.button if b.key == "g3d_solve"), None)
+    check("⑥求解按钮存在", _g3d_btn is not None)
+    if _g3d_btn is not None:
+        _g3d_btn.click().run()
+        check("⑥求解无异常", not _errors(at), _errors(at)[:1])
+        _r = at.session_state.get("g3d_result")
+        check("⑥结果已缓存", _r is not None)
+        if _r:
+            _st = at.session_state.get("g3d_stats", {})
+            check("⑥默认模型 222 单元", _st.get("elements") == 222,
+                  f"{_st.get('elements')}")
+            check("⑥三阶段施工", _st.get("stages") == 3, f"{_st.get('stages')}")
+            check("⑥活载包络 3 阶段", len(_r.get("live", {})) == 3,
+                  str(sorted(_r.get("live", {}))))
+            _meta = at.session_state.get("g3d_meta", {})
+            _dw = _r["disp"].get((_meta.get("mid_node", 2022), 3), (0, 0))
+            check("⑥中跨跨中挠度合理",
+                  -0.03 < _dw[0] < -0.001, f"{_dw[0]*1000:.2f} mm")
 
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 74)

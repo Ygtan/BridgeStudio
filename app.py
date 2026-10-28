@@ -524,3 +524,130 @@ else:
         with st.expander("查看导出的 .dat（FEM-Eigen new format）"):
             st.code(_fr["dat_text"], language="text")
             st.code(_fr["stdout"][-1500:] or "（无输出）", language="text")
+
+
+# ================================================================ ⑥ 三维梁格
+# 三跨连续箱梁空间梁格（ModelSpec3D）：逐跨施工阶段 + JTG D60 车道活载。
+# 与①~⑤的 2D 链路相互独立——3D 内核（example_3d_grillage.exe）输出的是
+# 阶段位移/内力包络与活载包络，不是 7 张 SVG，因此单独成块。
+try:
+    from fem_eigen_3d import fem_eigen_3d_available, solve_3d
+    from grillage_3d import build_box_grillage_3d
+    _G3D_OK = fem_eigen_3d_available()
+except Exception:
+    _G3D_OK = False
+
+st.divider()
+st.subheader("⑥ 三维梁格 · 三跨连续箱梁（施工阶段 + 活载）")
+
+if not _G3D_OK:
+    st.info(
+        "三维求解器不可用：需要 FEM-Eigen 的 `build/example_3d_grillage.exe`。"
+        "可用环境变量 `FEM_EIGEN_DIR` 指定内核目录。"
+    )
+else:
+    _g = st.session_state.get("g3d_params", {})
+    _c1, _c2, _c3, _c4, _c5 = st.columns(5)
+    with _c1:
+        _sp1 = st.number_input("边跨 (m)", 10.0, 60.0, float(_g.get("sp1", 30.0)), 5.0,
+                               key="g3d_sp1")
+        _sp2 = st.number_input("中跨 (m)", 20.0, 120.0, float(_g.get("sp2", 50.0)), 5.0,
+                               key="g3d_sp2")
+    with _c2:
+        _Bw = st.number_input("箱宽 B (m)", 6.0, 20.0, float(_g.get("B", 12.0)), 0.5,
+                              key="g3d_B")
+        _hg = st.number_input("梁高 h (m)", 1.2, 5.0, float(_g.get("h", 2.5)), 0.1,
+                              key="g3d_h")
+    with _c3:
+        _tf = st.number_input("顶/底板厚 (m)", 0.15, 0.6, float(_g.get("tf", 0.28)),
+                              0.01, key="g3d_tf")
+        _tw = st.number_input("腹板厚 (m)", 0.2, 0.8, float(_g.get("tw", 0.45)), 0.05,
+                              key="g3d_tw")
+    with _c4:
+        _qd = st.number_input("桥面均布 q (kN/m)", 20.0, 500.0,
+                              float(_g.get("q", 100.0)), 10.0, key="g3d_q")
+        _panel = st.number_input("横梁间距 (m)", 1.0, 5.0, float(_g.get("panel", 2.5)),
+                                 0.5, key="g3d_panel")
+    with _c5:
+        _staged = st.checkbox("逐跨施工（3 阶段）", value=True, key="g3d_staged")
+        _lane = st.checkbox("JTG D60 车道活载", value=True, key="g3d_lane")
+
+    _params_now = dict(sp1=_sp1, sp2=_sp2, B=_Bw, h=_hg, tf=_tf, tw=_tw,
+                       q=_qd, panel=_panel, staged=_staged, lane=_lane)
+    if _params_now != _g:
+        st.session_state["g3d_params"] = _params_now
+        st.session_state.pop("g3d_result", None)      # 参数变 → 结果过期
+
+    if st.button("构建梁格并求解（FEM-Eigen 3D）", key="g3d_solve"):
+        with st.spinner("构建 → 导出 .dat → example_3d_grillage.exe 求解 …"):
+            try:
+                _m3 = build_box_grillage_3d(
+                    spans=(_sp1, _sp2, _sp1), B=_Bw, h=_hg, tf=_tf, tw=_tw,
+                    n_lines=3, panel=_panel, q_deck=_qd * 1000.0,
+                    staged=_staged,
+                    lane_code="JTG_D60" if _lane else "")
+                _r3 = solve_3d(_m3, out_dir="out/g3d", dat_name="grillage.dat")
+                st.session_state["g3d_result"] = _r3
+                st.session_state["g3d_stats"] = _m3.stats()
+                st.session_state["g3d_dat"] = _m3.to_dat()
+                # 支座/跨中节点索引：按中梁线（2001..）的实际节点 x 推
+                _cl = sorted(n.id for n in _m3.nodes if 2000 < n.id < 3000)
+                _clx = [next(n.x for n in _m3.nodes if n.id == i) for i in _cl]
+                _sup_x = [0.0, _sp1, _sp1 + _sp2, 2 * _sp1 + _sp2]
+                _sup_nodes = [min(range(len(_clx)),
+                                  key=lambda k: abs(_clx[k] - sx)) for sx in _sup_x]
+                _mid_i = (_sup_nodes[1] + _sup_nodes[2]) // 2
+                st.session_state["g3d_meta"] = {
+                    "mid_node": 2000 + _mid_i,
+                    "sup_nodes": _sup_nodes,
+                    "n_line_nodes": len(_cl),
+                }
+            except Exception as _e:
+                st.error(f"三维求解失败：{_e}")
+
+    _r3 = st.session_state.get("g3d_result")
+    if _r3:
+        _stats = st.session_state.get("g3d_stats", {})
+        _meta = st.session_state.get("g3d_meta", {})
+        _live = _r3.get("live", {})
+
+        _m1, _m2, _m3c, _m4 = st.columns(4)
+        _m1.metric("节点 / 单元",
+                   f"{_stats.get('nodes', 0)} / {_stats.get('elements', 0)}")
+        _m1.metric("施工阶段", f"{_stats.get('stages', 0)}")
+        _dw = _r3["disp"].get((_meta.get("mid_node", 2022), 3), (0, 0))
+        _m2.metric("中跨跨中包络挠度", f"{_dw[0] * 1000:.2f} mm")
+        if _live:
+            _lv = _live[max(_live)][1]
+            _m3c.metric("成桥活载包络（影响点）", f"{_lv * 1000:.2f} mm")
+        _m4.metric("梁内力包络单元数", f"{len(_r3['beam'])}")
+
+        # ---- 中梁线包络挠度曲线（节点索引取自 meta，适配任意跨径）----
+        _xx, _yy = [], []
+        for _nid in range(2001, 2001 + _meta.get("n_line_nodes", 45)):
+            _w = _r3["disp"].get((_nid, 3))
+            if _w is None:
+                continue
+            _xx.append(_nid - 2000)
+            _yy.append(_w[0] * 1000)
+        if _yy:
+            fig, ax = plt.subplots(figsize=(10, 3.2))
+            ax.plot(_xx, _yy, "-o", ms=3, color="#185FA5", lw=1.2)
+            for _si in _meta.get("sup_nodes", []):
+                ax.axvline(x=_si, color="#A32D2D", ls="--", lw=0.8)
+            ax.set_xlabel("中梁线节点序号")
+            ax.set_ylabel("包络挠度 min (mm)")
+            ax.set_title("三跨连续箱梁 · 中梁线位移包络（竖向，向下为负）")
+            ax.grid(alpha=0.3)
+            st.pyplot(fig)
+
+        if _live:
+            st.markdown("**活载包络（JTG D60，影响点 = 中跨跨中）**："
+                        + "　".join(
+                            f"阶段{k}: {v[1]*1000:.2f} mm"
+                            for k, v in sorted(_live.items())))
+
+        with st.expander("查看 3D .dat（fem_3d new format）"):
+            st.code(st.session_state.get("g3d_dat", ""), language="text")
+    else:
+        st.caption("调整参数后点击求解；结果随参数自动过期。")
