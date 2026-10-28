@@ -63,17 +63,18 @@ from model_spec import ModelSpec, Support
 from section_lib import section_properties
 
 # ---------------------------------------------------------------- 路径配置
-# FEM-Eigen 内核目录自动探测（按优先级）。历史上它搬过家：
-#   D:\AI-work\FEM-Eigen （旧家，已不存在）
-#   C:\Users\Thinkpad\WorkBuddy AI\2026-10-06-17-19-31\FEM-Eigen （当前主版本，git 管理）
+# FEM-Eigen 内核目录自动探测（按优先级）。它搬过两次家：
+#   D:\AI-work\FEM-Eigen （2026-10-28 起的主家，P3 内核攻坚在此进行）
+#   C:\Users\Thinkpad\WorkBuddy AI\2026-10-06-17-19-31\FEM-Eigen （旧家，
+#     位于 WorkBuddy 会话目录内，已冻结为历史快照，仅作兜底）
 # 优先级：环境变量 FEM_EIGEN_DIR > 逐一探测候选目录。
 # 判定标准：目录下存在 build/example_mixed.exe（或任一求解器候选）。
 import os as _os
 
 _FEM_EIGEN_DIR_CANDIDATES = [
     Path(_os.environ.get("FEM_EIGEN_DIR", "")) if _os.environ.get("FEM_EIGEN_DIR") else None,
-    Path(r"C:\Users\Thinkpad\WorkBuddy AI\2026-10-06-17-19-31\FEM-Eigen"),
     Path(r"D:\AI-work\FEM-Eigen"),
+    Path(r"C:\Users\Thinkpad\WorkBuddy AI\2026-10-06-17-19-31\FEM-Eigen"),
     Path(r"D:\AI-work\前处理\FEM-Eigen"),
 ]
 
