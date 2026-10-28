@@ -53,6 +53,12 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 ## 路线图
 
 - [x] **P0** 修复 FEM-Eigen 内核路径断链（多候选自动探测）——2026-10-28
+- [x] **P1** ModelDoc 3D 化（第一步）：`model_spec_3d.py`（BEAM/BEAM7/TRUSS/CABLE +
+       3D 实常数 + 6 自由度边界 + 施工阶段 + to_dat 3D 导出）、`grillage_3d.py`
+       （三跨连续箱梁空间梁格建造器，含横隔板与 Hambly 横向条带刚度）、
+       `fem_eigen_3d.py`（对接 example_3d_grillage.exe 求解与包络解析）——
+       2026-10-28，`verify_grillage_3d.py` 12/12 全绿：中跨跨中挠度 8.21mm
+       vs anastruct 理论 8.11mm（1.2%），与三弯矩闭式解独立吻合
 - [ ] **P1** ModelDoc 3D 化：3D ModelSpec（IY/IZ/J/IW 截面）、X20 桥型建造器移植、
        3D .dat 导出；基准 = 三跨连续箱梁 3D 梁格（对照 FEM-Eigen 黄金基线
        `bridge_3d_grillage`）
