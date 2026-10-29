@@ -41,6 +41,164 @@ def fmt(v: float) -> str:
     return f"{v:.10g}"
 
 
+# ---------------------------------------------------------------- 紧凑输出
+# 内核 readModel3D 支持两条压缩语法（见 fem_3d.hpp 的 crEvalToken）：
+#
+#     *FILL <首节点> <末节点>        等间距节点只写首末两点，中间点由内核插值
+#     *DO I a b ... *ENDDO           规则排列的单元用索引表达式展开
+#
+# 压缩的目的**不是**把文件弄小，而是让编号规律可见：一座斜拉桥 80 根索、
+# 上百个梁段时，逐行 dat 有几千行，人工核对锚点与单元号几乎不可能；压缩后
+# "第 k 号梁段连接 k 与 k+1 号节点" 是一眼能看出来的。
+#
+# 但压缩必须**可逆**：内核读回来的模型要与逐行写法逐字段相同。因此
+#   · 只在"严格等距 / 严格等差"时才压缩，判据宁紧勿松——压错了会静默
+#     移动节点（坐标差几微米），力学上看不出来，事后无法追查；
+#   · 带单元级附加项（W=/L0=）的单元一律单行：*DO 的循环体每轮是同一行
+#     文本，表达不了"只有某一根索的 W 不同"。
+_FILL_TOL = 1e-9
+
+
+def _consecutive_runs(ids: list[int]) -> list[tuple[int, int]]:
+    """把升序整数序列切成连续段（闭区间）。"""
+    out: list[tuple[int, int]] = []
+    if not ids:
+        return out
+    start = prev = ids[0]
+    for x in ids[1:]:
+        if x == prev + 1:
+            prev = x
+            continue
+        out.append((start, prev))
+        start = prev = x
+    out.append((start, prev))
+    return out
+
+
+def _compress_node_lines(nodes) -> list[str]:
+    """节点段压缩：连续 id 且 x/y/z 等步长（≥3 点）时写首末两点 + *FILL。"""
+    ns = sorted(nodes, key=lambda n: n.id)
+    lines: list[str] = []
+
+    def one(n) -> str:
+        return f"{n.id} {fmt(n.x)} {fmt(n.y)} {fmt(n.z)}"
+
+    def step_close(a, b, c) -> bool:
+        """a→b 与 b→c 的两步是否同长（容差随坐标量级放大）。"""
+        scale = max(1.0, abs(a.x), abs(b.x), abs(c.x), abs(a.y), abs(b.y),
+                    abs(c.y), abs(a.z), abs(b.z), abs(c.z))
+        tol = _FILL_TOL * scale
+        return (abs((b.x - a.x) - (c.x - b.x)) <= tol
+                and abs((b.y - a.y) - (c.y - b.y)) <= tol
+                and abs((b.z - a.z) - (c.z - b.z)) <= tol)
+
+    i = 0
+    while i < len(ns):
+        group = [ns[i]]
+        j = i + 1
+        while j < len(ns) and ns[j].id == group[-1].id + 1:
+            group.append(ns[j])
+            j += 1
+
+        # 连续 id 段内再按"步长相同"切分。边跨 16 段、主跨 32 段时，步长会
+        # 在跨界处从 5 m 跳到 6.25 m；若整段判等距，主梁一段都压不动
+        # （实测压缩率只有 80%，且大模型上几乎没有收益）。
+        cuts = [0]
+        for k in range(1, len(group) - 1):
+            if not step_close(group[k - 1], group[k], group[k + 1]):
+                cuts.append(k)
+        cuts.append(len(group) - 1)
+
+        # 相邻子段共用转折点，只写一次：*FILL 只要求首末点已定义，
+        # 而转折点在上一个子段已经写过。
+        prev_id: int | None = None
+        for a, b in zip(cuts, cuts[1:]):
+            seg = group[a:b + 1]
+            if len(seg) >= 3:
+                if seg[0].id != prev_id:
+                    lines.append(one(seg[0]))
+                lines.append(one(seg[-1]))
+                lines.append(f"*FILL {seg[0].id} {seg[-1].id}")
+                prev_id = seg[-1].id
+            else:
+                for g in seg:
+                    if g.id != prev_id:
+                        lines.append(one(g))
+                    prev_id = g.id
+        i = j
+    return lines
+
+
+def _expr(coeff: int, const: int) -> str:
+    """生成 *DO 体内可用的索引表达式（内核支持 + - * / 与括号）。"""
+    if coeff == 0:
+        return str(const)
+    body = "I" if coeff == 1 else f"{coeff}*I"
+    if const == 0:
+        return body
+    return f"{body}+{const}" if const > 0 else f"{body}-{abs(const)}"
+
+
+def _fit_linear(values: list[int], ids: list[int]) -> tuple[int, int] | None:
+    """拟合 values = a*id + b（a ≥ 0）。"""
+    if len(values) < 2:
+        return None
+    a = values[1] - values[0]
+    if a < 0:
+        return None
+    b = values[0] - a * ids[0]
+    if all(v == a * i + b for v, i in zip(values, ids)):
+        return a, b
+    return None
+
+
+def _compress_element_lines(items: list[tuple[int, int, int, str]]) -> list[str]:
+    """单元段压缩：items = [(id, n1, n2, extra)]。
+
+    extra 非空（单元级 W=/L0= 覆盖）的单元不参与循环，单独成行。
+    每段取"最长可拟合"的连续 id 段，与 X20 导出器的策略一致：贪心取最长，
+    因为一段 *DO 的表达力只取决于首末，越长越省。
+    """
+    singles = [t for t in items if t[3]]
+    loops = sorted((t[:3] for t in items if not t[3]), key=lambda t: t[0])
+    body: list[str] = []
+
+    k = 0
+    while k < len(loops):
+        best: tuple[int, int, tuple[int, int], tuple[int, int]] | None = None
+        best_end = k
+        for m in range(k + 3, len(loops) + 1):
+            seg = loops[k:m]
+            ids = [t[0] for t in seg]
+            if any(ids[p + 1] != ids[p] + 1 for p in range(len(ids) - 1)):
+                break                      # 再往后也不可能连续
+            f1 = _fit_linear([t[1] for t in seg], ids)
+            if f1 is None:
+                continue
+            f2 = _fit_linear([t[2] for t in seg], ids)
+            if f2 is None:
+                continue
+            best = (ids[0], ids[-1], f1, f2)
+            best_end = m
+        if best is not None:
+            first, last, f1, f2 = best
+            body.append(f"*DO I {first} {last}")
+            body.append(f"*EN,I,{_expr(f1[0], f1[1])},{_expr(f2[0], f2[1])}")
+            body.append("*ENDDO")
+            k = best_end
+        else:
+            t = loops[k]
+            body.append(f"*EN,{t[0]},{t[1]},{t[2]}")
+            k += 1
+
+    # 带附加项的单元按 id 插回（数量通常极少，直接追加在末尾会打乱编号顺序，
+    # 而编号顺序本身是核对的线索，所以按 id 归并）
+    out = list(body)
+    for t in sorted(singles, key=lambda t: t[0]):
+        out.append(f"*EN,{t[0]},{t[1]},{t[2]} {t[3]}")
+    return out
+
+
 # ---------------------------------------------------------------- 基础构件
 class Node3D(BaseModel):
     id: int
@@ -301,7 +459,7 @@ class ModelSpec3D(BaseModel):
         }
 
     # -------------------------------------------------- 导出
-    def to_dat(self) -> str:
+    def to_dat(self, compact: bool = True) -> str:
         """导出 FEM-Eigen 3D new-format .dat（fem_3d.hpp readModel3D）。
 
         CABLE 的两种导出行为（重要）：
@@ -309,15 +467,24 @@ class ModelSpec3D(BaseModel):
           CABLE 映射为 TRUSS —— 线性内核没有只受拉单元，索会被当成杆。
         - 有 cable_bridge（走 **非线性** cable_solver）时，CABLE 原样导出，
           并附带 *CABLE_BRIDGE / *CABLE 工况段：内核按只受拉 + 垂度处理。
+
+        compact（默认 True）：节点走 *FILL、单元走 *DO 循环，见模块顶部
+        "紧凑输出"一节。`compact=False` 逐行输出，用于排查——两种写法必须
+        解析出同一个模型，这是 test_3d [18] 的对拍内容。
         """
         L: list[str] = []
         nonlinear = self.cable_bridge is not None
         L.append(f"# {self.title}")
         L.append("# 由 BridgeStudio 导出（FEM-Eigen 3D new format，单位 m/N/Pa）")
+        if compact:
+            L.append("# 紧凑写法：*FILL 补等间距节点、*DO 展开规则单元（内核可读回）")
 
         L.append("*NODE")
-        for n in sorted(self.nodes, key=lambda n: n.id):
-            L.append(f"{n.id} {fmt(n.x)} {fmt(n.y)} {fmt(n.z)}")
+        if compact:
+            L.extend(_compress_node_lines(self.nodes))
+        else:
+            for n in sorted(self.nodes, key=lambda n: n.id):
+                L.append(f"{n.id} {fmt(n.x)} {fmt(n.y)} {fmt(n.z)}")
 
         L.append("*ET")
         cable_mapped = False
@@ -347,17 +514,25 @@ class ModelSpec3D(BaseModel):
                     kv.append(f"{key}={fmt(v)}")
             L.append(" ".join(kv))
 
-        # 单元：按 TYPE/MAT/REAL 状态机输出（内核按激活三元组装单元）
-        state = (None, None, None)
+        # 单元：按 (type, mat, real) 分组，每组只激活一次三元组。
+        # 用分组而不是"状态机逐行切换"，是因为交错编号（如梁段 1001 与索
+        # 9001 交替）会让状态机反复重写 *TYPE/*MAT/*REAL，既啰嗦又打断
+        # 后面 *DO 的连续性——连续性是压缩的唯一前提。
+        groups: dict[tuple[int, int, int], list[tuple[int, int, int, str]]] = {}
         for e in sorted(self.elements, key=lambda e: e.id):
             t = self._etype(e.etype)
-            cur = (t.id, t.mat, t.real)
-            if cur != state:
-                L.append(f"*TYPE,{t.id}")
-                L.append(f"*MAT,{t.mat}")
-                L.append(f"*REAL,{t.real}")
-                state = cur
-            L.append(f"*EN,{e.id},{e.n1},{e.n2}")
+            key = (t.id, t.mat, t.real)
+            groups.setdefault(key, []).append((e.id, e.n1, e.n2, ""))
+
+        for (tid, mat, real), items in groups.items():
+            L.append(f"*TYPE,{tid}")
+            L.append(f"*MAT,{mat}")
+            L.append(f"*REAL,{real}")
+            if compact:
+                L.extend(_compress_element_lines(items))
+            else:
+                for eid, n1, n2, extra in items:
+                    L.append(f"*EN,{eid},{n1},{n2}" + (f" {extra}" if extra else ""))
 
         if self.boundaries:
             L.append("*BOUNDARY")

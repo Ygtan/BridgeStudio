@@ -77,8 +77,11 @@ def offline_checks(m) -> None:
     check("支承断面精确落点", ok_pos, "节点 i=0/12/32/44 ↔ x=0/30/80/110")
 
     # .dat 文本检查（按节解析，避免把 STAGE_LOAD 行误计为节点）
-    text = m.to_dat()
-    lines = text.splitlines()
+    # 完整性用**逐行版**核对（1 行 = 1 个单元，最直白）；压缩版另行核对
+    # "确实压缩了"——压缩后行数不再等于单元数，这是设计而非缺陷。
+    text_full = m.to_dat(compact=False)
+    text_cmp = m.to_dat(compact=True)
+    lines = text_full.splitlines()
     def section_lines(header: str) -> list[str]:
         out, inside = [], False
         for ln in lines:
@@ -92,9 +95,13 @@ def offline_checks(m) -> None:
     n_en_lines = sum(1 for ln in lines if ln.startswith("*EN,"))
     active_line = next(ln for ln in lines if "ACTIVE=" in ln)
     n_active = len(active_line.split("ACTIVE=")[1].split(","))
-    check(".dat 节点行数", n_node_lines == m.n_nodes, f"{n_node_lines}")
-    check(".dat 单元行数", n_en_lines == m.n_elements, f"{n_en_lines}")
+    check(".dat 节点行数（逐行）", n_node_lines == m.n_nodes, f"{n_node_lines}")
+    check(".dat 单元行数（逐行）", n_en_lines == m.n_elements, f"{n_en_lines}")
     check("ACTIVE 覆盖全部单元", n_active == m.n_elements, f"{n_active}")
+    check("紧凑导出生效（*FILL + *DO 且行数更少）",
+          "*FILL" in text_cmp and "*DO I" in text_cmp
+          and len(text_cmp.splitlines()) < len(lines),
+          f"{len(text_cmp.splitlines())} 行 / 逐行 {len(lines)} 行")
     check("边界条件数", len(m.boundaries) == 9,
           f"{len(m.boundaries)} = 4 断面×2 支座 + 1 纵向固定")
 
