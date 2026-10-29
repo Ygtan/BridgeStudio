@@ -153,6 +153,28 @@ def main() -> int:
                     check("⑦计算书含三张关键表", len(_doc.tables) >= 10,
                           f"{len(_doc.tables)} 张表")
 
+            # 第三方复核：点按钮 → 三份文件落盘（不落盘就是死按钮）
+            _eb = next((b for b in at.button if b.key == "cb_export_btn"), None)
+            check("⑦三方复核按钮存在", _eb is not None)
+            if _eb is not None:
+                _eb.click().run()
+                _ex = at.session_state.get("cb_export")
+                _paths = (_ex or {}).get("paths", {})
+                _ok = bool(_paths) and all(Path(p).exists() and Path(p).stat().st_size > 500
+                                           for p in _paths.values())
+                check("⑦ANSYS/Abaqus/MIDAS 三份文件已落盘", _ok,
+                      "、".join(Path(p).name for p in _paths.values()) or "—")
+                if _ok:
+                    _ans = Path(_paths["ansys"]).read_text(encoding="utf-8")
+                    _inp = Path(_paths["abaqus"]).read_text(encoding="utf-8")
+                    check("⑦ANSYS 有单元且有 FILL 压缩",
+                          _ans.count("\nEN,") > 100 and "FILL," in _ans,
+                          f"{_ans.count(chr(10) + 'EN,')} 个单元")
+                    check("⑦Abaqus 截面带方向向量", "0., 0., -1." in _inp)
+                    check("⑦导出无信息丢失告警堆积",
+                          len((_ex or {}).get("warnings", [])) <= 2,
+                          f"{len((_ex or {}).get('warnings', []))} 条")
+
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 74)
     print(f"  {n_pass}/{len(PASS)} 通过")

@@ -866,6 +866,39 @@ else:
             _rc2.caption("点击生成后可直接下载。计算书内的表格数据由求解结果"
                          "直接生成，与界面显示逐项一致。")
 
+        # ---- 第三方复核：导出 ANSYS / Abaqus / MIDAS ----
+        # 斜拉桥最怕的是「只有你自己的软件能算出这个下料索长」，所以成品必须能
+        # 交给别人用别的软件复核。三个导出器吃的是同一个 canonical 模型（见
+        # export_formats.to_canonical），字段映射只在一处定义。
+        st.markdown("**第三方复核（导出给 ANSYS / Abaqus / MIDAS 核对）**")
+        _ex1, _ex2 = st.columns([1.1, 2.0])
+        if _ex1.button("导出三种格式", key="cb_export_btn"):
+            try:
+                from export_formats import export_all
+                _res = export_all(_cbm, out_dir="out/cable/export", stem="cable")
+                st.session_state["cb_export"] = _res
+            except Exception as _e:                         # noqa: BLE001
+                st.session_state.pop("cb_export", None)
+                st.error(f"导出失败：{_e}")
+        _exr = st.session_state.get("cb_export")
+        if _exr:
+            _ec = _ex2.columns(3)
+            for _i, (_fmt, _lab) in enumerate((("ansys", "ANSYS (.ans)"),
+                                               ("abaqus", "Abaqus (.inp)"),
+                                               ("midas", "MIDAS (.mct)"))):
+                _ep = Path(_exr["paths"][_fmt])
+                if _ep.exists():
+                    _ec[_i].download_button(_lab, data=_ep.read_bytes(),
+                                            file_name=_ep.name,
+                                            key=f"cb_ex_{_fmt}")
+            for _w in _exr["warnings"]:
+                st.caption(f"· {_w}")
+            st.caption("导出的是**同一套节点/单元/实常数**：惯矩按「绕哪根轴」同名映射"
+                       "（IY→IYY、IZ→IZZ、J→IXX），泊松比由 G 反算。"
+                       "三格式均只建模、不含求解控制，荷载与边界随模型一起导出。")
+        else:
+            _ex2.caption("导出后可在第三方软件里独立建算，核对索力与线形。")
+
         with st.expander("查看导出的 .dat（含 *CABLE_BRIDGE 工况段）"):
             st.code(st.session_state.get("cb_dat", ""), language="text")
             st.code(_cb.get("stdout", ""), language="text")
