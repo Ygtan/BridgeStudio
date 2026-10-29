@@ -203,6 +203,13 @@ def main() -> int:
                 check("导出无告警堆积", len((_ex or {}).get("warnings", [])) <= 2,
                       f"{len((_ex or {}).get('warnings', []))} 条")
 
+    print("\n[从三维切回单梁：两条链路不串味]")
+    at.button(key="ex0").click().run()
+    check("无异常", not _errors(at), _errors(at)[:1])
+    check("类型回到 beam", at.session_state["doc"].kind == "beam", _subs(at)[:50])
+    check("⑤二维区块回来了", "FEM-Eigen 二维求解" in _subs(at), _subs(at)[:80])
+    check("三维区块消失", "模型与求解" not in _subs(at))
+
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(PASS)} 通过")
