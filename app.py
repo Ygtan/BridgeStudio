@@ -706,7 +706,7 @@ else:
         st.session_state.pop("cb_result", None)     # 参数变 → 结果过期
 
     if st.button("求解成桥态（非线性闭环）", key="cb_solve", type="primary"):
-        with st.spinner("建桥 → 导出 .dat → cable_solver 几何非线性成桥态 …"):
+        with st.spinner("建桥 → 校验 → 导出 .dat → cable_solver 几何非线性成桥态 …"):
             try:
                 _cbm, _cbinfo = build_cable_stayed_3d(
                     main_span=_cb_Lm, side_span=_cb_Ls, tower_height=_cb_Ht,
@@ -714,15 +714,32 @@ else:
                     q_deck=_cb_q * 1e3,
                     cable_area_mm2=_cb_A, method=_method_key,
                 )
-                _cbres = solve_cable_bridge(_cbm, out_dir="out/cable",
-                                            dat_name="cable.dat")
-                st.session_state["cb_result"] = _cbres
-                st.session_state["cb_model"] = _cbm
-                st.session_state["cb_info"] = _cbinfo
-                st.session_state["cb_dat"] = _cbm.to_dat()
+                # 求解前先校验引用完整性。pydantic 只能保证「字段类型对」，
+                # 管不了「单元指向不存在的节点」「索两端等高」这类错——它们
+                # 到内核里会变成难回溯的崩溃，或者静默算错。
+                from model_spec_3d import validate_model_3d
+                _verrs, _vwarns = validate_model_3d(_cbm)
+                st.session_state["cb_validate"] = (_verrs, _vwarns)
+                if _verrs:
+                    st.session_state["cb_result"] = None
+                    st.error("模型校验未通过，已阻止求解：\n\n- "
+                             + "\n- ".join(_verrs[:6]))
+                else:
+                    _cbres = solve_cable_bridge(_cbm, out_dir="out/cable",
+                                                dat_name="cable.dat")
+                    st.session_state["cb_result"] = _cbres
+                    st.session_state["cb_model"] = _cbm
+                    st.session_state["cb_info"] = _cbinfo
+                    st.session_state["cb_dat"] = _cbm.to_dat()
             except Exception as _e:
                 st.session_state["cb_result"] = None
                 st.error(f"成桥态求解失败：{_e}")
+
+    _vres = st.session_state.get("cb_validate")
+    if _vres and _vres[1]:
+        with st.expander(f"模型校验提示（{len(_vres[1])} 条，不影响求解）"):
+            for _vw in _vres[1][:12]:
+                st.caption(f"· {_vw}")
 
     _cb = st.session_state.get("cb_result")
     if _cb:

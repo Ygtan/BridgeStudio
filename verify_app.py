@@ -122,6 +122,11 @@ def main() -> int:
         check("⑦结果已缓存", _cr is not None)
         if _cr:
             _md = _cr["meta"]
+            _v = at.session_state.get("cb_validate")
+            check("⑦求解前跑了模型校验且无错误",
+                  _v is not None and not _v[0],
+                  f"{len(_v[0]) if _v else '?'} 错误 / "
+                  f"{len(_v[1]) if _v else '?'} 提示")
             check("⑦收敛", bool(_cr.get("converged")),
                   f"{_md.get('iterations')} 轮 / {_md.get('elapsed_ms'):.0f} ms")
             check("⑦闭合误差 < 1e-6 m", _md.get("closure_err", 1) < 1e-6,

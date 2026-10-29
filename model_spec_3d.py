@@ -603,3 +603,190 @@ class ModelSpec3D(BaseModel):
 
         L.append("*END")
         return "\n".join(L) + "\n"
+
+
+# ---------------------------------------------------------------- 模型校验
+def validate_model_3d(model: ModelSpec3D) -> tuple[list[str], list[str]]:
+    """检查模型的引用完整性与可解性，返回 ``(errors, warnings)``。
+
+    为什么 pydantic 不够：``ModelSpec3D`` 只能保证「字段类型对、A>0」，
+    它管不了**引用**——单元指向不存在的节点、etype 指向不存在的实常数、
+    索两端等高。这些错误在 pydantic 眼里完全合法，却会在内核里变成
+    「节点缺失」「局部坐标退化」这类难以回溯的崩溃，或者更糟：静默算错。
+
+    约定与手册 §7 一致：**返回中文列表，不抛异常**。界面上直接把 errors
+    显示出来即可，不需要 try/except 包一层——校验本身就是给用户看的。
+
+    检查项分两级：
+      errors   不可求解（引用断了、几何退化、无约束）
+      warnings 可求解但很可能是笔误（孤立节点、重复单元、索等高差、W=0）
+
+    后面三项 warnings 是本项目里真实踩过的坑，不是教科书清单：
+      · 孤立节点会被内核的「悬空自由度」处理逻辑硬约束住，塔顶变刚体；
+      · 索两端等高会让竖向分量 ez 退化为 0，目标索力反算直接除零；
+      · 索 W=0 时 Ernst 模量退化成无垂度，成桥态索力偏高而没有任何报错。
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    # ---------------------------------------------------------- 编号唯一性
+    def duplicates(kind: str, ids: list[int]) -> None:
+        seen: set[int] = set()
+        dup: set[int] = set()
+        for i in ids:
+            if i in seen:
+                dup.add(i)
+            seen.add(i)
+        if dup:
+            errors.append(f"{kind}编号重复：{sorted(dup)}")
+
+    duplicates("节点", [n.id for n in model.nodes])
+    duplicates("材料", [m.id for m in model.materials])
+    duplicates("实常数", [r.id for r in model.reals])
+    duplicates("单元类型", [t.id for t in model.etypes])
+    duplicates("单元", [e.id for e in model.elements])
+
+    if not model.nodes:
+        errors.append("模型没有节点")
+    if not model.elements:
+        errors.append("模型没有单元")
+
+    node_ids = {n.id for n in model.nodes}
+    mat_ids = {m.id for m in model.materials}
+    real_ids = {r.id for r in model.reals}
+    et_ids = {t.id for t in model.etypes}
+    et_by_id = {t.id: t for t in model.etypes}
+    real_by_id = {r.id: r for r in model.reals}
+    node_xyz = {n.id: n for n in model.nodes}
+
+    # ---------------------------------------------------------- 引用完整性
+    for t in model.etypes:
+        if t.mat not in mat_ids:
+            errors.append(f"单元类型 {t.id} 引用了不存在的材料 {t.mat}")
+        if t.real not in real_ids:
+            errors.append(f"单元类型 {t.id} 引用了不存在的实常数 {t.real}")
+
+    zero_len: list[int] = []
+    for e in model.elements:
+        if e.etype not in et_ids:
+            errors.append(f"单元 {e.id} 引用了不存在的单元类型 {e.etype}")
+        missing = [n for n in (e.n1, e.n2) if n not in node_ids]
+        if missing:
+            errors.append(f"单元 {e.id} 引用了不存在的节点 {missing}")
+            continue
+        if e.n1 == e.n2:
+            errors.append(f"单元 {e.id} 的起止节点相同（{e.n1}）")
+            continue
+        a, b = node_xyz[e.n1], node_xyz[e.n2]
+        L = ((b.x - a.x) ** 2 + (b.y - a.y) ** 2 + (b.z - a.z) ** 2) ** 0.5
+        if L <= 1e-9:
+            zero_len.append(e.id)
+
+    if zero_len:
+        errors.append(
+            f"单元长度为 0（两节点坐标重合，局部坐标退化）：{sorted(zero_len)[:8]}"
+            + ("…" if len(zero_len) > 8 else ""))
+
+    # ---------------------------------------------------------- 边界与荷载
+    for b in model.boundaries:
+        if b.node not in node_ids:
+            errors.append(f"边界条件引用了不存在的节点 {b.node}")
+        lo, hi = b.dofs
+        if not (1 <= lo <= hi <= 6):
+            errors.append(f"节点 {b.node} 的自由度区间 {lo}-{hi} 越界（应为 1~6）")
+        if b.k < 0:
+            errors.append(f"节点 {b.node} 的弹性支承刚度不能为负（k={b.k:g}）")
+
+    for ld in model.loads:
+        if ld.node not in node_ids:
+            errors.append(f"节点荷载引用了不存在的节点 {ld.node}")
+        if not (1 <= ld.dof <= 6):
+            errors.append(f"节点 {ld.node} 的荷载自由度 {ld.dof} 越界（应为 1~6）")
+
+    for s in model.stages:
+        for eid in list(s.activate) + list(s.deactivate):
+            if eid not in {e.id for e in model.elements}:
+                errors.append(f"阶段 {s.id} 激活/去激活了不存在的单元 {eid}")
+
+    # ---------------------------------------------------------- 索专用检查
+    # 索的两端若等高，竖向分量 ez = Δz/L = 0，目标索力 T = q·t/ez 会除零。
+    # 这个退化在 pydantic 看来完全正常，进内核才变成 inf/NaN。
+    cable_elems: dict[int, "Element3D"] = {}
+    for e in model.elements:
+        t = et_by_id.get(e.etype)
+        if t is not None and t.kind == "CABLE":
+            cable_elems[e.id] = e
+
+    for eid, e in cable_elems.items():
+        if e.n1 not in node_ids or e.n2 not in node_ids:
+            continue
+        a, b = node_xyz[e.n1], node_xyz[e.n2]
+        if abs(b.z - a.z) <= 1e-9:
+            errors.append(f"索单元 {eid} 两端等高（z 相同），竖向分量退化")
+        rc = real_by_id.get(et_by_id[e.etype].real)
+        if rc is not None:
+            if rc.W <= 0:
+                warnings.append(
+                    f"索单元 {eid} 所在实常数 W=0：垂度与 Ernst 模量退化为无垂度，"
+                    f"成桥态索力会偏高（且不会有任何报错）")
+            if rc.L0 > 0:
+                L = ((b.x - a.x) ** 2 + (b.y - a.y) ** 2 + (b.z - a.z) ** 2) ** 0.5
+                if abs(rc.L0 - L) / L > 0.05:
+                    warnings.append(
+                        f"索单元 {eid} 的无应力索长 L0={rc.L0:.4f} m 与几何长度 "
+                        f"{L:.4f} m 相差 {abs(rc.L0 - L) / L * 100:.1f}%")
+
+    if model.cable_bridge is not None:
+        for c in model.cable_bridge.cables:
+            if c.elem not in cable_elems:
+                errors.append(f"成桥态工况引用的单元 {c.elem} 不是索（或不存在）")
+
+    # ---------------------------------------------------------- 结构可解性
+    # 完全没有约束 → 6 个刚体位移，K 奇异。这是最常见也最难看出的一类错。
+    if not model.boundaries:
+        has_spring = any(b.k > 0 for b in model.boundaries)
+        if not has_spring:
+            errors.append("模型没有任何边界约束：刚度矩阵奇异（6 个刚体位移）")
+
+    # ---------------------------------------------------------- 警告级
+    used_nodes: set[int] = set()
+    for e in model.elements:
+        used_nodes.add(e.n1)
+        used_nodes.add(e.n2)
+    lonely = sorted(node_ids - used_nodes)
+    if lonely:
+        warnings.append(
+            f"{len(lonely)} 个节点未被任何单元引用：{lonely[:8]}"
+            + ("…" if len(lonely) > 8 else "")
+            + "。内核会把它们的自由度硬约束住（塔顶因此变刚体）")
+
+    seen_pairs: dict[tuple[int, int, int], int] = {}
+    for e in model.elements:
+        key = (min(e.n1, e.n2), max(e.n1, e.n2), e.etype)
+        if key in seen_pairs:
+            warnings.append(
+                f"单元 {e.id} 与 {seen_pairs[key]} 连接同一对节点且类型相同（重复单元）")
+        else:
+            seen_pairs[key] = e.id
+
+    seen_dof: dict[tuple[int, int], int] = {}
+    for i, b in enumerate(model.boundaries):
+        for d in range(b.dofs[0], b.dofs[1] + 1):
+            key = (b.node, d)
+            if key in seen_dof:
+                warnings.append(
+                    f"节点 {b.node} 的自由度 {d} 被重复约束（多条约束取其一，易生歧义）")
+            seen_dof[key] = i
+
+    for r in model.reals:
+        if r.G > 0 and any(t.real == r.id and t.mat in mat_ids for t in model.etypes):
+            mats = [m for m in model.materials
+                    if any(t.real == r.id and t.mat == m.id for t in model.etypes)]
+            for m in mats:
+                nu = m.E / (2.0 * r.G) - 1.0
+                if not (0.0 < nu < 0.5):
+                    warnings.append(
+                        f"实常数 {r.id} 的 G={r.G:g} 与材料 {m.id} 的 E={m.E:g} "
+                        f"不自洽（反算泊松比 {nu:.3f}，超出 0~0.5）")
+
+    return errors, warnings
