@@ -39,13 +39,18 @@ from typing import Any, Callable, Literal
 
 from model_spec import Load, ModelSpec, Section, Support
 
-Kind = Literal["beam", "arch", "truss", "beam_bridge"]
+Kind = Literal["beam", "arch", "truss", "beam_bridge", "grillage3d", "cable_stayed"]
+
+#: 三维结构：走 FEM-Eigen 三维内核，而不是 2D 的 example_mixed。
+KINDS_3D: tuple[str, ...] = ("grillage3d", "cable_stayed")
 
 KIND_LABELS: dict[str, str] = {
     "beam": "单梁",
     "arch": "拱桥",
     "truss": "桁架桥",
     "beam_bridge": "梁桥",
+    "grillage3d": "三维梁格",
+    "cable_stayed": "斜拉桥成桥态",
 }
 
 KIND_HINTS: dict[str, str] = {
@@ -53,6 +58,8 @@ KIND_HINTS: dict[str, str] = {
     "拱桥": "arch",
     "桁架桥": "truss",
     "梁桥": "beam_bridge",
+    "三维梁格": "grillage3d",
+    "斜拉桥": "cable_stayed",
 }
 
 # 材料名 → (E, ρ)
@@ -103,6 +110,29 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "span": 40.0, "n_spans": 1, "udl": 20.0, "point": 0.0,
         "h": 2.0, "b": 8.0, "shape": "box",
         "material": "钢材 Q345", "self_weight": True,
+    },
+    # ---- 三维：参数名沿用建造器（sp1/sp2 而不是 span/n_spans）----
+    # 梁格是"三跨连续箱梁"专用建造器：三跨不对称就没有意义，
+    # 硬套 span+n_spans 会造出它表达不了的模型。
+    "grillage3d": {
+        "sp1": 30.0, "sp2": 50.0,          # 边跨 / 中跨 (m)
+        "B": 12.0, "h": 2.5, "tf": 0.28, "tw": 0.45,
+        "q": 100.0,                         # 全宽桥面均布 (kN/m，含自重)
+        "panel": 2.5,                       # 横梁间距 / 纵向离散 (m)
+        "n_lines": 3,                       # 纵梁线条数（奇数，含中梁线）
+        "staged": True,                     # 逐跨浇筑三阶段
+        "lane": True,                       # JTG D60 车道活载 + 影响线
+    },
+    "cable_stayed": {
+        "Lm": 200.0, "Ls": 80.0, "Ht": 60.0,
+        "n": 12,                            # 每塔每侧索数
+        "h": 2.5, "B": 12.0,
+        "q": 100.0,                         # 桥面恒载 (kN/m)
+        "A": 6000.0,                        # 单索面积 (mm²)
+        "method": "DECK",                   # DECK | RIGID | MINENERGY
+        "fpu": 1860.0,                       # 索破断强度 (MPa)
+        "tower_b": 3.0, "tower_h": 4.5,
+        "panel": 8.0,
     },
 }
 
@@ -204,6 +234,68 @@ FIELDS: dict[str, list[list[Field]]] = {
         ],
         [{"key": "self_weight", "label": "计入自重", "type": "bool"}],
     ],
+    "grillage3d": [
+        [
+            {"key": "sp1", "label": "边跨 (m)", "type": "float",
+             "min": 10.0, "max": 60.0, "step": 5.0},
+            {"key": "sp2", "label": "中跨 (m)", "type": "float",
+             "min": 20.0, "max": 120.0, "step": 5.0},
+            {"key": "B", "label": "箱宽 B (m)", "type": "float",
+             "min": 6.0, "max": 20.0, "step": 0.5},
+            {"key": "h", "label": "梁高 h (m)", "type": "float",
+             "min": 1.2, "max": 5.0, "step": 0.1},
+        ],
+        [
+            {"key": "tf", "label": "顶/底板厚 (m)", "type": "float",
+             "min": 0.15, "max": 0.6, "step": 0.01},
+            {"key": "tw", "label": "腹板厚 (m)", "type": "float",
+             "min": 0.2, "max": 0.8, "step": 0.05},
+            {"key": "q", "label": "桥面均布 q (kN/m)", "type": "float",
+             "min": 20.0, "max": 500.0, "step": 10.0},
+            {"key": "panel", "label": "纵向离散 / 横梁间距 (m)", "type": "float",
+             "min": 1.0, "max": 5.0, "step": 0.5},
+        ],
+        [
+            {"key": "n_lines", "label": "纵梁线条数（奇数）", "type": "int",
+             "min": 3, "max": 9, "step": 2},
+            {"key": "staged", "label": "逐跨施工（3 阶段）", "type": "bool"},
+            {"key": "lane", "label": "JTG D60 车道活载", "type": "bool"},
+        ],
+    ],
+    "cable_stayed": [
+        [
+            {"key": "Lm", "label": "主跨 (m)", "type": "float",
+             "min": 100.0, "max": 600.0, "step": 10.0},
+            {"key": "Ls", "label": "边跨 (m)", "type": "float",
+             "min": 30.0, "max": 300.0, "step": 5.0},
+            {"key": "Ht", "label": "塔高 (m)", "type": "float",
+             "min": 20.0, "max": 200.0, "step": 5.0},
+            {"key": "n", "label": "每塔每侧索数", "type": "int",
+             "min": 3, "max": 30, "step": 1},
+        ],
+        [
+            {"key": "h", "label": "主梁高 (m)", "type": "float",
+             "min": 1.2, "max": 6.0, "step": 0.1},
+            {"key": "B", "label": "主梁宽 (m)", "type": "float",
+             "min": 6.0, "max": 30.0, "step": 0.5},
+            {"key": "q", "label": "桥面恒载 (kN/m)", "type": "float",
+             "min": 20.0, "max": 500.0, "step": 10.0},
+            {"key": "A", "label": "单索面积 (mm²)", "type": "float",
+             "min": 1000.0, "max": 20000.0, "step": 500.0},
+        ],
+        [
+            {"key": "method", "label": "定索力方法", "type": "choice",
+             "choices": ["DECK", "RIGID", "MINENERGY"],
+             "fmt": {"DECK": "按恒载竖向分配", "RIGID": "刚性支承连续梁法",
+                     "MINENERGY": "最小弯曲能量法"}},
+            {"key": "fpu", "label": "索破断强度 (MPa)", "type": "float",
+             "min": 1200.0, "max": 2200.0, "step": 10.0},
+            {"key": "tower_b", "label": "塔柱宽 (m)", "type": "float",
+             "min": 1.5, "max": 10.0, "step": 0.5},
+            {"key": "tower_h", "label": "塔柱深 (m)", "type": "float",
+             "min": 2.0, "max": 12.0, "step": 0.5},
+        ],
+    ],
 }
 
 
@@ -229,16 +321,21 @@ def classify_text(text: str, hint: str | None = None) -> str:
     hint 来自界面的"结构类型"提示（"自动识别" 或具体桥型）；给了具体类型
     就完全跳过猜测——用户比自己写的分类器可靠。
 
-    顺序有讲究：先「拱」再「桁架」再「桥」，最后才落到单梁。
-    因为「拱桥」「桁架桥」都含「桥」，而「简支梁桥」含「梁」。
+    顺序有讲究：先「斜拉」再「拱」再「桁架」，然后「梁格」，最后才落到
+    普通桥/单梁。因为「拱桥」「桁架桥」「斜拉桥」都含「桥」，「简支梁桥」
+    含「梁」，而「三跨连续箱梁」这类描述里一个「桥」字都没有。
     """
     if hint and hint in KIND_HINTS:
         return KIND_HINTS[hint]
     t = text.strip()
+    if re.search(r"斜拉|拉索桥|斜拉索", t):
+        return "cable_stayed"
     if re.search(r"拱|矢高|矢跨比", t):
         return "arch"
     if re.search(r"桁架|truss", t, re.I):
         return "truss"
+    if re.search(r"梁格|连续箱梁|箱梁三维|空间梁格", t):
+        return "grillage3d"
     if "桥" in t:
         return "beam_bridge"
     return "beam"
@@ -268,17 +365,23 @@ class ModelDoc:
             merged.update(params)
         self.params: dict[str, Any] = merged
         self._model: Any = None
+        self._info: dict[str, Any] | None = None
 
     # ------------------------------------------------------------ 构建
 
     def build(self) -> "ModelDoc":
         """params → 展开模型。幂等，可反复调用。"""
+        self._info = None
         if self.kind == "beam":
             self._model = self._build_beam()
         elif self.kind == "arch":
             self._model = self._build_arch()
         elif self.kind == "truss":
             self._model = self._build_truss()
+        elif self.kind == "grillage3d":
+            self._model = self._build_grillage3d()
+        elif self.kind == "cable_stayed":
+            self._model = self._build_cable_stayed()
         else:
             self._model = self._build_beam_bridge()
         return self
@@ -288,6 +391,22 @@ class ModelDoc:
         if self._model is None:
             self.build()
         return self._model
+
+    @property
+    def info(self) -> dict[str, Any]:
+        """建造器给的派生量（支座 x、实际索数、索重…）。三维专用。"""
+        if self._model is None:
+            self.build()
+        return self._info or {}
+
+    @property
+    def is_3d(self) -> bool:
+        return self.kind in KINDS_3D
+
+    @property
+    def solver_kind(self) -> str:
+        """交给哪个内核。判据与 `ModelSpec3D.to_dat()` 的 CABLE 分叉一致。"""
+        return self.kind if self.is_3d else "2d"
 
     def _build_beam(self) -> ModelSpec:
         p = self.params
@@ -356,6 +475,42 @@ class ModelDoc:
             gravity=self._gravity(),
         )
 
+    def _build_grillage3d(self):
+        from grillage_3d import build_box_grillage_3d
+
+        p = self.params
+        return build_box_grillage_3d(
+            spans=(float(p["sp1"]), float(p["sp2"]), float(p["sp1"])),
+            B=float(p["B"]), h=float(p["h"]),
+            tf=float(p["tf"]), tw=float(p["tw"]),
+            n_lines=int(p.get("n_lines", 3)),
+            panel=float(p["panel"]),
+            q_deck=float(p["q"]) * 1e3,
+            staged=bool(p.get("staged", True)),
+            lane_code="JTG_D60" if p.get("lane", True) else "",
+        )
+
+    def _build_cable_stayed(self):
+        from cable_stayed_3d import build_cable_stayed_3d
+
+        p = self.params
+        model, info = build_cable_stayed_3d(
+            main_span=float(p["Lm"]), side_span=float(p["Ls"]),
+            tower_height=float(p["Ht"]), n_cable=int(p["n"]),
+            panel=float(p.get("panel", 8.0)),
+            B=float(p["B"]), h=float(p["h"]),
+            tower_b=float(p.get("tower_b", 3.0)),
+            tower_h=float(p.get("tower_h", 4.5)),
+            q_deck=float(p["q"]) * 1e3,
+            cable_area_mm2=float(p["A"]),
+            method=str(p.get("method", "DECK")),
+        )
+        # 派生量挂在外壳上：界面要支座 x 才能画红虚线，而 pydantic 契约里
+        # 不该出现这种"只给界面用"的字段。
+        self._info = dict(info)
+        self._info["fpu"] = float(p.get("fpu", 1860.0)) * 1e6
+        return model
+
     # ------------------------------------------------------------ 校验
 
     def validate(self) -> list[str]:
@@ -382,9 +537,88 @@ class ModelDoc:
                         errs.append(f"均布荷载 {i} 的区间无效（终点 ≤ 起点）")
             if not m.supports:
                 errs.append("没有支座（结构会是机构）")
+        elif self.is_3d:
+            errs = self._param_checks_3d() + self.warnings_3d()
         else:
             errs = self._bridge_param_checks() + self._model.validate_model()
         return errs
+
+    def warnings_3d(self) -> list[str]:
+        """三维模型的引用完整性硬错误（`validate_model_3d` 的第一返回值）。
+
+        与 `validate()` 分开：界面要在求解前拦错误、同时把提示折叠起来，
+        两件事不该挤在一个列表里靠数个数来区分。
+        """
+        from model_spec_3d import validate_model_3d
+
+        errs, _ = validate_model_3d(self.model)
+        return list(errs)
+
+    def hints_3d(self) -> list[str]:
+        """三维模型的"可以算但建议看一眼"提示。"""
+        from model_spec_3d import validate_model_3d
+
+        _, warns = validate_model_3d(self.model)
+        return list(warns)
+
+    def _param_checks_3d(self) -> list[str]:
+        """三维参数量级检查。
+
+        与二维桥型同样的道理：`validate_model_3d()` 查的是"节点/单元表自洽"，
+        拦不住"塔高写成 6000 m"这种几何自洽但物理荒谬的参数。
+        """
+        p = self.params
+        e: list[str] = []
+
+        def pos(key: str, label: str) -> float:
+            v = p.get(key)
+            if not isinstance(v, (int, float)) or isinstance(v, bool) or v <= 0:
+                e.append(f"{label}必须为正数")
+                return 0.0
+            return float(v)
+
+        if self.kind == "grillage3d":
+            sp1 = pos("sp1", "边跨")
+            sp2 = pos("sp2", "中跨")
+            h = pos("h", "梁高")
+            B = pos("B", "箱宽")
+            tf = pos("tf", "顶/底板厚")
+            tw = pos("tw", "腹板厚")
+            pos("q", "桥面均布荷载")
+            if sp1 and sp2 and sp2 < 0.5 * sp1:
+                e.append(f"中跨 {sp2:g} m 不足边跨 {sp1:g} m 的一半，"
+                         "三跨连续梁的受力与配束都不成立")
+            if h and sp2 and h < sp2 / 40.0:
+                e.append(f"梁高 {h:g} m 对 {sp2:g} m 中跨偏矮（< L/40），"
+                         "梁格法假定平面截面保持，高跨比过小会失真")
+            if tf and h and 2 * tf >= h:
+                e.append(f"顶+底板厚 {2 * tf:g} m 已达梁高 {h:g} m，腹板无高度")
+            if tw and B and 2 * tw >= B:
+                e.append(f"两片腹板厚 {2 * tw:g} m 已达箱宽 {B:g} m")
+            nl = p.get("n_lines")
+            if not isinstance(nl, int) or nl < 3 or nl % 2 == 0:
+                e.append(f"纵梁线条数 {nl} 必须是 ≥3 的奇数（含中梁线，对称）")
+        else:
+            Lm = pos("Lm", "主跨")
+            Ls = pos("Ls", "边跨")
+            Ht = pos("Ht", "塔高")
+            pos("h", "主梁高")
+            pos("B", "主梁宽")
+            pos("q", "桥面恒载")
+            A = pos("A", "单索面积")
+            n = p.get("n")
+            if not isinstance(n, int) or n < 3:
+                e.append(f"每塔每侧索数 {n} 太少（≥3），无法形成扇形索面")
+            if Lm and Ls and Ls > 0.8 * Lm:
+                e.append(f"边跨 {Ls:g} m 接近主跨 {Lm:g} m，"
+                         "边跨/主跨通常取 0.35~0.5，过大时边跨索力会主导设计")
+            if Ht and Lm and Ht < 0.12 * Lm:
+                e.append(f"塔高 {Ht:g} m 相对主跨 {Lm:g} m 偏矮（< L/8），"
+                         "索倾角过小，竖向分力效率低")
+            if A and A < 500:
+                e.append(f"单索面积 {A:g} mm² 过小，请核对是否写成 cm²")
+        return e
+
 
     def _bridge_param_checks(self) -> list[str]:
         """桥型的参数量级检查。
@@ -444,6 +678,24 @@ class ModelDoc:
         """能力自述：界面据此决定显示哪些区块，而不是写 `if 是桥`。"""
         from fem_eigen_export import fem_eigen_available
 
+        if self.is_3d:
+            # 三维只有一条路：三维内核。没有 anastruct 草算，也没有第三方互校。
+            try:
+                from solver_3d import capabilities
+
+                ok3d = bool(capabilities().get(self.kind))
+            except Exception:
+                ok3d = False
+            return {
+                "anastruct": False,
+                "fem_eigen": ok3d,          # 三维内核是否可用
+                "matplotlib": False,
+                "cross_check": False,
+                "solve3d": ok3d,
+                "cable": self.kind == "cable_stayed",
+                "nonlinear": self.kind == "cable_stayed",
+            }
+
         fem = fem_eigen_available()
         is_beam = self.kind == "beam"
         return {
@@ -452,7 +704,25 @@ class ModelDoc:
             "matplotlib": is_beam,         # 截面/变形/弯矩图只对梁画
             # 互校的前提：梁（两边都能算）且不计自重（anastruct 无重力项）
             "cross_check": is_beam and fem and not self.params.get("self_weight", False),
+            "solve3d": False,
+            "cable": False,
+            "nonlinear": False,
         }
+
+    def solve(self, out_dir: str | Path | None = None, dat_name: str | None = None):
+        """三维求解的唯一入口，返回 `SolveResult`。
+
+        这就是"接入"的落点：界面不再知道内核叫什么名字、exe 在哪个目录、
+        输出文件分几段。它只问 `doc.capability()["solve3d"]`，然后拿结果。
+        """
+        if not self.is_3d:
+            raise ValueError(f"{KIND_LABELS.get(self.kind, self.kind)}不是三维模型，"
+                             "二维模型请走 fem_eigen_export.run_fem_eigen")
+        from solver_3d import solve as solve_3d_model
+
+        out = out_dir or Path("out") / self.kind
+        return solve_3d_model(self.model, kind=self.kind, out_dir=out,
+                              dat_name=dat_name)
 
     # ------------------------------------------------------------ 展示
 
@@ -462,9 +732,39 @@ class ModelDoc:
         if self.kind == "beam":
             lines = self._model.summary().splitlines()
             return {"title": KIND_LABELS[self.kind], "lines": lines}
+        if self.is_3d:
+            return {"title": KIND_LABELS[self.kind],
+                    "lines": self._summary_3d().splitlines()}
         spec = self._model
         lines = spec.summary().splitlines()
         return {"title": spec.title, "lines": lines}
+
+    def _summary_3d(self) -> str:
+        """三维摘要：规模 + 分类型单元数 + 工况，全部从模型本身统计。"""
+        m = self._model
+        st = m.stats()
+        kinds = st.get("kinds", {})
+        lines = [
+            f"{m.title}",
+            f"节点 {st['nodes']} / 单元 {st['elements']} / 实常数 {st['reals']} / "
+            f"材料 {st['materials']}",
+            "单元构成：" + "，".join(f"{k} {v}" for k, v in sorted(kinds.items())),
+        ]
+        if self.kind == "cable_stayed":
+            info = self.info
+            lines.append(
+                f"拉索 {info.get('n_cable_actual', 0)} 根，索重 "
+                f"{info.get('cable_w', 0):.0f} N/m，桥面恒载 "
+                f"{info.get('total_deck_load', 0) / 1e3:.0f} kN")
+            lines.append(
+                "支承断面 x = " + "、".join(f"{x:.0f}" for x in info.get("x_supports", []))
+                + " m")
+            lines.append(f"定索力方法：{info.get('tension_method', '—')}"
+                         "（DECK = 按恒载竖向分配）")
+        else:
+            lines.append(f"施工阶段 {st.get('stages', 0)} 个，"
+                         f"活载工况 {len(getattr(m, 'influences', []) or [])} 个")
+        return "\n".join(lines)
 
     def param_rows(self) -> list[list[Field]]:
         """当前类型下要显示的控件行（已按 when 过滤）。"""
@@ -548,6 +848,14 @@ class ModelDoc:
                         if k in prev.params}
             return cls.from_beam_spec(spec, **opts), source, diag
 
+        if kind in KINDS_3D:
+            # 三维只走规则解析：参数量少、名字确定（sp1/Lm/Ht），而 LLM 侧
+            # 没有对应的 Schema。加 Schema 的成本高于收益——真正需要"理解"
+            # 的是二维那座桥，三维这几十个参数正则就够了。
+            params, notes = extract_3d_params(text, kind)
+            params = _keep_solver_opts(prev, kind, params)
+            return cls(kind, params), "rule(三维)", Diag(notes=notes)
+
         from bridge_spec import extract_bridge_params
 
         # 桥梁侧也走 LLM 了，但**只出参数**（bridge_llm），几何仍由 build() 算。
@@ -603,6 +911,101 @@ def _keep_solver_opts(prev: "ModelDoc | None", kind: str,
         if k in prev.params and k not in out:
             out[k] = prev.params[k]
     return out
+
+
+def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
+    """三维结构的规则解析：只抽参数、不建造。
+
+    与 `bridge_spec.extract_bridge_params` 同一套做法：抓不到的用工程默认值，
+    并在 `notes` 里逐条列出"替你默认了什么"。三维参数名与二维不同
+    （sp1/Lm/Ht 而不是 span/rise），所以不能复用那张正则表。
+
+    一个刻意的取舍：**不做"两者择一"的猜测**。斜拉桥说"跨度 200 米"，
+    按主跨理解是对的；说"边跨 80、中跨 200" 也能对上。但如果一句话同时
+    出现"主跨 200 边跨 80"，正则各取各的，不需要判断谁是谁。
+    """
+    from bridge_spec import _grab
+    from units_guard import guard_bridge_span, guard_units
+
+    d = DEFAULTS[kind]
+    p: dict[str, Any] = {}
+    notes: list[str] = []
+
+    def grab(key: str, *names: str) -> bool:
+        v = _grab(text, *names)
+        if v is None:
+            return False
+        p[key] = v
+        return True
+
+    def default(key: str, label: str) -> None:
+        notes.append(f"未说明{label}，默认 {d[key]:g}")
+
+    if kind == "cable_stayed":
+        if not grab("Lm", "主跨", "跨径", "主孔"):
+            if grab("Lm", "跨度", "总长", "全长"):
+                notes.append(f"只给了一个跨度，按主跨 {p['Lm']:g} m 处理")
+            else:
+                p["Lm"] = d["Lm"]
+                default("Lm", "主跨")
+        # 单位哨兵必须跑在**派生默认值之前**：否则先用 200000 推出"塔高 60000 m"，
+        # 再回头把主跨改成 200 m，提示里就会出现"边跨按 0.4×主跨 = 80000 m"
+        # 紧接着"边跨 80000 疑为 mm，已按 80 m 处理"这种自相矛盾的两行。
+        p["Lm"] = guard_bridge_span(float(p["Lm"]), notes)
+        if not grab("Ls", "边跨", "边孔"):
+            p["Ls"] = round(float(p["Lm"]) * 0.4, 1)
+            notes.append(f"未说明边跨，按经验取 0.4×主跨 = {p['Ls']:g} m")
+        if not grab("Ht", "塔高", "索塔高", "塔柱高"):
+            p["Ht"] = round(float(p["Lm"]) * 0.3, 1)
+            notes.append(f"未说明塔高，按 0.3×主跨 = {p['Ht']:g} m")
+        m = re.search(r"每塔每侧\s*(\d+)|(\d+)\s*对索|(\d+)\s*根索", text)
+        if m:
+            p["n"] = int(next(g for g in m.groups() if g))
+        else:
+            p["n"] = d["n"]
+            default("n", "每塔每侧索数")
+        if not grab("h", "主梁高", "梁高"):
+            p["h"] = round(float(p["Lm"]) / 80.0, 2)
+            notes.append(f"未说明主梁高，按 L/80 = {p['h']:g} m")
+        if not grab("B", "主梁宽", "桥宽", "箱宽"):
+            p["B"] = d["B"]
+            default("B", "主梁宽")
+        if not grab("q", "恒载", "桥面荷载", "均布荷载"):
+            p["q"] = d["q"]
+            default("q", "桥面恒载")
+        m = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm2|mm²|平方毫米)", text)
+        if m:
+            p["A"] = float(m.group(1))
+        else:
+            p["A"] = d["A"]
+            default("A", "单索面积")
+    else:
+        if not grab("sp1", "边跨"):
+            p["sp1"] = d["sp1"]
+            default("sp1", "边跨")
+        if not grab("sp2", "中跨"):
+            if grab("sp2", "跨度", "主跨"):
+                notes.append(f"只给了一个跨度，按中跨 {p['sp2']:g} m 处理")
+            else:
+                p["sp2"] = d["sp2"]
+                default("sp2", "中跨")
+        p["sp2"] = guard_bridge_span(float(p["sp2"]), notes)   # 派生 h 之前先纠正
+        if not grab("h", "梁高"):
+            p["h"] = round(float(p["sp2"]) / 20.0, 2)
+            notes.append(f"未说明梁高，按中跨 L/20 = {p['h']:g} m")
+        for key, names, label in (
+            ("B", ("箱宽", "桥宽"), "箱宽"),
+            ("tf", ("顶板厚", "底板厚", "板厚"), "顶/底板厚"),
+            ("tw", ("腹板厚",), "腹板厚"),
+            ("q", ("均布荷载", "桥面荷载", "恒载"), "桥面均布荷载"),
+            ("panel", ("横梁间距", "节段长"), "横梁间距"),
+        ):
+            if not grab(key, *names):
+                p[key] = d[key]
+                default(key, label)
+
+    guard_units(p, kind, notes)     # 单位误写在这一层就纠正
+    return p, notes
 
 
 def _supports_are_default(spec: ModelSpec) -> bool:

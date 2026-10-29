@@ -47,16 +47,21 @@ def parse_summary(path: Path) -> dict:
     """解析 <stem>_summary.txt。
 
     返回 {"disp": {(node,dof): (min,max)},
-          "beam": {elem: {"Nmin":..,"Nmax":..,"MzMin":..,"MzMax":..}},
+          "beam": {elem: {Nmin,Nmax,VyMin,…,MyMin,MyMax,MzMin,MzMax}},
           "live": {stage: (max,min)}}
+
+    梁内力**逐分量**解析（键名不写死）。旧版 summary 只输出 N/Mz，新版输出
+    六个分量——竖向受弯的弯矩落在 My 上（纵向梁沿 X，绕局部 y 水平轴），
+    只读 Mz 会得到"222 个单元内力全 0"。按 key=value 通用解析后，新旧格式
+    都能读，缺的分量就是缺，不补零成"算过了"。
     """
     disp: dict = {}
     beam: dict = {}
     live: dict = {}
     section = None
     re_disp = re.compile(r"^N(\d+) dof(\d+) min=(\S+) max=(\S+)$")
-    re_beam = re.compile(
-        r"^E(\d+) Nmin=(\S+) Nmax=(\S+) MzMin=(\S+) MzMax=(\S+)$")
+    re_beam_id = re.compile(r"^E(\d+)\s+(.*)$")
+    re_kv = re.compile(r"([A-Za-z]+)=(\S+)")
     re_live = re.compile(r"^STAGE(\d+) max=(\S+) min=(\S+)$")
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
@@ -71,12 +76,16 @@ def parse_summary(path: Path) -> dict:
                 disp[(int(m.group(1)), int(m.group(2)))] = (
                     float(m.group(3)), float(m.group(4)))
         elif section and section.startswith("beam force"):
-            m = re_beam.match(line)
+            m = re_beam_id.match(line)
             if m:
-                beam[int(m.group(1))] = {
-                    "Nmin": float(m.group(2)), "Nmax": float(m.group(3)),
-                    "MzMin": float(m.group(4)), "MzMax": float(m.group(5)),
-                }
+                vals: dict[str, float] = {}
+                for key, raw in re_kv.findall(m.group(2)):
+                    try:
+                        vals[key] = float(raw)
+                    except ValueError:
+                        continue
+                if vals:
+                    beam[int(m.group(1))] = vals
         elif section and section.startswith("stage live"):
             m = re_live.match(line)
             if m:

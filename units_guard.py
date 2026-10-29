@@ -69,6 +69,27 @@ _SCALARS: dict[str, dict[str, tuple[float, float, str, str, str]]] = {
         "udl": (BEAM_MAX_UDL, 1000.0, "N/m", "均布荷载", "kN/m"),
         "point": (BEAM_MAX_POINT, 1000.0, "N", "集中力", "kN"),
     },
+    # 三维：参数名与二维完全不同（sp1/sp2、Lm/Ls、Ht），必须单独登记。
+    # 漏登记的后果是静默的——`_SCALARS.get(kind, {})` 对未知 kind 是空操作，
+    # 于是 "主跨200000" 会一路建成 200 公里的斜拉桥并照算不误。
+    "grillage3d": {
+        "sp1": (BRIDGE_MAX_SPAN, 1000.0, "mm", "边跨", "m"),
+        "sp2": (BRIDGE_MAX_SPAN, 1000.0, "mm", "中跨", "m"),
+        "B": (BRIDGE_MAX_WIDTH, 1000.0, "mm", "箱宽", "m"),
+        "h": (BEAM_MAX_SECTION, 1000.0, "mm", "梁高", "m"),
+        "tf": (BEAM_MAX_SECTION, 1000.0, "mm", "顶/底板厚", "m"),
+        "tw": (BEAM_MAX_SECTION, 1000.0, "mm", "腹板厚", "m"),
+        "panel": (BEAM_MAX_SECTION, 1000.0, "mm", "横梁间距", "m"),
+        "q": (BEAM_MAX_UDL, 1000.0, "N/m", "桥面均布荷载", "kN/m"),
+    },
+    "cable_stayed": {
+        "Lm": (BRIDGE_MAX_SPAN, 1000.0, "mm", "主跨", "m"),
+        "Ls": (BRIDGE_MAX_SPAN, 1000.0, "mm", "边跨", "m"),
+        "Ht": (BRIDGE_MAX_SPAN, 1000.0, "mm", "塔高", "m"),
+        "h": (BEAM_MAX_SECTION, 1000.0, "mm", "主梁高", "m"),
+        "B": (BRIDGE_MAX_WIDTH, 1000.0, "mm", "主梁宽", "m"),
+        "q": (BEAM_MAX_UDL, 1000.0, "N/m", "桥面恒载", "kN/m"),
+    },
 }
 
 
@@ -131,7 +152,7 @@ def _guard_scalars(data: dict, kind: str, notes: list[str]) -> None:
 def guard_units(data: dict, kind: str, notes: list[str] | None = None) -> list[str]:
     """就地修正 `data` 里的单位误写，返回提示列表。
 
-    kind ∈ {"beam", "arch", "truss", "beam_bridge"}。
+    kind ∈ {"beam", "arch", "truss", "beam_bridge", "grillage3d", "cable_stayed"}。
     只做"量级明显不可能"的换算，不做业务范围校验（那是 validate() 的事）。
     """
     notes = notes if notes is not None else []
