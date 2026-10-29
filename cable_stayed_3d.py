@@ -61,6 +61,7 @@ def build_cable_stayed_3d(
     tower_h: float = 4.5,
     n_tower_seg: int = 8,
     anchor_low: float = 0.55,             # 最低索的塔上锚固高度（占塔高）
+    main_cover: float = 0.46,             # 单侧索在主跨上的覆盖比例（留中部无索区）
     q_deck: float = 100e3,                # 桥面恒载 N/m（含自重），向下为正
     cable_area_mm2: float = 6000.0,       # 单索截面积 mm²
     cable_E: float = 195e9,
@@ -87,12 +88,24 @@ def build_cable_stayed_3d(
     G_shear = E_conc / (2 * (1 + 0.2))
 
     # ---------------------------------------------------------- 主梁节点
+    # 离散数由"布索覆盖比例"反推，而不是拍一个 panel：
+    #   主跨每侧只覆盖 main_cover 倍主跨（中部留无索区，这是实际斜拉桥的做法），
+    #   要在 0.42L 内放下 n_cable 个锚点且首末各留 1.2 段余量，需要
+    #       (0.42·L − 2·1.2·seg) / seg + 1 ≥ n_cable
+    #   ⇒  n_seg ≥ (n_cable + 2.4) / 0.42　（取 2.6 留一格余量）
+    # 曾用固定 n_cable+4：主跨 12 根/侧只有 27 段，覆盖半跨时锚点不够，
+    # 于是两侧索都铺满全跨、锚点交错，索力沿桥呈锯齿（实测 520→2580→880 kN）。
+    n_seg_by_cover = {
+        "side": int(math.ceil((n_cable + 2.6) / 1.0)),
+        "main": int(math.ceil((n_cable + 2.6) / main_cover)),
+    }
     xs: list[float] = [0.0]
     support_idx: list[int] = [0]
-    for span, x_start in ((side_span, 0.0), (main_span, xT1), (side_span, xT2)):
-        # 每跨至少 n_cable + 4 段：留出首末索到支座的余量后，仍能给足
-        # n_cable 个锚点（否则 n_cable=12 会静默退化成 9 根）。
-        n_seg = max(int(math.ceil(span / panel)), n_cable + 4)
+    for span, x_start, kind in ((side_span, 0.0, "side"),
+                                (main_span, xT1, "main"),
+                                (side_span, xT2, "side")):
+        n_seg = max(int(math.ceil(span / panel)), n_cable + 4,
+                    n_seg_by_cover[kind])
         for j in range(1, n_seg + 1):
             xs.append(x_start + span * j / n_seg)
         support_idx.append(len(xs) - 1)
@@ -151,7 +164,10 @@ def build_cable_stayed_3d(
             nodes.append(Node3D(id=tid(k), x=xT, y=0.0,
                                 z=tower_height * k / n_tower_seg))
         tower_tops.append(tid(n_tower_seg))
-        ebase = 200 if ti == 0 else 300
+        # 塔单元从 800 起：主梁单元按 100+i 递增，主跨加密后可能越过 200，
+        # 原先塔从 200 起会与主梁撞号（n_cable=20 时主梁到 206，实测报
+        # "单元编号重复: 201"）。索仍从 9000 起，三者互不重叠。
+        ebase = 800 if ti == 0 else 900
         w_tower = tower_A * dens_conc * G
         for k in range(n_tower_seg):
             elements.append(Element3D(id=ebase + k + 1, etype=2,
@@ -185,7 +201,13 @@ def build_cable_stayed_3d(
     def pick_even(seq: list[int], k: int) -> list[int]:
         if k <= 0 or not seq:
             return []
-        if len(seq) <= k:
+        if len(seq) < k:
+            # 静默少索是这里最危险的失败模式：模型照样收敛、报告照样出，
+            # 只是"每塔每侧 12 根"变成了 11 根。宁可当场报错。
+            raise ValueError(
+                f"锚点候选不足：需要 {k} 个，候选只有 {len(seq)} 个。"
+                f"请增大主梁离散或减小 main_cover。")
+        if len(seq) == k:
             return list(seq)
         if k == 1:
             return [seq[0]]
@@ -203,11 +225,15 @@ def build_cable_stayed_3d(
 
     cable_ids: list[int] = []
     eid_cable = 9000
+    # 主跨每侧只覆盖 main_cover×Lm：两侧索在跨中留出无索区（实际斜拉桥
+    # 的无索区约占主跨 1/5~1/3）。若两侧都铺满全跨，锚点会交错，
+    # 同一 x 附近同时有短索与长索，索力沿桥呈锯齿——那不是索力分布，
+    # 是布索错误在结果上的投影。
     span_specs = (
-        (0, xT1, 0.0, xT1),      # 塔1 边跨侧
-        (0, xT1, xT1, xT2),      # 塔1 主跨侧
-        (1, xT2, xT1, xT2),      # 塔2 主跨侧
-        (1, xT2, xT2, L_tot),    # 塔2 边跨侧
+        (0, xT1, 0.0, xT1),                                  # 塔1 边跨侧
+        (0, xT1, xT1, xT1 + main_cover * main_span),         # 塔1 主跨侧
+        (1, xT2, xT2 - main_cover * main_span, xT2),         # 塔2 主跨侧
+        (1, xT2, xT2, L_tot),                                # 塔2 边跨侧
     )
     for ti, xT, x_lo, x_hi in span_specs:
         # 该跨的实际段长（节点等分，取跨起点相邻 xs 的差）
@@ -244,7 +270,7 @@ def build_cable_stayed_3d(
         model_tmp = ModelSpec3D(
             title=title, nodes=nodes, materials=materials, reals=reals,
             etypes=etypes, elements=elements, boundaries=boundaries, loads=loads)
-        tensions = tensions_by_deck_load(model_tmp, q_deck, trib_map)
+        tensions = tensions_by_deck_load(model_tmp, q_deck, trib_map, x_sup)
         method_out = "GIVEN"
     cables = [CableSpec3D(elem=eid, anchor=0, tension=float(tensions.get(eid, 0.0)))
               for eid in cable_ids]
@@ -286,38 +312,65 @@ def build_cable_stayed_3d(
 def tensions_by_deck_load(
     model: ModelSpec3D,
     q_deck: float,
-    trib_map: dict[int, float],
+    trib_map: dict[int, float] | None = None,
+    x_supports: list[float] | None = None,
 ) -> dict[int, float]:
-    """按恒载竖向分配法初定索力：T_i = q·trib(锚点) / ez_i。
+    """按恒载竖向分配法初定索力：每跨的恒载按索数均分，再除以各索的竖向余弦。
 
-    ez_i 为索从梁侧锚点指向塔端的方向余弦（竖直分量）。因为
-    Σ q·trib = q·L，所以 Σ T·ez 精确等于桥面总恒载——**竖向自洽**，
-    这是刚性支承法/最小弯曲能量法在有塔处支座的体系里做不到的：
-      · 刚性支承法把锚点竖向压成 0，塔处支座会被解成"向下拉"（负反力），
-        实测索力竖向分量达到桥面恒载的 141%（支座在拉梁，物理上不成立）；
-      · 最小弯曲能量法在有支座的裸结构上，最优解就是"索不受力"
-        （梁自己扛弯矩），实测 48 根索里 40 根被钉在保力下限。
-    本方法忽略塔的柔性（初定阶段允许），塔的变形由成桥态闭环的几何迭代
-    自行吸收——闭环里 L0 就是按这组目标索力反算的。
+    为什么必须"按跨"而不是"按锚点受荷宽度"
+    ----------------------------------------
+    早期实现用 T_i = q·trib(锚点)/ez_i，只在**有锚点**的节点上分配。主跨中部
+    留出无索区后，那几段梁的 trib 无处分摊，等于宣称"这部分恒载由支座承担"——
+    可主跨中部根本没有支座。于是成桥态里 28% 的桥面荷载必须靠主梁自己跨越
+    200 m 传到两端，实测预抬高被放大到 992 mm（正常应为数十毫米）。
+
+    现在的做法：每个跨内的恒载（扣掉两端支座断面直接承担的那一半受荷宽度）
+    均分给该跨全部拉索，于是 ΣT·ez 精确等于"该跨由索承担的恒载"，荷载有了
+    着落，主梁不再被迫跨越整跨。索力仍随 ez 单调变化，符合扇形索面的规律。
     """
-    node_z = {n.id: n.z for n in model.nodes}
-    out: dict[int, float] = {}
+    node = {n.id: n for n in model.nodes}
+    kind_of = {t.id: t.kind for t in model.etypes}
+
+    cables: list[tuple[int, int, float]] = []      # (elem, 梁侧锚点, ez)
     for e in model.elements:
-        kind = next(t.kind for t in model.etypes if t.id == e.etype)
-        if kind != "CABLE":
+        if kind_of.get(e.etype) != "CABLE":
             continue
-        a, b = (e.n1, e.n2) if node_z[e.n1] <= node_z[e.n2] else (e.n2, e.n1)
-        dz = node_z[b] - node_z[a]
+        a, b = (e.n1, e.n2) if node[e.n1].z <= node[e.n2].z else (e.n2, e.n1)
+        dz = node[b].z - node[a].z
         if abs(dz) < 1e-9:
             raise ValueError(f"索 {e.id} 两端等高，竖向分量退化")
-        na = next(n for n in model.nodes if n.id == a)
-        nb = next(n for n in model.nodes if n.id == b)
+        na, nb = node[a], node[b]
         L = ((nb.x - na.x) ** 2 + (nb.y - na.y) ** 2 + (nb.z - na.z) ** 2) ** 0.5
-        ez = dz / L
-        out[e.id] = q_deck * trib_map.get(a, 0.0) / ez
+        cables.append((e.id, a, dz / L))
+
+    # 退化路径：没给支座位置时按锚点受荷宽度分配（保留给单元测试/旧调用）
+    if not x_supports or len(x_supports) < 2:
+        out: dict[int, float] = {}
+        for eid, a, ez in cables:
+            out[eid] = q_deck * (trib_map or {}).get(a, 0.0) / ez
+        return out
+
+    node_at_x = {round(n.x, 9): n.id for n in model.nodes}
+    out = {}
+    spans = list(zip(x_supports[:-1], x_supports[1:]))
+    for lo, hi in spans:
+        group = [(eid, ez) for eid, a, ez in cables
+                 if lo - 1e-9 <= node[a].x <= hi + 1e-9]
+        if not group:
+            continue
+        # 支座断面处的荷载由支座直接承担：该节点 trib 有一半落在本跨
+        w_span = q_deck * (hi - lo)
+        if trib_map:
+            for x_sup in (lo, hi):
+                nid = node_at_x.get(round(x_sup, 9))
+                if nid is not None:
+                    w_span -= q_deck * trib_map.get(nid, 0.0) / 2.0
+        each = max(w_span, 0.0) / len(group)
+        for eid, ez in group:
+            out[eid] = each / ez
     return out
 
 
-def cable_break_load(cable_area_mm2: float, fpu: float = 1770e6) -> float:
-    """单索破断力 N（fpu 默认 1770 MPa 钢绞线/钢丝）。"""
+def cable_break_load(cable_area_mm2: float, fpu: float = 1860e6) -> float:
+    """单索破断力 N（fpu 默认 1860 MPa 级钢绞线，GB/T 5224）。"""
     return cable_area_mm2 * 1e-6 * fpu

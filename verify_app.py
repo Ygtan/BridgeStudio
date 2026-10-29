@@ -8,6 +8,7 @@ C 方案把①的梁与⑥的桥合并成一个入口，最容易出现的回归
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
@@ -133,6 +134,24 @@ def main() -> int:
             check("⑦预抬高含梁节点",
                   len([n for n in _cr["camber"] if 1000 < n < 2000]) > 40,
                   f"{len([n for n in _cr['camber'] if 1000 < n < 2000])} 个节点")
+
+            # 计算书：点按钮 → 落盘 → 可下载（缺任一步，界面上就是个死按钮）
+            _rb = next((b for b in at.button if b.key == "cb_report_btn"), None)
+            check("⑦计算书按钮存在", _rb is not None)
+            if _rb is not None:
+                _rb.click().run()
+                _rp = at.session_state.get("cb_report_path")
+                check("⑦计算书已生成", bool(_rp) and Path(_rp).exists(),
+                      str(_rp or "—"))
+                if _rp and Path(_rp).exists():
+                    from docx import Document as _Doc
+                    _doc = _Doc(str(_rp))
+                    _heads = [p.text for p in _doc.paragraphs
+                              if p.style.name == "Heading 1"]
+                    check("⑦计算书章节齐全", len(_heads) >= 7,
+                          f"{len(_heads)} 章：" + "、".join(h[:6] for h in _heads))
+                    check("⑦计算书含三张关键表", len(_doc.tables) >= 10,
+                          f"{len(_doc.tables)} 张表")
 
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 74)

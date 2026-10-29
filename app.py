@@ -694,7 +694,7 @@ else:
             key="cb_method",
             help="斜拉桥默认用第一项：ΣT·ez 精确等于桥面恒载，且分布随索倾角平滑。"
                  "后两项由内核计算，适合无塔处竖向支座的纯索承体系。")
-        _cb_fpu = st.number_input("索破断强度 (MPa)", 1200.0, 2200.0, 1770.0, 10.0,
+        _cb_fpu = st.number_input("索破断强度 (MPa)", 1200.0, 2200.0, 1860.0, 10.0,
                                   key="cb_fpu")
 
     _method_key = {"按恒载竖向分配": "DECK", "刚性支承连续梁法": "RIGID",
@@ -831,6 +831,40 @@ else:
                     + [f"{r['节点']},{r['x(m)']},{r['预抬高(mm)']},{r['制造标高(m)']}"
                        for r in _crow]),
                 file_name="camber_table.csv", mime="text/csv", key="cb_dl2")
+
+        # ---- 计算书（P4 成果层：把上面三张表落成可交付的 Word）----
+        st.markdown("**计算书（Word，含索力表 / 下料索长表 / 制造线形表）**")
+        _rc1, _rc2 = st.columns([1.1, 2.0])
+        if _rc1.button("生成计算书 (.docx)", key="cb_report_btn"):
+            with st.spinner("排版计算书（表格、插图、目录）…"):
+                try:
+                    from report_docx import build_cable_report
+                    _p = dict(st.session_state.get("cb_params", {}))
+                    _p["Lm"], _p["Ls"], _p["Ht"] = _cb_Lm, _cb_Ls, _cb_Ht
+                    _p["n"], _p["h"], _p["B"] = _cb_n, _cb_h, _cb_B
+                    _p["q"], _p["A"] = _cb_q, _cb_A
+                    _p["method"], _p["fpu"] = _method_key, _cb_fpu
+                    _out = build_cable_report(
+                        model=_cbm, info=_cbinfo, res=_cb, params=_p,
+                        out_path="out/cable/report.docx",
+                        project="双塔三跨斜拉桥")
+                    st.session_state["cb_report_path"] = str(_out)
+                except Exception as _e:                     # noqa: BLE001
+                    st.session_state.pop("cb_report_path", None)
+                    st.error(f"计算书生成失败：{_e}")
+        _rp = st.session_state.get("cb_report_path")
+        if _rp and Path(_rp).exists():
+            _rc2.download_button(
+                "下载计算书 (.docx)", data=Path(_rp).read_bytes(),
+                file_name="斜拉桥成桥态计算书.docx",
+                mime=("application/vnd.openxmlformats-officedocument"
+                      ".wordprocessingml.document"),
+                key="cb_dl3")
+            _rc2.caption(f"已生成 {Path(_rp).stat().st_size / 1024:.0f} KB。"
+                         "数值全部来自本次求解结果，不含二次力学计算。")
+        else:
+            _rc2.caption("点击生成后可直接下载。计算书内的表格数据由求解结果"
+                         "直接生成，与界面显示逐项一致。")
 
         with st.expander("查看导出的 .dat（含 *CABLE_BRIDGE 工况段）"):
             st.code(st.session_state.get("cb_dat", ""), language="text")

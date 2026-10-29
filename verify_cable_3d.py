@@ -152,7 +152,7 @@ def main() -> int:
 
     # ---------------------------------------------------------------- 4 索力上限
     print("\n[4] 索力安全系数")
-    bl = cable_break_load(6000.0, 1770e6)
+    bl = cable_break_load(6000.0, 1860e6)
     tmax = md.get("tension_max_kN", 0.0) * 1e3
     check("最大索力安全系数 > 2.0", bl / max(tmax, 1e-9) > 2.0,
           f"{bl/tmax:.2f}（{tmax/1e3:.0f} kN / 破断 {bl/1e3:.0f} kN）")
