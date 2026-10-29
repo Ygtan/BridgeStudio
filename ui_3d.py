@@ -12,9 +12,12 @@ session_state 键、两套"参数变了作废结果"的判断，第四张图还�
 
 界面不再知道内核叫什么、exe 在哪、输出文件分几段。换内核只改 solver_3d.py。
 
-一处刻意的保留：斜拉桥的"计算书"与"第三方导出"两个按钮仍是专属的——
-它们消费的是 cable 特有的下料索长/制造线形，梁格没有这些量。
-但触发它们的数据来源已经是 SolveResult，不再是各自的 session_state 字典。
+图不再由界面自己画：`report_3d.figures()` 出 PNG，界面只负责摆。这样
+"屏幕上看到的图"与"报告里的图"是同一个文件，不是各画一张再对齐。
+
+导出也是一处：`report_3d` 的 Word / HTML / CSV 三个出口吃同一份 `Report`。
+斜拉桥另保留"详细计算书（7 章带公式推导）"与"三方格式导出"两个专属按钮，
+因为下料索长与制造线形是 cable 独有的量。
 """
 
 from __future__ import annotations
@@ -24,14 +27,16 @@ import io
 from pathlib import Path
 from typing import Any
 
-import matplotlib.pyplot as plt
 import streamlit as st
 
 from model_doc import KIND_LABELS, ModelDoc
-from result_3d import SolveResult, support_x
+from report_3d import build_document, figures as build_figures, write_all
+from result_3d import SolveResult
 
 #: 结果缓存键（带模型指纹，避免"换模型后显示上一个模型的结果"）
 SS_RESULT = "r3d_result"
+SS_FIGURES = "r3d_figures"
+SS_REPORT = "r3d_report"
 
 
 # ---------------------------------------------------------------- 小工具
@@ -83,62 +88,67 @@ def _tables_block(res: SolveResult, model: Any) -> None:
 # ---------------------------------------------------------------- 图
 
 
-def _plot_grillage(res: SolveResult, model: ModelDoc) -> None:
-    """中梁线（或全部梁节点）的竖向包络挠度沿桥分布。"""
-    x_of = {n.id: n.x for n in model.model.nodes}
-    pts = sorted(
-        ((x_of[nid], lo, hi) for (nid, dof), (lo, hi) in res.disp.items()
-         if dof == 3 and nid in x_of),
-        key=lambda t: t[0])
-    if not pts:
-        st.caption("结果中没有竖向位移，跳过曲线。")
+def _figures_block(doc: ModelDoc, res: SolveResult) -> None:
+    """图来自 report_3d（与 Word / HTML 报告同一批 PNG）。
+
+    按结果指纹缓存：Streamlit 每次交互都会重跑脚本，重新生成 5 张 matplotlib
+    图要 1 s 左右，而结果没变时图也不会变。
+    """
+    key = (res.fingerprint, res.kind)
+    cached = st.session_state.get(SS_FIGURES)
+    if not cached or cached[0] != key:
+        figs = build_figures(res, doc.model, Path("out") / doc.kind / "report")
+        st.session_state[SS_FIGURES] = (key, figs)
+        cached = st.session_state[SS_FIGURES]
+    figs = cached[1]
+    if not figs:
+        st.caption("本次结果没有可绘制的曲线（内核未输出位移或内力）。")
         return
-    xs = [p[0] for p in pts]
-    lo = [p[1] * 1000 for p in pts]
-    hi = [p[2] * 1000 for p in pts]
-    fig, ax = plt.subplots(figsize=(10, 3.2))
-    ax.plot(xs, lo, "-", lw=1.2, color="#185FA5", label="包络 min")
-    ax.plot(xs, hi, "--", lw=0.9, color="#8FA8C8", label="包络 max")
-    for sx in support_x(model.model):
-        ax.axvline(x=sx, color="#A32D2D", ls="--", lw=0.8, alpha=0.7)
-    ax.set_xlabel("顺桥向 x (m)　（红虚线 = 支承断面）")
-    ax.set_ylabel("竖向位移 (mm)")
-    ax.set_title(f"{res.title} · 阶段位移包络（向下为负）")
-    ax.grid(alpha=0.3)
-    ax.legend(fontsize=8)
-    st.pyplot(fig)
-    plt.close(fig)
+    for f in figs.values():
+        st.image(str(f.path), use_container_width=True)
+        st.caption(f"**{f.caption}**" + (f"　{f.note}" if f.note else ""))
 
 
-def _plot_cable(res: SolveResult, model: ModelDoc) -> None:
-    """索力与制造线形预抬高沿桥纵向的双联图。"""
-    x_of = {n.id: n.x for n in model.model.nodes}
-    sup = support_x(model.model)
+# ---------------------------------------------------------------- 报告导出
 
-    if res.cables:
-        cs = sorted(res.cables, key=lambda c: x_of.get(c["anchor"], 0.0))
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
-        ax1.plot([x_of.get(c["anchor"], 0.0) for c in cs],
-                 [c["T"] / 1e3 for c in cs], "o-", ms=3, color="#185FA5", lw=1.2)
-        for sx in sup:
-            ax1.axvline(x=sx, color="#A32D2D", ls="--", lw=0.8, alpha=0.6)
-        ax1.set_ylabel("成桥索力 (kN)")
-        ax1.set_title("成桥态 · 索力与制造线形预抬高")
-        ax1.grid(alpha=0.3)
 
-        deck = sorted((n for n in res.camber if 1000 < n < 2000),
-                      key=lambda n: x_of.get(n, 0.0)) or sorted(res.camber)
-        ax2.plot([x_of.get(n, 0.0) for n in deck],
-                 [res.camber[n][2] * 1000 for n in deck],
-                 "o-", ms=3, color="#2E7D32", lw=1.2)
-        ax2.axhline(y=0.0, color="#666666", lw=0.8)
-        for sx in sup:
-            ax2.axvline(x=sx, color="#A32D2D", ls="--", lw=0.8, alpha=0.6)
-        ax2.set_xlabel("顺桥向 x (m)　（红虚线 = 支承断面）")
-        ax2.set_ylabel("预抬高 (mm)")
-        ax2.grid(alpha=0.3)
-        st.pyplot(fig)
-        plt.close(fig)
+def _report_block(doc: ModelDoc, res: SolveResult) -> None:
+    """Word / HTML / CSV 三出口，同一份 Report。"""
+    st.markdown("**报告与数据导出**")
+    c1, c2 = st.columns([1.1, 2.2])
+    if c1.button("生成报告", key="r3d_report_btn",
+                 help="同一份内容同时产出 Word、HTML 与 CSV 数据包"):
+        with st.spinner("排版报告（表格、插图、结论）…"):
+            try:
+                rep = build_document(res, doc.model, project=res.title,
+                                     out_dir=Path("out") / doc.kind / "report")
+                paths = write_all(rep, Path("out") / doc.kind / "report",
+                                  stem=f"{doc.kind}_report")
+                st.session_state[SS_REPORT] = {
+                    "fingerprint": res.fingerprint, "paths": paths,
+                    "n_blocks": len(rep.blocks)}
+            except Exception as e:                  # noqa: BLE001
+                st.session_state.pop(SS_REPORT, None)
+                st.error(f"报告生成失败：{e}")
+
+    got = st.session_state.get(SS_REPORT)
+    if not got:
+        c2.caption("报告含：计算概要、工程校核、结果图、结论、明细表。"
+                   "数值与界面逐项同源（同一个 SolveResult）。")
+        return
+    if got["fingerprint"] != res.fingerprint:
+        c2.warning("报告是上一次求解的结果，模型已变，请重新生成。")
+        return
+    names = {"docx": ("Word (.docx)", "application/vnd.openxmlformats-"
+                                      "officedocument.wordprocessingml.document"),
+             "html": ("HTML (.html)", "text/html"),
+             "zip": ("数据表 (.zip)", "application/zip")}
+    cols = c2.columns(3)
+    for i, (fmt, (label, mime)) in enumerate(names.items()):
+        p = Path(got["paths"][fmt])
+        if p.exists():
+            cols[i].download_button(label, data=p.read_bytes(), file_name=p.name,
+                                    mime=mime, key=f"r3d_dl_{fmt}")
 
 
 # ---------------------------------------------------------------- 斜拉桥专属
@@ -146,10 +156,10 @@ def _plot_cable(res: SolveResult, model: ModelDoc) -> None:
 
 def _cable_extras(doc: ModelDoc, res: SolveResult) -> None:
     """计算书 + 三方导出。数据全部取自 SolveResult。"""
-    st.markdown("**计算书与第三方复核**")
+    st.markdown("**详细计算书（7 章，含公式推导）与第三方复核**")
     c1, c2 = st.columns([1.2, 2.0])
 
-    if c1.button("生成计算书 (.docx)", key="cb_report_btn"):
+    if c1.button("生成详细计算书 (.docx)", key="cb_report_btn"):
         with st.spinner("排版计算书（表格、插图、目录）…"):
             try:
                 from report_docx import build_cable_report
@@ -283,16 +293,16 @@ def render(doc: ModelDoc) -> None:
     # ---- 校核 ----
     _checks_block(res, doc.model)
 
-    # ---- 图 ----
-    if res.kind == "cable_stayed":
-        _plot_cable(res, doc)
-    else:
-        _plot_grillage(res, doc)
+    # ---- 图（与报告同一批 PNG）----
+    _figures_block(doc, res)
 
     # ---- 表 ----
     _tables_block(res, doc.model)
 
-    # ---- 专属出口 ----
+    # ---- 报告导出 ----
+    _report_block(doc, res)
+
+    # ---- 斜拉桥专属出口 ----
     if res.kind == "cable_stayed":
         _cable_extras(doc, res)
 

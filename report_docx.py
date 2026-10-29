@@ -674,16 +674,23 @@ class _Writer:
               rows: Iterable[Sequence[Any]], widths: Sequence[float],
               *, aligns: Sequence[str] | None = None,
               font_size: float = TABLE_PT,
-              groups: dict[int, str] | None = None) -> None:
+              groups: dict[int, str] | None = None,
+              number: bool = True) -> None:
         """三线表。`rows` 中若某行是 dict 形式的分组标题（groups 索引 → 文本），
-        会生成跨列合并行 —— 长表按塔/跨分栏比加一列“组别”更清晰。"""
-        self.tab_no += 1
+        会生成跨列合并行 —— 长表按塔/跨分栏比加一列“组别”更清晰。
+
+        `number=False` 用于标题区的信息表（计算基本信息）：它不属于正文，
+        编号会变成“表 0-1”这种自相矛盾的东西，且会把后续表号整体推一位。
+        """
+        if number:
+            self.tab_no += 1
         # 表题（表上）
         cap = self.doc.add_paragraph()
         cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
         cap.paragraph_format.space_before = Pt(8)
         cap.paragraph_format.space_after = Pt(3)
-        r = cap.add_run(f"表 {self.label}-{self.tab_no}　{caption}")
+        label = f"表 {self.label}-{self.tab_no}　" if number else ""
+        r = cap.add_run(f"{label}{caption}")
         _set_run_font(r, cn=FONT_HEI, size=9.5, bold=True)
         # 表题必须与表头同页，否则会出现"表头孤零零落在页脚"的排版事故
         cap.paragraph_format.keep_with_next = True

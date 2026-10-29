@@ -121,6 +121,33 @@ def main() -> int:
             check("明细表含梁内力包络", "beam_envelope" in _r.tables(
                 at.session_state["doc"].model))
 
+        # 报告：三出口一次落盘（缺任一份界面上就是死按钮）
+        _gb = next((b for b in at.button if b.key == "r3d_report_btn"), None)
+        check("报告按钮存在（梁格）", _gb is not None)
+        if _gb is not None:
+            _gb.click().run()
+            check("生成报告无异常", not _errors(at), _errors(at)[:1])
+            _got = at.session_state.get("r3d_report")
+            _paths = (_got or {}).get("paths", {})
+            _ok = bool(_paths) and all(Path(p).exists() and Path(p).stat().st_size > 2000
+                                       for p in _paths.values())
+            check("梁格报告三份已落盘", _ok,
+                  "、".join(f"{Path(p).name}" for p in _paths.values()) or "—")
+            if _ok:
+                import zipfile as _zip
+                from docx import Document as _Doc
+                _d = _Doc(str(_paths["docx"]))
+                _h = [x.text for x in _d.paragraphs if x.style.name == "Heading 1"]
+                check("梁格报告章节齐全", len(_h) >= 5,
+                      f"{len(_h)} 章：" + "、".join(_h))
+                _html = Path(_paths["html"]).read_text(encoding="utf-8")
+                check("HTML 图片内嵌（单文件可发）",
+                      "data:image/png;base64" in _html
+                      and 'src="http' not in _html)
+                _zn = set(_zip.ZipFile(_paths["zip"]).namelist())
+                check("CSV 包含指标与校核",
+                      {"00_指标.csv", "01_校核.csv"} <= _zn, str(sorted(_zn))[:80])
+
         print("\n[梁格：改参数后结果过期]")
         _ver = at.session_state["doc_version"]
         at.number_input(key=f"pgrillage3d{_ver}_sp2").set_value(60.0).run()
