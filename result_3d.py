@@ -446,8 +446,8 @@ class SolveResult:
             if npeak < 1.0:            # < 1 N 视为零（浮点残差量级）
                 out.append(Check(
                     "轴力水平", True,
-                    f"全模型 |N| < {npeak:.1e} N：梁格无纵向约束，竖向荷载"
-                    "不产生轴力（故不绘轴力图）", level="info"))
+                    f"全模型 |N| 最大 {npeak:.2e} N（浮点残差量级）：梁格无纵向"
+                    "约束，竖向荷载不产生轴力（故不绘轴力图）", level="info"))
             else:
                 out.append(Check(
                     "轴力水平", True,
