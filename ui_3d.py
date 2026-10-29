@@ -165,10 +165,13 @@ def _cable_extras(doc: ModelDoc, res: SolveResult) -> None:
                 from report_docx import build_cable_report
 
                 p = dict(doc.params)
+                # 文件名带结果指纹：一是"这份计算书对应哪次求解"一目了然，
+                # 二是避免覆盖 Word 正打开着的同名文件（实测直接
+                # PermissionError，界面上只剩一句"生成失败"）。
                 out = build_cable_report(
                     model=doc.model, info=doc.info,
                     res=res.as_legacy_dict(), params=p,
-                    out_path="out/cable/report.docx",
+                    out_path=f"out/cable/report_{res.fingerprint}.docx",
                     project=res.title or "双塔三跨斜拉桥")
                 st.session_state["cb_report_path"] = str(out)
             except Exception as e:                  # noqa: BLE001

@@ -66,7 +66,9 @@ def main() -> int:
 
     # ---------------------------------------------------------- ② 内核选择
     print("\n[② 内核由模型自述决定]")
-    m_g = build_box_grillage_3d()
+    # 带活载 + 逐跨施工：这是界面默认（ModelDoc.DEFAULTS 里 staged/lane 均为真），
+    # 之前用建造器裸默认（无活载）测，活载包络这条链就没被覆盖过。
+    m_g = build_box_grillage_3d(staged=True, lane_code="JTG_D60")
     m_c, _ = build_cable_stayed_3d()
     check("梁格模型 → grillage3d", detect_kind(m_g) == "grillage3d", detect_kind(m_g))
     check("斜拉桥模型 → cable_stayed", detect_kind(m_c) == "cable_stayed", detect_kind(m_c))
@@ -94,6 +96,26 @@ def main() -> int:
           bool(mmax and mmax[1] > 1e3), f"{mmax[1] / 1e3:.1f} kN·m" if mmax else "—")
     _tables = r_g.tables(m_g)
     check("明细表含梁内力包络", "beam_envelope" in _tables, str(list(_tables)))
+    # 活载包络是这本软件唯一"活载相关"的结果：算完必须有出口，
+    # 否则它就是躺在 res.live 里的一串没人看的数字。
+    check("活载包络有指标", any("活载" in x.label for x in r_g.metrics(m_g)),
+          str([x.label for x in r_g.metrics(m_g)]))
+    check("明细表含活载包络表", "live_envelope" in _tables, str(list(_tables)))
+    check("活载包络表行数 = 阶段数",
+          len(_tables.get("live_envelope", {}).get("rows", [])) == len(r_g.live),
+          f"{len(_tables.get('live_envelope', {}).get('rows', []))}/{len(r_g.live)}")
+    _lw = r_g.live_worst()
+    check("活载包络最不利值非零", bool(_lw and abs(_lw[1]) > 1e-9),
+          f"阶段 {_lw[0]} {_lw[1] * 1000:.2f} mm" if _lw else "—")
+    check("明细表含控制断面位移表", "control_disp" in _tables, str(list(_tables)))
+    _cd = _tables.get("control_disp", {}).get("rows", [])
+    check("控制断面 = 支座 + 跨中（不是全节点）",
+          0 < len(_cd) < len(m_g.nodes),
+          f"{len(_cd)} 行 / {len(m_g.nodes)} 节点")
+    # 轴力为零是结果不是缺失：必须有一条说明，否则读者会去追问轴力图
+    check("轴力为零有显式说明",
+          any("轴力" in c.name for c in r_g.checks(m_g)),
+          next((c.detail for c in r_g.checks(m_g) if "轴力" in c.name), "无"))
     check("指标卡非空且都有值", all(x.value for x in r_g.metrics(m_g)),
           f"{len(r_g.metrics(m_g))} 张")
     _bad = [c.name for c in r_g.checks(m_g) if not c.passed]
@@ -115,6 +137,20 @@ def main() -> int:
     check("明细表含索表与制造线形",
           {"cable_table", "camber_table"} <= set(r_c.tables(m_c)),
           str(list(r_c.tables(m_c))))
+    # 逐根安全系数：只给最不利值不够，施工方要核对"哪几根偏紧"
+    _ct = r_c.tables(m_c)["cable_table"]
+    check("索表含安全系数列", any("安全系数" in h for h in _ct["headers"]),
+          str(_ct["headers"]))
+    _sf = r_c.cable_safety(m_c)
+    check("最不利索安全系数可算", bool(_sf and _sf[1] > 1.0),
+          f"索 {_sf[0]} κ={_sf[1]:.2f}" if _sf else "—")
+    check("安全系数进指标卡",
+          any("安全系数" in x.label for x in r_c.metrics(m_c)),
+          str([x.label for x in r_c.metrics(m_c)]))
+    _sfcol = _ct["headers"].index(next(h for h in _ct["headers"] if "安全系数" in h))
+    _kmin = min(r[_sfcol] for r in _ct["rows"])
+    check("逐根安全系数最小值与最不利一致",
+          abs(float(_kmin) - _sf[1]) < 0.02, f"{_kmin} vs {_sf[1]:.2f}")
     _bad = [c.name for c in r_c.checks(m_c) if not c.passed]
     check("成桥态校核全通过", not _bad, "、".join(_bad))
     _legacy = r_c.as_legacy_dict()

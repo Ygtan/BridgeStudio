@@ -167,6 +167,64 @@ class SolveResult:
                 best = (nid, v)
         return best
 
+    def live_worst(self) -> tuple[int, float] | None:
+        """活载包络最不利值 → (阶段号, 位移 m)。取绝对值大的一侧。
+
+        内核给的是**影响点**（中跨跨中）处各施工阶段的活载位移包络，一个
+        阶段一对 (max, min)；包络的 min 才是向下挠的控制值，但上拱同样要
+        看得见，所以按绝对值挑。
+        """
+        best: tuple[int, float] | None = None
+        for stage, (hi, lo) in self.live.items():
+            v = lo if abs(lo) >= abs(hi) else hi
+            if best is None or abs(v) > abs(best[1]):
+                best = (stage, v)
+        return best
+
+    def cable_safety(self, model: Any = None) -> tuple[int, float] | None:
+        """最不利索的安全系数 → (索单元号, κ)。κ = A·fpu / T。
+
+        面积取模型实常数、fpu 取 1860 级默认值；任一缺失就返回 None 而不是
+        假设一个面积——用假面积算出来的安全系数比不给更糟。
+        """
+        area = _cable_area_m2(model) if model is not None else None
+        if not area or not self.cables:
+            return None
+        worst: tuple[int, float] | None = None
+        for c in self.cables:
+            t = float(c.get("T") or 0.0)
+            if t <= 0:
+                continue
+            k = area * CABLE_FPU_DEFAULT / t
+            if worst is None or k < worst[1]:
+                worst = (int(c["elem"]), k)
+        return worst
+
+    def control_sections(self, model: Any = None) -> list[tuple[str, int, float]]:
+        """控制断面 → [(标记, 节点号, x)]：支座断面 + 各跨跨中。
+
+        施工控制只关心这几处（支座看支承是否落实，跨中看线形），逐个节点
+        列表没有意义：91 个节点里有 80 个既不是支座也不是跨中。
+        """
+        if model is None or not self.disp:
+            return []
+        x_of = {n.id: n.x for n in model.nodes}
+        sup = support_x(model)
+        if len(sup) < 1:
+            return []
+        targets = [(f"支座 {x:.0f} m", x) for x in sup]
+        targets += [(f"跨中 {(a + b) / 2:.0f} m", (a + b) / 2)
+                    for a, b in zip(sup[:-1], sup[1:])]
+        out: list[tuple[str, int, float]] = []
+        for label, x in targets:
+            if not x_of:
+                continue
+            nid = min(x_of, key=lambda n: abs(x_of[n] - x))
+            if any(nid == o[1] for o in out):      # 同一节点只列一次
+                continue
+            out.append((label, nid, x_of[nid]))
+        return out
+
     def total_length(self, model: Any = None) -> float | None:
         """模型纵向长度（用于挠度限值 L/xxx）。由节点坐标推出，不信参数。"""
         if model is None:
@@ -200,6 +258,11 @@ class SolveResult:
                 Metric("索承担桥面恒载", f"{(m.get('deck_share_pct') or 0):.1f}", "%",
                        hint=f"支座承担 {(m.get('support_share_kN') or 0):.0f} kN"),
             ]
+            sf = self.cable_safety(model)
+            if sf is not None:
+                out.append(Metric(
+                    "索最小安全系数", f"{sf[1]:.2f}",
+                    hint=f"索 {sf[0]}，限值 ≥ {CABLE_SAFETY_MIN:.1f}"))
         else:
             mvd = self.max_vertical_deflection()
             out.append(Metric(
@@ -211,6 +274,14 @@ class SolveResult:
                 "最大竖向弯矩 My",
                 f"{mmax[1] / 1e3:.1f}" if mmax else "—", "kN·m",
                 hint=f"单元 {mmax[0]}" if mmax else "无梁内力"))
+            # 活载包络是这本软件唯一"活载相关"的结果，之前算完就没出口了：
+            # 数据在 res.live 里躺着，界面上只显示"活载包络 3 阶段"这条
+            # 说明文字。旧版界面有这一格，重构时必须恢复。
+            lw = self.live_worst()
+            if lw is not None:
+                out.append(Metric(
+                    "活载包络（影响点）", f"{lw[1] * 1000:.2f}", "mm",
+                    hint=f"阶段 {lw[0]}，JTG D60 车道荷载"))
             out.append(Metric("施工阶段", f"{st.get('stages', 0)}",
                               hint=f"活载包络 {len(self.live)} 阶段"))
             out.append(Metric("梁内力包络单元", f"{len(self.beam)}",
@@ -294,16 +365,15 @@ class SolveResult:
                 value=float(tmin), limit=0.0, unit="kN"))
 
         # 安全系数：面积从模型实常数取，破断强度用 1860 级默认值
+        sf = self.cable_safety(model)
         area = _cable_area_m2(model)
-        if area and self.cables:
-            tmax = max(c["T"] for c in self.cables)
-            fbru = area * CABLE_FPU_DEFAULT
-            sf = fbru / tmax if tmax > 0 else float("inf")
+        if sf is not None and area:
             out.append(Check(
-                f"索最小安全系数（≥ {CABLE_SAFETY_MIN:.1f}）", sf >= CABLE_SAFETY_MIN,
-                f"破断力 {fbru / 1e3:.0f} kN / 最大索力 {tmax / 1e3:.0f} kN = {sf:.2f}"
-                f"（A={area * 1e6:.0f} mm²，fpu=1860 MPa）",
-                value=sf, limit=CABLE_SAFETY_MIN))
+                f"索最小安全系数（≥ {CABLE_SAFETY_MIN:.1f}）", sf[1] >= CABLE_SAFETY_MIN,
+                f"破断力 {area * CABLE_FPU_DEFAULT / 1e3:.0f} kN / 最大索力 "
+                f"{area * CABLE_FPU_DEFAULT / sf[1] / 1e3:.0f} kN = {sf[1]:.2f}"
+                f"（索 {sf[0]}，A={area * 1e6:.0f} mm²，fpu=1860 MPa）",
+                value=sf[1], limit=CABLE_SAFETY_MIN))
 
         out += _same_span_smoothness(self.cables, model)
         out.append(self._camber_check(model))
@@ -345,6 +415,22 @@ class SolveResult:
                 f"|{mvd[1] * 1000:.2f}| mm ≤ {lim * 1000:.1f} mm"
                 f"（L={L:.0f} m，节点 {mvd[0]}）",
                 value=abs(mvd[1]), limit=lim, unit="m", level="warn"))
+
+        # 活载挠度单独校核：规范限值针对的是**车道荷载产生的挠度**，
+        # 不是恒载 + 活载的总量。上面那条拿全量对 L/600，只能当量级判据；
+        # 这条才是条文对应的量，分母用最大跨径（不是总长）。
+        lw = self.live_worst()
+        if lw is not None:
+            sup = support_x(model)
+            span = (max((b - a for a, b in zip(sup[:-1], sup[1:])), default=0.0)
+                    if len(sup) >= 2 else 0.0)
+            if span > 0:
+                lim = span / 600.0
+                out.append(Check(
+                    "活载挠度 ≤ L₁/600（JTG D60 4.3.2）", abs(lw[1]) <= lim,
+                    f"阶段 {lw[0]} 影响点 |{lw[1] * 1000:.2f}| mm ≤ "
+                    f"{lim * 1000:.1f} mm（最大跨径 {span:.0f} m）",
+                    value=abs(lw[1]), limit=lim, unit="m"))
         if self.beam:
             mmax = self.max_bending()
             out.append(Check(
@@ -352,6 +438,21 @@ class SolveResult:
                 (f"最大 |My| {mmax[1] / 1e3:.1f} kN·m（单元 {mmax[0]}）"
                  if mmax else "所有单元弯矩为 0"),
                 level="warn"))
+            # 轴力为 0 是**结果**而不是缺失：梁格只在支座处约束竖向/横向，
+            # 竖向荷载找不到传力路径去产生轴力。写出来，读者才不会追问
+            # "轴力图去哪了"。
+            npeak = max((max(abs(v.get("Nmin", 0.0)), abs(v.get("Nmax", 0.0)))
+                         for v in self.beam.values()), default=0.0)
+            if npeak < 1.0:            # < 1 N 视为零（浮点残差量级）
+                out.append(Check(
+                    "轴力水平", True,
+                    f"全模型 |N| < {npeak:.1e} N：梁格无纵向约束，竖向荷载"
+                    "不产生轴力（故不绘轴力图）", level="info"))
+            else:
+                out.append(Check(
+                    "轴力水平", True,
+                    f"最大 |N| {npeak / 1e3:.1f} kN（由纵向约束/温度等引起）",
+                    value=npeak / 1e3, unit="kN", level="info"))
         if not self.disp:
             out.append(Check("位移包络非空", False, "summary 里没有任何位移条目"))
         return out
@@ -364,27 +465,64 @@ class SolveResult:
         x_of = {n.id: n.x for n in model.nodes} if model is not None else {}
 
         if self.cables:
+            area = _cable_area_m2(model) if model is not None else None
             rows = []
             for c in sorted(self.cables, key=lambda c: x_of.get(c["anchor"], 0.0)):
+                t = float(c.get("T") or 0.0)
+                # 逐根安全系数：只有最不利值进指标卡，但施工方要核对的是
+                # "哪几根索偏紧"，所以每根都得列出来。
+                k = (area * CABLE_FPU_DEFAULT / t) if (area and t > 0) else None
                 rows.append([
                     c["elem"], c["anchor"],
                     _r(x_of.get(c["anchor"], float("nan")), 2),
-                    _r(c["Ltarget"], 3), _r(c["L0"], 3), _r(c["chord"], 3),
-                    _r(c["T"] / 1e3, 1), _r(c["dL"] * 1000, 1),
+                    _r(c["Ltarget"], 3), _r(c["L0"], 3),
+                    _r(c["T"] / 1e3, 1),
+                    _r(k, 2) if k is not None else "—",
+                    _r(c["dL"] * 1000, 1),
                 ])
             out["cable_table"] = {
-                "title": "成桥索力与下料索长",
+                "title": "成桥索力、下料索长与安全系数",
                 # dL 是「成桥弦长 − 目标弦长」的闭合残差，不是设计调整量。
                 # 不写这一句，读者会以为"换算出来的索长调整量全是 0"。
-                "note": "弦长残差 = 成桥弦长 − 目标弦长，反映索长闭环精度，"
-                        "量级应在 0.1 mm 以下。",
+                "note": "弦长残差 = 成桥弦长 − 设计弦长（成桥弦长 = 设计弦长 + "
+                        "残差/1000），反映索长闭环精度，量级应在 0.1 mm 以下；"
+                        "安全系数 = A·fpu / T"
+                        f"（A 取实常数，fpu = 1860 MPa，限值 ≥ "
+                        f"{CABLE_SAFETY_MIN:.1f}）。",
                 # 表头刻意短：8 列塞进 15.5 cm 时，"索单元"会被折成「索单/元」
                 # 这种带孤字的竖排。信息量由表题承担（成桥索力与下料索长）。
                 "headers": ["索号", "锚点", "锚点 x (m)", "设计弦长 (m)",
-                            "下料 L0 (m)", "成桥弦长 (m)", "索力 (kN)",
+                            "下料 L0 (m)", "索力 (kN)", "安全系数",
                             "弦长残差 (mm)"],
                 "rows": rows,
             }
+
+        if self.live:
+            out["live_envelope"] = {
+                "title": "活载包络（JTG D60，影响点 = 中跨跨中）",
+                "note": "取自内核 compute3DStageLiveEnvelope：对各施工阶段的"
+                        "激活体系逐车道求影响面后取包络，max 为向上、min 为向下。",
+                "headers": ["施工阶段", "竖向 max (mm)", "竖向 min (mm)"],
+                "rows": [[k, _r(hi * 1000, 2), _r(lo * 1000, 2)]
+                         for k, (hi, lo) in sorted(self.live.items())],
+            }
+
+        if self.disp and model is not None:
+            rows2 = []
+            for label, nid, x in self.control_sections(model):
+                v = self.disp.get((nid, 3), (0.0, 0.0))
+                h = self.disp.get((nid, 2), (0.0, 0.0))
+                rows2.append([label, nid, _r(x, 2),
+                              _r(v[0] * 1000, 2), _r(v[1] * 1000, 2),
+                              _r(max(abs(h[0]), abs(h[1])) * 1000, 2)])
+            if rows2:
+                out["control_disp"] = {
+                    "title": "控制断面位移包络",
+                    "note": "支座与跨中节点；竖向向下为负，横向取绝对值最大者。",
+                    "headers": ["断面", "节点", "x (m)", "竖向 min (mm)",
+                                "竖向 max (mm)", "横向 max (mm)"],
+                    "rows": rows2,
+                }
 
         if self.camber:
             deck = sorted((n for n in self.camber if 1000 < n < 2000),

@@ -48,7 +48,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-from result_3d import Check, Metric, SolveResult, support_x
+from result_3d import (CABLE_FPU_DEFAULT, CABLE_SAFETY_MIN, Check, Metric,
+                       SolveResult, _cable_area_m2, support_x)
 
 # ---------------------------------------------------------------- 配色
 # 与界面、Word 计算书同一套，避免"屏幕上蓝、报告里灰"
@@ -119,32 +120,40 @@ def figure_layout(res: SolveResult, model: Any, path: Path) -> Path:
     plan = _is_plan_view(model)
 
     fig, ax = plt.subplots(figsize=(7.6, 3.3))
-    style = {"BEAM": (C_INK, 1.6), "CABLE": ("#8A8A8A", 0.8),
+    style = {"BEAM": (C_INK, 1.6), "CABLE": ("#6F6F6F", 0.9),
              "TRUSS": ("#7A7A7A", 1.2)}
     for e in model.elements:
         a, b = nodes.get(e.n1), nodes.get(e.n2)
         if a is None or b is None:
             continue
         col, lw = style.get(kind_of.get(e.etype, "BEAM"), ("#9A9A9A", 1.0))
+        # 横梁必须画细画浅：45 道横梁在 15.5 cm 宽的版面上会连成一片黑栅栏，
+        # 把纵梁全盖住（图上只剩"斑马线"，看不出是三跨连续体系）。
+        if plan and abs(b.y - a.y) > 0.5:
+            col, lw = "#9A9A9A", 0.45
         if plan:
-            ax.plot([a.x, b.x], [a.y, b.y], color=col, lw=lw, solid_capstyle="butt")
+            ax.plot([a.x, b.x], [a.y, b.y], color=col, lw=lw, solid_capstyle="butt",
+                    zorder=3 if lw > 1.0 else 2)
         else:
             ax.plot([a.x, b.x], [a.z, b.z], color=col, lw=lw, solid_capstyle="butt")
 
+    # 支座按**实际受约束的节点**画，不在 y=0 画一个代表符号：梁格的支座
+    # 是横向一排（每条纵梁下一个），只画中间那一个会让人以为是独柱支承。
+    sup_nodes = _support_node_positions(model)
     if plan:
-        for x in support_x(model):
-            ax.plot([x], [0.0], marker="^", ms=7, mfc="white", mec=C_RED,
+        for (x, y, _z) in sup_nodes:
+            ax.plot([x], [y], marker="^", ms=6, mfc="white", mec=C_RED,
                     mew=1.0, zorder=6)
-        ax.set_xlabel("顺桥向 x (m)　（红三角 = 支承断面）")
+        ax.set_xlabel("顺桥向 x (m)　（红三角 = 支承节点）")
         ax.set_ylabel("横桥向 y (m)")
     else:
         zs = [n.z for n in model.nodes] or [0.0]
         H = max(zs) - min(zs) or 1.0
-        for x in support_x(model):
-            ax.plot([x], [0.0], marker="^", ms=7, mfc="white", mec=C_RED,
+        for (x, _y, z) in sup_nodes:
+            ax.plot([x], [z], marker="^", ms=6, mfc="white", mec=C_RED,
                     mew=1.0, zorder=6)
         ax.set_ylim(-0.16 * H, 1.10 * max(H, 1e-9))
-        ax.set_xlabel("顺桥向 x (m)　（红三角 = 支承断面）")
+        ax.set_xlabel("顺桥向 x (m)　（红三角 = 支承节点）")
         ax.set_ylabel("竖向 z (m)")
 
     ax.grid(alpha=0.25, lw=0.5)
@@ -152,6 +161,23 @@ def figure_layout(res: SolveResult, model: Any, path: Path) -> Path:
         ax.spines[s].set_visible(False)
     fig.tight_layout()
     return _save(fig, path)
+
+
+def _support_node_positions(model: Any) -> list[tuple[float, float, float]]:
+    """受竖向/横向约束的节点坐标 → [(x, y, z)]。
+
+    与 `support_x()` 同源（都看 dof 2/3），但保留 y：梁格的支座是横向一排，
+    画到图上是 3 个三角并排，而不是一个代表符号。
+    """
+    by = {n.id: n for n in model.nodes}
+    out: list[tuple[float, float, float]] = []
+    seen: set[int] = set()
+    for b in getattr(model, "boundaries", []):
+        if (2 in b.dofs or 3 in b.dofs) and b.node in by and b.node not in seen:
+            n = by[b.node]
+            out.append((n.x, n.y, n.z))
+            seen.add(b.node)
+    return out
 
 
 def _bucketed(pairs: Iterable[tuple[float, float, float]]) -> list[tuple[float, float, float]]:
@@ -258,6 +284,144 @@ def figure_moment(res: SolveResult, model: Any,
     return p, note
 
 
+def _component_peak(res: SolveResult, kmin: str, kmax: str,
+                    scale: float = 1.0) -> float:
+    """某内力分量的包络峰值（已按 scale 换算单位）。"""
+    return max((max(abs(v.get(kmin, 0.0)), abs(v.get(kmax, 0.0)))
+                for v in res.beam.values()), default=0.0) / scale
+
+
+def _line_groups(res: SolveResult, model: Any, kmin: str, kmax: str
+                 ) -> tuple[dict[float, list[tuple[float, float, float]]], int]:
+    """按纵梁线（横向 y）分组收集单元包络 → ({y: [(x, min, max)]}, 横梁数)。
+
+    为什么必须分组：梁格里横梁与纵梁的同一分量语义不同（纵梁 My 是竖向弯曲，
+    横梁 My 是横向弯曲）。混在一起画，同一个 x 上两个量交替出现，看起来就是
+    数值振荡。这个坑已经踩过一次（弯矩图锯齿）。
+    """
+    nodes = {n.id: n for n in model.nodes}
+    groups: dict[float, list[tuple[float, float, float]]] = {}
+    n_trans = 0
+    for e in model.elements:
+        a, b = nodes.get(e.n1), nodes.get(e.n2)
+        v = res.beam.get(e.id)
+        if a is None or b is None or v is None:
+            continue
+        if abs(b.y - a.y) > 0.5:            # 横梁
+            n_trans += 1
+            continue
+        y = round((a.y + b.y) / 2.0, 2)
+        groups.setdefault(y, []).append(
+            ((a.x + b.x) / 2.0, v.get(kmin, 0.0), v.get(kmax, 0.0)))
+    for g in groups.values():
+        g.sort(key=lambda t: t[0])
+    return groups, n_trans
+
+
+def _envelope_figure(groups: dict[float, list[tuple[float, float, float]]],
+                     model: Any, path: Path, *, ylabel: str, scale: float,
+                     legend_fmt: str = "纵梁 y={:+.1f} m") -> Path:
+    """一组纵梁线的 min/max 包络（实线 min、虚线 max）。"""
+    plt = _plt()
+    fig, ax = plt.subplots(figsize=(7.4, 3.0))
+    colors = [C_BLUE, C_GREEN, "#8A5A00", "#5B4B8A", "#0F6E6E"]
+    for i, (y, rows) in enumerate(sorted(groups.items())):
+        c = colors[i % len(colors)]
+        ax.plot([r[0] for r in rows], [r[1] / scale for r in rows], "-", lw=1.2,
+                color=c, label=legend_fmt.format(y) + " min")
+        ax.plot([r[0] for r in rows], [r[2] / scale for r in rows], "--", lw=0.95,
+                color=c, alpha=0.85)
+    ax.axhline(0.0, color=C_GRAY, lw=0.8)
+    if groups:
+        hi = max(max(r[2] for r in g) for g in groups.values()) / scale
+        lo = min(min(r[1] for r in g) for g in groups.values()) / scale
+        top = hi * 1.45 if hi > 0 else 0.0
+        bot = lo * 1.12 if lo < 0 else 0.0
+        ax.set_ylim(bot, top if top > bot else bot + 1.0)
+    for sx in support_x(model):
+        ax.axvline(x=sx, color=C_RED, ls="--", lw=0.7, alpha=0.55)
+    ax.set_xlabel("顺桥向 x (m)　（红虚线 = 支承断面）")
+    ax.set_ylabel(ylabel)
+    ax.grid(alpha=0.25, lw=0.5)
+    if groups:
+        ax.legend(frameon=False, fontsize=7.5, ncol=3, loc="upper center")
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
+def figure_axial(res: SolveResult, model: Any,
+                 path: Path) -> tuple[Path, str]:
+    """轴力包络 N（纵梁）。轴力是预应力/体系转换的核对量，不是弯矩的附属。"""
+    groups, n_trans = _line_groups(res, model, "Nmin", "Nmax")
+    p = _envelope_figure(groups, model, path, ylabel="N (kN)", scale=1e3)
+    note = (f"只含纵梁；{n_trans} 个横梁单元未绘入。" if n_trans else "")
+    return p, note
+
+
+def figure_shear(res: SolveResult, model: Any,
+                 path: Path) -> tuple[Path, str]:
+    """剪力包络 Vz（纵梁）。"""
+    groups, n_trans = _line_groups(res, model, "VzMin", "VzMax")
+    p = _envelope_figure(groups, model, path, ylabel="Vz (kN)", scale=1e3)
+    note = (f"只含纵梁；{n_trans} 个横梁单元未绘入。" if n_trans else "")
+    return p, note
+
+
+def figure_live(res: SolveResult, model: Any, path: Path) -> Path:
+    """活载包络：各施工阶段影响点处车道荷载产生的竖向位移。
+
+    内核只给标量（每个阶段一对 max/min），没有沿桥分布——所以是成对柱状图，
+    不是曲线。画成曲线会是伪造的：三个点连成的"曲线"没有物理含义。
+    """
+    plt = _plt()
+    stages = sorted(res.live)
+    lo = [res.live[s][1] * 1000 for s in stages]
+    hi = [res.live[s][0] * 1000 for s in stages]
+    fig, ax = plt.subplots(figsize=(6.4, 2.9))
+    idx = list(range(len(stages)))
+    # 柱宽按组数自适应：只有 3 个阶段时 0.34 的柱宽在版面上细得像针
+    w = min(0.42, 2.6 / max(len(stages), 1) / 2)
+    ax.bar([i - w / 2 for i in idx], lo, w, color=C_BLUE, label="向下（min）")
+    ax.bar([i + w / 2 for i in idx], hi, w, color=C_LIGHT, label="向上（max）")
+    ax.axhline(0.0, color=C_GRAY, lw=0.8)
+    ax.set_xticks(idx)
+    ax.set_xticklabels([f"阶段 {s}" for s in stages])
+    ax.set_ylabel("竖向位移 (mm)")
+    ax.grid(axis="y", alpha=0.25, lw=0.5)
+    ax.legend(frameon=False, fontsize=8)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
+def figure_safety(res: SolveResult, model: Any, path: Path) -> Path:
+    """逐根索的安全系数，附规范下限线。"""
+    plt = _plt()
+    area = _cable_area_m2(model)
+    x_of = _deck_x(model)
+    cs = sorted(res.cables, key=lambda c: x_of.get(c["anchor"], 0.0))
+    ks = [(x_of.get(c["anchor"], 0.0), area * CABLE_FPU_DEFAULT / c["T"]
+           if (area and c["T"] > 0) else float("nan")) for c in cs]
+    fig, ax = plt.subplots(figsize=(7.4, 2.7))
+    ax.plot([k[0] for k in ks], [k[1] for k in ks], "o-", ms=3.4, lw=1.1,
+            color=C_BLUE, mfc=C_BLUE, label="安全系数 κ = A·fpu / T")
+    ax.axhline(CABLE_SAFETY_MIN, color=C_RED, ls="--", lw=0.9,
+               label=f"限值 {CABLE_SAFETY_MIN:.1f}（JTG/T 3365-01）")
+    for sx in support_x(model):
+        ax.axvline(x=sx, color=C_RED, ls="--", lw=0.7, alpha=0.35)
+    ax.set_xlabel("顺桥向 x (m)　（红虚线 = 支承断面）")
+    ax.set_ylabel("安全系数 κ")
+    ax.grid(alpha=0.25, lw=0.5)
+    ax.legend(frameon=False, fontsize=8, loc="upper center", ncol=2)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
 def figure_tension(res: SolveResult, model: Any, path: Path) -> Path:
     """成桥索力沿桥纵向分布。"""
     plt = _plt()
@@ -308,6 +472,12 @@ def figure_camber(res: SolveResult, model: Any, path: Path) -> Path:
     return _save(fig, path)
 
 
+#: 报告正文里图的排列顺序。与 figures() 的生成顺序解耦：报告要有稳定的
+#: 叙事顺序（先简图、再变形、再内力、再索），而生成顺序由判据决定。
+_FIGURE_ORDER = ("layout", "deflection", "moment", "axial", "shear",
+                 "live", "tension", "safety", "camber")
+
+
 @dataclass
 class Figure:
     key: str
@@ -353,9 +523,43 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
             "moment", "梁单元竖向弯矩包络（My）", mp,
             note="弯矩符号随单元 i→j 方向：实线为 min、虚线为 max，"
                  "比较量级时取绝对值。" + mnote)
+        # 轴力与剪力：弯矩之外的两个主控内力，内核已输出就不该只画弯矩。
+        # 但"有字段"不等于"有量"：三跨连续梁格没有纵向约束，竖向荷载不产生
+        # 轴力（N 全为 -0.0）。画出来是一张 y 轴 0~1 的空图，比不画更糟——
+        # 读者会以为轴力曲线被裁掉了。这里按峰值判，1e-3 kN 以下视为零。
+        if _component_peak(res, "Nmin", "Nmax", 1e3) > 1e-3:
+            ap, anote = figure_axial(res, model, d / "axial.png")
+            out["axial"] = Figure(
+                "axial", "梁单元轴力包络（N）", ap,
+                note="实线为 min（压）、虚线为 max（拉）。" + anote)
+        if _component_peak(res, "VzMin", "VzMax", 1e3) > 1e-3:
+            sp, snote = figure_shear(res, model, d / "shear.png")
+            out["shear"] = Figure(
+                "shear", "梁单元剪力包络（Vz）", sp,
+                note="实线为 min、虚线为 max。" + snote)
+    if res.live:
+        # 阶段包络为 0 不是漏算：施工中间态下影响点还没与任何单元连通
+        # （阶段 1 只建边跨，中跨跨中尚无单元）。不说清楚，读者会以为
+        # "阶段 1 的活载算丢了"。
+        zeros = [s for s, (hi, lo) in sorted(res.live.items())
+                 if abs(hi) < 1e-12 and abs(lo) < 1e-12]
+        lnote = ("内核按施工阶段逐车道求影响面后取包络；每阶段只有一对极值，"
+                 "故为柱状而非沿桥曲线。")
+        if zeros:
+            lnote += (f"阶段 {'、'.join(map(str, zeros))} 包络为 0：该阶段"
+                      "影响点尚未与任何单元连通（施工中间态），不是漏算。")
+        out["live"] = Figure(
+            "live", "活载包络（JTG D60 车道荷载，影响点 = 中跨跨中）",
+            figure_live(res, model, d / "live.png"), note=lnote)
     if res.cables:
         out["tension"] = Figure("tension", "成桥索力分布",
                                 figure_tension(res, model, d / "tension.png"))
+        if _cable_area_m2(model):
+            out["safety"] = Figure(
+                "safety", "索安全系数分布",
+                figure_safety(res, model, d / "safety.png"),
+                note=f"κ = A·fpu / T，A 取实常数、fpu = 1860 MPa；"
+                     f"限值 {CABLE_SAFETY_MIN:.1f}。")
     if res.camber:
         out["camber"] = Figure("camber", "制造线形预抬高",
                                figure_camber(res, model, d / "camber.png"))
@@ -495,16 +699,15 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     blocks.append({"type": "checks", "items": checks})
 
     blocks.append({"type": "h1", "text": "计算结果"})
-    if "layout" in figs:
-        blocks.append({"type": "figure", "key": "layout"})
-    if "deflection" in figs:
-        blocks.append({"type": "figure", "key": "deflection"})
-    if "moment" in figs:
-        blocks.append({"type": "figure", "key": "moment"})
-    if "tension" in figs:
-        blocks.append({"type": "figure", "key": "tension"})
-    if "camber" in figs:
-        blocks.append({"type": "figure", "key": "camber"})
+    # 按**实际生成的图**出章节，而不是写死一份清单。写死的清单在加图时
+    # 会静默漏掉：图生成了、报告里没有，而"报告生成成功"看不出来
+    # （这正是 verify_report_3d 的 base64 对拍断言抓到的问题）。
+    for key in _FIGURE_ORDER:
+        if key in figs:
+            blocks.append({"type": "figure", "key": key})
+    for key in figs:                     # 清单外的新图兜底，排在最后
+        if key not in _FIGURE_ORDER:
+            blocks.append({"type": "figure", "key": key})
 
     blocks.append({"type": "h1", "text": "结论与说明"})
     blocks.append({"type": "bullets", "items": _conclusion_bullets(res, model, checks)})
@@ -882,12 +1085,26 @@ def write_csv(rep: Report, path: str | Path) -> Path:
 
 
 def write_all(rep: Report, out_dir: str | Path, stem: str = "report") -> dict[str, Path]:
-    """三种文件一次写全，返回 {格式: 路径}。界面按钮直接用这个。"""
+    """三种文件一次写全，返回 {格式: 路径}。界面按钮直接用这个。
+
+    目标文件被 Word / Excel 打开着时，Windows 直接拒写（PermissionError）。
+    "生成失败：Permission denied" 对用户毫无指导意义——他不会想到是自己开着
+    那份文档。这里退一步改名写到同目录，并把实际路径返回给界面，用户仍能
+    下载到正确内容，且不会覆盖他正在看的那一份。
+    """
     d = Path(out_dir)
+
+    def _put(fn: Any, path: Path) -> Path:
+        try:
+            return fn(rep, path)
+        except PermissionError:
+            alt = path.with_name(f"{path.stem}_{rep.fingerprint}{path.suffix}")
+            return fn(rep, alt)
+
     return {
-        "html": write_html(rep, d / f"{stem}.html"),
-        "docx": write_docx(rep, d / f"{stem}.docx"),
-        "zip": write_csv(rep, d / f"{stem}_数据表.zip"),
+        "html": _put(write_html, d / f"{stem}.html"),
+        "docx": _put(write_docx, d / f"{stem}.docx"),
+        "zip": _put(write_csv, d / f"{stem}_数据表.zip"),
     }
 
 

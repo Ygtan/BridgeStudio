@@ -88,8 +88,8 @@ def main() -> int:
     reps = {}
     for kind, model in cases:
         print(f"\n[{kind}]")
-        res = solve(model, kind=kind, out_dir=f"out/p4_{kind}")
-        rep = R.build_document(res, model, out_dir=f"out/p4_{kind}")
+        res = solve(model, kind=kind, out_dir=f"out/verify_report/{kind}")
+        rep = R.build_document(res, model, out_dir=f"out/verify_report/{kind}")
         reps[kind] = (rep, res, model)
 
         kinds = [b["type"] for b in rep.blocks]
@@ -114,7 +114,7 @@ def main() -> int:
               ("tension" not in rep.figures if kind == "grillage3d"
                else "moment" not in rep.figures), str(sorted(rep.figures)))
 
-        paths = R.write_all(rep, f"out/p4_{kind}", stem=f"{kind}_report")
+        paths = R.write_all(rep, f"out/verify_report/{kind}", stem=f"{kind}_report")
         check("三种格式都写出来了",
               all(Path(p).exists() and Path(p).stat().st_size > 2000
                   for p in paths.values()),
@@ -191,7 +191,7 @@ def main() -> int:
                        {"type": "h1", "text": "结论与说明"},
                        {"type": "bullets", "items": ["**1 项未通过**"]}],
                    meta=[("桥型", "三维梁格")])
-    paths = R.write_all(rep, "out/p4_inject", stem="inject")
+    paths = R.write_all(rep, "out/verify_report/inject", stem="inject")
     html = Path(paths["html"]).read_text(encoding="utf-8")
     check("HTML 写入「不通过」", "不通过" in html)
     check("HTML 提示级不标成不通过", html.count("不通过") == 1, f"{html.count('不通过')} 次")
@@ -206,10 +206,10 @@ def main() -> int:
     empty = SolveResult(kind="cable_stayed", stats={}, disp={}, beam={},
                         cables=[], camber={})
     check("无位移时不出位移图",
-          "deflection" not in R.figures(empty, cases[1][1], "out/p4_inject"),
-          str(sorted(R.figures(empty, cases[1][1], "out/p4_inject"))))
+          "deflection" not in R.figures(empty, cases[1][1], "out/verify_report/inject"),
+          str(sorted(R.figures(empty, cases[1][1], "out/verify_report/inject"))))
     check("无索时不出索力图",
-          "tension" not in R.figures(empty, cases[1][1], "out/p4_inject"))
+          "tension" not in R.figures(empty, cases[1][1], "out/verify_report/inject"))
 
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
