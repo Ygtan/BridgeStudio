@@ -108,6 +108,32 @@ def main() -> int:
             check("⑥中跨跨中挠度合理",
                   -0.03 < _dw[0] < -0.001, f"{_dw[0]*1000:.2f} mm")
 
+    print("\n[⑦ 斜拉桥成桥态]")
+    _subs2 = [s.value for s in at.subheader]
+    check("⑦区块存在", any("斜拉桥成桥态" in s for s in _subs2),
+          "下料索长 / 制造线形")
+    _cb_btn = next((b for b in at.button if b.key == "cb_solve"), None)
+    check("⑦求解按钮存在", _cb_btn is not None)
+    if _cb_btn is not None:
+        _cb_btn.click().run()
+        check("⑦求解无异常", not _errors(at), _errors(at)[:1])
+        _cr = at.session_state.get("cb_result")
+        check("⑦结果已缓存", _cr is not None)
+        if _cr:
+            _md = _cr["meta"]
+            check("⑦收敛", bool(_cr.get("converged")),
+                  f"{_md.get('iterations')} 轮 / {_md.get('elapsed_ms'):.0f} ms")
+            check("⑦闭合误差 < 1e-6 m", _md.get("closure_err", 1) < 1e-6,
+                  f"{_md.get('closure_err'):.1e}")
+            check("⑦索数 = 48（12 根/侧×4）", _md.get("cables") == 48,
+                  f"{_md.get('cables')}")
+            check("⑦索承担桥面恒载 > 50%", _md.get("deck_share_pct", 0) > 50.0,
+                  f"{_md.get('deck_share_pct'):.1f}%")
+            check("⑦下料索长非空", len(_cr["cables"]) == 48)
+            check("⑦预抬高含梁节点",
+                  len([n for n in _cr["camber"] if 1000 < n < 2000]) > 40,
+                  f"{len([n for n in _cr['camber'] if 1000 < n < 2000])} 个节点")
+
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 74)
     print(f"  {n_pass}/{len(PASS)} 通过")

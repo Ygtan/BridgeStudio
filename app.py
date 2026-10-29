@@ -651,3 +651,190 @@ else:
             st.code(st.session_state.get("g3d_dat", ""), language="text")
     else:
         st.caption("调整参数后点击求解；结果随参数自动过期。")
+
+
+# ================================================================ ⑦ 斜拉桥成桥态
+# P3 内核的能力出口：给定跨度/索数/定索力方法 → 下料索长 + 制造线形（预抬高）。
+# 与⑥梁格的区别不只是模型，而是求解类型：⑥是线性阶段+活载包络，
+# ⑦是几何非线性成桥态闭环（索垂度、索长反算、几何闭合）。
+try:
+    from cable_stayed_3d import build_cable_stayed_3d, cable_break_load
+    from fem_eigen_cable import cable_solver_available, solve_cable_bridge
+    _CB_OK = cable_solver_available()
+except Exception:
+    _CB_OK = False
+
+st.divider()
+st.subheader("⑦ 斜拉桥成桥态 · 下料索长与制造线形")
+
+if not _CB_OK:
+    st.info(
+        "成桥态求解器不可用：需要 FEM-Eigen 的 `build/cable_solver.exe`。\n\n"
+        "编译：`cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver`"
+    )
+else:
+    _cbc = st.columns(5)
+    with _cbc[0]:
+        _cb_Lm = st.number_input("主跨 (m)", 100.0, 600.0, 200.0, 10.0, key="cb_Lm")
+        _cb_Ls = st.number_input("边跨 (m)", 30.0, 300.0, 80.0, 5.0, key="cb_Ls")
+    with _cbc[1]:
+        _cb_Ht = st.number_input("塔高 (m)", 20.0, 200.0, 60.0, 5.0, key="cb_Ht")
+        _cb_n = int(st.number_input("每塔每侧索数", 3, 30, 12, 1, key="cb_n"))
+    with _cbc[2]:
+        _cb_h = st.number_input("主梁高 (m)", 1.2, 6.0, 2.5, 0.1, key="cb_h")
+        _cb_B = st.number_input("主梁宽 (m)", 6.0, 30.0, 12.0, 0.5, key="cb_B")
+    with _cbc[3]:
+        _cb_q = st.number_input("桥面恒载 (kN/m)", 20.0, 500.0, 100.0, 10.0,
+                                key="cb_q")
+        _cb_A = st.number_input("单索面积 (mm²)", 1000.0, 20000.0, 6000.0, 500.0,
+                                key="cb_A")
+    with _cbc[4]:
+        _cb_method = st.selectbox(
+            "定索力方法", ["按恒载竖向分配", "刚性支承连续梁法", "最小弯曲能量法"],
+            key="cb_method",
+            help="斜拉桥默认用第一项：ΣT·ez 精确等于桥面恒载，且分布随索倾角平滑。"
+                 "后两项由内核计算，适合无塔处竖向支座的纯索承体系。")
+        _cb_fpu = st.number_input("索破断强度 (MPa)", 1200.0, 2200.0, 1770.0, 10.0,
+                                  key="cb_fpu")
+
+    _method_key = {"按恒载竖向分配": "DECK", "刚性支承连续梁法": "RIGID",
+                   "最小弯曲能量法": "MINENERGY"}[_cb_method]
+    _cb_now = dict(Lm=_cb_Lm, Ls=_cb_Ls, Ht=_cb_Ht, n=_cb_n, h=_cb_h, B=_cb_B,
+                   q=_cb_q, A=_cb_A, method=_method_key, fpu=_cb_fpu)
+    if _cb_now != st.session_state.get("cb_params"):
+        st.session_state["cb_params"] = _cb_now
+        st.session_state.pop("cb_result", None)     # 参数变 → 结果过期
+
+    if st.button("求解成桥态（非线性闭环）", key="cb_solve", type="primary"):
+        with st.spinner("建桥 → 导出 .dat → cable_solver 几何非线性成桥态 …"):
+            try:
+                _cbm, _cbinfo = build_cable_stayed_3d(
+                    main_span=_cb_Lm, side_span=_cb_Ls, tower_height=_cb_Ht,
+                    n_cable=_cb_n, h=_cb_h, B=_cb_B,
+                    q_deck=_cb_q * 1e3,
+                    cable_area_mm2=_cb_A, method=_method_key,
+                )
+                _cbres = solve_cable_bridge(_cbm, out_dir="out/cable",
+                                            dat_name="cable.dat")
+                st.session_state["cb_result"] = _cbres
+                st.session_state["cb_model"] = _cbm
+                st.session_state["cb_info"] = _cbinfo
+                st.session_state["cb_dat"] = _cbm.to_dat()
+            except Exception as _e:
+                st.session_state["cb_result"] = None
+                st.error(f"成桥态求解失败：{_e}")
+
+    _cb = st.session_state.get("cb_result")
+    if _cb:
+        _md = _cb["meta"]
+        _cbm = st.session_state.get("cb_model")
+        _cbinfo = st.session_state.get("cb_info", {})
+        _x_of = {n.id: n.x for n in _cbm.nodes}
+
+        _m1, _m2, _m3, _m4, _m5 = st.columns(5)
+        _m1.metric("收敛", "是" if _cb["converged"] else "否")
+        _m2.metric("几何迭代", f"{_md.get('iterations', 0)} 轮 / {_md.get('elapsed_ms', 0):.0f} ms")
+        _m3.metric("闭合误差", f"{_md.get('closure_err', 0) * 1000:.2e} mm")
+        _m4.metric("索力范围", f"{_md.get('tension_min_kN', 0):.0f} ~ "
+                               f"{_md.get('tension_max_kN', 0):.0f} kN")
+        _m5.metric("索承担桥面恒载", f"{_md.get('deck_share_pct', 0):.1f} %")
+        st.caption(
+            f"模型 {_md.get('nodes')} 节点 / {_md.get('elements')} 单元 / "
+            f"{_md.get('cables')} 根索（{_md.get('dofs')} 自由度）　｜　"
+            f"支座承担 {_md.get('support_share_kN', 0):.0f} kN　｜　"
+            f"索自重 {_cbinfo.get('cable_w', 0):.0f} N/m（垂度已计入）"
+        )
+
+        # ---- 索力 / 预抬高 沿桥纵向分布 ----
+        _cs = sorted(_cb["cables"], key=lambda c: _x_of.get(c["anchor"], 0.0))
+        _xs = [_x_of.get(c["anchor"], 0.0) for c in _cs]
+        _ts = [c["T"] / 1000.0 for c in _cs]
+        _deck_nodes = sorted((n for n in _cb["camber"] if 1000 < n < 2000),
+                             key=lambda n: _x_of.get(n, 0.0))
+        _dxs = [_x_of.get(n, 0.0) for n in _deck_nodes]
+        _dzs = [_cb["camber"][n][2] * 1000.0 for n in _deck_nodes]
+
+        _fig, (_ax1, _ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+        _ax1.plot(_xs, _ts, "o-", ms=3, color="#185FA5", lw=1.2)
+        for _sx in _cbinfo.get("x_supports", []):
+            _ax1.axvline(x=_sx, color="#A32D2D", ls="--", lw=0.8, alpha=0.6)
+        _ax1.set_ylabel("成桥索力 (kN)")
+        _ax1.set_title("斜拉桥成桥态 · 索力与制造线形预抬高")
+        _ax1.grid(alpha=0.3)
+
+        _ax2.plot(_dxs, _dzs, "o-", ms=3, color="#2E7D32", lw=1.2)
+        _ax2.axhline(y=0.0, color="#666666", lw=0.8)
+        for _sx in _cbinfo.get("x_supports", []):
+            _ax2.axvline(x=_sx, color="#A32D2D", ls="--", lw=0.8, alpha=0.6)
+        _ax2.set_xlabel("顺桥向 x (m)　（红虚线=支承断面）")
+        _ax2.set_ylabel("预抬高 (mm)")
+        _ax2.grid(alpha=0.3)
+        st.pyplot(_fig)
+        plt.close(_fig)
+
+        # ---- 下料索长表 ----
+        st.markdown("**下料索长表（施工下料 / 挂索依据）**")
+        _fpu = _cb_fpu * 1e6
+        _bl = cable_break_load(_cb_A, _fpu)
+        _rows = []
+        for c in _cs:
+            _sig = c["T"] / (_cb_A * 1e-6)
+            _rows.append({
+                "索单元": c["elem"],
+                "梁侧锚点": c["anchor"],
+                "锚点x(m)": round(_x_of.get(c["anchor"], 0.0), 2),
+                "设计弦长(m)": round(c["Ltarget"], 3),
+                "下料索长L0(m)": round(c["L0"], 3),
+                "成桥弦长(m)": round(c["chord"], 3),
+                "成桥索力(kN)": round(c["T"] / 1e3, 1),
+                "索应力(MPa)": round(_sig / 1e6, 0),
+                "安全系数": round(_bl / max(c["T"], 1e-9), 2),
+            })
+        st.dataframe(_rows, use_container_width=True, hide_index=True)
+
+        _tmax = max(c["T"] for c in _cb["cables"])
+        _sf_min = _bl / _tmax
+        if _sf_min < 2.0:
+            st.warning(
+                f"最大索力 {_tmax/1e3:.0f} kN，安全系数仅 {_sf_min:.2f}"
+                f"（< 2.0）。请加大单索面积或减少索数。")
+
+        # ---- 预抬高表 ----
+        st.markdown("**制造线形（预抬高）表**")
+        _crow = [{"节点": n, "x(m)": round(_x_of.get(n, 0.0), 2),
+                  "预抬高(mm)": round(_cb["camber"][n][2] * 1000, 1),
+                  "制造标高(m)": round(_cb["erected"].get(n, (0, 0, 0))[2], 4)}
+                 for n in _deck_nodes]
+        st.dataframe(_crow, use_container_width=True, hide_index=True)
+        _zmax = max(abs(v) for v in _dzs) if _dzs else 0.0
+        st.caption(
+            f"预抬高最大绝对值 {_zmax:.1f} mm（约 L/{_cb_Lm*1000/max(_zmax,1e-9):.0f}）。"
+            "**负值表示该点成桥会上抬，制造时要压低**——量级来自给定索力下"
+            "结构的真实变形，不是算法噪声。")
+
+        # ---- 下载 ----
+        _dl1, _dl2 = st.columns(2)
+        with _dl1:
+            st.download_button(
+                "下载下料索长表 (.csv)",
+                data="\n".join(
+                    ["索单元,梁侧锚点,锚点x_m,设计弦长_m,下料索长L0_m,成桥弦长_m,"
+                     "成桥索力_kN,索应力_MPa,安全系数"]
+                    + [",".join(str(r[k]) for k in r) for r in _rows]),
+                file_name="cable_length_table.csv", mime="text/csv",
+                key="cb_dl1")
+        with _dl2:
+            st.download_button(
+                "下载制造线形表 (.csv)",
+                data="\n".join(
+                    ["节点,x_m,预抬高_mm,制造标高_m"]
+                    + [f"{r['节点']},{r['x(m)']},{r['预抬高(mm)']},{r['制造标高(m)']}"
+                       for r in _crow]),
+                file_name="camber_table.csv", mime="text/csv", key="cb_dl2")
+
+        with st.expander("查看导出的 .dat（含 *CABLE_BRIDGE 工况段）"):
+            st.code(st.session_state.get("cb_dat", ""), language="text")
+            st.code(_cb.get("stdout", ""), language="text")
+    else:
+        st.caption("调整参数后点求解。本区块输出的是**下料索长**与**制造线形**，"
+                   "不是内力包络——两者用途不同。")

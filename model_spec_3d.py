@@ -70,6 +70,8 @@ class RealConst3D(BaseModel):
     IW: float = 0.0                 # 翘曲常数（仅 BEAM7）m⁶
     ADDMASS: float = 0.0            # 附加线质量 kg/m
     ISTRN: float = 0.0              # 初应变（可作初拉力：F=E·A·ISTRN）
+    W: float = 0.0                  # 索单位长度重量 N/m（CABLE 垂度/Ernst 用）
+    L0: float = 0.0                 # 无应力索长 m（0 = 取几何长度）
 
 
 class ElemTypeDef3D(BaseModel):
@@ -134,6 +136,35 @@ class Lane3D(BaseModel):
     code: str = ""                           # "JTG_D60" 或空
 
 
+class CableSpec3D(BaseModel):
+    """一根待定索：单元 id + 梁侧锚点 + 目标成桥索力（0 = 自动定）。"""
+    elem: int
+    anchor: int = 0                 # 0 = 由几何自动判定（z 较低的那端）
+    tension: float = 0.0            # N，拉为正；<=0 表示自动
+
+
+class CableBridge3D(BaseModel):
+    """成桥态求解工况（对应内核 *CABLE_BRIDGE 段）。
+
+    MODE：
+      - COMPLETION：成桥态闭环。由设计线形反算下料索长，并迭代制造线形
+        （= 预抬高）。这是"施工控制"真正要的东西。
+      - TENSION：已给全目标索力，只做无应力索长迭代找形。
+      - STATIC：按 .dat 里给的 L0（无应力索长）直接做几何非线性静力。
+    """
+    mode: Literal["COMPLETION", "TENSION", "STATIC"] = "COMPLETION"
+    method: Literal["MINENERGY", "RIGID"] = "MINENERGY"   # 自动定索力方法
+    nl_steps: int = 3
+    newton: int = 30
+    max_iter: int = 20
+    tol: float = 1e-8
+    tol_tension: float = 1e-7
+    min_tension_fraction: float = 0.02
+    deck_load: float = 0.0          # 桥面恒载合计 N（仅用于竖向平衡校核）
+    verbose: bool = False
+    cables: list[CableSpec3D] = Field(default_factory=list)
+
+
 class ModelSpec3D(BaseModel):
     """三维模型完整规范。to_dat() 输出 fem_3d.hpp 可直接读取的 .dat。"""
     title: str = "untitled_3d"
@@ -147,6 +178,7 @@ class ModelSpec3D(BaseModel):
     stages: list[Stage3D] = Field(default_factory=list)
     influences: list[Influence3D] = Field(default_factory=list)
     lanes: list[Lane3D] = Field(default_factory=list)
+    cable_bridge: "CableBridge3D | None" = None
 
     # -------------------------------------------------- 校验
     @model_validator(mode="after")
@@ -222,6 +254,21 @@ class ModelSpec3D(BaseModel):
             for nd in lane.nodes:
                 if nd not in node_ids:
                     raise ValueError(f"车道引用了不存在的节点 {nd}")
+
+        if self.cable_bridge is not None:
+            kind_of_et = {t.id: t.kind for t in self.etypes}
+            elem_by_id = {e.id: e for e in self.elements}
+            if not self.cable_bridge.cables:
+                raise ValueError("成桥态工况未指定任何索（cable_bridge.cables 为空）")
+            for c in self.cable_bridge.cables:
+                if c.elem not in elem_by_id:
+                    raise ValueError(f"成桥态工况引用了不存在的单元 {c.elem}")
+                e = elem_by_id[c.elem]
+                if kind_of_et[e.etype] != "CABLE":
+                    raise ValueError(f"成桥态工况的单元 {c.elem} 不是 CABLE 类型")
+                if c.anchor and c.anchor not in (e.n1, e.n2):
+                    raise ValueError(
+                        f"索 {c.elem} 的锚点 {c.anchor} 不是其端点（{e.n1}/{e.n2}）")
         return self
 
     def _etype(self, etype_id: int) -> ElemTypeDef3D:
@@ -257,10 +304,14 @@ class ModelSpec3D(BaseModel):
     def to_dat(self) -> str:
         """导出 FEM-Eigen 3D new-format .dat（fem_3d.hpp readModel3D）。
 
-        CABLE → TRUSS 映射说明：3D 线性内核无只受拉单元；索的
-        几何非线性（受压退出/垂度效应）属 P3 阶段二内容。
+        CABLE 的两种导出行为（重要）：
+        - 无 cable_bridge（走 3D **线性** 内核 example_3d_grillage）时，
+          CABLE 映射为 TRUSS —— 线性内核没有只受拉单元，索会被当成杆。
+        - 有 cable_bridge（走 **非线性** cable_solver）时，CABLE 原样导出，
+          并附带 *CABLE_BRIDGE / *CABLE 工况段：内核按只受拉 + 垂度处理。
         """
         L: list[str] = []
+        nonlinear = self.cable_bridge is not None
         L.append(f"# {self.title}")
         L.append("# 由 BridgeStudio 导出（FEM-Eigen 3D new format，单位 m/N/Pa）")
 
@@ -272,12 +323,12 @@ class ModelSpec3D(BaseModel):
         cable_mapped = False
         for t in sorted(self.etypes, key=lambda t: t.id):
             out_kind = t.kind
-            if t.kind == "CABLE":
+            if t.kind == "CABLE" and not nonlinear:
                 out_kind = "TRUSS"
                 cable_mapped = True
             L.append(f"{t.id} {out_kind}")
         if cable_mapped:
-            L.append("# 注：CABLE 在 3D 线性内核中映射为 TRUSS（只受拉非线性属 P3）")
+            L.append("# 注：CABLE 在 3D 线性内核中映射为 TRUSS（只受拉/垂度需非线性内核）")
 
         L.append("*MP")
         for m in sorted(self.materials, key=lambda m: m.id):
@@ -290,7 +341,7 @@ class ModelSpec3D(BaseModel):
         for r in sorted(self.reals, key=lambda r: r.id):
             kv = [f"{r.id}", f"A={fmt(r.A)}"]
             for key in ("IY", "IZ", "J", "G", "WT", "WB", "WY", "WTORS",
-                        "IW", "ADDMASS", "ISTRN"):
+                        "IW", "ADDMASS", "ISTRN", "W", "L0"):
                 v = getattr(r, key)
                 if v:
                     kv.append(f"{key}={fmt(v)}")
@@ -355,6 +406,25 @@ class ModelSpec3D(BaseModel):
             if lane.reduction != 1.0:
                 parts.append(f"REDUCTION={fmt(lane.reduction)}")
             L.append(" ".join(parts))
+
+        if self.cable_bridge is not None:
+            cb = self.cable_bridge
+            L.append("*CABLE_BRIDGE")
+            L.append(f"MODE={cb.mode}")
+            L.append(f"METHOD={cb.method}")
+            L.append(f"NLSTEPS={cb.nl_steps}")
+            L.append(f"NEWTON={cb.newton}")
+            L.append(f"MAXITER={cb.max_iter}")
+            L.append(f"TOL={fmt(cb.tol)}")
+            L.append(f"TOLT={fmt(cb.tol_tension)}")
+            L.append(f"MINT={fmt(cb.min_tension_fraction)}")
+            if cb.deck_load > 0:
+                L.append(f"DECKLOAD={fmt(cb.deck_load)}")
+            L.append(f"VERBOSE={1 if cb.verbose else 0}")
+            L.append("# <elemId> <anchorNode> <targetTension_N>  （索力 0 = 自动）")
+            L.append("*CABLE")
+            for c in cb.cables:
+                L.append(f"{c.elem} {c.anchor} {fmt(c.tension)}")
 
         L.append("*END")
         return "\n".join(L) + "\n"
