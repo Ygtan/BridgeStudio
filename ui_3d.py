@@ -172,6 +172,13 @@ def _scene_block(doc: ModelDoc, res: SolveResult) -> None:
     """
     import view_3d as V
 
+    try:                                   # plotly 只是这一块的依赖
+        import plotly.graph_objects  # noqa: F401
+    except ImportError:
+        st.info("未安装 plotly，三维交互视图不可用（`pip install plotly`）。"
+                "指标、校核、组合、图、表、报告都不受影响。")
+        return
+
     fs = V.fields(res, doc.model)
     if not fs:
         return
