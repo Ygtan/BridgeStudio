@@ -477,6 +477,10 @@ def figure_camber(res: SolveResult, model: Any, path: Path) -> Path:
 _FIGURE_ORDER = ("layout", "deflection", "moment", "axial", "shear",
                  "live", "tension", "safety", "camber")
 
+#: 进「荷载组合」章的明细表键。其余（含 combo_ultimate 这种几百行的
+#: 逐截面表）仍归「明细表」——组合的**结论**要一页看得完，**依据**才翻表。
+COMBO_SUMMARY_KEYS = ("combo_coef", "combo_summary")
+
 
 @dataclass
 class Figure:
@@ -627,6 +631,27 @@ def _overview_paragraph(res: SolveResult, model: Any) -> str:
     return txt
 
 
+def _combo_paragraph(res: SolveResult) -> str:
+    """组合章节的引言：把"为什么取成桥态、为什么按端"讲清楚。
+
+    这两句不是客套。施工阶段包络里含未浇筑悬臂的临时内力，若直接拿来做
+    `1.2×包络 + 1.4×活载`，等于把两个不同结构的内力相加；而单元两端弯矩
+    异号，先外包再相加会把 i 端恒载配 j 端活载。读者看到"1.2G+1.4Q"以为
+    是照规范套公式，不知道分母上换了构型。
+    """
+    has_live = bool(getattr(res, "live_beam", None))
+    txt = ("组合按 JTG D60-2015 取值。恒载项 S_G 取**成桥态单值**，"
+           "不取施工阶段包络：逐跨施工的包络含未浇筑悬臂的临时内力，"
+           "与运营期活载不是同一构型，相加没有物理意义；"
+           "施工阶段验算仍用包络，见「梁内力包络」表。"
+           "组合按**截面**（单元 × i/j 端）进行，不按单元：两端弯矩异号，"
+           "先外包再相加会把一端的恒载与另一端的活载凑到一起。")
+    if not has_live:
+        txt += ("**本模型未定义车道荷载（*LANE_3D），表中组合值只有恒载项乘"
+                "系数，不是组合值**——在补齐车道定义之前不得用于设计。")
+    return txt
+
+
 def _conclusion_bullets(res: SolveResult, model: Any,
                         checks: Sequence[Check]) -> list[str]:
     """结论从校核结果**生成**，不手写——手写的结论会与数据脱节。"""
@@ -657,8 +682,19 @@ def _conclusion_bullets(res: SolveResult, model: Any,
         zmax = max((v[2] for v in res.camber.values()), key=abs, default=0.0)
         out.append(f"制造线形最大预抬高 {zmax * 1000:.1f} mm"
                    "（负值表示成桥会上抬，制造时压低）。")
+    # 组合值进结论，但要说清它是什么：设计内力，不是"承载力够"。
+    combos = res.combinations() if hasattr(res, "combinations") else []
+    ult = next((c for c in combos if c.spec.key == "ultimate"), None)
+    w = ult.worst("My") if ult is not None else None
+    if w is not None:
+        tail = "" if ult.has_live else "（模型无车道荷载，此项只有恒载）"
+        out.append(f"基本组合（1.2G + 1.4Q）控制弯矩 {w[1] / 1e3:,.0f} kN·m，"
+                   f"位于单元 {w[0][0]} 的 {w[0][1]} 端{tail}；"
+                   "该项为配筋设计用的**设计内力包络**，"
+                   "本程序不建钢筋，未做正截面/斜截面承载力验算。")
     out.append("本报告为设计阶段计算复核，不含施工阶段验算、疲劳验算与"
-               "抗震验算；荷载组合按单一恒载工况给出。")
+               "抗震验算；荷载组合只计永久作用与汽车荷载两项，"
+               "未计入温度、风、人群、支座沉降与预应力二次效应。")
     return out
 
 
@@ -709,6 +745,19 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
         if key not in _FIGURE_ORDER:
             blocks.append({"type": "figure", "key": key})
 
+    # 荷载组合单列一章，**不混进明细表**：明细表是被查的原始数据，
+    # 组合是经过规范加工的设计值，读者找它时不会翻到第 15 页表格后面。
+    if COMBO_SUMMARY_KEYS[0] in tabs:
+        blocks.append({"type": "h1", "text": "荷载组合"})
+        blocks.append({"type": "p", "text": _combo_paragraph(res)})
+        for key in COMBO_SUMMARY_KEYS:
+            if key in tabs:
+                blocks.append({"type": "table", "key": key})
+        if "combo_ultimate" in tabs:
+            blocks.append({"type": "note", "text": (
+                "基本组合的逐截面结果（每个单元 × i/j 两端）见文末明细表"
+                "「基本组合（承载力）：梁端弯矩与剪力」；本页不重复 222 行。")})
+
     blocks.append({"type": "h1", "text": "结论与说明"})
     blocks.append({"type": "bullets", "items": _conclusion_bullets(res, model, checks)})
     if res.diagnostics:
@@ -717,9 +766,10 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
 
     # 明细表放最后：它是被查的，不是被读的；夹在结果与结论之间会让结论
     # 翻过几十页表格才出现（梁格 222 个单元 = 15 页）。
-    if tabs:
+    rest = {k: v for k, v in tabs.items() if k not in COMBO_SUMMARY_KEYS}
+    if rest:
         blocks.append({"type": "h1", "text": "明细表"})
-        for key in tabs:
+        for key in rest:
             blocks.append({"type": "table", "key": key})
 
     return Report(title=title, subtitle=res.kind_label, kind=res.kind, meta=meta,

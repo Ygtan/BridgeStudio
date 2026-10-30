@@ -121,6 +121,28 @@ def main() -> int:
             check("明细表含梁内力包络", "beam_envelope" in _r.tables(
                 at.session_state["doc"].model))
 
+            # ---- 荷载组合块：数据在、界面在、数字同源 ----
+            _cb = _r.combinations()
+            check("组合可用且含活载项",
+                  len(_cb) == 3 and all(c.has_live for c in _cb),
+                  f"{len(_cb)} 组 / has_live={_cb[0].has_live if _cb else '—'}")
+            _w = _cb[0].worst("My") if _cb else None
+            check("基本组合控制弯矩为负（跨中下缘受拉）",
+                  _w is not None and _w[1] < 0,
+                  f"{_w[1] / 1e3:,.0f} kN·m（单元 {_w[0][0]}·{_w[0][1]} 端）"
+                  if _w else "—")
+            _md = " ".join(str(m.value) for m in at.markdown)
+            check("界面出现荷载组合块",
+                  "荷载组合（JTG D60-2015）" in _md, _md[:40])
+            _labs = [m.label for m in at.metric]
+            check("指标卡含基本组合控制弯矩", "基本组合控制弯矩" in _labs,
+                  "、".join(_labs))
+            # 组合表已经单独成块，明细表页签里不该再重复一遍
+            _tb = _r.tables(at.session_state["doc"].model)
+            check("组合表齐全（系数/汇总/逐截面）",
+                  {"combo_coef", "combo_summary", "combo_ultimate"} <= set(_tb),
+                  "、".join(k for k in _tb if k.startswith("combo")))
+
         # 报告：三出口一次落盘（缺任一份界面上就是死按钮）
         _gb = next((b for b in at.button if b.key == "r3d_report_btn"), None)
         check("报告按钮存在（梁格）", _gb is not None)

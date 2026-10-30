@@ -93,10 +93,14 @@ def main() -> int:
         reps[kind] = (rep, res, model)
 
         kinds = [b["type"] for b in rep.blocks]
-        check("章节顺序：结论在明细表之前",
-              kinds.index("bullets") < (kinds.index("table") if "table" in kinds
-                                        else len(kinds)),
-              " > ".join(kinds[:3]))
+        h1s0 = [b["text"] for b in rep.blocks if b["type"] == "h1"]
+        # "结论在明细表之前"要按**章**判，不能按"第一个 table 块"判：
+        # 荷载组合章的系数表本来就在结论之前，按块判会把这个正常布局判成
+        # 错误（曾经就是这么误报的）。
+        check("章节顺序：结论在明细表章之前",
+              h1s0.index("结论与说明") < h1s0.index("明细表")
+              if ("明细表" in h1s0 and "结论与说明" in h1s0) else True,
+              " > ".join(h1s0))
         check("块结构完整（概要/校核/图/结论）",
               all(t in kinds for t in ("h1", "p", "metrics", "checks",
                                        "figure", "bullets")),
@@ -173,6 +177,102 @@ def main() -> int:
                       f"{len(body) - 1} 行 vs {len(rep.tables[key]['rows'])}")
         check("CSV 带 BOM（Excel 中文列名不乱码）",
               zf.read("00_指标.csv").startswith(b"\xef\xbb\xbf"))
+
+        # ---- 组合章的位置：不许混进明细表 ----
+        h1s = [b["text"] for b in rep.blocks if b["type"] == "h1"]
+        if "荷载组合" in h1s:
+            check("荷载组合章在结论之前、明细表之前",
+                  h1s.index("荷载组合") < h1s.index("结论与说明")
+                  < h1s.index("明细表"),
+                  " > ".join(h1s))
+            # 组合控制的**汇总**必须在正文，222 行明细才归附表
+            i_tab = next((i for i, b in enumerate(rep.blocks)
+                          if b["type"] == "h1" and b["text"] == "明细表"), len(rep.blocks))
+            tail = rep.blocks[i_tab:]
+            check("组合汇总表未落进明细表章",
+                  all(b.get("key") not in ("combo_coef", "combo_summary")
+                      for b in tail),
+                  "、".join(str(b.get("key")) for b in tail if b["type"] == "table"))
+
+    # ---------------------------------------------------------- 荷载组合
+    print("\n[荷载组合：正常路径]")
+    # 单独起一个带车道荷载的模型：`cases` 里那个没有 LANE_3D，走的是
+    # "缺项就说缺" 的分支，两条路径都得守。
+    ml = build_box_grillage_3d(staged=True, lane_code="JTG_D60")
+    resl = solve(ml, out_dir="out/verify_report/combo")
+    repl = R.build_document(resl, ml, out_dir="out/verify_report/combo")
+    tabsl = repl.tables
+    check("三张组合表齐全", {"combo_coef", "combo_summary", "combo_ultimate"}
+          <= set(tabsl), str(sorted(set(tabsl) & {"combo_coef", "combo_summary",
+                                                  "combo_ultimate"})))
+    check("组合明细按截面（单元×端）出，不是按单元",
+          len(resl.combinations()[0].rows) == len(resl.final_beam)
+          and all(k[1] in ("i", "j") for k in resl.combinations()[0].rows),
+          f"{len(resl.combinations()[0].rows)} 行 / final_beam "
+          f"{len(resl.final_beam)} 行")
+
+    # 独立复算：不调 combination 的函数，照条文式子手算一遍再对比。
+    # 这是本层唯一能证明"系数真的乘上去了"的检查——只比结构不看数值，
+    # 把 1.4 写成 1.0 也照样通过。
+    ult = next(c for c in resl.combinations() if c.spec.key == "ultimate")
+    freq = next(c for c in resl.combinations() if c.spec.key == "frequent")
+    key = ult.worst("My")[0]
+    g_my = resl.final_beam[key]["My"]
+    q = resl.live_beam[key]
+    ok_ult = all(abs(ult.rows[key][f"My{s}"] - (1.2 * g_my + 1.4 * q[f"My{s}"])) < 1e-6
+                 for s in ("Min", "Max"))
+    ok_freq = all(abs(freq.rows[key][f"My{s}"] - (g_my + 0.7 * q[f"My{s}"])) < 1e-6
+                  for s in ("Min", "Max"))
+    check("基本组合 = 1.2·S_G + 1.4·S_Q（控制截面复算）", ok_ult,
+          f"单元{key[0]}·{key[1]}端 G={g_my / 1e3:,.1f} "
+          f"Q={q['MyMin'] / 1e3:,.1f}~{q['MyMax'] / 1e3:,.1f} kN·m")
+    check("频遇组合 = S_G + 0.7·S_Q", ok_freq)
+
+    # 按端组合的意义：梁两端弯矩异号，若先外包再相加，i 端恒载会配上
+    # j 端活载。用"同一单元两端的组合值之差"来验：必须等于各自的
+    # (1.2·G + 1.4·Q)，而不是同一个数。
+    e_multi = next((e for (e, _d) in ult.rows
+                    if (e, "i") in ult.rows and (e, "j") in ult.rows
+                    and abs(ult.rows[(e, "i")]["MyMin"] - ult.rows[(e, "j")]["MyMin"]) > 1.0),
+                   None)
+    check("同一单元两端组合值不同（确实按端组合）", e_multi is not None,
+          f"单元 {e_multi}")
+
+    # 三个组合的单调关系：γ 递减，组合值 |My| 也应递减。
+    def _peak(c):
+        w = c.worst("My")
+        return abs(w[1]) / 1e3 if w else 0.0
+    quasi = next(c for c in resl.combinations() if c.spec.key == "quasi")
+    check("基本 > 频遇 > 准永久（控制弯矩递减）",
+          _peak(ult) > _peak(freq) > _peak(quasi),
+          f"{_peak(ult):,.0f} / {_peak(freq):,.0f} / {_peak(quasi):,.0f} kN·m")
+    check("汇总表控制值与 worst() 一致",
+          f"{_peak(ult):,.0f}" in tabsl["combo_summary"]["rows"][0][2],
+          tabsl["combo_summary"]["rows"][0][2])
+
+    # 位移组合：三项必须由同一对 (sg, sq) 组合出来
+    dc = resl.disp_combinations()
+    check("位移组合从成桥态取 S_G（不取阶段包络）",
+          len(dc) == 3 and abs(dc[0].value - (1.2 * dc[0].sg + 1.4 * dc[0].sq)) < 1e-12,
+          f"S_G={dc[0].sg * 1000:.2f} S_Q={dc[0].sq * 1000:.2f} mm" if dc else "无")
+
+    # ---- 缺项路径：没有车道荷载就必须说"这不是组合值" ----
+    rep0 = reps["grillage3d"][0]
+    html0 = R.render_html(rep0)
+    check("无车道荷载时报告明说「不是组合值」", "不是组合值" in html0)
+    check("无车道荷载时系数表仍在（读者要知道缺了哪一项）",
+          "combo_coef" in rep0.tables)
+    check("无车道荷载时汇总表标「只有恒载项」",
+          any("只有恒载" in str(t.get("note", ""))
+              for k, t in rep0.tables.items() if k.startswith("combo")),
+          "combo_*.note")
+
+    # ---- 斜拉桥：不许凭空给组合值 ----
+    repc = reps["cable_stayed"][0]
+    check("斜拉桥不出组合表", not any(k.startswith("combo") for k in repc.tables),
+          str(sorted(repc.tables)))
+    check("斜拉桥在校核里说明「不做运营期组合」",
+          any("不做运营期组合" in c.detail for c in repc.checks()))
 
     # ---------------------------------------------------------- 故障注入
     print("\n[故障注入：渲染器必须把「不通过」写出来]")

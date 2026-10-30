@@ -65,9 +65,12 @@ def _checks_block(res: SolveResult, model: Any) -> None:
         st.markdown(f"{icon} **{c.name}** — {c.detail}")
 
 
-def _tables_block(res: SolveResult, model: Any) -> None:
-    """明细表：SolveResult.tables() 出数据，这里只负责摆。"""
-    tabs = res.tables(model)
+def _tables_block(res: SolveResult, model: Any, skip: tuple[str, ...] = ()) -> None:
+    """明细表：SolveResult.tables() 出数据，这里只负责摆。
+
+    `skip` 用来让已在别处展示过的表不重复出现（组合表在组合块里给）。
+    """
+    tabs = {k: v for k, v in res.tables(model).items() if k not in skip}
     if not tabs:
         st.caption("本次结果没有可导出的明细表。")
         return
@@ -79,10 +82,53 @@ def _tables_block(res: SolveResult, model: Any) -> None:
             st.dataframe(
                 [dict(zip(tb["headers"], r)) for r in tb["rows"]],
                 use_container_width=True, hide_index=True)
+            if tb.get("note"):
+                st.caption(tb["note"])
             st.download_button(
                 f"下载 {tb['title']} (.csv)",
                 data=_csv_bytes(tb["headers"], tb["rows"]),
                 file_name=f"{n}.csv", mime="text/csv", key=f"dl_{n}")
+
+
+def _combination_block(res: SolveResult, model: Any) -> None:
+    """荷载组合块：三种组合的控制值 + 系数出处 + 逐截面明细。
+
+    数据直接取自 `res.tables()` 里那三张表——与 Word/HTML 报告同一份 dict，
+    界面与报告不会各算一遍。呈现上分三层：控制值（一屏看完）、系数（复核
+    依据）、逐截面（配筋用，收进展开器）。
+    """
+    tabs = res.tables(model)
+    summ = tabs.get("combo_summary")
+    if summ is None:
+        return
+    st.markdown("**荷载组合（JTG D60-2015）**")
+    combos = res.combinations()
+    if combos and not combos[0].has_live:
+        st.warning("模型未定义车道荷载（`*LANE_3D`），下列组合值只有恒载项乘"
+                   "系数，**不是组合值**——补齐车道定义前不得用于设计。")
+    st.dataframe([dict(zip(summ["headers"], r)) for r in summ["rows"]],
+                 use_container_width=True, hide_index=True)
+    st.caption(summ["note"])
+    st.caption("恒载项取成桥态单值（非施工阶段包络），组合按单元 × i/j 端进行："
+               "阶段包络含未浇筑悬臂的临时内力，与运营期活载不属同一构型；"
+               "两端弯矩异号，先外包再相加会把一端恒载配另一端活载。")
+    with st.expander("组合系数与依据 / 基本组合逐截面结果"):
+        coef = tabs.get("combo_coef")
+        if coef:
+            st.dataframe([dict(zip(coef["headers"], r)) for r in coef["rows"]],
+                         use_container_width=True, hide_index=True)
+            st.caption(coef["note"])
+        ult = tabs.get("combo_ultimate")
+        if ult:
+            st.markdown(f"**{ult['title']}**")
+            st.dataframe([dict(zip(ult["headers"], r)) for r in ult["rows"]],
+                         use_container_width=True, hide_index=True)
+            st.caption(ult["note"])
+            st.download_button(
+                "下载基本组合逐截面 (.csv)",
+                data=_csv_bytes(ult["headers"], ult["rows"]),
+                file_name="combo_ultimate.csv", mime="text/csv",
+                key="dl_combo_ultimate")
 
 
 # ---------------------------------------------------------------- 图
@@ -285,22 +331,31 @@ def render(doc: ModelDoc) -> None:
         return
 
     # ---- 指标卡 ----
+    # 超过 5 张就换行：梁格现在有 7 张（含组合控制弯矩），一线排 7 列时
+    # 每列不足 130 px，"基本组合控制弯矩"会被折成三行。
     _m = res.metrics(doc.model)
     if _m:
-        _cols = st.columns(len(_m))
-        for _c, _mt in zip(_cols, _m):
-            _c.metric(_mt.label, _mt.value + (f" {_mt.unit}" if _mt.unit else ""))
-            if _mt.hint:
-                _c.caption(_mt.hint)
+        per = 5
+        for _s in range(0, len(_m), per):
+            _chunk = _m[_s:_s + per]
+            _cols = st.columns(per)
+            for _c, _mt in zip(_cols, _chunk):
+                _c.metric(_mt.label, _mt.value + (f" {_mt.unit}" if _mt.unit else ""))
+                if _mt.hint:
+                    _c.caption(_mt.hint)
 
     # ---- 校核 ----
     _checks_block(res, doc.model)
+
+    # ---- 荷载组合（梁格才有；斜拉桥内核不出梁内力）----
+    _combination_block(res, doc.model)
 
     # ---- 图（与报告同一批 PNG）----
     _figures_block(doc, res)
 
     # ---- 表 ----
-    _tables_block(res, doc.model)
+    _tables_block(res, doc.model,
+                  skip=("combo_coef", "combo_summary", "combo_ultimate"))
 
     # ---- 报告导出 ----
     _report_block(doc, res)

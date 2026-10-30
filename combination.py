@@ -263,11 +263,17 @@ def summary_table(combos: list[BeamCombo], disps: list[DispCombo]) -> dict[str, 
         cell = "—" if w is None else f"{w[1] / 1e3:,.0f}（单元 {w[0][0]}·{w[0][1]} 端）"
         dv = "—" if d is None else f"{d.value * 1000:.2f}"
         rows.append([spec.name, spec.expr, cell, dv, spec.use])
+    note = ("弯矩取全桥 |My| 最大者；位移为影响点（竖向位移最大节点）处的值，"
+            "向下为负。位移组合值仅供参考——JTG D60 4.3.2 的挠度限值判的是"
+            "汽车荷载本身产生的挠度，不是组合值。")
+    # 缺活载时这张表最容易被误读成"组合已经做完了"：它看起来和正常时
+    # 一模一样，只是数值小一圈。必须在表注里说死。
+    if combos and not combos[0].has_live:
+        note += ("本模型未定义车道荷载（*LANE_3D），表中组合值只有恒载项，"
+                 "不是组合值。")
     return {
         "title": "荷载组合控制值汇总",
-        "note": "弯矩取全桥 |My| 最大者；位移为影响点（竖向位移最大节点）处的值，"
-                "向下为负。位移组合值仅供参考——JTG D60 4.3.2 的挠度限值判的是"
-                "汽车荷载本身产生的挠度，不是组合值。",
+        "note": note,
         "headers": ["组合", "表达式", "控制弯矩 My (kN·m)", "影响点位移 (mm)", "用途"],
         "rows": rows,
     }
