@@ -114,6 +114,22 @@ def main() -> int:
         want = {"grillage3d": {"layout", "deflection", "moment"},
                 "cable_stayed": {"layout", "deflection", "tension", "camber"}}[kind]
         check("该有的图都有", want <= set(rep.figures), str(sorted(rep.figures)))
+        # 轴测图：与界面里的可旋转视图同一份场景，报告里必须有一张
+        check("轴测图已生成且不是空白",
+              "axon" in rep.figures and rep.figures["axon"].path.exists()
+              and rep.figures["axon"].path.stat().st_size > 20000,
+              f"{rep.figures['axon'].path.stat().st_size // 1024} KB"
+              if "axon" in rep.figures else "缺")
+        _fk = [b.get("key") for b in rep.blocks if b["type"] == "figure"]
+        check("轴测图排在简图之后、曲线之前",
+              "axon" in _fk and _fk.index("axon") > _fk.index("layout")
+              and (_fk.index("axon") < _fk.index("deflection")
+                   if "deflection" in _fk else True),
+              " > ".join(str(k) for k in _fk[:4]))
+        check("轴测图图注点明是轴测/未放大变形",
+              "轴测" in rep.figures["axon"].caption
+              and "未放大变形" in rep.figures["axon"].note,
+              rep.figures["axon"].caption)
         check("不该有的图没画（梁格无索力/成桥态无梁内力）",
               ("tension" not in rep.figures if kind == "grillage3d"
                else "moment" not in rep.figures), str(sorted(rep.figures)))

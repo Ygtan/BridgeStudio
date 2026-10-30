@@ -143,6 +143,53 @@ def main() -> int:
                   {"combo_coef", "combo_summary", "combo_ultimate"} <= set(_tb),
                   "、".join(k for k in _tb if k.startswith("combo")))
 
+            # ---- 三维交互视图：控件在、图在、场景与结果同源 ----
+            _fp = _r.fingerprint
+            _fld = next((s for s in at.selectbox
+                         if s.key == f"v3d_field_{_fp}"), None)
+            check("界面出现三维交互视图", "三维交互视图" in _md)
+            check("着色场选择器存在", _fld is not None,
+                  "、".join(str(x) for x in (_fld.options if _fld else [])))
+            check("梁格给 6 个场（几何/位移两向/My/Vz/组合）",
+                  _fld is not None and len(_fld.options) == 6,
+                  f"{len(_fld.options) if _fld else 0} 个")
+            check("变形开关存在",
+                  any(c.key == f"v3d_deform_{_fp}" for c in at.checkbox))
+            _pc = at.get("plotly_chart")
+            check("三维图已渲染", len(_pc) == 1, f"{len(_pc)} 张")
+            _sc = at.session_state.get("v3d_scene")
+            check("场景已缓存且与结果同源",
+                  bool(_sc) and len(_sc[1].members) == _r.stats.get("elements"),
+                  f"{len(_sc[1].members)} 构件" if _sc else "—")
+
+            if _fld is not None:
+                _fld.select("combo_My").run()
+                check("切换着色场无异常", not _errors(at), _errors(at)[:1])
+                _sc2 = at.session_state.get("v3d_scene")
+                check("切到基本组合后场景换场",
+                      bool(_sc2) and _sc2[1].field.key == "combo_My",
+                      _sc2[1].field.key if _sc2 else "—")
+                _cw = _cb[0].worst("My") if _cb else None
+                check("切场后色标与组合值一致",
+                      bool(_sc2) and _cw is not None
+                      and abs(_sc2[1].vmax - abs(_cw[1]) / 1e3) < 1e-6,
+                      f"{_sc2[1].vmax:,.1f} kN·m" if _sc2 else "—")
+                check("说明里写明放大倍数（不藏参数）",
+                      any("放大绘制" in n for n in _sc2[1].notes),
+                      "；".join(n[:18] for n in _sc2[1].notes[:2]) if _sc2 else "—")
+
+            # 可旋转视图单独发出去的那份 html
+            _hb = next((b for b in at.button if b.key == f"v3d_html_{_fp}"), None)
+            check("生成可旋转视图按钮存在", _hb is not None)
+            if _hb is not None:
+                _hb.click().run()
+                _hp = at.session_state.get("v3d_html_path")
+                check("可旋转视图已落盘且内联引擎",
+                      bool(_hp) and Path(_hp).exists()
+                      and Path(_hp).stat().st_size > 1_000_000,
+                      f"{Path(_hp).stat().st_size / 1024 / 1024:.1f} MB"
+                      if _hp and Path(_hp).exists() else "—")
+
         # 报告：三出口一次落盘（缺任一份界面上就是死按钮）
         _gb = next((b for b in at.button if b.key == "r3d_report_btn"), None)
         check("报告按钮存在（梁格）", _gb is not None)
@@ -212,6 +259,25 @@ def main() -> int:
                   {"cable_table", "camber_table"} <= set(_r.tables(
                       at.session_state["doc"].model)),
                   str(list(_r.tables(at.session_state["doc"].model))))
+
+            # 换模型后控件 key 变（带指纹），旧的"基本组合"不会越界
+            # 注意 options 里是**格式化后的标签**，不是 key
+            _fld = next((s for s in at.selectbox
+                         if s.key == f"v3d_field_{_r.fingerprint}"), None)
+            _want = {f.label for f in __import__("view_3d").fields(
+                _r, at.session_state["doc"].model)}
+            check("斜拉桥也出交互视图且场随结果换",
+                  _fld is not None
+                  and {str(x) for x in _fld.options} == _want,
+                  "、".join(str(x) for x in (_fld.options if _fld else [])))
+            check("斜拉桥不提供梁内力场（成桥态内核不出）",
+                  _fld is not None and not any(
+                      "My" in str(x) for x in _fld.options),
+                  str(len(_fld.options)) + " 个场" if _fld else "—")
+            _sc3 = at.session_state.get("v3d_scene")
+            check("斜拉桥场景仍可建（136 构件）",
+                  bool(_sc3) and len(_sc3[1].members) == 136,
+                  f"{len(_sc3[1].members)} 构件" if _sc3 else "—")
 
         # 计算书：点按钮 → 落盘 → 可下载（缺任一步界面上就是个死按钮）
         _rb = next((b for b in at.button if b.key == "cb_report_btn"), None)

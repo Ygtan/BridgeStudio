@@ -48,6 +48,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+import view_3d
 from result_3d import (CABLE_FPU_DEFAULT, CABLE_SAFETY_MIN, Check, Metric,
                        SolveResult, _cable_area_m2, support_x)
 
@@ -474,7 +475,7 @@ def figure_camber(res: SolveResult, model: Any, path: Path) -> Path:
 
 #: 报告正文里图的排列顺序。与 figures() 的生成顺序解耦：报告要有稳定的
 #: 叙事顺序（先简图、再变形、再内力、再索），而生成顺序由判据决定。
-_FIGURE_ORDER = ("layout", "deflection", "moment", "axial", "shear",
+_FIGURE_ORDER = ("layout", "axon", "deflection", "moment", "axial", "shear",
                  "live", "tension", "safety", "camber")
 
 #: 进「荷载组合」章的明细表键。其余（含 combo_ultimate 这种几百行的
@@ -506,6 +507,18 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
         figure_layout(res, model, d / "layout.png"),
         note=("平面图：横向为便于阅读已放大，横纵比例不相等。"
               if _is_plan_view(model) else ""))
+
+    # 轴测图：与界面上的可旋转视图**同一份场景**（view_3d.build_scene）。
+    # 报告里要印得出来，所以走 matplotlib 投影；但**不放大变形**——静态图上
+    # 按 ×300 画出来的挠曲会被读成"模型算歪了"，交互视图里能自己转、能取消
+    # 放大，静态图没有这个退路。
+    _sc = view_3d.build_scene(res, model, view_3d.default_field(res, model))
+    out["axon"] = Figure(
+        "axon", f"结构轴测图（{_sc.field.label}）",
+        view_3d.figure_axon(_sc, d / "axon.png"),
+        note=("固定视角、未放大变形的轴测图。同一份几何在界面的「三维交互视图」"
+              "里可旋转、可切换着色场、可放大变形。"))
+
     if any(dof == 3 for (_n, dof) in res.disp):
         # 成桥态的 u 是"相对制造线形"的位移（内核 CompletionStateResult3D::u），
         # 不是"相对设计标高"的下挠：桥面按制造线形架好、在恒载下落回设计标高，

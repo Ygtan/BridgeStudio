@@ -155,6 +155,87 @@ def _figures_block(doc: ModelDoc, res: SolveResult) -> None:
         st.caption(f"**{f.caption}**" + (f"　{f.note}" if f.note else ""))
 
 
+# ---------------------------------------------------------------- 三维交互视图
+
+
+#: 变形放大倍数的可选档位。用离散档位而不是 1–2000 的连续滑杆：连续滑杆上
+#: "×317" 这种数字没有意义，也复现不了（换个浏览器就是别的值）。
+_SCALES = (1, 2, 5, 10, 20, 50, 100, 200, 300, 500, 1000)
+
+
+def _scene_block(doc: ModelDoc, res: SolveResult) -> None:
+    """可旋转的三维视图（plotly）。几何与着色场由 view_3d 装配，这里只摆控件。
+
+    为什么界面上要这个、报告里却是 PNG：屏幕上能转是"看形态"的刚需——梁格
+    的横向分配、斜拉桥两排索的空间关系，一个固定视角讲不清楚；而 Word 里
+    印不出交互，只能用同一份场景投影一张轴测图。两边同源，不各画一套。
+    """
+    import view_3d as V
+
+    fs = V.fields(res, doc.model)
+    if not fs:
+        return
+    labels = {f.key: f.label for f in fs}
+    st.markdown("**三维交互视图**")
+    st.caption("拖动旋转、滚轮缩放、悬停读每个单元的值。"
+               "同一份几何在报告里印成轴测图（图 2）。")
+
+    # 控件 key 带结果指纹：换模型后旧的选择（比如"成桥索力"）在新模型里
+    # 不存在，selectbox 会抛 "value not in options"。
+    fp = res.fingerprint
+    c1, c2, c3, c4 = st.columns([2.4, 1.0, 1.1, 1.5])
+    fk = c1.selectbox("着色场", [f.key for f in fs],
+                      format_func=lambda k: labels[k], key=f"v3d_field_{fp}")
+    deform = c2.checkbox("显示变形", value=True, key=f"v3d_deform_{fp}",
+                         help="按放大倍数绘制挠曲形态；放大倍数会写在图注里")
+    prop = c3.selectbox("比例", ["自动压缩", "真实比例"], key=f"v3d_prop_{fp}",
+                        help="自动压缩把横向/竖向放大到看得见的比例；"
+                             "真实比例横纵一致，长桥会是一条线")
+    suggest = V.deform_scale_suggest(res, doc.model)
+    scale = suggest
+    if deform:
+        opts = list(_SCALES)
+        if suggest not in opts:                    # 建议值不在档位里就补进去
+            opts = sorted(opts + [suggest])
+        scale = c4.select_slider("变形放大 ×", options=opts, value=suggest,
+                                 key=f"v3d_scale_{fp}_{fk}")
+
+    cache_key = (fp, fk, bool(deform), float(scale), prop)
+    got = st.session_state.get("v3d_scene")
+    if not got or got[0] != cache_key:
+        scene = V.build_scene(res, doc.model, fk, deform=deform, scale=scale,
+                             true_proportion=(prop == "真实比例"))
+        fig = V.to_plotly(scene, height=560)
+        st.session_state["v3d_scene"] = (cache_key, scene, fig)
+        got = st.session_state["v3d_scene"]
+    scene, fig = got[1], got[2]
+
+    st.plotly_chart(fig, width="stretch", key=f"v3d_chart_{fp}")
+    for n in scene.notes:
+        st.caption(f"· {n.replace('**', '')}")
+
+    # 单独发出去的 html：审图的人不一定装了这个程序，截图只能看一个角度。
+    c5, c6 = st.columns([1.2, 2.4])
+    if c5.button("生成可旋转视图 (.html)", key=f"v3d_html_{fp}",
+                 help="内联 plotly.js 的单文件，约 4 MB，双击即可打开"):
+        try:
+            p = V.write_html(scene, Path("out") / doc.kind / "report" / "view_3d.html",
+                             title=f"{res.title or doc.kind_label} · {labels[fk]}")
+            st.session_state["v3d_html_path"] = str(p)
+        except Exception as e:                     # noqa: BLE001
+            st.session_state.pop("v3d_html_path", None)
+            st.error(f"生成失败：{e}")
+    _hp = st.session_state.get("v3d_html_path")
+    if _hp and Path(_hp).exists():
+        c6.download_button(
+            "下载三维视图 (.html)", data=Path(_hp).read_bytes(),
+            file_name="view_3d.html", mime="text/html", key="v3d_dl_html")
+        c6.caption(f"{Path(_hp).stat().st_size / 1024 / 1024:.1f} MB，"
+                   "已内联渲染引擎，离线可开。")
+    else:
+        c6.caption("导出的是**当前这个着色场与视角参数**下的场景。")
+
+
 # ---------------------------------------------------------------- 报告导出
 
 
@@ -349,6 +430,9 @@ def render(doc: ModelDoc) -> None:
 
     # ---- 荷载组合（梁格才有；斜拉桥内核不出梁内力）----
     _combination_block(res, doc.model)
+
+    # ---- 三维交互视图（报告里的轴测图出自同一份场景）----
+    _scene_block(doc, res)
 
     # ---- 图（与报告同一批 PNG）----
     _figures_block(doc, res)
