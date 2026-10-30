@@ -48,49 +48,93 @@ def parse_summary(path: Path) -> dict:
 
     返回 {"disp": {(node,dof): (min,max)},
           "beam": {elem: {Nmin,Nmax,VyMin,…,MyMin,MyMax,MzMin,MzMax}},
-          "live": {stage: (max,min)}}
+          "live": {stage: (max,min)},
+          "final_beam": {elem: {...}}   # 成桥态恒载内力（单一状态）
+          "final_disp": {(node,dof): u} # 成桥态位移
+          "live_beam": {elem: {MyMin,MyMax,VzMin,VzMax}}}  # 成桥态活载内力包络
 
     梁内力**逐分量**解析（键名不写死）。旧版 summary 只输出 N/Mz，新版输出
     六个分量——竖向受弯的弯矩落在 My 上（纵向梁沿 X，绕局部 y 水平轴），
     只读 Mz 会得到"222 个单元内力全 0"。按 key=value 通用解析后，新旧格式
     都能读，缺的分量就是缺，不补零成"算过了"。
+
+    `final_*` 与 `live_beam` 是荷载组合的输入：组合的两项必须来自**同一个
+    构型**（成桥态），所以不能拿 `beam` 的阶段包络去乘 1.2——那份包络里
+    混着"某跨还没浇完"的临时内力。
     """
     disp: dict = {}
     beam: dict = {}
     live: dict = {}
-    section = None
+    final_beam: dict = {}
+    final_disp: dict = {}
+    live_beam: dict = {}
+
+    # 段名按**完整前缀**分派，不做子串匹配："beam force envelope" 与
+    # "final stage beam force" 都含 "beam force"，用子串会串段。
+    sections = (
+        "stage displacement envelope",
+        "beam force envelope",
+        "final stage beam force",
+        "final stage displacement",
+        "stage live envelope",
+        "live beam envelope",
+    )
+    section = ""
     re_disp = re.compile(r"^N(\d+) dof(\d+) min=(\S+) max=(\S+)$")
+    re_fdisp = re.compile(r"^N(\d+) dof(\d+) u=(\S+)$")
     re_beam_id = re.compile(r"^E(\d+)\s+(.*)$")
+    re_end_id = re.compile(r"^E(\d+)\s+([ij])\s+(.*)$")
     re_kv = re.compile(r"([A-Za-z]+)=(\S+)")
     re_live = re.compile(r"^STAGE(\d+) max=(\S+) min=(\S+)$")
+
+    def _beam_row(rest: str) -> dict[str, float]:
+        vals: dict[str, float] = {}
+        for key, raw in re_kv.findall(rest):
+            try:
+                vals[key] = float(raw)
+            except ValueError:
+                continue
+        return vals
+
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
         if not line:
             continue
-        if line.startswith(("stage displacement", "beam force", "stage live")):
-            section = line
+        hit = next((s for s in sections if line.startswith(s)), None)
+        if hit:
+            section = hit
             continue
-        if section and section.startswith("stage displacement"):
+        if section == "stage displacement envelope":
             m = re_disp.match(line)
             if m:
                 disp[(int(m.group(1)), int(m.group(2)))] = (
                     float(m.group(3)), float(m.group(4)))
-        elif section and section.startswith("beam force"):
+        elif section == "final stage displacement":
+            m = re_fdisp.match(line)
+            if m:
+                final_disp[(int(m.group(1)), int(m.group(2)))] = float(m.group(3))
+        elif section == "beam force envelope":
             m = re_beam_id.match(line)
             if m:
-                vals: dict[str, float] = {}
-                for key, raw in re_kv.findall(m.group(2)):
-                    try:
-                        vals[key] = float(raw)
-                    except ValueError:
-                        continue
+                vals = _beam_row(m.group(2))
                 if vals:
                     beam[int(m.group(1))] = vals
-        elif section and section.startswith("stage live"):
+        elif section in ("final stage beam force", "live beam envelope"):
+            # 逐端：键为 (单元号, "i"/"j")。两端弯矩异号，外包后组合会
+            # 把 i 端的恒载与 j 端的活载相加。
+            m = re_end_id.match(line)
+            if m:
+                vals = _beam_row(m.group(3))
+                if vals:
+                    target = final_beam if section.startswith("final") else live_beam
+                    target[(int(m.group(1)), m.group(2))] = vals
+        elif section == "stage live envelope":
             m = re_live.match(line)
             if m:
                 live[int(m.group(1))] = (float(m.group(2)), float(m.group(3)))
-    return {"disp": disp, "beam": beam, "live": live}
+    return {"disp": disp, "beam": beam, "live": live,
+            "final_beam": final_beam, "final_disp": final_disp,
+            "live_beam": live_beam}
 
 
 def solve_3d(model, out_dir: str | Path, dat_name: str = "model_3d.dat") -> dict:

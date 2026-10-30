@@ -75,6 +75,12 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
     res.disp = dict(raw.get("disp") or {})
     res.beam = {int(k): dict(v) for k, v in (raw.get("beam") or {}).items()}
     res.live = {int(k): tuple(v) for k, v in (raw.get("live") or {}).items()}
+    res.final_beam = {(int(e), str(d)): dict(v)
+                      for (e, d), v in (raw.get("final_beam") or {}).items()}
+    res.final_disp = {(int(n), int(d)): float(u)
+                      for (n, d), u in (raw.get("final_disp") or {}).items()}
+    res.live_beam = {(int(e), str(d)): dict(v)
+                     for (e, d), v in (raw.get("live_beam") or {}).items()}
     st = model.stats() if hasattr(model, "stats") else {}
     res.stats = {**st, "dofs": _dofs(model)}
     res.converged = True                       # 线性求解，无迭代
@@ -83,10 +89,18 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
     res.diagnostics.append(
         "线性阶段分析：不考虑几何非线性、索垂度与只受拉。"
         "本内核输出阶段位移/内力包络与活载包络。")
+    if res.final_beam:
+        res.diagnostics.append(
+            "荷载组合取「成桥态」单值（final stage），不取阶段包络："
+            "阶段包络里含未浇筑完成的悬臂临时内力，与运营期活载不属同一构型。")
+    if not res.live_beam:
+        res.diagnostics.append(
+            "模型未定义车道荷载（LANE_3D），无活载内力，荷载组合只出恒载项。")
     if any(t.kind == "CABLE" for t in getattr(model, "etypes", [])):
         res.diagnostics.append(
             "模型含 CABLE 单元，但线性内核把它们当 TRUSS 处理（可压）。"
             "要按只受拉 + 垂度算成桥态，请走 cable_stayed 内核。")
+
 
 
 def _adapt_cable(model: Any, raw: dict, res: SolveResult) -> None:

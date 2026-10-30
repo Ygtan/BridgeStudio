@@ -39,6 +39,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import combination
+
 #: 内核键 → 中文名。界面标题、计算书章节名都取这里，不各写一份。
 KIND_LABELS: dict[str, str] = {
     "grillage3d": "三维梁格",
@@ -127,6 +129,20 @@ class SolveResult:
     beam: dict[int, dict[str, float]] = field(default_factory=dict)
     # 活载包络：{stage: (max, min)}
     live: dict[int, tuple[float, float]] = field(default_factory=dict)
+
+    # ---- 荷载组合用的成桥态效应 ----------------------------------------
+    # 上面 `disp` / `beam` 是**跨施工阶段的包络**，里面混着"某跨还没浇完"
+    # 的临时构型内力；而活载效应只可能发生在成桥构型上。两者不是同一状态，
+    # 不能一个乘 1.2、另一个乘 1.4 再相加（两个不同构型的极值相加没有物理
+    # 意义）。所以组合另取这一组成桥态单值。
+    #
+    # 键是 (单元号, "i"/"j") 而不是单元号：同一单元两端弯矩通常异号，
+    # 先外包成一对再组合，会把 i 端的恒载与 j 端的活载加到一起——那既不是
+    # i 端也不是 j 端的截面。
+    final_beam: dict[tuple[int, str], dict[str, float]] = field(default_factory=dict)
+    final_disp: dict[tuple[int, int], float] = field(default_factory=dict)
+    # 成桥态活载内力包络：{(单元, 端): {MyMin, MyMax, VzMin, VzMax}}
+    live_beam: dict[tuple[int, str], dict[str, float]] = field(default_factory=dict)
     # 成桥态专用
     cables: list[dict[str, Any]] = field(default_factory=list)
     camber: dict[int, tuple[float, float, float]] = field(default_factory=dict)
@@ -286,6 +302,13 @@ class SolveResult:
                               hint=f"活载包络 {len(self.live)} 阶段"))
             out.append(Metric("梁内力包络单元", f"{len(self.beam)}",
                               hint="六分量：N/Vy/Vz/T/My/Mz"))
+            ult = next((c for c in self.combinations()
+                        if c.spec.key == "ultimate"), None)
+            w = ult.worst("My") if ult else None
+            if w is not None:
+                out.append(Metric(
+                    "基本组合控制弯矩", f"{w[1] / 1e3:,.0f}", "kN·m",
+                    hint=f"1.2G+1.4Q，单元 {w[0][0]}·{w[0][1]} 端"))
         return out
 
     def max_bending(self) -> tuple[int, float] | None:
@@ -302,6 +325,54 @@ class SolveResult:
             if best is None or my > abs(best[1]):
                 best = (eid, my)
         return best
+
+    # ------------------------------------------------------------ 荷载组合
+
+    def combinations(self) -> list[combination.BeamCombo]:
+        """JTG D60-2015 三种组合下的梁端内力（基本/频遇/准永久）。
+
+        只对梁格内核有意义：斜拉桥内核不输出梁内力，也不输出活载效应。
+        """
+        return combination.beam_combinations(self)
+
+    def disp_combinations(self) -> list[combination.DispCombo]:
+        """影响点处的位移组合。"""
+        return combination.disp_combinations(self)
+
+    def combination_checks(self, model: Any = None) -> list[Check]:
+        """组合是否可用、量级是否合理。不做承载力判定——那要配筋。"""
+        if self.kind != "grillage3d":
+            return [Check(
+                "运营期荷载组合", True,
+                f"{self.kind_label}内核不输出梁内力与活载效应，不做运营期组合；"
+                "索力按标准值 + 安全系数验算", level="info")]
+        if not self.final_beam:
+            return [Check("荷载组合", False,
+                          "结果里没有成桥态梁内力，无法形成组合值", level="error")]
+        out: list[Check] = []
+        if not self.live_beam:
+            out.append(Check(
+                "活载效应", False,
+                "模型未定义车道荷载（LANE_3D）：组合里只有恒载项乘系数，"
+                "这不是组合值", level="warn"))
+        else:
+            g = max((abs(v.get("My", 0.0)) for v in self.final_beam.values()),
+                    default=0.0)
+            q = max((max(abs(v.get("MyMin", 0.0)), abs(v.get("MyMax", 0.0)))
+                     for v in self.live_beam.values()), default=0.0)
+            if g > 0:
+                ratio = q / g
+                # 经验判据，不是条文：常规梁桥活载弯矩约为恒载的 0.2~0.6，
+                # 超过 2 倍多半是车道荷载或跨径填错（这也是唯一能自动发现的
+                # "活载异常"信号）。
+                out.append(Check(
+                    "活载/恒载效应比", ratio <= 2.0,
+                    f"|S_Q| / |S_G| = {ratio:.2f}（活载 {q / 1e3:,.0f} / "
+                    f"恒载 {g / 1e3:,.0f} kN·m）"
+                    + ("" if ratio <= 2.0
+                       else "：活载效应超过恒载两倍，请核对车道荷载与跨径"),
+                    value=ratio, limit=2.0, level="warn"))
+        return out
 
     # ------------------------------------------------------------ 校核
 
@@ -320,6 +391,7 @@ class SolveResult:
             out += self._checks_cable(model)
         else:
             out += self._checks_grillage(model)
+        out += self.combination_checks(model)
         return out
 
     def _checks_cable(self, model: Any) -> list[Check]:
@@ -552,6 +624,14 @@ class SolveResult:
                           _r(max(abs(v.get("Tmin", 0)), abs(v.get("Tmax", 0))) / 1e3, 1)]
                          for e, v in sorted(self.beam.items())],
             }
+        combos = self.combinations()
+        if combos:
+            out["combo_coef"] = combination.coefficient_table()
+            out["combo_summary"] = combination.summary_table(
+                combos, self.disp_combinations())
+            ult = next((c for c in combos if c.spec.key == "ultimate"), None)
+            if ult is not None and ult.rows:
+                out["combo_ultimate"] = combination.beam_table(ult)
         return out
 
     # ------------------------------------------------------------ 兼容旧字典
