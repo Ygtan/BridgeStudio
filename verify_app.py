@@ -178,6 +178,31 @@ def main() -> int:
                       any("放大绘制" in n for n in _sc2[1].notes),
                       "；".join(n[:18] for n in _sc2[1].notes[:2]) if _sc2 else "—")
 
+            # ---- MIDAS 互导：导出走界面一次，加载没丢 ----
+            _xb = next((b for b in at.button if b.key == "mi_export_btn"), None)
+            check("互导块出现导出按钮", _xb is not None)
+            try:
+                _fu = at.get("file_uploader")
+            except Exception:                       # noqa: BLE001
+                _fu = []
+            check("互导块出现 .mct 上传口", len(_fu) == 1, f"{len(_fu)} 个")
+            if _xb is not None:
+                _xb.click().run()
+                _xp = (at.session_state.get("mi_export") or {}).get("path")
+                check("界面导出 .mct 已落盘",
+                      bool(_xp) and Path(_xp).exists()
+                      and Path(_xp).stat().st_size > 10_000,
+                      f"{Path(_xp).stat().st_size // 1024} KB"
+                      if _xp and Path(_xp).exists() else "—")
+                if _xp and Path(_xp).exists():
+                    _xt = Path(_xp).read_text(encoding="utf-8")
+                    check("导出的 .mct 带荷载工况（界面级回归：旧实现一条没写）",
+                          "*STLDCASE" in _xt and _xt.count("\n") > 200,
+                          f"{_xt.count('*CONLOAD')} 个 CONLOAD 段")
+                    check("梁格导出的单元都是 BEAM（没有把梁写成索）",
+                          _xt.count(", BEAM,") == _r.stats.get("elements"),
+                          f"{_xt.count(', BEAM,')} 个")
+
             # 可旋转视图单独发出去的那份 html
             _hb = next((b for b in at.button if b.key == f"v3d_html_{_fp}"), None)
             check("生成可旋转视图按钮存在", _hb is not None)
@@ -315,8 +340,20 @@ def main() -> int:
                       _ans.count("\nEN,") > 100 and "FILL," in _ans,
                       f"{_ans.count(chr(10) + 'EN,')} 个单元")
                 check("Abaqus 截面带方向向量", "0., 0., -1." in _inp)
-                check("导出无告警堆积", len((_ex or {}).get("warnings", [])) <= 2,
-                      f"{len((_ex or {}).get('warnings', []))} 条")
+                # 告警现在有三类（成桥态工况带不走、荷载已写入、不写自重），
+                # 按条数卡"≤2"会误伤真告警；改为按内容判：
+                #   · 不含异常文本（出现 Traceback/Error 说明是崩出来的字符串）
+                #   · 必须提到自重双计这条——它对应"导出的模型能不能直接算"的关键坑
+                _warns = list((_ex or {}).get("warnings", []))
+                check("导出告警不含异常文本",
+                      all(not any(t in x for t in ("Traceback", "Error", "None"))
+                          for x in _warns), f"{len(_warns)} 条")
+                check("MIDAS 导出带上了荷载工况（旧实现一条没写）",
+                      "*CONLOAD" in Path(_paths["midas"]).read_text(encoding="utf-8")
+                      and "*STLDCASE" in Path(_paths["midas"]).read_text(encoding="utf-8"))
+                check("并说明自重的双计风险",
+                      any("双计" in x for x in _warns),
+                      str([x for x in _warns if "双计" in x])[:50])
 
     print("\n[从三维切回单梁：两条链路不串味]")
     at.button(key="ex0").click().run()

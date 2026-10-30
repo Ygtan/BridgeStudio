@@ -109,7 +109,8 @@ def _combination_block(res: SolveResult, model: Any) -> None:
     st.dataframe([dict(zip(summ["headers"], r)) for r in summ["rows"]],
                  use_container_width=True, hide_index=True)
     st.caption(summ["note"])
-    st.caption("恒载项取成桥态单值（非施工阶段包络），组合按单元 × i/j 端进行："
+    st.caption("恒载项取成桥态单值（各阶段累加，非施工阶段包络），"
+               "组合按单元 × i/j 端进行："
                "阶段包络含未浇筑悬臂的临时内力，与运营期活载不属同一构型；"
                "两端弯矩异号，先外包再相加会把一端恒载配另一端活载。")
     with st.expander("组合系数与依据 / 基本组合逐截面结果"):
@@ -241,6 +242,115 @@ def _scene_block(doc: ModelDoc, res: SolveResult) -> None:
                    "已内联渲染引擎，离线可开。")
     else:
         c6.caption("导出的是**当前这个着色场与视角参数**下的场景。")
+
+
+# ---------------------------------------------------------------- MIDAS 互导
+
+
+def _interop_block(doc: ModelDoc) -> None:
+    """MIDAS ``.mct`` 双向互导：导出当前模型 / 导入别人的模型试算。
+
+    为什么不把导入的模型直接塞回 ``doc``：``ModelDoc`` 是"参数 → 展开模型"
+    的产物，而 .mct 里没有"跨径布置"这种参数，只有节点和单元。硬塞进去会让
+    ``doc.params`` 与实际模型对不上（改一个参数重算，模型就变回原样）。
+    所以导入的结果走独立的"试算"面板：能算、能看、能导出 .dat，但不冒充
+    参数化模型。
+    """
+    import mct_io
+
+    st.markdown("**与 MIDAS Civil 互导（.mct）**")
+    c1, c2 = st.columns([1.0, 1.7])
+
+    # ---- 导出 ----
+    if c1.button("导出当前模型 (.mct)", key="mi_export_btn",
+                 help="节点、单元、材料、截面、约束与荷载工况；车道荷载与施工阶段"
+                      "不在 MCT 的范围内，会逐条列出"):
+        try:
+            p = Path("out") / doc.kind / "export" / f"{doc.kind}.mct"
+            warns = mct_io.write_mct(doc.model, p)
+            st.session_state["mi_export"] = {"path": str(p), "warnings": warns}
+        except Exception as e:                      # noqa: BLE001
+            st.session_state.pop("mi_export", None)
+            c1.error(f"导出失败：{e}")
+    got = st.session_state.get("mi_export")
+    if got and Path(got["path"]).exists():
+        _p = Path(got["path"])
+        c1.download_button("下载 .mct", data=_p.read_bytes(), file_name=_p.name,
+                           mime="text/plain", key="mi_dl")
+        with c1.expander(f"导出说明（{len(got['warnings'])} 条，含丢失项）"):
+            for w in got["warnings"]:
+                st.caption(f"· {w}")
+    else:
+        c1.caption("MCT 是单工况模型：施工阶段会被合并为一条荷载工况。")
+
+    # ---- 导入 ----
+    up = c2.file_uploader("导入 MIDAS .mct（只读，不覆盖当前模型）",
+                          type=["mct", "txt"], key="mi_upload")
+    if up is None:
+        c2.caption("导入后可看「读进来什么、丢了什么」，并直接写出 FEM-Eigen "
+                   ".dat 或就地试算一次。")
+        return
+
+    imp = mct_io.read_mct(up.getvalue(), title=up.name.rsplit(".", 1)[0])
+    sm = imp.summary()
+    c2.caption(f"{sm['nodes']} 节点 / {sm['elements']} 单元 / "
+               f"{sm['materials']} 材料 / {sm['reals']} 截面 / "
+               f"{sm['boundaries']} 约束 / {sm['loads']} 节点力　"
+               f"｜　单位 {sm['unit'][0]}, {sm['unit'][1]}　"
+               f"｜　竖向合力 {sm['load_sum_z'] / 1e3:,.1f} kN")
+
+    for e in imp.errors[:5]:
+        c2.error(e)
+    if len(imp.errors) > 5:
+        c2.caption(f"…另有 {len(imp.errors) - 5} 条错误")
+    if imp.notes:
+        for x in imp.notes:
+            c2.info(x)
+    if imp.warnings:
+        with c2.expander(f"告警（{len(imp.warnings)} 条：能算，但与原模型不完全一致）"):
+            for w in imp.warnings:
+                st.caption(f"· {w}")
+    if imp.losses:
+        with c2.expander(f"带不走的（{len(imp.losses)} 条：文件里有，本程序没有）"):
+            for x in imp.losses:
+                st.caption(f"· {x}")
+
+    if not imp.ok:
+        return
+
+    _errs, _warns = imp.lint()
+    if _errs:
+        c2.error("模型校验不通过：" + "；".join(_errs[:3]))
+        return
+    if _warns:
+        with c2.expander(f"模型校验提示（{len(_warns)} 条）"):
+            for w in _warns:
+                st.caption(f"· {w}")
+
+    _c1, _c2 = c2.columns(2)
+    _c1.download_button("写出 FEM-Eigen .dat", data=imp.model.to_dat().encode("utf-8"),
+                        file_name=f"{up.name.rsplit('.', 1)[0]}.dat",
+                        mime="text/plain", key="mi_dl_dat")
+    if _c2.button("用本内核试算（恒载静力）", key="mi_solve_btn"):
+        from solver_3d import solve as _solve
+
+        with st.spinner("导入模型 → 导出 .dat → 调用内核 …"):
+            try:
+                st.session_state["mi_result"] = _solve(
+                    imp.model, kind="grillage3d", out_dir="out/interop")
+            except Exception as e:                  # noqa: BLE001
+                st.session_state.pop("mi_result", None)
+                c2.error(f"试算失败：{e}")
+    _r = st.session_state.get("mi_result")
+    if _r is not None and _r.final_beam and _r.final_disp:
+        _mymax = max(abs(v.get("My", 0.0)) for v in _r.final_beam.values())
+        _dz = min(v for (_n, d), v in _r.final_disp.items() if d == 3) if any(
+            d == 3 for (_n, d) in _r.final_disp) else 0.0
+        _k = c2.columns(3)
+        _k[0].metric("控制弯矩 |My|", f"{_mymax / 1e3:,.0f} kN·m")
+        _k[1].metric("成桥挠度", f"{_dz * 1000:.2f} mm")
+        _k[2].metric("自由度", str(_r.stats.get("dofs", "—")))
+        c2.caption("试算只算恒载（车道荷载不在 MCT 里），结果不参与本页的校核与组合。")
 
 
 # ---------------------------------------------------------------- 报告导出
@@ -388,6 +498,10 @@ def render(doc: ModelDoc) -> None:
         with st.expander(f"模型校验提示（{len(hints)} 条，不影响求解）"):
             for h in hints[:15]:
                 st.caption(f"· {h}")
+
+    # ---- 互导（放在求解之前：导入别人的模型本身就是一条"取模型"的路）----
+    with st.expander("与 MIDAS 互导（.mct）：导出当前模型 / 导入 MIDAS 模型试算"):
+        _interop_block(doc)
 
     # ---- 求解 ----
     st.caption(

@@ -95,6 +95,11 @@ _REAL_FIELDS_BEAM = {
     "ADDMAS": "ADDMASS",
     "WT": "WT",
     "WB": "WB",
+    # 侧向截面模量：ANSYS/Abaqus 用不到，MCT 的截面纤维距离要用它反算
+    # （CyP = Izz / WY）。放在这里而不是单独传参，是因为它本来就是实常数的
+    # 一份字段，出处只有一个。
+    "WY": "WY",
+    "WTORS": "WTORS",
 }
 _REAL_FIELDS_TRUSS = {
     "A_TRUSS": "A",
@@ -126,6 +131,48 @@ def _poisson(E: float, G: float) -> tuple[float, bool]:
         if 0.01 < nu < 0.49:
             return nu, True
     return 0.3, False
+
+
+def _collect_loads(model: ModelSpec3D) -> tuple[list[tuple[int, int, float]],
+                                                list[str]]:
+    """把模型里的荷载汇总成一份「单工况节点力」。返回 ([(节点, 自由度, 值)], 告警)。
+
+    **为什么必须求和而不是只读 model.loads**：三维内核的荷载只挂在施工阶段上
+    （``solveModel3DStages`` 里 ``mc.loads = st.loads``，``m.loads`` 被忽略），
+    梁格模型的 ``model.loads`` 是空的。旧实现只读 ``model.loads``，于是三跨
+    梁格的 141 条阶段荷载一条都没写出去——导出的 MIDAS/ANSYS/Abaqus 模型
+    「有刚度、有支座、零荷载」，求解得到全零位移，而文件完全合法。
+
+    判据与内核一致：**有阶段就只看阶段荷载**，不把两者相加（否则凭空多一份力）。
+    线性分析里各阶段节点力可叠加，合并后的单工况与"分阶段累加"在构型相同时
+    严格相等；有钝化或阶段间构型差异时不等价，故单独告警。
+    """
+    warns: list[str] = []
+    if not model.stages:
+        return [(ld.node, ld.dof, ld.value) for ld in model.loads], warns
+
+    acc: dict[tuple[int, int], float] = {}
+    order: list[tuple[int, int]] = []
+    for s in model.stages:
+        for ld in s.loads:
+            key = (ld.node, ld.dof)
+            if key not in acc:
+                order.append(key)
+                acc[key] = 0.0
+            acc[key] += ld.value
+
+    dead = [(s.id, len(s.deactivate)) for s in model.stages if s.deactivate]
+    if dead:
+        warns.append(
+            f"模型有 {sum(n for _i, n in dead)} 个单元被钝化（阶段 "
+            + "、".join(str(i) for i, _n in dead)
+            + "）。导出的是**单工况全激活**模型：钝化单元依然存在、也参与受力，"
+              "与被钝化后的构型不同。要做施工阶段分析需在目标软件里另建阶段组。")
+    warns.append(
+        f"施工阶段荷载已合并为单一工况：{len(model.stages)} 个阶段、"
+        f"{sum(len(s.loads) for s in model.stages)} 条节点力 → "
+        f"{len(order)} 个独立自由度。线性叠加；构型相同时与分阶段累加严格相等。")
+    return [(n, d, acc[(n, d)]) for (n, d) in order], warns
 
 
 def to_canonical(model: ModelSpec3D) -> tuple[dict[str, Any], list[str]]:
@@ -249,9 +296,11 @@ def to_canonical(model: ModelSpec3D) -> tuple[dict[str, Any], list[str]]:
                 f"节点 {b.node} 的弹性支承 k={b.k:g} N/m 无法导出——"
                 f"X20 的 canonical 模型只有刚性约束")
 
-    # ---- 荷载：ModelSpec3D 只有节点力；无重力对象、无梁上分布荷载
-    cloads = [{"id": i, "node_id": ld.node, "dof": ld.dof, "value": ld.value}
-              for i, ld in enumerate(model.loads, start=1)]
+    # ---- 荷载：单工况节点力（阶段荷载求和，见 _collect_loads）
+    node_loads, w_load = _collect_loads(model)
+    warnings += w_load
+    cloads = [{"id": i, "node_id": n, "dof": d, "value": v}
+              for i, (n, d, v) in enumerate(node_loads, start=1)]
 
     canonical = {
         "bridge": {"name": model.title, "type": "BEAM3D"},
@@ -271,10 +320,10 @@ def to_canonical(model: ModelSpec3D) -> tuple[dict[str, Any], list[str]]:
         },
     }
 
-    if model.loads:
+    if not cloads:
         warnings.append(
-            "canonical 模型只承载节点力：ModelSpec3D 里若有梁上分布荷载/重力，"
-            "导出后会丢失（当前实现的桥面恒载是换算成节点力的，故本项通常为空）")
+            "模型没有任何节点力可选：导出的是纯结构（无荷载）。若原模型的恒载"
+            "由自重施加，三种格式都不会带上它——本程序没有重力对象")
     return canonical, warnings
 
 
@@ -461,66 +510,28 @@ def write_abaqus_file(model: dict[str, Any], path: str) -> None:
 def write_midas_file(model: dict[str, Any], path: str) -> None:
     """写 MIDAS Civil MCT 命令文件。
 
-    MIDAS 的截面命名（IYY 绕 y 轴）与 FEM-Eigen 同义，故 IY→iyy、IZ→izz 直接
+    实现搬到 ``mct_io.write_mct_from_canonical``：MCT 的格式细节（材料行
+    15 字段、截面四行块、``*STLDCASE``/``*USE-STLD`` 工况、``*CONLOAD`` 的
+    六分量）比 ANSYS/Abaqus 琐碎得多，放在一起会让本文件的主线（"三种格式
+    共用一份 canonical 映射"）被淹没。这里只留签名，保证 X20 的调用方式不变。
+
+    MIDAS 的截面命名（Iyy 绕 y 轴）与 FEM-Eigen 同义，故 IY→iyy、IZ→izz 直接
     同名搬用；这一点与 ANSYS 相反，不要混用两套对应关系。
     """
-    _ensure_parent(path)
-    gravity = 9.806
-    rc_by_id = {rc["id"]: rc for rc in model["real_constants"]}
+    from mct_io import write_mct_from_canonical       # 局部导入：避免环引用
 
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.write("*VERSION\n8.8.5\n")
-        f.write("*UNIT\nN, M\n")
-        f.write("*STRUCTYPE\n0, 0, 9.806, 0, NO, NO\n")
-
-        f.write("*MATERIAL\n")
-        for m in model["materials"]:
-            f.write(f"{m['id']}, USER, MAT{m['id']}, 0, 0, 2, "
-                    f"{_num(m['elastic_modulus'])}, {_num(m['poisson_ratio'])}, "
-                    f"{_num(m['thermal_expansion'])}, "
-                    f"{_num(m['density'] * gravity)}\n")
-
-        f.write("*SECTION\n")
-        for rc in model["real_constants"]:
-            v = rc["fields"]
-            sid = rc["id"]
-            if rc["kind"] == "BEAM3D":
-                f.write(f"{sid}, VALUE, SEC{sid}, CC, SB, Built, 0, 0, 0, 0, 0, 0\n")
-                f.write(f"{_num(v['AREA'])}, {_num(v['AREA'])}, {_num(v['AREA'])}, "
-                        f"{_num(v['IXX'])}, {_num(v['IYY'])}, {_num(v['IZZ'])}\n")
-            else:
-                f.write(f"{sid}, VALUE, SEC{sid}, CC, SR, Built, 0, 0, 0, 0, 0, 0\n")
-                f.write(f"{_num(v['A_TRUSS'])}, 0, 0, 0, 0, 0\n")
-            f.write("0, 0, 0, 0, 0, 0, 0, 0, 0, 0\n")
-            f.write("0, 0, 0, 0, 0, 0, 0, 0\n")
-
-        f.write("*NODE\n")
-        for n in model["nodes"]:
-            f.write(f"{n['id']}, {_num(n['x'])}, {_num(n['y'])}, {_num(n['z'])}\n")
-
-        f.write("*ELEMENT\n")
-        et_by_id = {et["id"]: et for et in model["element_types"]}
-        for e in model["elements"]:
-            et = et_by_id[e["element_type_id"]]
-            kind = MIDAS_ELEMENT_TYPES[et["kind"]]
-            if kind == "TENSTR":
-                f.write(f"{e['id']}, TENSTR, {et['material_id']}, {et['real_id']}, "
-                        f"{e['start_node']}, {e['end_node']}, 0, 1, 0\n")
-            else:
-                f.write(f"{e['id']}, {kind}, {et['material_id']}, {et['real_id']}, "
-                        f"{e['start_node']}, {e['end_node']}, 0, 0, 0\n")
-
-        if model["boundary_conditions"]:
-            f.write("*CONSTRAINT\n")
-            for bc in model["boundary_conditions"]:
-                code = "".join("1" if d in bc["dofs"] else "0" for d in _DOF_NAMES)
-                f.write(f"{bc['node_id']}, {code}, \n")
-
-        f.write("*ENDDATA\n")
+    write_mct_from_canonical(model, path)
 
 
 def export_all(model: ModelSpec3D, out_dir: str, stem: str = "model") -> dict[str, Any]:
-    """一次导出三种格式，返回 {格式: 路径} 与 warnings。"""
+    """一次导出三种格式，返回 {格式: 路径} 与 warnings。
+
+    MCT 走 ``mct_io.write_mct`` 而不是 ``write_midas_file``：前者会额外告警
+    「车道荷载带不走」「成桥态工况带不走」——这些是 MCT 特有的丢失项，其他
+    两种格式也有，但只有 MCT 的写入器知道该怎么说。
+    """
+    from mct_io import write_mct                   # 局部导入：避免环引用
+
     canonical, warnings = to_canonical(model)
     os.makedirs(out_dir, exist_ok=True)
     paths = {
@@ -530,5 +541,5 @@ def export_all(model: ModelSpec3D, out_dir: str, stem: str = "model") -> dict[st
     }
     write_ansys_file(canonical, paths["ansys"])
     write_abaqus_file(canonical, paths["abaqus"])
-    write_midas_file(canonical, paths["midas"])
+    warnings = list(warnings) + write_mct(model, paths["midas"])
     return {"paths": paths, "warnings": warnings, "canonical": canonical}

@@ -91,7 +91,7 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
         "本内核输出阶段位移/内力包络与活载包络。")
     if res.final_beam:
         res.diagnostics.append(
-            "荷载组合取「成桥态」单值（final stage），不取阶段包络："
+            "荷载组合取「成桥态」单值（各施工阶段内力累加），不取阶段包络："
             "阶段包络里含未浇筑完成的悬臂临时内力，与运营期活载不属同一构型。")
     if not res.live_beam:
         res.diagnostics.append(
