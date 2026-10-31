@@ -256,7 +256,12 @@ def require(kind: str) -> SolverSpec:
 
 
 def _fallback_hints() -> dict[str, SolverSpec]:
-    """模块都导不进来时，至少把两条编译命令说清楚。"""
+    """模块都导不进来时，至少把各内核的编译命令说清楚。
+
+    键必须与真注册表一致（`grillage3d` / `cable_stayed` / `suspension`）：
+    少一个键，用户在那种情况下会看到"未知内核键"而不是"请先编译"，
+    提示就白写了。
+    """
     def _no() -> bool:
         return False
 
@@ -276,6 +281,10 @@ def _fallback_hints() -> dict[str, SolverSpec]:
             ("grillage3d", "example_3d_grillage.exe",
              "cd D:/AI-work/FEM-Eigen && cmake --build build --target example_3d_grillage"),
             ("cable_stayed", "cable_solver.exe",
+             "cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver"),
+            # 悬索桥与斜拉桥共用 cable_solver.exe，但同样是独立的一个键：
+            # adapt 与出口不同，键合并会让 detect_kind 的分支无处落地。
+            ("suspension", "cable_solver.exe",
              "cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver"),
         )
     }

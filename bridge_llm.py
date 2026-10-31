@@ -164,7 +164,11 @@ def build_bridge_messages(text: str, prev: dict | None = None) -> list[dict]:
 def normalize_material(name: Any) -> str:
     """把 LLM 五花八门的材料写法收敛到两个选项。"""
     s = str(name or "")
-    if "混凝土" in s or s.upper().startswith("C") and s[1:].isdigit():
+    # 括号是给读代码的人看的：and 的优先级高于 or，去掉括号结果一样。
+    # 但不写括号时，后来者很容易误以为这是"混凝土 或 (C+数字)"两个独立条件，
+    # 从而把后半句改成 `s[1:].isdigit()` 之外的东西却不加括号。
+    is_grade_c = s.upper().startswith("C") and s[1:].isdigit()
+    if "混凝土" in s or is_grade_c:
         return "混凝土 C50"
     if "钢" in s or "Q" in s.upper():
         return "钢材 Q345"

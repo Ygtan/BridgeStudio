@@ -21,6 +21,10 @@
 
 from __future__ import annotations
 
+from console_utf8 import setup_console
+
+setup_console()          # 输出被重定向到管道/文件时，GBK 会崩（见模块说明）
+
 import http.server
 import json
 import threading

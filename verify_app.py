@@ -10,6 +10,10 @@ C 方案把①的梁与③的桥合并成一个入口，最容易出现的回归
 
 from __future__ import annotations
 
+from console_utf8 import setup_console
+
+setup_console()          # 输出被重定向到管道/文件时，GBK 会崩（见模块说明）
+
 import sys
 from pathlib import Path
 
@@ -354,6 +358,53 @@ def main() -> int:
                 check("并说明自重的双计风险",
                       any("双计" in x for x in _warns),
                       str([x for x in _warns if "双计" in x])[:50])
+
+    print("\n[三维 · 悬索桥（自锚式）]")
+    at.button(key="ex8").click().run()
+    check("无异常", not _errors(at), _errors(at)[:1])
+    check("类型为 suspension", at.session_state["doc"].kind == "suspension",
+          _subs(at)[:50])
+    check("出现悬索桥区块", "悬索桥成桥态" in _subs(at), _subs(at)[:80])
+
+    _btn = next((b for b in at.button if b.key == "r3d_solve"), None)
+    if _btn is not None:
+        _btn.click().run()
+        check("悬索桥求解无异常", not _errors(at), _errors(at)[:1])
+        _r = at.session_state.get("r3d_result")
+        check("结果为 suspension",
+              _r is not None and getattr(_r, "kind", "") == "suspension",
+              getattr(_r, "kind", "—"))
+        if _r is not None:
+            check("收敛", bool(_r.converged),
+                  f"{_r.iterations} 轮 / {_r.elapsed_ms:.0f} ms")
+            _bad = [c.name for c in _r.checks(at.session_state["doc"].model)
+                    if not c.passed]
+            check("悬索桥校核全通过", not _bad, "、".join(_bad))
+
+            # 两种桥型的导出按钮必须各是各的、各写各的目录。
+            # 这一条是回归：上一版把斜拉桥的导出块整体错插进了悬索桥函数，
+            # 结果斜拉桥的按钮消失、悬索桥则用 cable 的目录与文件名导出一份
+            # 悬索桥——文件名叫 "cable"，还和斜拉桥互相覆盖。
+            _sb = next((b for b in at.button if b.key == "susp_export_btn"), None)
+            check("悬索桥有自己的导出按钮", _sb is not None)
+            check("斜拉桥的导出按钮不在悬索桥里",
+                  next((b for b in at.button if b.key == "cb_export_btn"), None) is None)
+            if _sb is not None:
+                _sb.click().run()
+                _ex = at.session_state.get("susp_export")
+                _paths = (_ex or {}).get("paths", {})
+                check("悬索桥三份已落盘",
+                      bool(_paths) and all(Path(p).exists()
+                                           and Path(p).stat().st_size > 500
+                                           for p in _paths.values()),
+                      "、".join(Path(p).name for p in _paths.values()) or "—")
+                check("导出到 out/susp/export、文件名 susp.*",
+                      all(Path(p).parent.name == "export"
+                          and "susp" in Path(p).parent.parent.name
+                          and Path(p).stem == "susp" for p in _paths.values()),
+                      str(sorted({str(Path(p).parent) for p in _paths.values()})))
+                check("不与斜拉桥同名覆盖",
+                      not any("cable" in Path(p).name for p in _paths.values()))
 
     print("\n[从三维切回单梁：两条链路不串味]")
     at.button(key="ex0").click().run()

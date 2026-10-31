@@ -26,6 +26,10 @@ L0 = (L* + s)/(1 + T/EA)，s = w²Lh³/(24T²)（浅垂度弹性悬链线）
 
 from __future__ import annotations
 
+from console_utf8 import setup_console
+
+setup_console()          # 输出被重定向到管道/文件时，GBK 会崩（见模块说明）
+
 import sys
 from pathlib import Path
 

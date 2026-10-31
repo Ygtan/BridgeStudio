@@ -395,11 +395,53 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
                                     mime=mime, key=f"r3d_dl_{fmt}")
 
 
-# ---------------------------------------------------------------- 斜拉桥专属
+# ------------------------------------------------------------ 索承体系共用出口
+
+
+def _export_block(doc: ModelDoc, res: SolveResult, *, out_dir: str,
+                  stem: str, key: str) -> None:
+    """三方复核导出（ANSYS / Abaqus / MIDAS）。
+
+    斜拉桥与悬索桥共用这一段，但 `out_dir` 与 `stem` **必须各给各的**：
+    悬索桥若沿用 `out/cable/export` + `stem="cable"`，两种桥型互相覆盖，
+    而且导出的悬索桥模型在第三方软件里叫 "cable"——打开的人无从判断这是
+    哪一座桥、哪一次求解。两个参数是必填而不是默认值，就是为了让调用点
+    必须显式表态。
+
+    `key` 是 widget key 前缀：同一次会话里只会有一种桥型渲染，但 key 撞了
+    会在切换桥型时留下旧状态（Streamlit 按 key 复用 widget），所以分开。
+    """
+    c3, c4 = st.columns([1.2, 2.0])
+    if c3.button("导出 ANSYS / Abaqus / MIDAS", key=f"{key}_export_btn"):
+        try:
+            from export_formats import export_all
+
+            st.session_state[f"{key}_export"] = export_all(
+                doc.model, out_dir=out_dir, stem=stem)
+        except Exception as e:                      # noqa: BLE001
+            st.session_state.pop(f"{key}_export", None)
+            st.error(f"导出失败：{e}")
+    _ex = st.session_state.get(f"{key}_export")
+    if _ex:
+        _cols = c4.columns(3)
+        for _i, (_fmt, _lab) in enumerate((("ansys", "ANSYS (.ans)"),
+                                           ("abaqus", "Abaqus (.inp)"),
+                                           ("midas", "MIDAS (.mct)"))):
+            _ep = Path(_ex["paths"][_fmt])
+            if _ep.exists():
+                _cols[_i].download_button(_lab, data=_ep.read_bytes(),
+                                          file_name=_ep.name,
+                                          key=f"{key}_ex_{_fmt}")
+        for _w in _ex.get("warnings", [])[:4]:
+            st.caption(f"· {_w}")
+        st.caption("导出的是同一套节点/单元/实常数；惯矩按「绕哪根轴」同名映射，"
+                   "泊松比由 G 反算。三格式均只建模、不含求解控制。")
+    else:
+        c4.caption("导出后可在第三方软件里独立建算，核对索力与线形。")
 
 
 def _cable_extras(doc: ModelDoc, res: SolveResult) -> None:
-    """计算书 + 三方导出。数据全部取自 SolveResult。"""
+    """斜拉桥：计算书 + 三方导出。数据全部取自 SolveResult。"""
     st.markdown("**详细计算书（7 章，含公式推导）与第三方复核**")
     c1, c2 = st.columns([1.2, 2.0])
 
@@ -433,16 +475,21 @@ def _cable_extras(doc: ModelDoc, res: SolveResult) -> None:
     else:
         c2.caption("计算书内的表格与界面显示逐项一致：同一个 SolveResult。")
 
+    _export_block(doc, res, out_dir="out/cable/export", stem="cable", key="cb")
+
 
 def _susp_extras(doc: ModelDoc, res: SolveResult) -> None:
-    """悬索桥计算书出口。
+    """悬索桥：计算书 + 三方导出。
 
     与斜拉桥分开，不是因为排版不同，而是因为**内容不同**：悬索桥要讲的是
     主缆找形（H 由矢高反求，不是人为给定）、两种体系只差边界条件、以及
     平衡边跨这个自锚式独有的几何约束。这些东西塞进斜拉桥那 7 章里会互相
     打架，所以 report_docx 里本来就是两套 `_sec_*`。
+
+    导出段则与斜拉桥共用（`_export_block`）——那里没有力学差异，
+    只有目录与文件名的差别。
     """
-    st.markdown("**详细计算书（7 章，含找形推导与体系校核）**")
+    st.markdown("**详细计算书（7 章，含找形推导与体系校核）与第三方复核**")
     c1, c2 = st.columns([1.2, 2.0])
     if c1.button("生成详细计算书 (.docx)", key="susp_report_btn"):
         with st.spinner("排版计算书（表格、插图、目录）…"):
@@ -471,32 +518,9 @@ def _susp_extras(doc: ModelDoc, res: SolveResult) -> None:
         c2.caption("计算书与界面显示同源：主缆/吊索/加劲梁三张表直接取 "
                    "SolveResult，不做二次力学计算。")
 
-    c3, c4 = st.columns([1.2, 2.0])
-    if c3.button("导出 ANSYS / Abaqus / MIDAS", key="cb_export_btn"):
-        try:
-            from export_formats import export_all
-
-            st.session_state["cb_export"] = export_all(
-                doc.model, out_dir="out/cable/export", stem="cable")
-        except Exception as e:                      # noqa: BLE001
-            st.session_state.pop("cb_export", None)
-            st.error(f"导出失败：{e}")
-    _ex = st.session_state.get("cb_export")
-    if _ex:
-        _cols = c4.columns(3)
-        for _i, (_fmt, _lab) in enumerate((("ansys", "ANSYS (.ans)"),
-                                           ("abaqus", "Abaqus (.inp)"),
-                                           ("midas", "MIDAS (.mct)"))):
-            _ep = Path(_ex["paths"][_fmt])
-            if _ep.exists():
-                _cols[_i].download_button(_lab, data=_ep.read_bytes(),
-                                          file_name=_ep.name, key=f"cb_ex_{_fmt}")
-        for _w in _ex.get("warnings", [])[:4]:
-            st.caption(f"· {_w}")
-        st.caption("导出的是同一套节点/单元/实常数；惯矩按「绕哪根轴」同名映射，"
-                   "泊松比由 G 反算。三格式均只建模、不含求解控制。")
-    else:
-        c4.caption("导出后可在第三方软件里独立建算，核对索力与线形。")
+    # 悬索桥的导出与斜拉桥共用同一段代码，但目录与文件名分开：
+    # out/susp/export/susp.ans，不与 out/cable/export/cable.* 互相覆盖。
+    _export_block(doc, res, out_dir="out/susp/export", stem="susp", key="susp")
 
 
 # ---------------------------------------------------------------- 主入口

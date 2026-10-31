@@ -798,10 +798,13 @@ def validate_model_3d(model: ModelSpec3D) -> tuple[list[str], list[str]]:
 
     # ---------------------------------------------------------- 结构可解性
     # 完全没有约束 → 6 个刚体位移，K 奇异。这是最常见也最难看出的一类错。
+    #
+    # 这里只判"一条 boundary 都没有"。别再往里套 `any(b.k > 0 ...)`——
+    # 进了这个分支，boundaries 一定是空的，那个判断恒为 False，纯属误导
+    # （曾经真这么写过）。弹簧支承（k>0）与刚性约束在这个判断上等价：
+    # 有一条就够，刚度不为零即可解。
     if not model.boundaries:
-        has_spring = any(b.k > 0 for b in model.boundaries)
-        if not has_spring:
-            errors.append("模型没有任何边界约束：刚度矩阵奇异（6 个刚体位移）")
+        errors.append("模型没有任何边界约束：刚度矩阵奇异（6 个刚体位移）")
 
     # ---------------------------------------------------------- 警告级
     used_nodes: set[int] = set()

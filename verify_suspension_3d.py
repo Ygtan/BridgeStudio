@@ -37,6 +37,10 @@
 
 from __future__ import annotations
 
+from console_utf8 import setup_console
+
+setup_console()          # 输出被重定向到管道/文件时，GBK 会崩（见模块说明）
+
 import subprocess
 import sys
 from pathlib import Path
@@ -437,6 +441,65 @@ def stage5() -> None:
           f"rc={r3.returncode}")
 
 
+# ---------------------------------------------------------------- [6] 三方导出
+
+
+def stage6() -> None:
+    print("\n[6] 三方导出（ANSYS / Abaqus / MIDAS）")
+
+    from export_formats import export_all
+
+    # 这里刻意用和斜拉桥**不同**的目录与文件名。共用 out/cable/export +
+    # stem="cable" 的后果是：两种桥型互相覆盖，且导出的悬索桥在第三方
+    # 软件里叫 "cable"——打开的人无从判断这是哪座桥。界面侧也有同样的
+    # 断言（verify_app.py 的"导出到 out/susp/export、文件名 susp.*"）。
+    m, _ = build_suspension_3d(system="SELF", main_span=300.0, sag_ratio=0.10)
+    got = export_all(m, out_dir=str(OUT / "export_susp"), stem="susp")
+    paths = {k: Path(v) for k, v in got["paths"].items()}
+
+    check("三份文件都落盘且非空",
+          all(p.is_file() and p.stat().st_size > 500 for p in paths.values()),
+          "、".join(f"{p.name}({p.stat().st_size // 1024}KB)"
+                    for p in paths.values() if p.is_file()))
+    check("文件名 stem 是 susp，不是 cable",
+          all(p.stem == "susp" for p in paths.values()),
+          "、".join(p.name for p in paths.values()))
+
+    ans = paths["ansys"].read_text(encoding="utf-8")
+    inp = paths["abaqus"].read_text(encoding="utf-8")
+    mct = paths["midas"].read_text(encoding="utf-8")
+
+    def _group(text: str, tid: int) -> int:
+        """数 ANSYS 里某个 TYPE 组下的单元数（导出器按 TYPE 分组写）。"""
+        n, cur = 0, -1
+        for line in text.splitlines():
+            if line.startswith("TYPE,"):
+                cur = int(line.split(",")[1])
+            elif line.startswith("EN,") and cur == tid:
+                n += 1
+        return n
+
+    n_beam = sum(_group(ans, t) for t in (1, 2))
+    n_cable = sum(_group(ans, t) for t in (3, 4))
+    # 导出器按单元种类分组写：梁一组、索一组。数出来的必须与模型一致，
+    # 不能只断言"大于某个数"——那样漏掉半座桥也照样过。
+    _kind = {t.id: t.kind for t in m.etypes}
+    n_beam_model = sum(1 for e in m.elements if _kind[e.etype].startswith("BEAM"))
+    n_cable_model = sum(1 for e in m.elements if _kind[e.etype] == "CABLE")
+    check("ANSYS 梁单元数与模型一致（加劲梁 + 桥塔，BEAM4）",
+          n_beam == n_beam_model and n_beam > 0,
+          f"导出 {n_beam} / 模型 {n_beam_model}")
+    check("ANSYS 索单元数与模型一致（主缆 + 吊索，LINK180）",
+          n_cable == n_cable_model and n_cable > 20,
+          f"导出 {n_cable} / 模型 {n_cable_model}")
+    check("Abaqus 索单元是 T3D2", "T3D2" in inp, f"{inp.count('T3D2')} 行")
+    check("MIDAS 写出节点与单元", "*NODE" in mct and "*ELEMENT" in mct)
+    check("导出告警里没有异常文本",
+          all(not any(t in w for t in ("Traceback", "Error", "None"))
+              for w in got.get("warnings", [])),
+          f"{len(got.get('warnings', []))} 条")
+
+
 # ---------------------------------------------------------------- main
 
 
@@ -458,6 +521,7 @@ def main() -> int:
     stage3(got)
     stage4()
     stage5()
+    stage6()
 
     n = sum(1 for r in RESULTS if r[0])
     print("=" * 66)

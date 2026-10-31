@@ -10,7 +10,7 @@
 | 部分 | 位置 | 说明 |
 |---|---|---|
 | BridgeStudio（本仓库） | `D:\AI-work\BridgeStudio` | 前处理 + 界面 + 规范验算 + 成果输出 |
-| FEM-Eigen 求解内核 | `C:\Users\Thinkpad\WorkBuddy AI\2026-10-06-17-19-31\FEM-Eigen` | C++/Eigen，git 管理，独立演进 |
+| FEM-Eigen 求解内核 | `D:\AI-work\FEM-Eigen` | C++/Eigen，git 管理，独立演进 |
 | 归档（不再投入） | `D:\AI-work\前处理\fe_nl_preprocessor` | NL-FE 原型，本项目的前身 |
 | 归档（不再投入） | `D:\AI-work\前处理\explore-x20` | X20 原型，多格式导出器的来源 |
 
@@ -67,12 +67,27 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 - [x] **P3** 内核攻坚：共转列式非线性 + 索长迭代 → 斜拉桥成桥态 —— 2026-10-30
 - [x] **P3** 悬索桥成桥态（自锚式 / 地锚式）：主缆索多边形找形（对 H 二分命中
        矢高）→ 平衡态弦长反算 L₀ → 索长迭代；两体系共用同一套内核，只差边界。
-       `verify_suspension_3d.py` 54/54 全绿，含两条内核硬校验的负例
+       `verify_suspension_3d.py` 61/61 全绿，含两条内核硬校验的负例
        （塔顶不共用节点、端节点悬空都会报错而不会静默算错）—— 2026-10-31
 - [ ] **P4** 成果层：Word/PDF 计算书、3D 包络视图、MIDAS 双向互导
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 19+7+6+17+54 项全绿）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 19+7+6+17+61 项全绿）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
+
+### 跑 verify 时的控制台编码
+
+所有 verify 脚本入口都调了 `console_utf8.setup_console()`，把 stdout/stderr
+强制成 UTF-8。**这不是装饰**：脚本里带 `✅`、`↔`、`mm²` 的 `²`，而 Windows
+默认控制台是 cp936——一旦把输出重定向到管道或文件（`> log.txt`、CI 收集日志、
+编辑器的"运行"按钮），`print` 就抛 `UnicodeEncodeError`，脚本跑到一半崩掉、
+退出码 1，看起来像"用例失败"，其实是"输出失败"。
+
+因此：
+
+- 用 `python verify_x.py | tee log.txt` 或 `> log.txt` 都是安全的；
+- 若在 cmd.exe 里直接看，建议先 `chcp 65001`（或改用 Windows Terminal）；
+- **不要**在脚本里删掉那两行 setup——删了就又回到"偶尔崩在 emoji 上"。
+

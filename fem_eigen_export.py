@@ -32,9 +32,11 @@ fem_eigen_export.py
 
 自由度约定（FEM-Eigen 二维）：`1`=u(x)  `2`=v(y)  `3`=θ(转角)，y 轴向上。
 
-⚠️ 注意（实测踩坑）：`fem_io.hpp:88` 中 `gx=0, gy=-9.81` 是**默认值**。
+⚠️ 注意（实测踩坑）：`fem_2d.hpp:109` 中 `gx=0, gy=-9.81` 是**默认值**。
 只要 `*MP` 里给了 `DENS`，即使完全不写 `*GRAVITY`，求解器也会自动计入自重
-（`autoLineMass = dens*A`，见 fem_io.hpp:728-732）。
+（`autoLineMass = dens*A`，见 fem_2d.cpp:348-350）。
+（内核早年把 2D 与 IO 放在同一个 `fem_io.hpp` 里，后来拆成
+`fem_2d.hpp` / `fem_2d.cpp`；这里跟的是拆分后的位置。）
 因此本模块**总是显式输出 `*GRAVITY`**：`self_weight=True` 给 `0 -9.81`，
 `False` 给 `0 0.0`。否则导出的模型会凭空多出一份自重，弯矩/挠度偏大。
 
@@ -298,7 +300,7 @@ def spec_to_dat(
         out.append("")
 
     # --- 自重 ---
-    # 注意（踩过的坑）：FEM-Eigen 的 gx/gy 默认值是 (0, -9.81)，见 fem_io.hpp:88。
+    # 注意（踩过的坑）：FEM-Eigen 的 gx/gy 默认值是 (0, -9.81)，见 fem_2d.hpp:109。
     # 也就是说只要 *MP 里给了 DENS，即使不写 *GRAVITY 也会自动计入自重。
     # 因此这里**必须显式写出** *GRAVITY：要自重就给 -9.81，不要就显式给 0.0。
     gy = -9.81 if self_weight else 0.0
@@ -374,11 +376,20 @@ def run_fem_eigen(
     exe_result: str | None = None,
     exe_viz: str | None = None,
     make_svg: bool = True,
+    timeout: float | None = 120.0,
 ) -> dict:
     """
     把 .dat 交给 FEM-Eigen：跑数值求解（.result）+ 可选出图（.svg）。
 
-    返回 {'result': Path|None, 'svgs': [Path,...], 'stdout': str, 'ok': bool}
+    返回 {'result': Path|None, 'svgs': [Path,...], 'stdout': str, 'ok': bool,
+          'timed_out': bool}
+
+    **超时**：两个子进程都带 `timeout`（默认 120 s，与 fem_eigen_3d 的
+    `solve_3d` 取同一个值）。没有超时的时候，内核一旦挂起——大规模模型、
+    加载步过大、或死循环——界面会永远停在"求解中…"，只能杀进程。这里
+    沿用本函数"不抛异常、用 ok 标志说话"的既有契约：超时不抛，而是把
+    原因写进 stdout 并置 `timed_out=True`，界面照常显示日志。
+    传 `timeout=None` 可关掉限制（批处理里跑超大模型时用）。
     """
     dat_path = Path(dat_path)
     tmp = None
@@ -392,28 +403,46 @@ def run_fem_eigen(
     if work_dat.resolve() != dat_path.resolve():
         shutil.copy2(dat_path, work_dat)
 
-    info: dict = {"result": None, "svgs": [], "stdout": "", "ok": False}
+    info: dict = {"result": None, "svgs": [], "stdout": "", "ok": False,
+                  "timed_out": False}
     logs = []
+
+    def _run(exe: Path, label: str):
+        """跑一个子进程；超时返回 None 并把原因记进 logs。"""
+        try:
+            return subprocess.run([str(exe), work_dat.name], cwd=str(workdir),
+                                  capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace",
+                                  timeout=timeout)
+        except subprocess.TimeoutExpired as e:
+            info["timed_out"] = True
+            tail = e.stdout or ""
+            if isinstance(tail, bytes):
+                tail = tail.decode("utf-8", "replace")
+            logs.append(
+                f"[超时] {label}超过 {timeout:g} s 未返回，已终止。\n"
+                f"  模型规模过大、加载步过长或内核挂起都会这样；\n"
+                f"  可调大 timeout 后重试（界面默认 120 s）。\n"
+                + (tail[-400:] if tail else ""))
+            return None
 
     # ① 数值求解 → .result
     exe_r = _find_exe(EXE_RESULT_CANDIDATES, exe_result, "result")
     if exe_r:
-        p = subprocess.run([str(exe_r), work_dat.name], cwd=str(workdir),
-                           capture_output=True, text=True,
-                           encoding="utf-8", errors="replace")
-        logs.append(p.stdout or "")
-        if (workdir / f"{dat_path.stem}.result").is_file():
-            info["result"] = workdir / f"{dat_path.stem}.result"
+        p = _run(exe_r, "数值求解")
+        if p is not None:
+            logs.append(p.stdout or "")
+            if (workdir / f"{dat_path.stem}.result").is_file():
+                info["result"] = workdir / f"{dat_path.stem}.result"
 
-    # ② 可视化 → .svg
-    if make_svg:
+    # ② 可视化 → .svg（求解超时就不必再等一遍出图）
+    if make_svg and not info["timed_out"]:
         exe_v = _find_exe(EXE_VIZ_CANDIDATES, exe_viz, "viz")
         if exe_v:
-            p = subprocess.run([str(exe_v), work_dat.name], cwd=str(workdir),
-                               capture_output=True, text=True,
-                               encoding="utf-8", errors="replace")
-            logs.append(p.stdout or "")
-            info["svgs"] = sorted(workdir.glob(f"{dat_path.stem}_*.svg"))
+            p = _run(exe_v, "出图")
+            if p is not None:
+                logs.append(p.stdout or "")
+                info["svgs"] = sorted(workdir.glob(f"{dat_path.stem}_*.svg"))
 
     info["stdout"] = "\n".join(logs)
     info["ok"] = info["result"] is not None or bool(info["svgs"])
@@ -452,6 +481,10 @@ def _theory(spec: ModelSpec) -> dict:
 
 
 def main() -> int:
+    # 命令行入口才改编码：本模块被 app.py / ui 导入时不碰全局 stdout。
+    from console_utf8 import setup_console
+
+    setup_console()
     import argparse
     ap = argparse.ArgumentParser(description="导出 FEM-Eigen .dat 并可选求解校验")
     ap.add_argument("--demo", action="store_true", help="使用内置 30m 简支梁用例")

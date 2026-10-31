@@ -6,6 +6,10 @@
   支座反力 R = w L / 2
 """
 
+from console_utf8 import setup_console
+
+setup_console()          # 输出被重定向到管道/文件时，GBK 会崩（见模块说明）
+
 from model_spec import ModelSpec, Section
 from fe_solver import solve
 
