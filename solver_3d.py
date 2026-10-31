@@ -121,6 +121,12 @@ def _adapt_cable(model: Any, raw: dict, res: SolveResult) -> None:
     res.cables = list(raw.get("cables") or [])
     res.camber = dict(raw.get("camber") or {})
     res.erected = dict(raw.get("erected") or {})
+    # 梁端内力：索承体系的应力验算靠它。旧内核没有这一段，缺失时留空，
+    # 由 result_3d 明说"没做"而不是报一个假的利用率。
+    res.girder_ends = {
+        (int(g["elem"]), int(g["end"])):
+            {"N": float(g["N"]), "My": float(g["My"]), "Vz": float(g["Vz"])}
+        for g in (raw.get("girder_ends") or [])}
     # 成桥态是"一个确定状态"，但对外仍按包络给：一个状态的包络就是 (v, v)。
     res.disp = {(int(n), int(d)): (float(v), float(v))
                 for (n, d), v in (raw.get("u") or {}).items()}
@@ -129,7 +135,8 @@ def _adapt_cable(model: Any, raw: dict, res: SolveResult) -> None:
     res.diagnostics.append(
         "几何非线性成桥态：共转列式 + 索垂度 + 索长反算，输出下料索长与制造线形。")
     res.diagnostics.append(
-        "本内核不输出梁内力包络（成桥态关注线形与索力）；梁内力请走 grillage3d 内核。")
+        "梁端内力（[GIRDEREND]）是成桥态恒载标准值，用于截面应力验算；"
+        "本内核不含活载，故没有梁内力包络——包络须走 grillage3d 内核。")
 
 
 def _adapt_suspension(model: Any, raw: dict, res: SolveResult) -> None:

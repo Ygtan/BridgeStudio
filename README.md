@@ -73,8 +73,15 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        JTG D64-2015 表 3.2.1 的强度设计值，按板厚分档）+ `section_strength.py`
        （钢按 D64 §5.3.1 三款算正应力/剪应力/折算应力，混凝土按 3362 §7.1.5
        算 0.5fck）；荷载组合扩到含轴力 N。`verify_section_strength.py` 46/46。
-       **边界**：成桥态内核（cable_solver）不输出梁内力，故索承体系暂无梁应力，
-       校核条目会明说"做不了"而不是静默跳过 —— 2026-10-31
+       **边界**：只做应力、不做承载力（不建钢筋）；混凝土按 0.5fck 只作量级判据
+       —— 2026-10-31
+- [x] **P3** 索承体系梁应力：`cable_solver` 新增 `[GIRDEREND]`（每端一行，两种桥型
+       都输出），斜拉桥第一次有主梁内力；`result_3d._checks_strength_cable` 用
+       `_strength_sections + section_strength` 做正应力/剪应力/折算应力，报告增
+       「控制截面应力」表。`verify_section_strength.py` 59/59（含同端配对的手算对拍）。
+       **口径**：成桥态恒载**标准值**，无活载、无组合系数——利用率 <1 不等于设计通过，
+       条目一律 warn；恒载单项就 >1 才 error。**边界**：仍不出梁内力包络与弯矩图
+       —— 2026-10-31
 - [x] **P3** 施工阶段调索（`*STAGE` 的 `TENSION=` / `L0=`）：内核在阶段内迭代命中目标
        索力（`ΔP = N目标 − N当前`，按索力状态而非参考几何算），跨阶段继承索力状态与
        按节点累积的位移；前端 `Stage3D.tensions/unstrained` → `.dat` → 结果解析 →
@@ -85,7 +92,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 18 个脚本、677 项全绿）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 18 个脚本、692 项全绿）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

@@ -27,8 +27,9 @@ HTML 每加一个出口就复制一遍这个判断。这正是"接入"要消灭�
 诚实标注
 --------
 内核没给的东西就留空，不猜：梁格内核不输出反力与梁内力包络以外的量，
-所以 `beam` 里没有索；成桥态内核不输出梁内力，`beam` 就是 `{}`，并在
-`diagnostics` 里写一条"本内核不输出梁内力包络"。宁可少一格，不要假一格。
+所以 `beam` 里没有索；成桥态内核只给**梁端**内力（`girder_ends`），不给
+包络，所以 `beam`（包络）就是 `{}`，并在 `diagnostics` 里写清楚。宁可少一格，
+不要假一格——应力验算用 `girder_ends`，包络图仍然没有。
 """
 
 from __future__ import annotations
@@ -174,6 +175,12 @@ class SolveResult:
     main_cable: list[dict[str, Any]] = field(default_factory=list)
     hangers: list[dict[str, Any]] = field(default_factory=list)
     girder: list[dict[str, Any]] = field(default_factory=list)
+    # 梁端内力（两种索承体系都有）：{(单元, 端): {N, My, Vz}}，端为 1=i、2=j。
+    #
+    # 为什么不能直接用上面那个 `girder`：它是"每根梁一行、N/My/Vz 各取两端
+    # 绝对值较大者"的摘要，max|N| 与 max|My| 可能来自不同端，拼出来的
+    # (N, My) 在梁上并不存在。应力 σ = N/A ± My/W 必须**同一端**配对。
+    girder_ends: dict[tuple[int, int], dict[str, float]] = field(default_factory=dict)
     reaction: dict[tuple[int, int], float] = field(default_factory=dict)
     # 找形后的主缆节点坐标 {node: (x, z)}。**这张图不能拿模型坐标画**：
     # .dat 里的主缆坐标只是建造器给的初始抛物线，边跨那一段甚至是按
@@ -389,7 +396,8 @@ class SolveResult:
     def combinations(self) -> list[combination.BeamCombo]:
         """JTG D60-2015 三种组合下的梁端内力（基本/频遇/准永久）。
 
-        只对梁格内核有意义：斜拉桥内核不输出梁内力，也不输出活载效应。
+        只对梁格内核有意义：索承体系内核只给恒载标准值，没有活载效应，
+        系数乘上去得到的是一个不存在的组合值。
         """
         return combination.beam_combinations(self)
 
@@ -410,8 +418,9 @@ class SolveResult:
                     "加劲梁按恒载内力。运营期组合需另接活载模块。", level="info")]
             return [Check(
                 "运营期荷载组合", True,
-                f"{self.kind_label}内核不输出梁内力与活载效应，不做运营期组合；"
-                "索力按标准值 + 安全系数验算", level="info")]
+                f"{self.kind_label}给的是恒载标准值（含梁端内力：索力与截面"
+                "应力都按标准值验），不含活载效应，故不做运营期组合；"
+                "索按安全系数、加劲梁与塔按恒载应力。运营期组合需另接活载模块。", level="info")]
         if not self.final_beam:
             return [Check("荷载组合", False,
                           "结果里没有成桥态梁内力，无法形成组合值", level="error")]
@@ -512,19 +521,13 @@ class SolveResult:
         与 `combination_checks` 的分工要分清：那条只说"我给了组合值"，
         这条才回答"这个组合值扛不扛得住"。前者是算术，后者是判定。
 
-        只在有 `final_beam` 时做——成桥态内核（cable_solver）不输出梁内力，
-        悬索桥/斜拉桥的梁内力要靠梁格内核单独算，这里无从验算。
+        梁格走组合内力（`final_beam`）；索承体系没有活载、没有组合，
+        走成桥态梁端内力（`girder_ends`），口径另算——见
+        `_checks_strength_cable`。
         """
         if not self.final_beam:
             if self.kind in ("cable_stayed", "suspension"):
-                return [Check(
-                    "截面应力验算", True,
-                    "本内核（cable_solver）只输出索力与线形，不输出梁内力，"
-                    "所以梁的应力验算做不了。这不是本模块的疏漏，是"
-                    "「成桥态内核不含活载与梁内力」这条链断在外面的结果——"
-                    "梁内力须由梁格内核单独求解，两套模型的结果不能直接"
-                    "相加（几何非线性效应进不去）。",
-                    level="info")]
+                return self._checks_strength_cable(model)
             return []
         secs = _strength_sections(model)
         if not secs:
@@ -627,6 +630,130 @@ class SolveResult:
                 f"模型含 {len(ranked)} 个梁截面，上列只给利用率最高的 "
                 f"{len(shown)} 个；其余 {len(ranked) - len(shown)} 个截面的"
                 "利用率更低（横梁、隔板在纵向弯曲中基本不参与）。",
+                level="info"))
+        return out
+
+    def _checks_strength_cable(self, model: Any) -> list[Check]:
+        """索承体系（斜拉桥 / 悬索桥）的截面应力验算。
+
+        内力来自 `cable_solver` 的 `[GIRDEREND]`——成桥态、**恒载标准值**、
+        每端一行。与梁格那条链路的差别只有两条，但两条都影响结论的用法：
+
+        1. **没有活载，也没有组合系数**。这里算的是恒载单项应力，不是组合
+           设计值，所以「利用率 < 1」不能当成设计通过——条目一律标 warn，
+           并在说明里写明口径。恒载单项就超过设计强度（利用率 > 1）反而
+           是硬结论：无论活载多大都不可能满足，标 error。
+        2. **用的是端内力，不是包络**。成桥态是一个确定状态，没有"最不利"，
+           所以不存在包络配对带来的近似（梁格那边 MyMax 配 VzMax 是一种
+           近似，这里不需要）。
+
+        塔柱也在验算范围内：它同样是 BEAM，同样被压弯。但塔的实常数里没有
+        截面模量（W=0），所以只算轴应力——这一点写在条目说明里，不静默。
+        """
+        if not self.girder_ends:
+            return [Check(
+                "截面应力验算", True,
+                "结果里没有梁端内力（[GIRDEREND] 段缺失）：多半是旧版 "
+                "cable_solver.exe，重新编译内核即可。本次没做应力验算——"
+                "这不是「通过」，是「没做」。",
+                level="info")]
+        secs = _strength_sections(model)
+        if not secs:
+            return [Check(
+                "截面应力验算", True,
+                "模型未标注材料牌号（*MAT 的 grade 为空），无法确定强度"
+                "设计值，本次不做应力验算——这不是「通过」，是「没做」",
+                level="info")]
+
+        ranked: list[tuple[float, str, Any, list[tuple[int, int, Any]]]] = []
+        for label, sec, eids in secs:
+            cases: list[tuple[int, int, Any]] = []
+            for (eid, end), v in self.girder_ends.items():
+                if eid not in eids:
+                    continue
+                cases.append((eid, end, section_strength.check(
+                    sec, float(v.get("N", 0.0)), float(v.get("My", 0.0)),
+                    float(v.get("Vz", 0.0)))))
+            if not cases:
+                continue
+            ranked.append((max(t[2].util for t in cases), label, sec, cases))
+        if not ranked:
+            return [Check(
+                "截面应力验算", True,
+                "梁端内力与模型的梁截面没对上（单元号或截面定义变了？），"
+                "本次不做应力验算", level="info")]
+        ranked.sort(key=lambda t: -t[0])
+
+        out: list[Check] = []
+        shown = [t for t in ranked if t[0] >= 0.02][:3] or ranked[:1]
+        # 主梁总要出现。索承体系的恒载分配常常让主梁利用率低到 2% 以下
+        # （地锚式悬索桥的加劲梁在恒载下本该几乎不受力），只按利用率筛选
+        # 会把它筛掉——而它恰恰是设计人要看的构件，塔不是。
+        main = next((t for t in ranked if t[1].startswith("主梁")), None)
+        if main is not None and not any(t[1] == main[1] for t in shown):
+            shown = (shown[:2] + [main]) if len(shown) >= 3 else shown + [main]
+        for top, label, sec, cases in shown:
+            steel = sec.kind == "steel"
+            wn = max(cases, key=lambda t: t[2].util_normal)
+            sym = "fd" if steel else "0.5fck"
+            no_w = sec.WT <= 0.0 and sec.WB <= 0.0
+            out.append(Check(
+                f"{label} 正应力 ≤ {sym}（恒载标准值）",
+                wn[2].util_normal <= 1.0,
+                f"单元 {wn[0]}·{wn[1]} 端 σ = {wn[2].sigma_top:+.1f} / "
+                f"{wn[2].sigma_bot:+.1f} MPa（上/下缘，拉正压负），"
+                f"利用率 {wn[2].util_normal:.3f}；{wn[2].limit_desc}。"
+                + ("**该截面未给截面模量（WT/WB=0），只算了轴应力，"
+                   "弯曲应力未计。**" if no_w else "")
+                + "口径：成桥态恒载标准值，未含活载与组合系数——"
+                  "利用率 < 1 不等于设计通过。",
+                value=wn[2].util_normal, limit=1.0,
+                level="error" if wn[2].util_normal > 1.0 else "warn"))
+
+            if sec.AW > 0.0:
+                ws = max(cases, key=lambda t: t[2].util_shear)
+                if steel:
+                    out.append(Check(
+                        f"{label} 剪应力 ≤ fvd（恒载标准值）",
+                        ws[2].util_shear <= 1.0,
+                        f"单元 {ws[0]}·{ws[1]} 端 τ = V/AW = {ws[2].tau:.1f} MPa，"
+                        f"利用率 {ws[2].util_shear:.3f}；{ws[2].limit_desc}",
+                        value=ws[2].util_shear, limit=1.0,
+                        level="error" if ws[2].util_shear > 1.0 else "warn"))
+                else:
+                    out.append(Check(
+                        f"{label} 腹板剪应力（量级）", True,
+                        f"单元 {ws[0]}·{ws[1]} 端 τ = V/AW = {ws[2].tau:.1f} MPa。"
+                        "混凝土梁的抗剪须按斜截面承载力验算（箍筋 + 混凝土"
+                        "贡献），本程序不建钢筋，故不给利用率、也不下结论。",
+                        value=ws[2].tau, unit="MPa", level="info"))
+
+            if steel:
+                we = max(cases, key=lambda t: t[2].util_eq)
+                out.append(Check(
+                    f"{label} 折算应力利用率 ≤ 1.0（恒载标准值）",
+                    we[2].util_eq <= 1.0,
+                    f"单元 {we[0]}·{we[1]} 端 √((σx/fd)²+(τ/fvd)²) = "
+                    f"{we[2].util_eq:.3f}（σx={we[2].sigma_top:+.1f} 或 "
+                    f"{we[2].sigma_bot:+.1f} MPa，τ={we[2].tau:.1f} MPa）；"
+                    "JTG D64-2015 §5.3.1 第 4 款",
+                    value=we[2].util_eq, limit=1.0,
+                    level="error" if we[2].util_eq > 1.0 else "warn"))
+
+        # 口径与边界只写一次。这段话比上面的利用率更重要：它是唯一能让人
+        # 不把"恒载应力合格"误读成"设计通过"的地方。
+        out.append(Check(
+            "索承体系应力验算的口径", True,
+            f"内力取自成桥态（{len(self.girder_ends) // 2} 根梁的两端），"
+            "为恒载标准值：本内核不含活载、不形成 JTG D60 组合，所以这些"
+            "利用率的含义是「恒载单项占设计强度的比例」，不是设计验算结论。"
+            "真正的运营期验算还缺活载效应与组合系数。",
+            level="info"))
+        if len(ranked) > len(shown):
+            out.append(Check(
+                "应力验算覆盖范围", True,
+                f"模型含 {len(ranked)} 个梁截面，上列只给利用率最高的 "
+                f"{len(shown)} 个；其余 {len(ranked) - len(shown)} 个更低。",
                 level="info"))
         return out
 
@@ -976,6 +1103,41 @@ class SolveResult:
                             "弦长残差 (mm)"],
                 "rows": rows,
             }
+
+        # ---- 索承体系：截面应力（成桥态恒载标准值）------------------------
+        # 每个梁截面一行，取该截面下利用率最高的那一端。梁格那边没有这张表：
+        # 它的应力是组合内力算的，逐截面组合表已经把内力给了，应力由校核条目
+        # 承担；索承体系没有组合表，若再不给应力表，报告里就只剩几条校核文字。
+        if (self.girder_ends and model is not None
+                and self.kind in ("cable_stayed", "suspension")):
+            rows = []
+            for label, sec, eids in _strength_sections(model):
+                best: tuple[float, int, int, Any] | None = None
+                for (eid, end), v in self.girder_ends.items():
+                    if eid not in eids:
+                        continue
+                    rr = section_strength.check(
+                        sec, float(v.get("N", 0.0)), float(v.get("My", 0.0)),
+                        float(v.get("Vz", 0.0)))
+                    if best is None or rr.util > best[0]:
+                        best = (rr.util, eid, end, rr)
+                if best is None:
+                    continue
+                rows.append([label, f"{best[1]}·{best[2]}"] + best[3].to_row())
+            if rows:
+                out["stress_table"] = {
+                    "title": "控制截面应力（成桥态恒载标准值）",
+                    "note": "正应力以受拉为正、受压为负，单位 MPa；利用率为"
+                            "「效应/限值」，>1.0 即不满足。内力取自成桥态梁端，"
+                            "N 与 M 来自**同一端**（同一截面）。"
+                            "**口径：恒载标准值，未含活载与组合系数**——"
+                            "利用率 <1 只说明恒载单项占设计强度的比例，"
+                            "不等于设计验算通过。钢按 JTG D64-2015 §5.3.1 "
+                            "三款；混凝土按 JTG 3362-2018 §7.1.5 的 0.5·fck。",
+                    "headers": ["部位", "单元·端", "上缘 σ (MPa)", "下缘 σ (MPa)",
+                                "τ (MPa)", "折算应力 (MPa)", "利用率", "控制项"],
+                    "rows": rows,
+                }
 
         if self.live:
             out["live_envelope"] = {

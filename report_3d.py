@@ -495,8 +495,9 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
             *, dpi_scale: float = 1.0) -> dict[str, Figure]:
     """生成全部图。**哪些图存在由结果决定**，不是由类型硬编码。
 
-    梁格没有索 → 不出索力图；成桥态内核不输出梁内力 → 不出弯矩图。
-    宁可少一张图，不要一张空坐标轴（那会让看图的人以为内力为零）。
+    梁格没有索 → 不出索力图；成桥态内核只给梁**端**内力（供应力验算），
+    没有逐单元包络 → 不出弯矩/剪力图。宁可少一张图，不要一张空坐标轴
+    （那会让看图的人以为内力为零）。
     """
     d = Path(out_dir) / "figures"
     out: dict[str, Figure] = {}

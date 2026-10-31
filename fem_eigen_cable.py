@@ -27,7 +27,8 @@
     res["cables"]  = [{elem, anchor, T, L0, chord, Ltarget, dL}, …]
     res["main_cable"] = [{elem, T, L0, z, chord}, …]    仅悬索桥：主缆分段
     res["hangers"] = [{elem, deck_node, T, L0, chord}, …] 仅悬索桥：吊索
-    res["girder"]  = [{elem, N, My, Vz}, …]              仅悬索桥：加劲梁内力
+    res["girder"]  = [{elem, N, My, Vz}, …]              仅悬索桥：加劲梁内力摘要
+    res["girder_ends"] = [{elem, end, N, My, Vz}, …]      两种桥型：梁端内力（应力验算用）
     res["reaction"] = {(node, dof): R}                    支座反力（向上为正）
     res["camber"]  = {node: (dx, dy, dz)}     制造线形相对设计线形的偏移 m
     res["erected"] = {node: (x, y, z)}        制造线形绝对坐标
@@ -93,6 +94,7 @@ def parse_cable_result(path: str | Path) -> dict:
     main_cable: list[dict] = []
     hangers: list[dict] = []
     girder: list[dict] = []
+    girder_ends: list[dict] = []
     reaction: dict[tuple[int, int], float] = {}
     shape: dict[int, tuple[float, float]] = {}
     sec = ""
@@ -146,6 +148,14 @@ def parse_cable_result(path: str | Path) -> dict:
                 "elem": int(parts[0]), "N": float(parts[1]),
                 "My": float(parts[2]), "Vz": float(parts[3]),
             })
+        elif sec == "GIRDEREND" and len(parts) >= 5:
+            # 梁端内力：每端一行。应力验算只能用这一段——[GIRDER] 那一行是
+            # 跨端各取绝对值最大者拼出来的，N 与 My 可能来自不同端，组合
+            # 在梁上并不存在。
+            girder_ends.append({
+                "elem": int(parts[0]), "end": int(parts[1]),
+                "N": float(parts[2]), "My": float(parts[3]), "Vz": float(parts[4]),
+            })
         elif sec == "REACTION" and len(parts) >= 3:
             reaction[(int(parts[0]), int(parts[1]))] = float(parts[2])
         elif sec == "CABLESHAPE" and len(parts) >= 3:
@@ -160,8 +170,8 @@ def parse_cable_result(path: str | Path) -> dict:
             u[(int(parts[0]), int(parts[1]))] = float(parts[2])
     return {"meta": meta, "cables": cables, "camber": camber,
             "erected": erected, "u": u, "main_cable": main_cable,
-            "hangers": hangers, "girder": girder, "reaction": reaction,
-            "cable_shape": shape}
+            "hangers": hangers, "girder": girder, "girder_ends": girder_ends,
+            "reaction": reaction, "cable_shape": shape}
 
 
 def solve_cable_bridge(model, out_dir: str | Path,

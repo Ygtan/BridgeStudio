@@ -15,7 +15,9 @@
 
 还守两条"宁可不做也不假装"的规矩：
 - 材料等级没登记 → 抛 KeyError，不许退回某个默认强度；
-- 成桥态内核不输出梁内力 → 校核条目明说"做不了"，不许静默消失。
+- 索承体系（斜拉桥/悬索桥）的梁应力：内核输出梁端内力后必须真的算出来，
+  而且必须**同端配对**（σ 用同一端的 N 与 My）；早期这里写的是"做不了"，
+  现在它变成了"能算，但口径是恒载标准值、不是组合值"——两句话不能混着说。
 """
 
 from __future__ import annotations
@@ -239,8 +241,9 @@ def part_integration() -> None:
 
 
 def part_suspension() -> None:
-    print("\n[6] 集成：索承体系如实说明「做不了」")
+    print("\n[6] 集成：悬索桥加劲梁应力（成桥态梁端内力）")
 
+    import result_3d as R
     import solver_3d
     from suspension_3d import build_suspension_3d
 
@@ -248,19 +251,83 @@ def part_suspension() -> None:
                                        sag_ratio=0.10)
     res = solver_3d.solve(model, out_dir="out/_verify/strength_susp",
                           kind="suspension")
-    check("成桥态内核确实不输出梁内力", not res.final_beam, f"{len(res.final_beam)} 条")
-    hit = [c for c in res.checks(model) if "应力验算" in c.name]
-    check("悬索桥给出「做不了」的说明而不是静默消失",
-          bool(hit) and "不输出梁内力" in hit[0].detail,
-          hit[0].detail[:30] if hit else "无条目")
+    # 成桥态没有"包络"（一个确定状态不需要包络），但已经有了梁端内力。
+    check("成桥态内核输出梁端内力（[GIRDEREND]）", bool(res.girder_ends),
+          f"{len(res.girder_ends)} 条")
+    beam_ids = {e.id for e in model.elements
+                if next((t.kind for t in model.etypes if t.id == e.etype), "") == "BEAM"}
+    check("每根梁两端各一条（端数 = 2×梁数）",
+          len(res.girder_ends) == 2 * len(beam_ids),
+          f"{len(res.girder_ends)} vs {2 * len(beam_ids)}")
+    check("两端内力不相等（端信息不是冗余的）",
+          any(abs(res.girder_ends[(e, 1)]["My"] - res.girder_ends[(e, 2)]["My"]) > 1.0
+              for e in beam_ids))
 
-    # 牌号确实落到了模型里（否则将来的梁内力也无从验算）
+    names = [c.name for c in res.checks(model)]
+    check("不再出现「不输出梁内力」的说明",
+          not any("不输出梁内力" in c.detail for c in res.checks(model)),
+          next((c.detail[:24] for c in res.checks(model) if "应力验算" in c.name), "无条目"))
+    check("出现加劲梁正应力校核", any("正应力" in n for n in names),
+          "、".join(n for n in names if "应力" in n)[:60])
+    sig = [c for c in res.checks(model) if "正应力" in c.name]
+    check("索承体系正应力条目一律 warn（恒载标准值，不是组合值）",
+          all(c.level == "warn" for c in sig), str({c.level for c in sig}))
+    check("口径条目写清「未含活载」",
+          any("未含活载" in c.detail for c in res.checks(model)))
+
+    # ---- 同端配对：这是 [GIRDER]（跨端各取最大）与 [GIRDEREND] 的分水岭 ----
+    # 拿表里那一行反算：σ 必须由**同一端**的 N 与 My 得到。若程序把 i 端的 N
+    # 与 j 端的 My 拼在一起，这条就对不上（而报告照样生成、数字照样好看）。
+    tab = res.tables(model)["stress_table"]
+    check("报告里有应力表", "应力" in tab["title"], tab["title"])
+    label, unit_end, s_top, s_bot = tab["rows"][0][:4]
+    eid, end = (int(x) for x in unit_end.split("·"))
+    v = res.girder_ends[(eid, end)]
+    sec = {lbl: s for lbl, s, _ in R._strength_sections(model)}[label]
+    sig_top = v["N"] / sec.A / 1e6 - v["My"] / sec.WT / 1e6
+    sig_bot = v["N"] / sec.A / 1e6 + v["My"] / sec.WB / 1e6
+    check("表内上下缘应力 = 同一端的 N/A ± My/W（手算对拍）",
+          abs(sig_top - float(s_top)) < 0.06 and abs(sig_bot - float(s_bot)) < 0.06,
+          f"手算 {sig_top:+.2f}/{sig_bot:+.2f} vs 表 {s_top}/{s_bot}")
+
+    # 牌号确实落到了模型里（否则梁端内力也无从验算）
     grades = {m.grade for m in model.materials if m.grade}
     check("悬索桥模型带上了材料牌号", {"Q345qD", "C50"} <= grades, str(sorted(grades)))
     deck = next(r for r in model.reals if r.id == 1)
     check("加劲梁实常数带腹板面积（剪应力要用）", deck.AW > 0.0, f"{deck.AW:.5f} m²")
     check("加劲梁实常数带控制板厚（查强度档要用）",
           deck.T_PLATE == 28.0, f"{deck.T_PLATE:g} mm")
+
+
+def part_cable_stayed() -> None:
+    print("\n[7] 集成：斜拉桥主梁应力（早期这一整条链是断的）")
+
+    import solver_3d
+    from cable_stayed_3d import build_cable_stayed_3d
+
+    model, _info = build_cable_stayed_3d()
+    res = solver_3d.solve(model, out_dir="out/_verify/strength_cable",
+                          kind="cable_stayed")
+    check("斜拉桥也输出梁端内力", bool(res.girder_ends), f"{len(res.girder_ends)} 条")
+    check("斜拉桥没有 [GIRDER] 摘要（那是悬索桥加劲梁用的）", not res.girder)
+
+    names = [c.name for c in res.checks(model)]
+    check("出现主梁正应力校核", any(n.startswith("主梁") and "正应力" in n for n in names),
+          "、".join(n for n in names if "应力" in n)[:60])
+    sig = [c for c in res.checks(model) if "正应力" in c.name]
+    check("正应力利用率落在 (0, 1) 的合理区间",
+          0.0 < max(c.value or 0.0 for c in sig) < 1.0,
+          f"{max(c.value or 0.0 for c in sig):.3f}")
+    check("塔柱也在验算范围内（它同样是 BEAM、同样被压弯）",
+          any(n.startswith("截面#") and "正应力" in n for n in names))
+
+    # 混凝土主梁没有预应力：恒载下上缘受拉很可能是真的（超 ftk 即开裂）。
+    # 这条不判对错，只要求程序把"开裂"这件事写出来，而不是给个好看的利用率。
+    peak = [c for c in res.checks(model) if "主梁" in c.name and "正应力" in c.name]
+    if peak:
+        print(f"      {peak[0].detail[:96]}")
+    check("应力表逐截面给出控制项",
+          all(row[-1] for row in res.tables(model)["stress_table"]["rows"]))
 
 
 # ---------------------------------------------------------------- main
@@ -277,6 +344,7 @@ def main() -> int:
     part_scope()
     part_integration()
     part_suspension()
+    part_cable_stayed()
 
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
