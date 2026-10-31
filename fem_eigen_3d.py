@@ -68,6 +68,7 @@ def parse_summary(path: Path) -> dict:
     final_beam: dict = {}
     final_disp: dict = {}
     live_beam: dict = {}
+    stage_cables: dict = {}
 
     # 段名按**完整前缀**分派，不做子串匹配："beam force envelope" 与
     # "final stage beam force" 都含 "beam force"，用子串会串段。
@@ -78,14 +79,18 @@ def parse_summary(path: Path) -> dict:
         "final stage displacement",
         "stage live envelope",
         "live beam envelope",
+        "stage cable tension",
     )
     section = ""
     re_disp = re.compile(r"^N(\d+) dof(\d+) min=(\S+) max=(\S+)$")
     re_fdisp = re.compile(r"^N(\d+) dof(\d+) u=(\S+)$")
     re_beam_id = re.compile(r"^E(\d+)\s+(.*)$")
     re_end_id = re.compile(r"^E(\d+)\s+([ij])\s+(.*)$")
-    re_kv = re.compile(r"([A-Za-z]+)=(\S+)")
+    # 键名允许字母后跟数字：L0= 这类键（无应力索长）首字母后就是数字，
+    # 只写 [A-Za-z]+ 会把它整条丢掉——不报错，只是字段"凭空消失"。
+    re_kv = re.compile(r"([A-Za-z][A-Za-z0-9]*)=(\S+)")
     re_live = re.compile(r"^STAGE(\d+) max=(\S+) min=(\S+)$")
+    re_stage_cable = re.compile(r"^STAGE(\d+)\s+E(\d+)\s+(.*)$")
 
     def _beam_row(rest: str) -> dict[str, float]:
         vals: dict[str, float] = {}
@@ -132,9 +137,17 @@ def parse_summary(path: Path) -> dict:
             m = re_live.match(line)
             if m:
                 live[int(m.group(1))] = (float(m.group(2)), float(m.group(3)))
+        elif section == "stage cable tension":
+            # 索力是**状态量**：键为 (阶段号, 单元号)，逐阶段各一条，不累加、
+            # 不做包络。施工阶段调索的成败就看 target 与 T 是否对得上。
+            m = re_stage_cable.match(line)
+            if m:
+                vals = _beam_row(m.group(3))
+                if vals:
+                    stage_cables[(int(m.group(1)), int(m.group(2)))] = vals
     return {"disp": disp, "beam": beam, "live": live,
             "final_beam": final_beam, "final_disp": final_disp,
-            "live_beam": live_beam}
+            "live_beam": live_beam, "stage_cables": stage_cables}
 
 
 def solve_3d(model, out_dir: str | Path, dat_name: str = "model_3d.dat") -> dict:

@@ -75,11 +75,17 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        算 0.5fck）；荷载组合扩到含轴力 N。`verify_section_strength.py` 46/46。
        **边界**：成桥态内核（cable_solver）不输出梁内力，故索承体系暂无梁应力，
        校核条目会明说"做不了"而不是静默跳过 —— 2026-10-31
+- [x] **P3** 施工阶段调索（`*STAGE` 的 `TENSION=` / `L0=`）：内核在阶段内迭代命中目标
+       索力（`ΔP = N目标 − N当前`，按索力状态而非参考几何算），跨阶段继承索力状态与
+       按节点累积的位移；前端 `Stage3D.tensions/unstrained` → `.dat` → 结果解析 →
+       两条校核（索无受压、末阶段索力 vs 设计目标）。`verify_stage_cable.py` 21/21。
+       **边界**：线弹性调索；分批张拉时先张的索会被带跑（分两批实测 193.7%），内核输出
+       `devDes` 量化而不静默，二次调索可拉回（实测 1e-15）—— 2026-10-31
 - [ ] **P4** 成果层：Word/PDF 计算书、3D 包络视图、MIDAS 双向互导
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 17 个脚本、650+ 项全绿）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 18 个脚本、677 项全绿）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

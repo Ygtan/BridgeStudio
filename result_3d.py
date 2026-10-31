@@ -154,6 +154,13 @@ class SolveResult:
     final_disp: dict[tuple[int, int], float] = field(default_factory=dict)
     # 成桥态活载内力包络：{(单元, 端): {MyMin, MyMax, VzMin, VzMax}}
     live_beam: dict[tuple[int, str], dict[str, float]] = field(default_factory=dict)
+    # 施工阶段各索状态：{(阶段号, 单元号): {T, L0, chord, target, dev, Tdes, devDes}}。
+    #
+    # 与上面的位移/内力包络性质不同：那些是**增量**（可逐阶段累加），索力是
+    # **状态量**（累加没有意义）。所以这里按 (阶段, 索) 平铺，不提供包络，
+    # 也不参与荷载组合。devDes 是"相对该索设计目标的偏差"——分批张拉时先张
+    # 的索会被后张的带跑，这个数就是必须二次调索的理由。
+    stage_cables: dict[tuple[int, int], dict[str, float]] = field(default_factory=dict)
     # 成桥态专用
     cables: list[dict[str, Any]] = field(default_factory=list)
     camber: dict[int, tuple[float, float, float]] = field(default_factory=dict)
@@ -454,6 +461,49 @@ class SolveResult:
             out += self._checks_grillage(model)
         out += self.combination_checks(model)
         out += self._checks_strength(model)
+        out += self._checks_stage_cable(model)
+        return out
+
+    def _checks_stage_cable(self, model: Any) -> list[Check]:
+        """施工阶段调索的校核。
+
+        只回答两个问题，都是"不回答就等于没做"的那种：
+        1. 索有没有被算成受压——线性阶段内核把 CABLE 当桁架，允许负轴力，
+           而真实索一受压就退出工作。出现负值说明这条施工顺序在该索上不成立，
+           不能当"索力偏小"糊过去。
+        2. 最后一阶段的各索还差设计目标多少——分批张拉时先张的必然被后张的
+           带跑，这个差额就是二次调索的依据。
+        """
+        if not self.stage_cables:
+            return []
+        out: list[Check] = []
+        last = max(s for s, _ in self.stage_cables)
+        rows = {e: v for (s, e), v in self.stage_cables.items() if s == last}
+
+        neg = [(e, v["T"]) for e, v in rows.items() if v["T"] <= 0.0]
+        out.append(Check(
+            f"施工阶段索不出现受压（阶段 {last}）",
+            not neg,
+            (f"{len(neg)} 根索轴力 ≤ 0，最小 {min(t for _, t in neg)/1e3:.0f} kN；"
+             "线性阶段把索当桁架，允许受压——真实索受压即退出工作，"
+             "该施工顺序在这几根索上不成立" if neg
+             else f"{len(rows)} 根索全部受拉"),
+            level="error"))
+
+        tgt = [(e, v) for e, v in rows.items() if v.get("Tdes", 0.0) > 0.0]
+        if tgt:
+            e_worst, v_worst = max(tgt, key=lambda kv: abs(kv[1].get("devDes", 0.0)))
+            dev = abs(v_worst.get("devDes", 0.0))
+            out.append(Check(
+                f"末阶段索力 vs 设计目标（{len(tgt)} 根）",
+                dev <= 0.02,
+                f"最大偏差 {dev*100:.2f}%（单元 {e_worst}："
+                f"{v_worst['T']/1e3:.0f} / {v_worst['Tdes']/1e3:.0f} kN）。"
+                + ("" if dev <= 0.02 else
+                   "分批张拉时先张的索会被后张的带跑，属正常现象——"
+                   "按目标再补调一轮（加一个只给 TENSION= 的阶段）即可拉回。"),
+                value=dev, limit=0.02,
+                level="warn" if dev <= 0.02 else "error"))
         return out
 
     def _checks_strength(self, model: Any) -> list[Check]:

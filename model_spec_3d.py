@@ -21,8 +21,9 @@
 - BEAM ：6 自由度空间梁
 - BEAM7：7 自由度薄壁梁（翘曲，需 IW）
 - TRUSS：三维桁架（仅轴力）
-- CABLE：斜拉索/吊杆——3D 线性内核中退化为 TRUSS 导出（只受拉的
-  几何非线性属 P3 阶段二内核），导出时自动映射并记录提示。
+- CABLE：斜拉索/吊杆。线性内核里刚度按轴向杆装配（不作只受拉判断），
+  类型原样导出——施工阶段调索（*STAGE 的 TENSION=）要求内核认得它是索。
+  垂度与只受拉的几何非线性走 cable_solver。
 
 依赖：pydantic。
 """
@@ -271,15 +272,24 @@ class NodalLoad3D(BaseModel):
 
 
 class Stage3D(BaseModel):
-    """施工阶段（*STAGE + *STAGE_LOAD）。
+    """施工阶段（*STAGE + *STAGE_LOAD + *STAGE 行内的 TENSION= / L0=）。
 
     注意：FEM-Eigen 3D 内核的 solveModel3DStages 只使用阶段荷载
     （m.loads 被忽略），因此所有荷载必须挂在某个阶段下。
+
+    张拉两个键的区别（写错会得到完全不同的结果，见 input_format_3d.md）：
+    - `tensions`：给**目标索力**，内核迭代无应力索长去命中它。这是"调索"，
+      也是唯一能表达"这一阶段把索拉到 3200 kN"的写法。
+    - `unstrained`：直接给**下料长度**，不迭代。用于"我知道这根索下多长"。
+    同一根索同时出现在两处会被内核判为语义冲突并报错。
     """
+
     id: int
     activate: list[int] = Field(default_factory=list)    # 激活单元 id
     deactivate: list[int] = Field(default_factory=list)  # 钝化单元 id
     loads: list[NodalLoad3D] = Field(default_factory=list)
+    tensions: dict[int, float] = Field(default_factory=dict)    # 单元号 → 目标索力 N
+    unstrained: dict[int, float] = Field(default_factory=dict)  # 单元号 → 无应力索长 m
 
 
 class Influence3D(BaseModel):
@@ -505,11 +515,14 @@ class ModelSpec3D(BaseModel):
     def to_dat(self, compact: bool = True) -> str:
         """导出 FEM-Eigen 3D new-format .dat（fem_3d.hpp readModel3D）。
 
-        CABLE 的两种导出行为（重要）：
-        - 无 cable_bridge（走 3D **线性** 内核 example_3d_grillage）时，
-          CABLE 映射为 TRUSS —— 线性内核没有只受拉单元，索会被当成杆。
-        - 有 cable_bridge（走 **非线性** cable_solver）时，CABLE 原样导出，
+        CABLE 的类型导出（重要）：
+        - 有 cable_bridge（走 **非线性** cable_solver）：CABLE 原样导出，
           并附带 *CABLE_BRIDGE / *CABLE 工况段：内核按只受拉 + 垂度处理。
+        - 无 cable_bridge（走 3D **线性** 内核 example_3d_grillage）：**仍导出
+          CABLE**。早期这里映射成 TRUSS，理由是"线性内核不区分二者"——但施工
+          阶段调索（*STAGE 的 TENSION=）要求内核认得这根是索，映射成 TRUSS
+          会让调索直接报错。线性装配只按 BEAM/non-BEAM 分支，两种写法的刚度
+          完全相同，所以改成原样导出不影响任何一个既有算例的数值。
 
         compact（默认 True）：节点走 *FILL、单元走 *DO 循环，见模块顶部
         "紧凑输出"一节。`compact=False` 逐行输出，用于排查——两种写法必须
@@ -530,15 +543,11 @@ class ModelSpec3D(BaseModel):
                 L.append(f"{n.id} {fmt(n.x)} {fmt(n.y)} {fmt(n.z)}")
 
         L.append("*ET")
-        cable_mapped = False
         for t in sorted(self.etypes, key=lambda t: t.id):
-            out_kind = t.kind
-            if t.kind == "CABLE" and not nonlinear:
-                out_kind = "TRUSS"
-                cable_mapped = True
-            L.append(f"{t.id} {out_kind}")
-        if cable_mapped:
-            L.append("# 注：CABLE 在 3D 线性内核中映射为 TRUSS（只受拉/垂度需非线性内核）")
+            L.append(f"{t.id} {t.kind}")
+        if any(t.kind == "CABLE" for t in self.etypes):
+            L.append("# 注：线性内核里 CABLE 的刚度按轴向杆装配（不作只受拉判断），"
+                     "垂度与只受拉须走非线性 cable_solver")
 
         L.append("*MP")
         for m in sorted(self.materials, key=lambda m: m.id):
@@ -601,6 +610,14 @@ class ModelSpec3D(BaseModel):
                 parts.append("ACTIVE=" + ",".join(str(i) for i in s.activate))
             if s.deactivate:
                 parts.append("DEACTIVE=" + ",".join(str(i) for i in s.deactivate))
+            # 张拉规格按单元号排序输出：dict 的插入顺序取决于调用方怎么建的，
+            # 同一份模型两次导出得到不同文本会让 .dat 对拍失去意义。
+            if s.tensions:
+                parts.append("TENSION=" + ",".join(
+                    f"{k}:{fmt(s.tensions[k])}" for k in sorted(s.tensions)))
+            if s.unstrained:
+                parts.append("L0=" + ",".join(
+                    f"{k}:{fmt(s.unstrained[k])}" for k in sorted(s.unstrained)))
             L.append(" ".join(parts))
             for ld in s.loads:
                 L.append(f"*STAGE_LOAD")
