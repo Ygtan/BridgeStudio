@@ -42,6 +42,27 @@ def fmt(v: float) -> str:
     return f"{v:.10g}"
 
 
+def _int_list_ranges(vals: list[int]) -> str:
+    """整数列表压缩成 `a-b,c,d-e`：连续段用 a-b，孤立值原样。
+
+    预应力束的 ELEM 列表通常是连续的梁段（1,2,...,10），写成 1-10 比十个
+    逗号分隔可读得多，也和 *STAGE 其他键的"编号规律可见"原则一致。
+    """
+    vals = sorted(set(vals))
+    if not vals:
+        return ""
+    parts: list[str] = []
+    a = b = vals[0]
+    for v in vals[1:]:
+        if v == b + 1:
+            b = v
+        else:
+            parts.append(str(a) if a == b else f"{a}-{b}")
+            a = b = v
+    parts.append(str(a) if a == b else f"{a}-{b}")
+    return ",".join(parts)
+
+
 # ---------------------------------------------------------------- 紧凑输出
 # 内核 readModel3D 支持两条压缩语法（见 fem_3d.hpp 的 crEvalToken）：
 #
@@ -271,8 +292,25 @@ class NodalLoad3D(BaseModel):
     value: float                    # N 或 N·m
 
 
+class Prestress3D(BaseModel):
+    """一条直线预应力筋（施工阶段 *STAGE 的 PRESTRESS=，等效荷载法）。
+
+    - ``elems``：连续梁单元 id（首尾即锚固端，必须首尾相接成一条开链）
+    - ``P``：张拉控制力 N（正）；``e``：竖向偏心 m（**形心上方为正**）
+    - ``loss``：有效/张拉比（0 < loss ≤ 1）
+
+    能力边界要写死：这是**直线筋 + 常偏心**，等效荷载只有「两端一对轴压 +
+    两端一对偏心弯矩」。它**不产生上拱**——上拱来自曲线筋的跨内反向均布力
+    （w = 8Pe·s/L²，s 为矢高），本版不做。把直线筋当"上拱手段"用是错的。
+    """
+    elems: list[int] = Field(min_length=1)
+    P: float = Field(gt=0)
+    e: float = 0.0
+    loss: float = Field(default=1.0, gt=0.0, le=1.0)
+
+
 class Stage3D(BaseModel):
-    """施工阶段（*STAGE + *STAGE_LOAD + *STAGE 行内的 TENSION= / L0=）。
+    """施工阶段（*STAGE + *STAGE_LOAD + *STAGE 行内的 TENSION= / L0= / PRESTRESS=）。
 
     注意：FEM-Eigen 3D 内核的 solveModel3DStages 只使用阶段荷载
     （m.loads 被忽略），因此所有荷载必须挂在某个阶段下。
@@ -282,6 +320,9 @@ class Stage3D(BaseModel):
       也是唯一能表达"这一阶段把索拉到 3200 kN"的写法。
     - `unstrained`：直接给**下料长度**，不迭代。用于"我知道这根索下多长"。
     同一根索同时出现在两处会被内核判为语义冲突并报错。
+
+    预应力束（`prestress`）独立于索张拉：直线筋的等效荷载是状态量（张拉一次、
+    永久存在），阶段内只施加一次，效应通过累计位移延续。
     """
 
     id: int
@@ -290,6 +331,7 @@ class Stage3D(BaseModel):
     loads: list[NodalLoad3D] = Field(default_factory=list)
     tensions: dict[int, float] = Field(default_factory=dict)    # 单元号 → 目标索力 N
     unstrained: dict[int, float] = Field(default_factory=dict)  # 单元号 → 无应力索长 m
+    prestress: list[Prestress3D] = Field(default_factory=list)  # 本阶段张拉的直线束
 
 
 class Influence3D(BaseModel):
@@ -618,6 +660,10 @@ class ModelSpec3D(BaseModel):
             if s.unstrained:
                 parts.append("L0=" + ",".join(
                     f"{k}:{fmt(s.unstrained[k])}" for k in sorted(s.unstrained)))
+            for ps in s.prestress:
+                body = (_int_list_ranges(sorted(ps.elems)) + f":{fmt(ps.P)}:{fmt(ps.e)}"
+                        + (f":{fmt(ps.loss)}" if ps.loss != 1.0 else ""))
+                parts.append("PRESTRESS=" + body)
             L.append(" ".join(parts))
             for ld in s.loads:
                 L.append(f"*STAGE_LOAD")

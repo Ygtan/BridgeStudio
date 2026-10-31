@@ -371,6 +371,106 @@ def figure_shear(res: SolveResult, model: Any,
     return p, note
 
 
+def _girder_segments(res: SolveResult, model: Any
+                     ) -> tuple[list[tuple[float, float, dict, dict]], int]:
+    """把 `[GIRDEREND]` 的每端内力拼成纵向梁分段。
+
+    返回 `[(xa, xb, i 端内力, j 端内力)]`（按 xa 升序）与被排除的单元数。
+
+    为什么必须按几何筛：索承体系的 `[GIRDEREND]` 里，除主梁外还有桥塔
+    ——塔是竖直线（Δx≈0）。把塔也连进这张图，塔位处会冒出一段几万 kN·m
+    的竖直线，主梁的弯矩被压成一条平线。那不是"数据有错"，是"不该同框"：
+    塔是压弯构件，它的 My 是另一套工况，要单独看。
+
+    为什么两端连线就是真实弯矩图：本内核的 3D 模型只有节点荷载，没有单元
+    分布荷载——自重、桥面荷载在建模时已按节点受荷宽度摊到节点上，所以单元
+    内剪力恒定、弯矩线性。实测连续 4 根主梁的 ΔM/Vz 全部为 −5.000 m（单元
+    长 5 m），即严格线性。**如果哪天内核支持单元分布荷载**，这条就不再成立，
+    两端连线会低估跨内峰值，届时要改成给单元内的极值。
+    """
+    nodes = {n.id: n for n in model.nodes}
+    segs: list[tuple[float, float, dict, dict]] = []
+    n_skip = 0
+    for e in model.elements:
+        a, b = nodes.get(e.n1), nodes.get(e.n2)
+        if a is None or b is None:
+            continue
+        vi = res.girder_ends.get((e.id, 1))
+        vj = res.girder_ends.get((e.id, 2))
+        if vi is None or vj is None:
+            continue
+        dx, dy, dz = b.x - a.x, b.y - a.y, b.z - a.z
+        # 竖向（塔柱）与横向（横梁）构件不进这张图
+        if abs(dx) < 1e-9 or abs(dx) < max(abs(dy), abs(dz)):
+            n_skip += 1
+            continue
+        segs.append((a.x, b.x, vi, vj) if a.x <= b.x else (b.x, a.x, vj, vi))
+    segs.sort(key=lambda t: t[0])
+    return segs, n_skip
+
+
+def figure_girder_forces(res: SolveResult, model: Any,
+                         path: Path) -> tuple[Path, str]:
+    """索承体系的梁内力图：My / Vz / N 沿桥长，三联（共享 x 轴）。
+
+    与梁格那张 `figure_moment` 的区别要说清楚：梁格每个单元有 `MyMin/MyMax`
+    **包络**（活载 + 组合），所以画 min/max 两条；索承体系的内核是成桥态
+    定解，只给一个状态，**没有包络**——所以每条梁只有一条线。这不是偷工，
+    是内核没算活载；图注必须写明，否则"没有上下包"会被读成"包络很窄"。
+    """
+    plt = _plt()
+    segs, n_skip = _girder_segments(res, model)
+    if not segs:
+        raise ValueError("没有可绘制的纵向梁端内力")
+
+    rows = (("My", "My (kN·m)", 1e3), ("Vz", "Vz (kN)", 1e3), ("N", "N (kN)", 1e3))
+    fig, axes = plt.subplots(3, 1, figsize=(7.4, 5.2), sharex=True)
+    for ax, (key, ylabel, scale) in zip(axes, rows):
+        xs: list[float] = []
+        ys: list[float] = []
+        for xa, xb, va, vb in segs:
+            xs += [xa, xb]
+            ys += [va.get(key, 0.0) / scale, vb.get(key, 0.0) / scale]
+        if key == "My":
+            # 竖向弯矩图：填到零线，跨内峰值一眼可见（施工图惯例）
+            ax.fill_between(xs, 0.0, ys, color=C_BLUE, alpha=0.18, lw=0)
+            ax.plot(xs, ys, "-", lw=1.2, color=C_BLUE)
+        else:
+            ax.plot(xs, ys, "-", lw=1.1, color=C_BLUE)
+        ax.axhline(0.0, color=C_GRAY, lw=0.8)
+        ax.set_ylabel(ylabel)
+        ax.grid(alpha=0.22, lw=0.5)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+
+        # 峰值点名：一条折线看不出"极值在哪个断面、有多大"，而施工/设计
+        # 复核要的正是这两个数。只标绝对值最大的一个，标满会盖住曲线。
+        if ys:
+            k = max(range(len(ys)), key=lambda i: abs(ys[i]))
+            v = ys[k]
+            span = max(abs(v), max((abs(y) for y in ys), default=0.0) * 0.12) or 1.0
+            ax.annotate(f"{v:+,.0f} @ x={xs[k]:.0f} m", (xs[k], v),
+                        textcoords="offset points",
+                        xytext=(0, 12), ha="center", va="bottom",
+                        fontsize=7.5, color=C_RED)
+            lo, hi = min(ys + [0.0]), max(ys + [0.0])
+            ax.set_ylim(lo - 0.28 * span, hi + 0.34 * span)
+
+    for sx in support_x(model):
+        for ax in axes:
+            ax.axvline(x=sx, color=C_RED, ls="--", lw=0.7, alpha=0.45)
+    axes[-1].set_xlabel("顺桥向 x (m)　（红虚线 = 支承断面）")
+    axes[0].set_title("成桥态梁内力（恒载标准值）", fontsize=9.5, pad=6)
+    fig.tight_layout()
+    p = _save(fig, path)
+    note = ("每条梁按两端截面内力连线（单元内无分布荷载，弯矩沿单元线性，"
+            "故连线即真图，不是插值示意）。")
+    if n_skip:
+        note += (f" 另有 {n_skip} 个竖向/横向构件（桥塔、横梁）未绘入——"
+                 "塔的弯矩是另一套工况，与主梁同框会把主梁压成平线。")
+    return p, note
+
+
 def figure_live(res: SolveResult, model: Any, path: Path) -> Path:
     """活载包络：各施工阶段影响点处车道荷载产生的竖向位移。
 
@@ -547,7 +647,7 @@ def figure_camber(res: SolveResult, model: Any, path: Path) -> Path:
 #: 报告正文里图的排列顺序。与 figures() 的生成顺序解耦：报告要有稳定的
 #: 叙事顺序（先简图、再变形、再内力、再索），而生成顺序由判据决定。
 _FIGURE_ORDER = ("layout", "axon", "deflection", "moment", "axial", "shear",
-                 "live", "stage_tension", "tension", "safety", "camber")
+                 "girder", "live", "stage_tension", "tension", "safety", "camber")
 
 #: 进「施工阶段索力」章的明细表键。与荷载组合同理：过程的**结论**要一页看完，
 #: 逐阶段原始数据才翻明细表——但这里反过来，过程表本身就是结论（每根索
@@ -632,6 +732,16 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
             out["shear"] = Figure(
                 "shear", "梁单元剪力包络（Vz）", sp,
                 note="实线为 min、虚线为 max。" + snote)
+    if res.girder_ends:
+        # 索承体系的梁内力：与上面 `res.beam`（梁格包络）是**两条不同的链**，
+        # 各自数据源不同，不能合并成一张图——一个是 min/max 两条线（有活载
+        # 包络），一个是一条线（成桥态定解）。混画会让读者以为索承体系也有包络。
+        gp, gnote = figure_girder_forces(res, model, d / "girder.png")
+        out["girder"] = Figure(
+            "girder", "成桥态梁内力（My / Vz / N）", gp,
+            note="**这是成桥态的单一状态，不是活载包络**：本内核不含活载，"
+                 "所以每条梁只有一根线、没有上下包。要包络必须走梁格内核（活载"
+                 "影响面在那里）。" + gnote)
     if res.live:
         # 阶段包络为 0 不是漏算：施工中间态下影响点还没与任何单元连通
         # （阶段 1 只建边跨，中跨跨中尚无单元）。不说清楚，读者会以为

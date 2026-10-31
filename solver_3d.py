@@ -83,6 +83,8 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
                      for (e, d), v in (raw.get("live_beam") or {}).items()}
     res.stage_cables = {(int(s), int(e)): dict(v)
                         for (s, e), v in (raw.get("stage_cables") or {}).items()}
+    res.stage_prestress = {(int(s), int(p)): dict(v)
+                           for (s, p), v in (raw.get("stage_prestress") or {}).items()}
     st = model.stats() if hasattr(model, "stats") else {}
     res.stats = {**st, "dofs": _dofs(model)}
     res.converged = True                       # 线性求解，无迭代

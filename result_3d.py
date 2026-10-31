@@ -169,6 +169,10 @@ class SolveResult:
     # 也不参与荷载组合。devDes 是"相对该索设计目标的偏差"——分批张拉时先张
     # 的索会被后张的带跑，这个数就是必须二次调索的理由。
     stage_cables: dict[tuple[int, int], dict[str, float]] = field(default_factory=dict)
+    # 施工阶段各预应力束的有效预加力：{(阶段号, 束号): {"Pe": N}}。
+    # 与索力同性质：**状态量**，只在张拉那一阶段出现，不累加。Pe = P·loss，
+    # 校核"有效预加力 vs 张拉控制应力"用它（张拉控制应力 = P / 束面积）。
+    stage_prestress: dict[tuple[int, int], dict[str, float]] = field(default_factory=dict)
     # 成桥态专用
     cables: list[dict[str, Any]] = field(default_factory=list)
     camber: dict[int, tuple[float, float, float]] = field(default_factory=dict)
@@ -585,6 +589,7 @@ class SolveResult:
         out += self.combination_checks(model)
         out += self._checks_strength(model)
         out += self._checks_stage_cable(model)
+        out += self._checks_stage_prestress(model)
         return out
 
     def _checks_stage_cable(self, model: Any) -> list[Check]:
@@ -707,6 +712,55 @@ class SolveResult:
                 "若是 DEACTIVE 拆索属正常，但过程表里那几格是空值而不是 0，"
                 "不能当索力归零参与比较",
                 level="warn"))
+        return out
+
+    def _checks_stage_prestress(self, model: Any = None) -> list[Check]:
+        """施工阶段预应力的校核。
+
+        与索力不同，预应力没有"目标力"要命中——它就是给定张拉力、扣损失后
+        施加。所以这里只回答三个问题：
+
+        1. 异常：内核报的 Pe 必须为正（P>0、loss∈(0,1] 时不可能为负，出现
+           非正说明解析或配置错了）。
+        2. 张拉了多少、有效预加力多少——让"这一阶段到底干了什么"有数。
+        3. 模型声明了预应力、结果里却没有 → 旧内核没编译，明说"没做"。
+
+        应力的「张拉控制应力 ≤ 0.75·fpk」判据本版**不做**：那需要束面积 Ap 与
+        钢绞线等级 fpk，而 Prestress3D 当前没有 Ap 输入。不是忘了——输入没给齐
+        就下结论，等于造一个假的判据。
+        """
+        out: list[Check] = []
+        declared = 0
+        if model is not None:
+            for s in getattr(model, "stages", []) or []:
+                declared += len(getattr(s, "prestress", []) or [])
+        if not self.stage_prestress:
+            if declared:
+                out.append(Check(
+                    "施工阶段预应力结果", False,
+                    f"模型声明了 {declared} 束预应力，但结果里没有 stage prestress "
+                    "段——多半是旧版 example_3d_grillage.exe，重新编译内核。"
+                    "本次没做预应力校核，这不是「通过」，是「没做」。",
+                    level="info"))
+            return out
+
+        neg = [(s, p, v["Pe"]) for (s, p), v in self.stage_prestress.items()
+               if v.get("Pe", 0.0) <= 0.0]
+        out.append(Check(
+            f"有效预加力为正（{len(self.stage_prestress)} 束·阶段）",
+            not neg,
+            (f"{len(neg)} 条记录 Pe ≤ 0：阶段 {neg[0][0]} 束 {neg[0][1]} "
+             f"Pe={neg[0][2]:.0f} N，P 或 loss 配置有误" if neg else
+             f"{len(self.stage_prestress)} 条记录全部为正"),
+            level="error" if neg else "info"))
+
+        stages = sorted({s for s, _ in self.stage_prestress})
+        last = stages[-1]
+        last_pe = [v["Pe"] for (s, _), v in self.stage_prestress.items() if s == last]
+        out.append(Check(
+            f"阶段 {last} 有效预加力合计", True,
+            f"{len(last_pe)} 束，ΣPe = {sum(last_pe)/1e3:,.0f} kN（损失后）",
+            value=sum(last_pe), unit="N", level="info"))
         return out
 
     def _checks_strength(self, model: Any) -> list[Check]:

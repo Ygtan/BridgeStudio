@@ -69,6 +69,7 @@ def parse_summary(path: Path) -> dict:
     final_disp: dict = {}
     live_beam: dict = {}
     stage_cables: dict = {}
+    stage_prestress: dict = {}
 
     # 段名按**完整前缀**分派，不做子串匹配："beam force envelope" 与
     # "final stage beam force" 都含 "beam force"，用子串会串段。
@@ -80,6 +81,7 @@ def parse_summary(path: Path) -> dict:
         "stage live envelope",
         "live beam envelope",
         "stage cable tension",
+        "stage prestress force",
     )
     section = ""
     re_disp = re.compile(r"^N(\d+) dof(\d+) min=(\S+) max=(\S+)$")
@@ -91,6 +93,7 @@ def parse_summary(path: Path) -> dict:
     re_kv = re.compile(r"([A-Za-z][A-Za-z0-9]*)=(\S+)")
     re_live = re.compile(r"^STAGE(\d+) max=(\S+) min=(\S+)$")
     re_stage_cable = re.compile(r"^STAGE(\d+)\s+E(\d+)\s+(.*)$")
+    re_stage_prestress = re.compile(r"^STAGE(\d+)\s+P(\d+)\s+(.*)$")
 
     def _beam_row(rest: str) -> dict[str, float]:
         vals: dict[str, float] = {}
@@ -145,9 +148,18 @@ def parse_summary(path: Path) -> dict:
                 vals = _beam_row(m.group(3))
                 if vals:
                     stage_cables[(int(m.group(1)), int(m.group(2)))] = vals
+        elif section == "stage prestress force":
+            # 每阶段每束的有效预加力 Pe（束号 → P·loss）。与索力一样是
+            # 状态量：键 (阶段号, 束号)，只在张拉那一阶段出现，不累加。
+            m = re_stage_prestress.match(line)
+            if m:
+                vals = _beam_row(m.group(3))
+                if vals:
+                    stage_prestress[(int(m.group(1)), int(m.group(2)))] = vals
     return {"disp": disp, "beam": beam, "live": live,
             "final_beam": final_beam, "final_disp": final_disp,
-            "live_beam": live_beam, "stage_cables": stage_cables}
+            "live_beam": live_beam, "stage_cables": stage_cables,
+            "stage_prestress": stage_prestress}
 
 
 def solve_3d(model, out_dir: str | Path, dat_name: str = "model_3d.dat") -> dict:

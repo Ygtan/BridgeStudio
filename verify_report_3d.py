@@ -116,7 +116,8 @@ def main() -> int:
               "、".join(f"{k} {f.path.stat().st_size // 1024}KB"
                         for k, f in rep.figures.items()))
         want = {"grillage3d": {"layout", "deflection", "moment"},
-                "cable_stayed": {"layout", "deflection", "tension", "camber"}}[kind]
+                "cable_stayed": {"layout", "deflection", "tension", "camber",
+                                 "girder"}}[kind]
         check("该有的图都有", want <= set(rep.figures), str(sorted(rep.figures)))
         # 轴测图：与界面里的可旋转视图同一份场景，报告里必须有一张
         check("轴测图已生成且不是空白",
@@ -134,9 +135,14 @@ def main() -> int:
               "轴测" in rep.figures["axon"].caption
               and "未放大变形" in rep.figures["axon"].note,
               rep.figures["axon"].caption)
-        check("不该有的图没画（梁格无索力/成桥态无梁内力）",
+        check("不该有的图没画（梁格无索力/成桥态无梁格式弯矩包络）",
               ("tension" not in rep.figures if kind == "grillage3d"
                else "moment" not in rep.figures), str(sorted(rep.figures)))
+        if kind == "cable_stayed":
+            check("成桥态梁内力图走 girder（不是梁格 moment）且图注写明非包络",
+                  "girder" in rep.figures
+                  and "不是活载包络" in rep.figures["girder"].note,
+                  rep.figures["girder"].caption if "girder" in rep.figures else "缺")
 
         paths = R.write_all(rep, f"out/verify_report/{kind}", stem=f"{kind}_report")
         check("三种格式都写出来了",
@@ -330,6 +336,8 @@ def main() -> int:
           str(sorted(R.figures(empty, cases[1][1], "out/verify_report/inject"))))
     check("无索时不出索力图",
           "tension" not in R.figures(empty, cases[1][1], "out/verify_report/inject"))
+    check("无梁端内力时不出成桥态梁内力图",
+          "girder" not in R.figures(empty, cases[1][1], "out/verify_report/inject"))
 
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)

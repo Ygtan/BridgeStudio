@@ -80,8 +80,12 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        `_strength_sections + section_strength` 做正应力/剪应力/折算应力，报告增
        「控制截面应力」表。`verify_section_strength.py` 59/59（含同端配对的手算对拍）。
        **口径**：成桥态恒载**标准值**，无活载、无组合系数——利用率 <1 不等于设计通过，
-       条目一律 warn；恒载单项就 >1 才 error。**边界**：仍不出梁内力包络与弯矩图
-       —— 2026-10-31
+       条目一律 warn；恒载单项就 >1 才 error。—— 2026-10-31
+- [x] **P3** 索承体系梁内力图（`girder` 键）：把 `[GIRDEREND]` 的每端内力拼成
+       纵向梁分段，画 My/Vz/N 三联（沿桥长）。**边界**：这是成桥态单一状态、
+       **不是活载包络**（内核不含活载），图注写死；桥塔按几何筛除（同框会压平主梁）；
+       两端连线即真弯矩图——分布荷载已节点化、单元内弯矩严格线性（实测 ΔM/Vz=−5 m）。
+       `verify_report_3d.py` 91/91 —— 2026-10-31
 - [x] **P3** 施工阶段调索（`*STAGE` 的 `TENSION=` / `L0=`）：内核在阶段内迭代命中目标
        索力（`ΔP = N目标 − N当前`，按索力状态而非参考几何算），跨阶段继承索力状态与
        按节点累积的位移；前端 `Stage3D.tensions/unstrained` → `.dat` → 结果解析 →
@@ -95,11 +99,18 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        **口径**：索力可跨阶段取极值但不能累加；"被带成负值"的索峰值恰好等于目标
        （`ratio=1.00`），排序与高亮用 `devRange` 才抓得住；校核必须走全过程，只查末阶段
        会漏掉"中途压负、后来补调回来"。`verify_stage_cable.py` 45/45 —— 2026-11-01
+- [x] **P3** 施工阶段预应力（`*STAGE` 的 `PRESTRESS=`，直线筋等效荷载法）：内核把
+       每条直线束翻译成两端轴压 `Pe` + 两端偏心弯矩 `Pe·e`（`Pe=P·loss`），按增量法
+       在张拉阶段施加；前端 `Stage3D.prestress`（`Prestress3D`）→ `.dat` → 结果解析
+       （`stage_prestress`）→ 校核（有效预加力为正、阶段末合计）。
+       **边界**：直线筋**不产生上拱**（上拱来自曲线筋的跨内反向力，本版不做）；
+       应力判据（σ≤0.75fpk）没做——缺束面积 `Ap` 输入，不下假判据。
+       `verify_stage_prestress.py` 8/8 —— 2026-10-31
 - [ ] **P4** 成果层：Word/PDF 计算书、3D 包络视图、MIDAS 双向互导
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 18 个脚本、714 项全绿）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 19 个脚本、726 项全绿）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
