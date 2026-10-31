@@ -83,6 +83,8 @@ def build_suspension_3d(
     deck_dens: float = 7850.0,
     tower_E: float = 34.5e9,
     tower_dens: float = 2500.0,
+    deck_grade: str = "Q345qD",           # 加劲梁钢材牌号（应力验算用，不参与求解）
+    tower_grade: str = "C50",             # 桥塔混凝土等级（同上）
     q_deck: float = 100e3,                # 桥面恒载 N/m（含桥面系与二期）
     title: str = "",
 ) -> tuple[ModelSpec3D, dict]:
@@ -168,15 +170,19 @@ def build_suspension_3d(
     G_conc = tower_E / (2 * (1 + 0.2))
 
     materials = [
-        Material3D(id=1, E=deck_E, dens=deck_dens),
-        Material3D(id=2, E=tower_E, dens=tower_dens),
+        Material3D(id=1, E=deck_E, dens=deck_dens, grade=deck_grade),
+        Material3D(id=2, E=tower_E, dens=tower_dens, grade=tower_grade),
+        # 缆索不做应力验算（按安全系数 A·fpu/T 判，见 result_3d.main_cable_table），
+        # 故不标牌号——标了反而会诱导别人拿它去套钢材的 fd。
         Material3D(id=3, E=cable_E, dens=cable_dens),
     ]
     reals = [
         RealConst3D(id=1, A=box["A"], IY=box["IY"], IZ=box["IY"] * 0.5,
-                    J=box["J"], G=G_steel, WT=box["WT"], WB=box["WB"]),
+                    J=box["J"], G=G_steel, WT=box["WT"], WB=box["WB"],
+                    AW=box["AW"], T_PLATE=box["T_MAX"] * 1000.0),
+        # 塔是实心矩形：最大剪应力 1.5V/A，故等效腹板面积取 A/1.5
         RealConst3D(id=2, A=tower_A, IY=tower_I, IZ=tower_I,
-                    J=tower_I * 1.6, G=G_conc),
+                    J=tower_I * 1.6, G=G_conc, AW=tower_A / 1.5),
         RealConst3D(id=3, A=cable_A, W=cable_w),
         RealConst3D(id=4, A=hanger_A, W=hanger_w),
     ]

@@ -69,11 +69,17 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        矢高）→ 平衡态弦长反算 L₀ → 索长迭代；两体系共用同一套内核，只差边界。
        `verify_suspension_3d.py` 61/61 全绿，含两条内核硬校验的负例
        （塔顶不共用节点、端节点悬空都会报错而不会静默算错）—— 2026-10-31
+- [x] **P3** 截面应力验算：`code_material.py`（JTG 3362-2018 表 3.1.3~3.1.5、
+       JTG D64-2015 表 3.2.1 的强度设计值，按板厚分档）+ `section_strength.py`
+       （钢按 D64 §5.3.1 三款算正应力/剪应力/折算应力，混凝土按 3362 §7.1.5
+       算 0.5fck）；荷载组合扩到含轴力 N。`verify_section_strength.py` 46/46。
+       **边界**：成桥态内核（cable_solver）不输出梁内力，故索承体系暂无梁应力，
+       校核条目会明说"做不了"而不是静默跳过 —— 2026-10-31
 - [ ] **P4** 成果层：Word/PDF 计算书、3D 包络视图、MIDAS 双向互导
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 19+7+6+17+61 项全绿）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 17 个脚本、650+ 项全绿）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

@@ -40,6 +40,8 @@ from pathlib import Path
 from typing import Any
 
 import combination
+import code_material
+import section_strength
 
 #: 内核键 → 中文名。界面标题、计算书章节名都取这里，不各写一份。
 KIND_LABELS: dict[str, str] = {
@@ -451,6 +453,131 @@ class SolveResult:
         else:
             out += self._checks_grillage(model)
         out += self.combination_checks(model)
+        out += self._checks_strength(model)
+        return out
+
+    def _checks_strength(self, model: Any) -> list[Check]:
+        """截面应力验算：把组合内力换成应力，跟材料强度比。
+
+        与 `combination_checks` 的分工要分清：那条只说"我给了组合值"，
+        这条才回答"这个组合值扛不扛得住"。前者是算术，后者是判定。
+
+        只在有 `final_beam` 时做——成桥态内核（cable_solver）不输出梁内力，
+        悬索桥/斜拉桥的梁内力要靠梁格内核单独算，这里无从验算。
+        """
+        if not self.final_beam:
+            if self.kind in ("cable_stayed", "suspension"):
+                return [Check(
+                    "截面应力验算", True,
+                    "本内核（cable_solver）只输出索力与线形，不输出梁内力，"
+                    "所以梁的应力验算做不了。这不是本模块的疏漏，是"
+                    "「成桥态内核不含活载与梁内力」这条链断在外面的结果——"
+                    "梁内力须由梁格内核单独求解，两套模型的结果不能直接"
+                    "相加（几何非线性效应进不去）。",
+                    level="info")]
+            return []
+        secs = _strength_sections(model)
+        if not secs:
+            return [Check(
+                "截面应力验算", True,
+                "模型未标注材料牌号（*MAT 的 grade 为空），无法确定强度"
+                "设计值，本次不做应力验算——这不是「通过」，是「没做」",
+                level="info")]
+
+        combos = combination.beam_combinations(self)
+        ult = next((c for c in combos if c.spec.key == "ultimate"), None)
+        if ult is None:
+            return []
+
+        # 先算每个截面，再按利用率排序取前 3。模型有 3 个梁截面时逐截面
+        # 出三条就是 9 条，其中大半是"利用率 0.00"——那不是校核，是噪音。
+        # 读者要的是"哪里最危险"，不是"处处多安全"。
+        ranked: list[tuple[float, str, Any, list[tuple[int, str, Any]]]] = []
+        for label, sec, eids in secs:
+            cases: list[tuple[int, str, Any]] = []
+            for (eid, end), v in ult.rows.items():
+                if eid not in eids:
+                    continue
+                n = float(v.get("N", 0.0))
+                # 包络配对：MyMin 配 VzMin、MyMax 配 VzMax。两者不一定同时
+                # 达到，但同号侧通常同现——包络法固有的近似，写在这里而不是
+                # 藏起来。
+                for my, vz in ((v.get("MyMin", 0.0), v.get("VzMin", 0.0)),
+                               (v.get("MyMax", 0.0), v.get("VzMax", 0.0))):
+                    cases.append((eid, end, section_strength.check(
+                        sec, n, float(my), float(vz))))
+            if not cases:
+                continue
+            top = max(t[2].util for t in cases)
+            ranked.append((top, label, sec, cases))
+
+        if not ranked:
+            return []
+        ranked.sort(key=lambda t: -t[0])
+
+        out: list[Check] = []
+        # 利用率 < 2% 的截面不单列：横梁、隔板在纵向弯曲里基本不参与，
+        # 把它们写成"利用率 0.000"的校核条目，等于用零信息占三行版面。
+        shown = [t for t in ranked if t[0] >= 0.02][:3] or ranked[:1]
+        for top, label, sec, cases in shown:
+            steel = sec.kind == "steel"
+            # 三项各找自己的控制截面：轴力极值与弯矩极值不在同一处，
+            # 拿弯矩最大的截面去代表剪应力控制部位会漏判。
+            wn = max(cases, key=lambda t: t[2].util_normal)
+            sym = "fd" if steel else "0.5fck"
+            out.append(Check(
+                f"{label} 正应力 ≤ {sym}",
+                wn[2].util_normal <= 1.0,
+                f"单元 {wn[0]}·{wn[1]} 端 σ = {wn[2].sigma_top:+.1f} / "
+                f"{wn[2].sigma_bot:+.1f} MPa（上/下缘，拉正压负），"
+                f"利用率 {wn[2].util_normal:.3f}；{wn[2].limit_desc}",
+                value=wn[2].util_normal, limit=1.0,
+                level="error" if steel else "warn"))
+
+            if sec.AW > 0.0:
+                ws = max(cases, key=lambda t: t[2].util_shear)
+                if steel:
+                    out.append(Check(
+                        f"{label} 剪应力 ≤ fvd", ws[2].util_shear <= 1.0,
+                        f"单元 {ws[0]}·{ws[1]} 端 τ = V/AW = {ws[2].tau:.1f} MPa，"
+                        f"利用率 {ws[2].util_shear:.3f}；{ws[2].limit_desc}",
+                        value=ws[2].util_shear, limit=1.0, level="error"))
+                else:
+                    # 混凝土的抗剪由配箍后的斜截面承载力控制（JTG 3362-2018
+                    # §5.2.9），不是"τ ≤ 某个强度"。硬把 τ 除以 ftd 得到
+                    # 1.57 这种数，是在制造一个没有物理意义的"不合格"。
+                    out.append(Check(
+                        f"{label} 腹板剪应力（量级）", True,
+                        f"单元 {ws[0]}·{ws[1]} 端 τ = V/AW = {ws[2].tau:.1f} MPa。"
+                        "混凝土梁的抗剪须按斜截面承载力验算（箍筋 + 混凝土"
+                        "贡献），本程序不建钢筋，故不给利用率、也不下结论。",
+                        value=ws[2].tau, unit="MPa", level="info"))
+
+            if steel:
+                we = max(cases, key=lambda t: t[2].util_eq)
+                out.append(Check(
+                    f"{label} 折算应力利用率 ≤ 1.0", we[2].util_eq <= 1.0,
+                    f"单元 {we[0]}·{we[1]} 端 √((σx/fd)²+(τ/fvd)²) = "
+                    f"{we[2].util_eq:.3f}（σx={we[2].sigma_top:+.1f} 或 "
+                    f"{we[2].sigma_bot:+.1f} MPa，τ={we[2].tau:.1f} MPa）；"
+                    "JTG D64-2015 §5.3.1 第 4 款",
+                    value=we[2].util_eq, limit=1.0, level="error"))
+
+        # 适用范围只写一次，不跟着每个截面重复。
+        if any(sec.kind == "concrete" for _, _, sec, _ in shown):
+            out.append(Check(
+                "混凝土应力验算的适用范围", True,
+                "钢筋混凝土构件的使用阶段应力验算不是 JTG 3362 的强制项"
+                "（规范靠承载力与裂缝宽度控制）；本程序不建钢筋，那两条"
+                "都做不了，故 0.5fck 只作量级判据，不构成「验算通过」。",
+                level="info"))
+        if len(ranked) > len(shown):
+            out.append(Check(
+                "应力验算覆盖范围", True,
+                f"模型含 {len(ranked)} 个梁截面，上列只给利用率最高的 "
+                f"{len(shown)} 个；其余 {len(ranked) - len(shown)} 个截面的"
+                "利用率更低（横梁、隔板在纵向弯曲中基本不参与）。",
+                level="info"))
         return out
 
     def _checks_cable(self, model: Any) -> list[Check]:
@@ -990,6 +1117,61 @@ class SolveResult:
 
 
 # ---------------------------------------------------------------- 内部工具
+
+
+def _strength_sections(model: Any) -> list[tuple[str, Any, set[int]]]:
+    """从模型里取出所有可做应力验算的梁截面。
+
+    返回 `[(标签, SectionForCheck, 该截面下的单元号集合)]`。
+
+    为什么按 (mat, real) 分组而不是"只验主梁"：桥塔同样是 BEAM、同样被
+    压弯，漏掉它就等于默认塔不会坏。模型里有几个梁截面就验几个。
+
+    标签里"主梁"给单元数最多的那一组（三个建造器的建模顺序都是主梁在
+    前），其余用实常数号标识——程序不知道"横隔板"叫什么，就不装作知道。
+    """
+    out: list[tuple[str, Any, set[int]]] = []
+    try:
+        ets = [t for t in model.etypes if getattr(t, "kind", "") == "BEAM"]
+        mats = {m.id: m for m in model.materials}
+        reals = {r.id: r for r in model.reals}
+    except AttributeError:
+        return out
+    if not ets:
+        return out
+
+    counts: dict[int, int] = {}
+    for e in model.elements:
+        counts[e.etype] = counts.get(e.etype, 0) + 1
+    main_et = max(ets, key=lambda t: counts.get(t.id, 0)).id
+
+    for t in ets:
+        mat = mats.get(t.mat)
+        rc = reals.get(t.real)
+        if mat is None or rc is None or not (getattr(mat, "grade", "") or "").strip():
+            continue          # 未标牌号：跳过，由调用方统一说明原因
+        kind = "concrete" if mat.grade.strip().upper() in code_material.CONCRETE \
+            else "steel"
+        sec = section_strength.SectionForCheck(
+            A=float(rc.A),
+            WT=float(rc.WT), WB=float(rc.WB),
+            AW=float(getattr(rc, "AW", 0.0) or 0.0),
+            grade=mat.grade, kind=kind,
+            t_plate=float(getattr(rc, "T_PLATE", 0.0) or 0.0),
+        )
+        # 牌号预检：查不到强度值就在这里跳过，不让 KeyError 冒到 checks()
+        # 外面去把整份报告带崩。程序宁可"这一项没做"，不能"整页打不开"。
+        try:
+            if kind == "steel":
+                code_material.steel(sec.grade, sec.t_plate)
+            else:
+                code_material.concrete(sec.grade)
+        except KeyError:
+            continue
+        eids = {e.id for e in model.elements if e.etype == t.id}
+        head = "主梁" if t.id == main_et else f"截面#{t.real}"
+        out.append((f"{head}（{sec.describe()}）", sec, eids))
+    return out
 
 
 def _r(v: Any, nd: int) -> Any:

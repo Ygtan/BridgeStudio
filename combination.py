@@ -24,9 +24,10 @@
 
 不做什么
 --------
-不算承载力。截面抗弯/抗剪承载力需要配筋，本程序不建钢筋，也没有材料
-强度设计值。这里给的是**设计内力包络**——设计院拿去配筋的输入，不是
-"验算通过"的结论。想要结论，得把 Mu 接进来。
+不算承载力。截面抗弯/抗剪承载力需要配筋，本程序不建钢筋。这里给的是
+**设计内力包络**（含 N / My / Vz）——设计院拿去配筋的输入，也是
+`section_strength.py` 做应力验算的输入，但不是"承载力验算通过"的结论。
+想要承载力结论，得把 Mu、Vu 接进来（路线图下一步）。
 """
 
 from __future__ import annotations
@@ -89,16 +90,37 @@ ALL: tuple[ComboSpec, ...] = (ULTIMATE, FREQUENT, QUASI)
 class BeamCombo:
     """一种组合下的梁端内力。
 
-    `rows[(单元, 端)] = {"MyMin","MyMax","VzMin","VzMax"}`（N·m / N）。
+    `rows[(单元, 端)] = {"N","MyMin","MyMax","VzMin","VzMax"}`（N·m / N）。
     弯矩保留 min/max 两侧：活载本身是包络，两端极值对应不同的车辆位置。
+
+    **轴力只有单值 N，且只含恒载项。** 内核的 `live beam envelope` 段只输出
+    My/Vz 包络，没有活载轴力——所以组合里 N 只能写成 γ_G·N_G。对自锚式
+    悬索桥这不是小事：梁轴力 ≈ 0.998H，而活载会改变 H，实际轴力比这里
+    给出的还要大几个百分点。`has_axial_live` 必须跟着这个事实走，
+    界面与报告要把它说出来。
     """
 
     spec: ComboSpec
     rows: dict[tuple[int, str], dict[str, float]] = field(default_factory=dict)
     has_live: bool = True
+    has_axial_live: bool = False
 
     def worst(self, comp: str = "My") -> tuple[tuple[int, str], float] | None:
-        """|分量| 最大的截面 → ((单元, 端), 值)。"""
+        """|分量| 最大的截面 → ((单元, 端), 值)。
+
+        `comp="N"` 时按单值处理：轴力在组合里只有一个数，没有 Min/Max 的
+        两侧之分（缺活载轴力包络，见类文档）。
+        """
+        if comp == "N":
+            best_n: tuple[tuple[int, str], float] | None = None
+            for key, v in self.rows.items():
+                val = v.get("N")
+                if val is None:
+                    continue
+                if best_n is None or abs(val) > abs(best_n[1]):
+                    best_n = (key, val)
+            return best_n
+
         lo, hi = f"{comp}Min", f"{comp}Max"
         best: tuple[tuple[int, str], float] | None = None
         for key, v in self.rows.items():
@@ -166,6 +188,9 @@ def beam_combinations(res: Any) -> list[BeamCombo]:
     if not final:
         return []
     has_live = bool(live)
+    # 内核活载包络只给 My/Vz，没有轴力。这里实测而不是假定：哪天内核补上
+    # N 的活载包络，这段代码自动开始用它，不用改两处。
+    has_axial_live = any("N" in (v or {}) for v in live.values())
     out: list[BeamCombo] = []
     for spec in ALL:
         rows: dict[tuple[int, str], dict[str, float]] = {}
@@ -174,12 +199,15 @@ def beam_combinations(res: Any) -> list[BeamCombo]:
             # G 是单值；Q 是影响线包络，两侧分别叠加。同截面同分量相加，
             # 不跨端、不跨分量。
             rows[key] = {
+                "N": spec.gamma_g * g.get("N", 0.0)
+                     + spec.gamma_q * q.get("N", 0.0),
                 "MyMin": spec.gamma_g * g.get("My", 0.0) + spec.gamma_q * q.get("MyMin", 0.0),
                 "MyMax": spec.gamma_g * g.get("My", 0.0) + spec.gamma_q * q.get("MyMax", 0.0),
                 "VzMin": spec.gamma_g * g.get("Vz", 0.0) + spec.gamma_q * q.get("VzMin", 0.0),
                 "VzMax": spec.gamma_g * g.get("Vz", 0.0) + spec.gamma_q * q.get("VzMax", 0.0),
             }
-        out.append(BeamCombo(spec=spec, rows=rows, has_live=has_live))
+        out.append(BeamCombo(spec=spec, rows=rows, has_live=has_live,
+                             has_axial_live=has_axial_live))
     return out
 
 
@@ -240,7 +268,8 @@ def beam_table(combo: BeamCombo, limit: int = 0) -> dict[str, Any]:
         "title": f"{combo.spec.name}：梁端弯矩与剪力",
         "note": ("弯矩以 kN·m、剪力以 kN 计；「端」列指出该极值出现在单元的 "
                  "i 端还是 j 端。活载侧取自 JTG D60 车道荷载影响线包络"
-                 "（一辆车队沿桥逐位置布载后取最不利）。"
+                 "（一辆车队沿桥逐位置布载后取最不利）。轴力 N 在同一截面上"
+                 "是单值、且只含恒载项，故不在此表逐行列，见汇总表。"
                  + ("模型未定义车道荷载，表中只有恒载项。" if not combo.has_live else "")),
         "headers": ["单元", "MyMin 端", "MyMin (kN·m)", "MyMax 端",
                     "MyMax (kN·m)", "VzMin (kN)", "VzMax (kN)"],
@@ -262,19 +291,27 @@ def summary_table(combos: list[BeamCombo], disps: list[DispCombo]) -> dict[str, 
             continue
         w = c.worst("My")
         cell = "—" if w is None else f"{w[1] / 1e3:,.0f}（单元 {w[0][0]}·{w[0][1]} 端）"
+        wn = c.worst("N")
+        ncell = "—" if wn is None else f"{wn[1] / 1e3:,.0f}（单元 {wn[0][0]}）"
         dv = "—" if d is None else f"{d.value * 1000:.2f}"
-        rows.append([spec.name, spec.expr, cell, dv, spec.use])
-    note = ("弯矩取全桥 |My| 最大者；位移为影响点（竖向位移最大节点）处的值，"
-            "向下为负。位移组合值仅供参考——JTG D60 4.3.2 的挠度限值判的是"
-            "汽车荷载本身产生的挠度，不是组合值。")
+        rows.append([spec.name, spec.expr, cell, ncell, dv, spec.use])
+    note = ("弯矩取全桥 |My| 最大者；轴力取全桥 |N| 最大者；位移为影响点"
+            "（竖向位移最大节点）处的值，向下为负。位移组合值仅供参考——"
+            "JTG D60 4.3.2 的挠度限值判的是汽车荷载本身产生的挠度，"
+            "不是组合值。")
     # 缺活载时这张表最容易被误读成"组合已经做完了"：它看起来和正常时
     # 一模一样，只是数值小一圈。必须在表注里说死。
     if combos and not combos[0].has_live:
         note += ("本模型未定义车道荷载（*LANE_3D），表中组合值只有恒载项，"
                  "不是组合值。")
+    elif combos and not combos[0].has_axial_live:
+        note += ("轴力列只含恒载贡献（γ_G·N_G）：本内核的活载包络只输出弯矩"
+                 "与剪力，不输出活载轴力。对自锚式悬索桥、系杆拱这类靠轴力"
+                 "受力的结构，实际轴力会略大于表中值。")
     return {
         "title": "荷载组合控制值汇总",
         "note": note,
-        "headers": ["组合", "表达式", "控制弯矩 My (kN·m)", "影响点位移 (mm)", "用途"],
+        "headers": ["组合", "表达式", "控制弯矩 My (kN·m)",
+                    "控制轴力 N (kN)", "影响点位移 (mm)", "用途"],
         "rows": rows,
     }

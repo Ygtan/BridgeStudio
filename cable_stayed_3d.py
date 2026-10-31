@@ -68,6 +68,7 @@ def build_cable_stayed_3d(
     cable_dens: float = 7850.0,
     E_conc: float = 34.5e9,
     dens_conc: float = 2500.0,
+    deck_grade: str = "C50",              # 主梁混凝土等级（应力验算用，不参与求解）
     mode: str = "COMPLETION",
     method: str = "DECK",                 # DECK | MINENERGY | RIGID
     cable_tensions: dict[int, float] | None = None,   # 指定索力（N），缺省按 method 定
@@ -123,14 +124,17 @@ def build_cable_stayed_3d(
     cable_w = cable_A * cable_dens * G          # 单位长度重量 N/m
 
     materials = [
-        Material3D(id=1, E=E_conc, dens=dens_conc),
+        Material3D(id=1, E=E_conc, dens=dens_conc, grade=deck_grade),
+        # 斜拉索按安全系数判，不标牌号（见 result_3d.cable_table）
         Material3D(id=2, E=cable_E, dens=cable_dens),
     ]
     reals = [
         RealConst3D(id=1, A=box["A"], IY=box["IY"], IZ=box["IY"] * 0.5,
-                    J=box["J"], G=G_shear, WT=box["WT"], WB=box["WB"]),
+                    J=box["J"], G=G_shear, WT=box["WT"], WB=box["WB"],
+                    AW=box["AW"]),
+        # 塔是实心矩形：最大剪应力 1.5V/A，等效腹板面积取 A/1.5
         RealConst3D(id=2, A=tower_A, IY=tower_I, IZ=tower_I,
-                    J=tower_I * 1.6, G=G_shear),
+                    J=tower_I * 1.6, G=G_shear, AW=tower_A / 1.5),
         RealConst3D(id=3, A=cable_A, W=cable_w),
     ]
     etypes = [

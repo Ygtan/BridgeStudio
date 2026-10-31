@@ -59,6 +59,8 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
+import code_material
+
 # ---------------------------------------------------------------- 版式常量
 
 FONT_CN = "宋体"
@@ -1119,16 +1121,57 @@ def _sec_2_model(w: _Writer, model, d: dict, fig_elev: Path) -> None:
     w.h2("2.2　材料与截面")
     mats = {m.id: m for m in model.materials}
     reals = {r.id: r for r in model.reals}
-    m1, m2 = mats.get(1), mats.get(2)
     r1, r2, r3 = reals.get(1), reals.get(2), reals.get(3)
-    w.p("主梁与桥塔为混凝土，拉索为钢绞线。截面特性按薄壁箱形截面计算，"
+
+    # 哪个材料用于什么，按 *ET 的单元类型判，**不按材料编号猜**：
+    # 悬索桥是 1=钢箱梁、2=混凝土塔、3=缆索，斜拉桥是 1=混凝土梁塔、
+    # 2=缆索。靠 id 写死，换一种桥型就错一行。
+    kind_of: dict[int, set[str]] = {}
+    for et in getattr(model, "etypes", []):
+        kind_of.setdefault(et.mat, set()).add(getattr(et, "kind", ""))
+    cable_mats = {mid for mid, ks in kind_of.items() if ks and ks <= {"CABLE"}}
+
+    def _grade(m: Any) -> str:
+        if m is None:
+            return "—"
+        return (getattr(m, "grade", "") or "").strip() or "未标注"
+
+    def _part(mid: int) -> str:
+        if mid in cable_mats:
+            return "缆索"
+        return "梁 / 塔" if "BEAM" in kind_of.get(mid, set()) else "—"
+
+    body_grades = sorted({_grade(m) for mid, m in mats.items()
+                          if mid not in cable_mats and _grade(m) != "未标注"})
+    w.p(f"主体受力构件（梁、塔）采用{'、'.join(body_grades) or '钢与混凝土'}，"
+        "缆索采用高强度钢绞线或高强钢丝。截面特性按薄壁箱形截面计算，"
         "计入约束扭转常数与扇性惯矩。")
-    rows = [["主梁 / 桥塔", "C50 混凝土", _f(m1.E / 1e9, 1) if m1 else "—",
-             _f(m1.dens, 0) if m1 else "—"],
-            ["拉索", "高强度钢绞线", _f(m2.E / 1e9, 1) if m2 else "—",
-             _f(m2.dens, 0) if m2 else "—"]]
-    w.table("材料参数", ["构件", "材料", "弹性模量 E (GPa)", "密度 (kg/m³)"], rows,
-            widths=[3.2, 4.2, 4.2, 3.9], aligns=["c", "l", "c", "c"])
+
+    rows = []
+    for mid, m in sorted(mats.items()):
+        rows.append([f"M{mid}", _part(mid), _grade(m),
+                     _f(m.E / 1e9, 1), _f(m.dens, 0)])
+    w.table("材料参数", ["编号", "用于", "材料", "弹性模量 E (GPa)", "密度 (kg/m³)"],
+            rows, widths=[1.8, 2.8, 3.6, 3.9, 3.4],
+            aligns=["c", "c", "l", "c", "c"])
+
+    # 材料强度设计值：应力验算的"分母"。即使本报告不做承载力验算，
+    # 读者也要能看到取的是哪一版规范、哪一个厚度档。
+    for g in body_grades:
+        try:
+            if g.upper() in code_material.CONCRETE:
+                t = code_material.concrete_table((g,))
+                w.table(f"混凝土强度标准值与设计值（{g}）", t["headers"], t["rows"],
+                        widths=[2.6, 2.9, 2.9, 2.9, 2.9, 2.9],
+                        aligns=["c"] * 6)
+            else:
+                t = code_material.steel_table((g,))
+                w.table(f"钢材强度设计值（{g}）", t["headers"], t["rows"],
+                        widths=[3.0, 3.4, 2.8, 2.8, 3.2],
+                        aligns=["c"] * 5)
+        except KeyError:
+            # 牌号没登记就不出这张表，也不猜一个强度值顶上
+            w.note(f"材料「{g}」不在强度登记表内，未列出强度设计值。")
 
     rows = []
     if r1:
@@ -1946,11 +1989,46 @@ def _susp_sec_2(w: _Writer, model, d: dict, fig_frame: Path) -> None:
            "设计值的百分之一。求解器对此有一条硬校验。")
 
     w.h2("2.2　材料与截面")
+    # 用途按 *ET 归类，不按材料号猜：加劲梁是钢、桥塔是混凝土、缆索是
+    # 高强钢丝，三者的强度体系完全不同（fd / 0.5fck / 安全系数）。
+    kind_of: dict[int, set[str]] = {}
+    for et in model.etypes:
+        kind_of.setdefault(et.mat, set()).add(getattr(et, "kind", ""))
+    cable_mats = {mid for mid, ks in kind_of.items() if ks and ks <= {"CABLE"}}
+
+    def _grade_of(m: Any) -> str:
+        return (getattr(m, "grade", "") or "").strip() or "未标注"
+
     rows = []
     for mat in model.materials:
-        rows.append([f"M{mat.id}", _f(mat.E / 1e9, 1), _f(mat.dens, 0)])
-    w.table("材料", ["编号", "弹性模量 E (GPa)", "密度 (kg/m³)"], rows,
-            widths=[3.0, 6.0, 6.0], aligns=["c", "c", "c"])
+        part = "缆索" if mat.id in cable_mats else "梁 / 塔"
+        rows.append([f"M{mat.id}", part, _grade_of(mat),
+                     _f(mat.E / 1e9, 1), _f(mat.dens, 0)])
+    w.table("材料", ["编号", "用于", "材料", "弹性模量 E (GPa)", "密度 (kg/m³)"],
+            rows, widths=[1.8, 2.8, 3.6, 3.9, 3.4],
+            aligns=["c", "c", "l", "c", "c"])
+    w.note("「用于」列只区分两类，因为两类材料的验算体系不同：梁与塔按强度"
+           "设计值（fd 或 0.5fck）验算，缆索按安全系数 A·fpu/T 验算。"
+           "各材料对应的具体构件见上一张表。")
+
+    body_grades = sorted({_grade_of(m) for m in model.materials
+                          if m.id not in cable_mats
+                          and _grade_of(m) != "未标注"})
+    for g in body_grades:
+        try:
+            if g.upper() in code_material.CONCRETE:
+                t = code_material.concrete_table((g,))
+                w.table(f"混凝土强度标准值与设计值（{g}）", t["headers"], t["rows"],
+                        widths=[2.6, 2.9, 2.9, 2.9, 2.9, 2.9],
+                        aligns=["c"] * 6)
+            else:
+                t = code_material.steel_table((g,))
+                w.table(f"钢材强度设计值（{g}）", t["headers"], t["rows"],
+                        widths=[3.0, 3.4, 2.8, 2.8, 3.2],
+                        aligns=["c"] * 5)
+        except KeyError:
+            w.note(f"材料「{g}」不在强度登记表内，未列出强度设计值。")
+
     rows = []
     for rc in model.reals:
         rows.append([f"R{rc.id}", _f(rc.A, 5), _f(getattr(rc, "IY", 0) or 0, 4),

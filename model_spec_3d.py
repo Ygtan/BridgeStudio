@@ -211,6 +211,10 @@ class Material3D(BaseModel):
     id: int
     E: float = Field(gt=0)          # 弹性模量 Pa
     dens: float = 0.0               # 密度 kg/m³（模态/自振用；静力显式加载不依赖）
+    #: 材料牌号（"Q345qD" / "C50"），只在强度验算时用。
+    #: 空串 = 未标注 → 应力验算跳过并说明原因，绝不猜一个等级顶上。
+    #: 不写进 *MAT（内核只认 E/DENS），所以留空不影响求解。
+    grade: str = ""
 
 
 class RealConst3D(BaseModel):
@@ -230,6 +234,11 @@ class RealConst3D(BaseModel):
     ISTRN: float = 0.0              # 初应变（可作初拉力：F=E·A·ISTRN）
     W: float = 0.0                  # 索单位长度重量 N/m（CABLE 垂度/Ernst 用）
     L0: float = 0.0                 # 无应力索长 m（0 = 取几何长度）
+    #: 腹板总面积 m²（所有腹板之和）。剪应力 τ=V/AW 用。0 = 未提供，跳过剪应力验算。
+    AW: float = 0.0
+    #: 控制板厚 mm（腹板/翼缘中较厚者）。查 JTG D64 表 3.2.1 的厚度档用。
+    #: 0 = 未提供，按 0 处理（落在 ≤16mm 档，偏不保守，故建造器都应填）。
+    T_PLATE: float = 0.0
 
 
 class ElemTypeDef3D(BaseModel):

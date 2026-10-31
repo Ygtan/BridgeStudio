@@ -57,6 +57,10 @@ def box_section(B: float, h: float, tf: float, tw: float) -> dict:
         "J": J,
         "WT": Iy / (h / 2),              # 上缘（顶板）模量
         "WB": Iy / (h / 2),              # 下缘（底板）模量
+        # 下面三个是强度验算要用的，力学求解不读它们：
+        "AW": 2 * hw * tw,               # 腹板总面积（两道腹板），剪应力 τ=V/AW
+        "HW": hw,                        # 腹板净高
+        "T_MAX": max(tf, tw),            # 控制板厚 m（查 JTG D64 表 3.2.1 的档位）
     }
 
 
@@ -71,6 +75,7 @@ def build_box_grillage_3d(
     E: float = 34.5e9,
     nu: float = 0.2,
     dens: float = 2500.0,
+    grade: str = "C50",                  # 混凝土等级（应力验算用，不参与求解）
     q_deck: float = 100e3,               # 全宽桥面均布荷载 N/m（含自重），向下
     td: float = 0.6,                     # 支承断面横隔板厚度 m
     staged: bool = False,                # True=逐跨浇筑三阶段；False=一次成桥
@@ -124,16 +129,17 @@ def build_box_grillage_3d(
             nodes.append(Node3D(id=node_id(li, i), x=x, y=ys[li], z=0.0))
 
     # ---- 单元类型/材料/实常数 ----
-    materials = [Material3D(id=1, E=E, dens=dens)]
+    materials = [Material3D(id=1, E=E, dens=dens, grade=grade)]
     reals = [
         RealConst3D(id=1, A=box["A"] / n_lines, IY=box["IY"] / n_lines,
                     IZ=box["A"] / n_lines * (B / n_lines) ** 2 / 8,  # 横向弯曲粗估
                     J=box["J"] / n_lines, G=G,
-                    WT=box["WT"] / n_lines, WB=box["WB"] / n_lines),
+                    WT=box["WT"] / n_lines, WB=box["WB"] / n_lines,
+                    AW=box["AW"] / n_lines),          # 腹板也按纵梁线均分
         RealConst3D(id=2, A=cross["A"], IY=cross["IY"], IZ=cross["A"] * panel ** 2 / 12,
-                    J=cross["J"], G=G),
+                    J=cross["J"], G=G, AW=cross["A"] / 1.5),
         RealConst3D(id=3, A=diaph["A"], IY=diaph["IY"], IZ=diaph["A"] * B ** 2 / 12,
-                    J=diaph["J"], G=G),
+                    J=diaph["J"], G=G, AW=diaph["A"] / 1.5),
     ]
     etypes = [
         ElemTypeDef3D(id=1, kind="BEAM", mat=1, real=1),   # 纵梁
