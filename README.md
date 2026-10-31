@@ -88,11 +88,18 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        两条校核（索无受压、末阶段索力 vs 设计目标）。`verify_stage_cable.py` 21/21。
        **边界**：线弹性调索；分批张拉时先张的索会被带跑（分两批实测 193.7%），内核输出
        `devDes` 量化而不静默，二次调索可拉回（实测 1e-15）—— 2026-10-31
+- [x] **P3** 施工期索力全过程与包络：`SolveResult.stage_cable_summary()` 把逐阶段
+       平铺压成"每根索一条过程"（峰值/谷值及阶段、`ratio`、`devRange`、`notYet`/`dropped`）；
+       表「施工阶段索力全过程」+ 图「施工阶段索力过程」（线的起点 = 张拉阶段，不补零）+
+       四条校核（全过程无受压、峰值 ≤ A·fpu/2.0、末阶段 vs 目标、全程峰值 vs 目标）。
+       **口径**：索力可跨阶段取极值但不能累加；"被带成负值"的索峰值恰好等于目标
+       （`ratio=1.00`），排序与高亮用 `devRange` 才抓得住；校核必须走全过程，只查末阶段
+       会漏掉"中途压负、后来补调回来"。`verify_stage_cable.py` 45/45 —— 2026-11-01
 - [ ] **P4** 成果层：Word/PDF 计算书、3D 包络视图、MIDAS 双向互导
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 18 个脚本、692 项全绿）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 18 个脚本、714 项全绿）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

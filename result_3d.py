@@ -58,6 +58,13 @@ CABLE_SAFETY_MIN = 2.5
 MAIN_CABLE_SAFETY_MIN = 2.0
 #: 索破断强度默认值（1860 级钢绞线，GB/T 5224）
 CABLE_FPU_DEFAULT = 1860e6
+#: 施工期索力上限对应的临时安全系数：T ≤ A·fpu / 2.0。
+#:
+#: 比运营期的 2.5 低——施工阶段是短暂工况、荷载组合系数更小，规范允许更低的
+#: 临时安全系数。但这个上限必须有：施工调索的目标是"到达设计索力"，不设上限
+#: 的话，一次超张拉到 1.5 倍设计索力的错误顺序也会显示成"调索成功"。
+#: 这是本程序自定的判定线，不是规范条文；条目里如实写明出处。
+CABLE_SAFETY_MIN_STAGE = 2.0
 #: 主缆破断强度（1770 级镀锌高强钢丝，GB/T 17101）
 MAIN_CABLE_FPU = 1770e6
 
@@ -256,6 +263,102 @@ class SolveResult:
                 worst = (int(c["elem"]), k)
         return worst
 
+    def stage_cable_summary(self, model: Any = None) -> list[dict[str, Any]]:
+        """把逐阶段索状态压成「每根索一条全过程记录」，供表、图、校核共用。
+
+        为什么要另做一层汇总：`stage_cables` 是 {(阶段, 索): {...}} 的平铺字典，
+        回答"第 3 阶段第 7 根索多少力"很直接，回答"这根索施工期最大多少、出现
+        在哪一阶段、离目标差多少"要遍历两遍。表、图、校核三处各遍历一遍就等于
+        三份口径，改一处漏两处。
+
+        返回的每条记录：
+            elem / stages（有记录的阶段号，升序）/ n
+            Tmin / TminStage、Tmax / TmaxStage
+            Tfirst / Tlast（首、末阶段索力）
+            Tdes / ratio（设计目标、峰值/目标；无目标时 ratio 为 None）
+            devLast（末阶段相对**设计目标**的偏差，不是相对本阶段目标）
+            missing（全程出现过、但这根索没被激活的阶段号）
+
+        `missing` 不是装饰：索在中途被拆掉（换索、合龙前临时索）时，Python 侧
+        的包络会把"没有记录"读成"索力不变"，得到一个假的平稳过程。这里把它
+        显式列出来，由调用方决定怎么处理。
+        """
+        all_stages = sorted({s for s, _ in self.stage_cables})
+        if not all_stages:
+            return []
+        by_elem: dict[int, list[tuple[int, dict[str, float]]]] = {}
+        for (s, e), v in self.stage_cables.items():
+            by_elem.setdefault(e, []).append((s, v))
+
+        out: list[dict[str, Any]] = []
+        for e, series in by_elem.items():
+            series.sort(key=lambda kv: kv[0])
+            seen = [s for s, _ in series]
+            tmax_s, tmax_v = max(series, key=lambda kv: float(kv[1].get("T", 0.0)))
+            tmin_s, tmin_v = min(series, key=lambda kv: float(kv[1].get("T", 0.0)))
+            Tdes = max((float(v.get("Tdes") or 0.0) for _, v in series), default=0.0)
+            Tmax = float(tmax_v.get("T", 0.0))
+            Tmin = float(tmin_v.get("T", 0.0))
+            # 缺失阶段分两种，含义完全相反，不能混成一个 `missing`：
+            #   notYet  出现在首记录之前 —— 该索还没张拉，本来就没有（正常）
+            #   dropped 出现在首记录之后 —— 记录中途消失，多半是被 DEACTIVE
+            #           拆掉了；也有可能是内核漏了。后者必须报出来。
+            not_yet = [s for s in all_stages if s < seen[0]]
+            dropped = [s for s in all_stages
+                       if s > seen[0] and s not in set(seen)]
+            out.append({
+                "elem": int(e),
+                "stages": seen,
+                "n": len(seen),
+                "Tmin": Tmin, "TminStage": int(tmin_s),
+                "Tmax": Tmax, "TmaxStage": int(tmax_s),
+                "Tfirst": float(series[0][1].get("T", 0.0)),
+                "Tlast": float(series[-1][1].get("T", 0.0)),
+                "Tdes": Tdes,
+                "ratio": (Tmax / Tdes) if Tdes > 0 else None,
+                # 全过程偏离目标：峰值往上、谷值往下都算，取绝对值大者。
+                # 只比峰值会漏掉"被后来的索带成负值"的那一类——它的峰值
+                # 恰好等于目标（因为张拉时就停在目标上），比值是漂亮的 1.00。
+                "devRange": (max(abs(Tmax - Tdes), abs(Tmin - Tdes)) / Tdes
+                             if Tdes > 0 else None),
+                "devLast": abs(float(series[-1][1].get("devDes") or 0.0)),
+                "L0": float(series[-1][1].get("L0") or 0.0),
+                "notYet": not_yet,
+                "dropped": dropped,
+                "missing": not_yet + dropped,
+            })
+        out.sort(key=lambda r: r["elem"])
+        return out
+
+    def stage_cable_series(self, model: Any = None) -> dict[int, dict[str, Any]]:
+        """索力-阶段曲线用：{索单元: {"label": 图例名, "pts": [(阶段, 索力 kN)]}}。
+
+        图例名带锚点 x（能从 model 取到的话）：施工方认的是"哪根索"，
+        而单元号在图纸上不一定标。取不到 model 就退回纯单元号——不编位置。
+        """
+        x_of: dict[int, float] = {}
+        el: dict[int, Any] = {}
+        if model is not None:
+            try:
+                x_of = {n.id: n.x for n in model.nodes}
+                el = {e.id: e for e in model.elements}
+            except AttributeError:
+                pass
+        out: dict[int, dict[str, Any]] = {}
+        for r in self.stage_cable_summary(model):
+            e = r["elem"]
+            label = f"索{e}"
+            if e in el:
+                x = x_of.get(el[e].n1)
+                if x is not None:
+                    label += f" @{x:.0f}m"
+            out[e] = {
+                "label": label,
+                "pts": sorted((s, float(v.get("T", 0.0)) / 1e3)
+                              for (s, ee), v in self.stage_cables.items() if ee == e),
+            }
+        return out
+
     def control_sections(self, model: Any = None) -> list[tuple[str, int, float]]:
         """控制断面 → [(标记, 节点号, x)]：支座断面 + 各跨跨中。
 
@@ -365,6 +468,17 @@ class SolveResult:
                     hint=f"阶段 {lw[0]}，JTG D60 车道荷载"))
             out.append(Metric("施工阶段", f"{st.get('stages', 0)}",
                               hint=f"活载包络 {len(self.live)} 阶段"))
+            if self.stage_cables:
+                # 索承体系走线性梁格时才有：与"成桥索力"不同，这是**过程**
+                # 峰值，施工控制关心的是它有没有把索（和塔、梁）顶过头。
+                sr = self.stage_cable_summary(model)
+                hi = max(sr, key=lambda r: r["Tmax"])
+                low = min(sr, key=lambda r: r["Tmin"])
+                out.append(Metric(
+                    "施工期索力峰值", f"{hi['Tmax'] / 1e3:.0f}", "kN",
+                    hint=f"索 {hi['elem']}，阶段 {hi['TmaxStage']}；"
+                         f"全过程最小 {low['Tmin'] / 1e3:.0f} kN"
+                         f"（阶段 {low['TminStage']}）"))
             out.append(Metric("梁内力包络单元", f"{len(self.beam)}",
                               hint="六分量：N/Vy/Vz/T/My/Mz"))
             ult = next((c for c in self.combinations()
@@ -474,45 +588,125 @@ class SolveResult:
         return out
 
     def _checks_stage_cable(self, model: Any) -> list[Check]:
-        """施工阶段调索的校核。
+        """施工阶段索力的校核。
 
-        只回答两个问题，都是"不回答就等于没做"的那种：
-        1. 索有没有被算成受压——线性阶段内核把 CABLE 当桁架，允许负轴力，
-           而真实索一受压就退出工作。出现负值说明这条施工顺序在该索上不成立，
-           不能当"索力偏小"糊过去。
-        2. 最后一阶段的各索还差设计目标多少——分批张拉时先张的必然被后张的
-           带跑，这个差额就是二次调索的依据。
+        四条常驻，前两条管**过程**、后两条管**终态**。只查末阶段是不够的：
+        一根索在阶段 2 被压成负值、阶段 4 又拉回目标，末阶段的检查会给出
+        "全部通过"，而实际施工中那根索在阶段 2 就已经退出工作了。
+
+        1. 全程不出现受压/松索——线性阶段内核把 CABLE 当桁架，允许负轴力，
+           而真实索一受压就退出工作；这个结果本身不可信，不能当"索力偏小"糊过去。
+        2. 全程峰值不超过 A·fpu/2.0（施工期临时安全系数，见常量说明）——
+           调索的判据是"到达目标"，不设上限的话，超张拉到 1.5 倍的错误顺序
+           也会显示成"调索成功"。
+        3. 末阶段各索还差设计目标多少——分批张拉时先张的必然被后张的带跑，
+           这个差额就是二次调索的依据。
+        4. 全过程峰值偏离设计目标多少——超张拉与欠张拉都在这里暴露。
+
+        第 5 条只在中途真有索失去记录时出现（见末尾），它不属于力学判定，
+        而是"这张过程表有没有洞"的提醒。
         """
-        if not self.stage_cables:
+        rows = self.stage_cable_summary(model)
+        if not rows:
             return []
         out: list[Check] = []
-        last = max(s for s, _ in self.stage_cables)
-        rows = {e: v for (s, e), v in self.stage_cables.items() if s == last}
+        all_stages = sorted({s for s, _ in self.stage_cables})
 
-        neg = [(e, v["T"]) for e, v in rows.items() if v["T"] <= 0.0]
-        out.append(Check(
-            f"施工阶段索不出现受压（阶段 {last}）",
-            not neg,
-            (f"{len(neg)} 根索轴力 ≤ 0，最小 {min(t for _, t in neg)/1e3:.0f} kN；"
-             "线性阶段把索当桁架，允许受压——真实索受压即退出工作，"
-             "该施工顺序在这几根索上不成立" if neg
-             else f"{len(rows)} 根索全部受拉"),
-            level="error"))
+        # ---- 1. 全程不出现受压 -------------------------------------------
+        neg = [r for r in rows if r["Tmin"] <= 0.0]
+        if neg:
+            worst = min(neg, key=lambda r: r["Tmin"])
+            detail = (f"{len(neg)} 根索全过程出现过轴力 ≤ 0，最小 "
+                      f"{worst['Tmin']/1e3:.0f} kN（单元 {worst['elem']}，"
+                      f"阶段 {worst['TminStage']}）；线性阶段把索当桁架，允许受压"
+                      "——真实索受压即退出工作，该施工顺序在这几根索上不成立")
+        else:
+            detail = (f"{len(rows)} 根索在 {len(all_stages)} 个阶段"
+                      f"（{'、'.join(map(str, all_stages))}）内全部受拉，"
+                      f"最小 {min(r['Tmin'] for r in rows)/1e3:.0f} kN")
+        out.append(Check("施工阶段索不出现受压（全过程）", not neg, detail,
+                         level="error"))
 
-        tgt = [(e, v) for e, v in rows.items() if v.get("Tdes", 0.0) > 0.0]
+        # ---- 2. 全程峰值 ≤ A·fpu / 2.0 -----------------------------------
+        # 逐根取面积：主缆与吊索的 A 差几十倍，用同一个面积会把吊索判重。
+        cap_rows: list[tuple[float, dict[str, Any], float]] = []
+        no_area: list[int] = []
+        if model is not None:
+            for r in rows:
+                area = _elem_area_m2(model, r["elem"])
+                if not area:
+                    no_area.append(r["elem"])
+                    continue
+                cap = area * CABLE_FPU_DEFAULT / CABLE_SAFETY_MIN_STAGE
+                if r["Tmax"] > 0.0:
+                    cap_rows.append((r["Tmax"] / cap, r, cap))
+        if not cap_rows:
+            out.append(Check(
+                "施工期索力上限（A·fpu / "
+                f"{CABLE_SAFETY_MIN_STAGE:.1f}）", True,
+                "模型没有给出索的实常数截面积，施工期索力上限无法判定"
+                "——这不是「通过」，是「没做」", level="info"))
+        else:
+            ratio, r, cap = max(cap_rows, key=lambda t: t[0])
+            msg = (f"峰值索力 {r['Tmax']/1e3:.0f} kN（单元 {r['elem']}，阶段 "
+                   f"{r['TmaxStage']}）对上限 {cap/1e3:.0f} kN = {ratio*100:.1f}%；"
+                   f"上限取 A·fpu/{CABLE_SAFETY_MIN_STAGE:.1f}"
+                   "（施工期临时安全系数，低于运营期 "
+                   f"{CABLE_SAFETY_MIN:.1f}），是本程序自定的判定线")
+            if no_area:
+                msg += f"；{len(no_area)} 根索无截面积、未参与判定"
+            out.append(Check(
+                "施工期索力不超过上限", ratio <= 1.0, msg,
+                value=ratio, limit=1.0,
+                level="warn" if ratio <= 1.0 else "error"))
+
+        # ---- 3. 末阶段 vs 设计目标 ---------------------------------------
+        tgt = [r for r in rows if r["Tdes"] > 0.0]
         if tgt:
-            e_worst, v_worst = max(tgt, key=lambda kv: abs(kv[1].get("devDes", 0.0)))
-            dev = abs(v_worst.get("devDes", 0.0))
+            r = max(tgt, key=lambda x: x["devLast"])
+            dev = r["devLast"]
             out.append(Check(
                 f"末阶段索力 vs 设计目标（{len(tgt)} 根）",
                 dev <= 0.02,
-                f"最大偏差 {dev*100:.2f}%（单元 {e_worst}："
-                f"{v_worst['T']/1e3:.0f} / {v_worst['Tdes']/1e3:.0f} kN）。"
+                f"最大偏差 {dev*100:.2f}%（单元 {r['elem']}："
+                f"{r['Tlast']/1e3:.0f} / {r['Tdes']/1e3:.0f} kN）。"
                 + ("" if dev <= 0.02 else
                    "分批张拉时先张的索会被后张的带跑，属正常现象——"
                    "按目标再补调一轮（加一个只给 TENSION= 的阶段）即可拉回。"),
                 value=dev, limit=0.02,
                 level="warn" if dev <= 0.02 else "error"))
+
+        # ---- 4. 全过程峰值 vs 设计目标 ------------------------------------
+        peak = [r for r in tgt if r["ratio"] is not None]
+        if peak:
+            r = max(peak, key=lambda x: abs(x["ratio"] - 1.0))
+            dev = abs(r["ratio"] - 1.0)
+            out.append(Check(
+                f"施工期索力峰值 vs 设计目标（{len(peak)} 根）",
+                dev <= 0.10,
+                f"最大偏离 {dev*100:.2f}%（单元 {r['elem']}：峰值 "
+                f"{r['Tmax']/1e3:.0f} kN 出现在阶段 {r['TmaxStage']}，"
+                f"目标 {r['Tdes']/1e3:.0f} kN）。超 10% 有两种常见原因："
+                "该阶段张拉量给大了，或者它被后来张拉的索带跑（先张的被顶起来）。"
+                "前者要改张拉量，后者要改顺序或补一轮调索——两者都不能靠"
+                "「最后一轮调平」掩盖过程中的超张",
+                value=dev, limit=0.10,
+                level="warn"))
+
+        # ---- 5. 记录连续性（只在真出现时提）-------------------------------
+        # 「还没张拉」不算：那根索本来就不存在。首记录之后又消失的才算，
+        # 它多半是被 DEACTIVE 拆掉了——这本身可能是设计意图，但必须让人看到，
+        # 因为过程表里那一格显示为「—」，与「索力为 0」是两件事。
+        gone = [r for r in rows if r["dropped"]]
+        if gone:
+            eg = gone[0]
+            out.append(Check(
+                f"施工阶段索记录连续（{len(gone)} 根中断）", False,
+                f"单元 {eg['elem']} 在阶段 "
+                f"{'、'.join(map(str, eg['dropped']))} 没有记录；"
+                "若是 DEACTIVE 拆索属正常，但过程表里那几格是空值而不是 0，"
+                "不能当索力归零参与比较",
+                level="warn"))
         return out
 
     def _checks_strength(self, model: Any) -> list[Check]:
@@ -1138,6 +1332,39 @@ class SolveResult:
                                 "τ (MPa)", "折算应力 (MPa)", "利用率", "控制项"],
                     "rows": rows,
                 }
+
+        # ---- 施工阶段：索力全过程 ----------------------------------------
+        # 行 = 索，列 = 各阶段末索力。这个形状是刻意的：施工控制问的是
+        # "这根索从张拉到现在怎么变的"，行是索才读得出来；反过来按阶段排，
+        # 得在几十行里横着找同一根索。
+        if self.stage_cables:
+            summ = self.stage_cable_summary(model)
+            stages = sorted({s for s, _ in self.stage_cables})
+            rows = []
+            for r in summ:
+                series = {s: float(v.get("T", 0.0))
+                          for (s, e), v in self.stage_cables.items()
+                          if e == r["elem"]}
+                rows.append([
+                    r["elem"],
+                    _r(r["Tdes"] / 1e3, 1) if r["Tdes"] > 0 else "—",
+                    *[(_r(series[s] / 1e3, 1) if s in series else "—")
+                      for s in stages],
+                    f"{_r(r['Tmax'] / 1e3, 1)}（{r['TmaxStage']}）",
+                    f"{_r(r['Tmin'] / 1e3, 1)}（{r['TminStage']}）",
+                ])
+            out["stage_cable_table"] = {
+                "title": "施工阶段索力全过程",
+                "note": "各阶段末的索力（kN），不是增量：索力是状态量，不能逐阶段"
+                        "累加（累加出来是「张拉动作的总和」，没有物理意义）。"
+                        "「—」表示该阶段这根索未激活。峰值/谷值取全过程，"
+                        "括号内为出现阶段；它才是施工期验算要看的两列——"
+                        "只盯最后一阶段，会漏掉中途被压成负值和一时超张的情况。",
+                "headers": (["索单元", "设计目标 (kN)"]
+                            + [f"阶段 {s} (kN)" for s in stages]
+                            + ["峰值 (阶段)", "谷值 (阶段)"]),
+                "rows": rows,
+            }
 
         if self.live:
             out["live_envelope"] = {

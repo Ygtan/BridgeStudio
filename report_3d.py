@@ -49,7 +49,8 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 import view_3d
-from result_3d import (CABLE_FPU_DEFAULT, CABLE_SAFETY_MIN, Check, Metric,
+from result_3d import (CABLE_FPU_DEFAULT, CABLE_SAFETY_MIN,
+                       CABLE_SAFETY_MIN_STAGE, Check, Metric,
                        SolveResult, _cable_area_m2, support_x)
 
 # ---------------------------------------------------------------- 配色
@@ -448,6 +449,76 @@ def figure_tension(res: SolveResult, model: Any, path: Path) -> Path:
     return _save(fig, path)
 
 
+def figure_stage_tension(res: SolveResult, model: Any, path: Path) -> Path:
+    """索力-施工阶段曲线。
+
+    为什么用「索力 vs 阶段」而不是「索力 vs 桥纵向位置」：成桥索力分布
+    （figure_tension）回答"设计是否合理"，这条回答"施工是否可控"——同一根索
+    在不同阶段的力，是张拉顺序的直接证据。
+
+    线的**左端点就是该索被张拉（或被激活）的阶段**：只有 4 根索在阶段 1 出现，
+    其余从阶段 2 起画，这个错开的起点本身就是分批张拉的形状。不补零、不延长到
+    阶段 1——补零等于说"这根索在阶段 1 的力是 0"，而它那时还不存在。
+    """
+    plt = _plt()
+    ser = res.stage_cable_series(model)
+    summ = {r["elem"]: r for r in res.stage_cable_summary(model)}
+    stages = sorted({s for s, _ in res.stage_cables})
+    fig, ax = plt.subplots(figsize=(7.2, 3.1))
+
+    # 高亮"全过程偏离设计目标最多"的 3 根：图上十几条细线看不过来，
+    # 但施工控制真正要盯的就是这几根（超张的、被带跑的）。偏离用 devRange
+    # 而不是峰值比 —— 被后来的索带成负值的那类，峰值恰好等于目标，
+    # 按峰值比排会得到 1.00 而不被高亮，可它才是真正出问题的那根。
+    rank = sorted(ser, key=lambda e: (summ[e]["devRange"] or 0.0), reverse=True)
+    hot = set(rank[:3]) if any(summ[e]["devRange"] for e in ser) else set(rank[:2])
+    palette = (C_RED, C_BLUE, C_GREEN)
+
+    for e in sorted(ser):
+        pts = ser[e]["pts"]
+        if not pts:
+            continue
+        x = [p[0] for p in pts]
+        y = [p[1] for p in pts]
+        if e in hot:
+            c = palette[sorted(hot).index(e) % len(palette)]
+            ax.plot(x, y, "-o", ms=3.4, lw=1.3, color=c, label=ser[e]["label"])
+        elif len(pts) == 1:
+            # 单点系列没有"线"可画：只在末阶段张拉的索属于这种。不画点就等于
+            # 从图上消失，而它恰恰是"最后一批才张拉"的证据。
+            ax.plot(x, y, "o", ms=2.6, color=C_LIGHT, alpha=0.9)
+        else:
+            ax.plot(x, y, "-o", ms=2.0, lw=0.8, color=C_LIGHT, alpha=0.85)
+
+    # 设计目标画成同色水平虚线：目标值每根索不同，画不成一根公共横线；
+    # 水平虚线与曲线的竖向间距就是偏差，比在末点打个方点更直观。
+    for e in sorted(hot):
+        r = summ[e]
+        if r["Tdes"] > 0:
+            ax.plot([stages[0], stages[-1]], [r["Tdes"] / 1e3] * 2,
+                    ls=":", lw=1.0, alpha=0.85,
+                    color=palette[sorted(hot).index(e) % len(palette)])
+
+    # 受压界限：有索跌到 0 以下时画出来，让"负索力"是一眼看得到的事，
+    # 而不是靠读表。没有负值时画它反而占地方。
+    if any(p[1] <= 0 for e in ser for p in ser[e]["pts"]):
+        ax.axhline(0.0, color=C_RED, lw=0.8, ls="--", alpha=0.6)
+        ax.text(stages[0], 0.0, " 索力为 0（以下即受压退出工作）",
+                color=C_RED, fontsize=7.5, va="bottom")
+    ax.set_xticks(stages)
+    ax.set_xlabel("施工阶段（末）")
+    ax.set_ylabel("索力 (kN)")
+    ax.grid(alpha=0.25, lw=0.5)
+    if hot:
+        handles, labels = ax.get_legend_handles_labels()
+        if handles:
+            ax.legend(frameon=False, fontsize=8, loc="best")
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
 def figure_camber(res: SolveResult, model: Any, path: Path) -> Path:
     """主梁预抬高（制造线形相对设计线形）。"""
     plt = _plt()
@@ -476,7 +547,13 @@ def figure_camber(res: SolveResult, model: Any, path: Path) -> Path:
 #: 报告正文里图的排列顺序。与 figures() 的生成顺序解耦：报告要有稳定的
 #: 叙事顺序（先简图、再变形、再内力、再索），而生成顺序由判据决定。
 _FIGURE_ORDER = ("layout", "axon", "deflection", "moment", "axial", "shear",
-                 "live", "tension", "safety", "camber")
+                 "live", "stage_tension", "tension", "safety", "camber")
+
+#: 进「施工阶段索力」章的明细表键。与荷载组合同理：过程的**结论**要一页看完，
+#: 逐阶段原始数据才翻明细表——但这里反过来，过程表本身就是结论（每根索
+#: 一条线），所以整张表跟着章节走，不在文末重复。
+STAGE_TABLE_KEY = "stage_cable_table"
+STAGE_FIGURE_KEY = "stage_tension"
 
 #: 进「荷载组合」章的明细表键。其余（含 combo_ultimate 这种几百行的
 #: 逐截面表）仍归「明细表」——组合的**结论**要一页看得完，**依据**才翻表。
@@ -569,6 +646,16 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
         out["live"] = Figure(
             "live", "活载包络（JTG D60 车道荷载，影响点 = 中跨跨中）",
             figure_live(res, model, d / "live.png"), note=lnote)
+    if res.stage_cables and len({s for s, _ in res.stage_cables}) > 1:
+        # 只有一个阶段时画不出"过程"：一张单点折线图会让人以为中间阶段算丢了。
+        out[STAGE_FIGURE_KEY] = Figure(
+            STAGE_FIGURE_KEY, "施工阶段索力过程",
+            figure_stage_tension(res, model, d / "stage_tension.png"),
+            note="横轴为各阶段末；每条线的**起点就是该索被张拉的阶段**，"
+                 "不补零——它在更早阶段还不存在，补零等于报一个假的 0。"
+                 "灰点是只在末阶段才有记录的索（最后一批张拉），单点画不成线。"
+                 "高亮的是全过程偏离设计目标最多的 3 根，同色点线为各自的设计目标，"
+                 "曲线与点线的竖向间距就是偏差。")
     if res.cables:
         out["tension"] = Figure("tension", "成桥索力分布",
                                 figure_tension(res, model, d / "tension.png"))
@@ -667,6 +754,40 @@ def _combo_paragraph(res: SolveResult) -> str:
     return txt
 
 
+def _stage_paragraph(res: SolveResult) -> str:
+    """施工阶段章节的引言：说清"这是什么量"，再给三处必须注意的地方。"""
+    rows = res.stage_cable_summary()
+    stages = sorted({s for s, _ in res.stage_cables})
+    first = sum(1 for r in rows if r["stages"] and r["stages"][0] == stages[0])
+    txt = (f"全过程 {len(stages)} 个阶段、{len(rows)} 根索；其中 {first} 根在"
+           f"阶段 {stages[0]} 张拉，其余随后续阶段陆续参与。"
+           "**索力是状态量**：表中每一格是「该阶段末的力」，不是「本阶段又增加"
+           "了多少」。把它当增量读，会得出「索力随施工单调增长」的结论，而实际"
+           "曲线经常是先高后被后来的索带下来。")
+
+    peak = [r for r in rows if r["ratio"] is not None]
+    if peak:
+        r = max(peak, key=lambda x: abs(x["ratio"] - 1.0))
+        txt += (f" 全过程偏离设计目标最多的是单元 {r['elem']}：峰值 "
+                f"{r['Tmax']/1e3:.0f} kN（阶段 {r['TmaxStage']}），"
+                f"目标 {r['Tdes']/1e3:.0f} kN，偏离 {abs(r['ratio']-1)*100:.1f}%。")
+    low = min(rows, key=lambda x: x["Tmin"])
+    txt += (f" 全过程最小索力 {low['Tmin']/1e3:.0f} kN（单元 {low['elem']}，"
+            f"阶段 {low['TminStage']}）——"
+            + ("已不大于 0，该索在此阶段退出工作，该顺序不成立。" if low["Tmin"] <= 0
+               else "仍在受拉范围内。"))
+
+    # 中途消失的索：包络会把「没有记录」读成「力不变」，这里必须点名。
+    # 「还没张拉」不在此列——那根索本来就不存在，不是数据缺失。
+    gone = [r for r in rows if r["dropped"]]
+    if gone:
+        eg = gone[0]
+        txt += (f" 另有 {len(gone)} 根索的记录中途消失（如单元 {eg['elem']} 缺阶段 "
+                f"{'、'.join(map(str, eg['dropped']))}），这些阶段的索力没有记录，"
+                "不是 0；被 DEACTIVE 拆掉的索不该继续参与后续各阶段的比较。")
+    return txt
+
+
 def _conclusion_bullets(res: SolveResult, model: Any,
                         checks: Sequence[Check]) -> list[str]:
     """结论从校核结果**生成**，不手写——手写的结论会与数据脱节。"""
@@ -707,7 +828,27 @@ def _conclusion_bullets(res: SolveResult, model: Any,
                    f"位于单元 {w[0][0]} 的 {w[0][1]} 端{tail}；"
                    "该项为配筋设计用的**设计内力包络**，"
                    "本程序不建钢筋，未做正截面/斜截面承载力验算。")
-    out.append("本报告为设计阶段计算复核，不含施工阶段验算、疲劳验算与"
+    if res.stage_cables:
+        sr = res.stage_cable_summary()
+        low = min(sr, key=lambda r: r["Tmin"])
+        nst = len({s for s, _ in res.stage_cables})
+        out.append(f"施工全过程 {nst} 个阶段、{len(sr)} 根索：最小索力 "
+                   f"{low['Tmin']/1e3:.0f} kN（单元 {low['elem']}，"
+                   f"阶段 {low['TminStage']}）；"
+                   + ("**该索已受压退出工作**，施工顺序需调整。" if low["Tmin"] <= 0
+                      else "全过程未出现索受压。"))
+        pk = [r for r in sr if r["ratio"] is not None]
+        if pk:
+            r = max(pk, key=lambda x: abs(x["ratio"] - 1.0))
+            out.append(f"施工期索力峰值偏离设计目标最大 {abs(r['ratio']-1)*100:.1f}%"
+                       f"（单元 {r['elem']}，阶段 {r['TmaxStage']}）；"
+                       "分批张拉时先张的索被后张的带跑是物理事实，"
+                       "不是程序误差——要压住它，要么改张拉顺序，要么补一轮二次调索。")
+    out.append("本报告为设计阶段计算复核，"
+               + ("施工部分只含**索力过程**（恒载 + 张拉顺序），"
+                  "不含施工临时荷载、挂篮/配重与施工阶段强度验算；"
+                  if res.stage_cables else "不含施工阶段验算；")
+               + "不含疲劳验算与"
                "抗震验算；荷载组合只计永久作用与汽车荷载两项，"
                "未计入温度、风、人群、支座沉降与预应力二次效应。")
     return out
@@ -750,15 +891,33 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     blocks.append({"type": "checks", "items": checks})
 
     blocks.append({"type": "h1", "text": "计算结果"})
+    # 施工阶段索力**单独一章**：它回答"施工过程是否可控"，与"成桥内力/线形"
+    # 不是同一类问题；混在计算结果里会被当成又一张成桥索力图，而两者的横轴
+    # 根本不是一回事（那里是桥纵向位置，这里是施工阶段）。
+    stage_chapter = bool(res.stage_cables) and STAGE_TABLE_KEY in tabs
+    skip_fig = {STAGE_FIGURE_KEY} if stage_chapter else set()
     # 按**实际生成的图**出章节，而不是写死一份清单。写死的清单在加图时
     # 会静默漏掉：图生成了、报告里没有，而"报告生成成功"看不出来
     # （这正是 verify_report_3d 的 base64 对拍断言抓到的问题）。
     for key in _FIGURE_ORDER:
-        if key in figs:
+        if key in figs and key not in skip_fig:
             blocks.append({"type": "figure", "key": key})
     for key in figs:                     # 清单外的新图兜底，排在最后
-        if key not in _FIGURE_ORDER:
+        if key not in _FIGURE_ORDER and key not in skip_fig:
             blocks.append({"type": "figure", "key": key})
+
+    if stage_chapter:
+        blocks.append({"type": "h1", "text": "施工阶段索力"})
+        blocks.append({"type": "p", "text": _stage_paragraph(res)})
+        if STAGE_FIGURE_KEY in figs:
+            blocks.append({"type": "figure", "key": STAGE_FIGURE_KEY})
+        blocks.append({"type": "table", "key": STAGE_TABLE_KEY})
+        blocks.append({"type": "note", "text": (
+            "该章的判定只看两条：全过程不出现受压、全程峰值不超过 "
+            f"A·fpu/{CABLE_SAFETY_MIN_STAGE:.1f}。"
+            "**成桥索力按设计目标验、施工过程按同一目标的过程偏差验**，"
+            "两者都不是承载力验算——本程序不建钢筋、不计施工临时荷载"
+            "（挂篮、配重、风），过程索力只反映恒载与张拉顺序的相互作用。")})
 
     # 荷载组合单列一章，**不混进明细表**：明细表是被查的原始数据，
     # 组合是经过规范加工的设计值，读者找它时不会翻到第 15 页表格后面。
@@ -782,6 +941,9 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     # 明细表放最后：它是被查的，不是被读的；夹在结果与结论之间会让结论
     # 翻过几十页表格才出现（梁格 222 个单元 = 15 页）。
     rest = {k: v for k, v in tabs.items() if k not in COMBO_SUMMARY_KEYS}
+    # 施工阶段那张表已经跟着章节走了，明细表里不再重复一遍。
+    if stage_chapter:
+        rest.pop(STAGE_TABLE_KEY, None)
     if rest:
         blocks.append({"type": "h1", "text": "明细表"})
         for key in rest:
