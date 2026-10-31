@@ -130,6 +130,35 @@ def _adapt_cable(model: Any, raw: dict, res: SolveResult) -> None:
         "本内核不输出梁内力包络（成桥态关注线形与索力）；梁内力请走 grillage3d 内核。")
 
 
+def _adapt_suspension(model: Any, raw: dict, res: SolveResult) -> None:
+    """悬索桥成桥态：复用斜拉桥的适配，再补上悬索桥专有的四组数据。
+
+    复用是有意的：`.dat` 是同一个、`cable_solver.exe` 是同一个、成桥态语义
+    也一样（下料长度 + 制造线形 + 成桥位移）。真正的差别只在**多出来什么**：
+    主缆是一条连续索，所以要分段给出索力链；吊索是恒载的直接承担者；加劲梁
+    在恒载下本该几乎不受力——这三张表就是悬索桥计算书的主干。
+    """
+    _adapt_cable(model, raw, res)
+    res.main_cable = list(raw.get("main_cable") or [])
+    res.hangers = list(raw.get("hangers") or [])
+    res.girder = list(raw.get("girder") or [])
+    res.reaction = dict(raw.get("reaction") or {})
+    res.cable_shape = {int(k): tuple(v)
+                       for k, v in (raw.get("cable_shape") or {}).items()}
+    sys_name = str(res.meta.get("susp_system") or "EARTH").upper()
+    res.diagnostics.append(
+        "体系：" + ("地锚式（主缆锚在锚碇，H 传给地基，梁端纵向固定）"
+                    if sys_name == "EARTH" else
+                    "自锚式（主缆锚在加劲梁端，H 压进梁，纵向约束放跨中）")
+        + "；主缆线形由恒载找形确定，不是人为给定。")
+    res.diagnostics.append(
+        "加劲梁走单梁线（平面模型），主缆与吊索节点的平面外自由度按平面问题"
+        "处理；双索面与横撑不在本版范围。")
+    res.diagnostics.append(
+        "塔处加劲梁竖向支座按支座反力计（不细分塔梁传力路径）：塔柱轴力若需"
+        "计入该反力，请在 [REACTION] 里取塔位梁节点的竖向反力叠加。")
+
+
 # ---------------------------------------------------------------- 注册表
 
 
@@ -162,6 +191,19 @@ def _registry() -> dict[str, SolverSpec]:
             adapt=_adapt_cable,
             build_hint="cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver",
         ),
+        # 悬索桥与斜拉桥共用同一个 exe：成桥态的力学内核完全一样（共转列式
+        # 非线性 + 索垂度 + 索长反算），差别在**前面多一步找形**。分成两个内核
+        # 键不是为了分程序，而是因为后处理、指标、校核、计算书章节结构全不同，
+        # 用 kind 分流比在消费方写 if 干净。
+        "suspension": SolverSpec(
+            key="suspension",
+            exe_name="cable_solver.exe",
+            available=cable_solver_available,
+            find=find_cable_solver,
+            run=lambda m, d, n: solve_cable_bridge(m, out_dir=d, dat_name=n),
+            adapt=_adapt_suspension,
+            build_hint="cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver",
+        ),
     }
 
 
@@ -177,8 +219,17 @@ def solver_keys() -> list[str]:
 
 
 def detect_kind(model: Any) -> str:
-    """模型 → 内核键。判据与 `ModelSpec3D.to_dat()` 的 CABLE 分叉完全一致。"""
-    return "cable_stayed" if getattr(model, "cable_bridge", None) is not None else "grillage3d"
+    """模型 → 内核键。判据与 `ModelSpec3D.to_dat()` 的 CABLE 分叉完全一致。
+
+    悬索桥与斜拉桥都有 `cable_bridge`，唯一的结构性区别是悬索桥声明了体系
+    （`system` 非空 = 主缆是一条连续索、线形由找形定）。用体系字段而不是
+    "有没有 main_cable"来判，是因为 main_cable 为空时 also 说明不了问题——
+    那是一个**该报错**的模型，不该被默默当成斜拉桥去算。
+    """
+    cb = getattr(model, "cable_bridge", None)
+    if cb is None:
+        return "grillage3d"
+    return "suspension" if str(getattr(cb, "system", "") or "") else "cable_stayed"
 
 
 def capabilities() -> dict[str, bool]:

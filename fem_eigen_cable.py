@@ -17,8 +17,18 @@
                       converged, iterations, elapsed_ms, closure_err,
                       tension_err, tension_min, tension_max, tension_sum,
                       vertical_sum, total_load, deck_load, deck_share_pct,
-                      support_share}
+                      support_share, support_v_sum_kN, support_v_max_kN,
+                      applied_v_kN,
+                      # 仅悬索桥：
+                      susp_system, H_kN, sag_m, sag_target_m, span_m, sag_ratio,
+                      main_cable_segments, hanger_count, hanger_T_min_kN,
+                      hanger_T_max_kN, hanger_V_sum_kN, hanger_T_sum_kN,
+                      girder_N_max_kN, girder_M_max_kNm}
     res["cables"]  = [{elem, anchor, T, L0, chord, Ltarget, dL}, …]
+    res["main_cable"] = [{elem, T, L0, z, chord}, …]    仅悬索桥：主缆分段
+    res["hangers"] = [{elem, deck_node, T, L0, chord}, …] 仅悬索桥：吊索
+    res["girder"]  = [{elem, N, My, Vz}, …]              仅悬索桥：加劲梁内力
+    res["reaction"] = {(node, dof): R}                    支座反力（向上为正）
     res["camber"]  = {node: (dx, dy, dz)}     制造线形相对设计线形的偏移 m
     res["erected"] = {node: (x, y, z)}        制造线形绝对坐标
     res["u"]       = {(node, dof): 值}        成桥位移（dof 1..6）
@@ -80,6 +90,11 @@ def parse_cable_result(path: str | Path) -> dict:
     camber: dict[int, tuple[float, float, float]] = {}
     erected: dict[int, tuple[float, float, float]] = {}
     u: dict[tuple[int, int], float] = {}
+    main_cable: list[dict] = []
+    hangers: list[dict] = []
+    girder: list[dict] = []
+    reaction: dict[tuple[int, int], float] = {}
+    shape: dict[int, tuple[float, float]] = {}
     sec = ""
     for raw in txt:
         line = raw.strip()
@@ -113,6 +128,30 @@ def parse_cable_result(path: str | Path) -> dict:
                 "chord": float(parts[4]), "Ltarget": float(parts[5]),
                 "dL": float(parts[6]),
             })
+        elif sec == "MAINCABLE" and len(parts) >= 4:
+            main_cable.append({
+                "elem": int(parts[0]), "T": float(parts[1]),
+                "L0": float(parts[2]), "z": float(parts[3]),
+                # 平衡态弦长（第 5 列）。旧内核只有 4 列，缺失时记 0，由
+                # 调用方决定是"退回设计弦长"还是"跳过该判据"。
+                "chord": float(parts[4]) if len(parts) >= 5 else 0.0,
+            })
+        elif sec == "HANGER" and len(parts) >= 5:
+            hangers.append({
+                "elem": int(parts[0]), "deck_node": int(parts[1]),
+                "T": float(parts[2]), "L0": float(parts[3]), "chord": float(parts[4]),
+            })
+        elif sec == "GIRDER" and len(parts) >= 4:
+            girder.append({
+                "elem": int(parts[0]), "N": float(parts[1]),
+                "My": float(parts[2]), "Vz": float(parts[3]),
+            })
+        elif sec == "REACTION" and len(parts) >= 3:
+            reaction[(int(parts[0]), int(parts[1]))] = float(parts[2])
+        elif sec == "CABLESHAPE" and len(parts) >= 3:
+            # 找形后的主缆节点 (x, z)。绘图只能用这一份：.dat 里的坐标是
+            # 建造器给的初始抛物线（边跨还是按直线插的），不是设计线形。
+            shape[int(parts[0])] = (float(parts[1]), float(parts[2]))
         elif sec == "CAMBER" and len(parts) >= 4:
             camber[int(parts[0])] = (float(parts[1]), float(parts[2]), float(parts[3]))
         elif sec == "ERECTED" and len(parts) >= 4:
@@ -120,7 +159,9 @@ def parse_cable_result(path: str | Path) -> dict:
         elif sec == "U" and len(parts) >= 3:
             u[(int(parts[0]), int(parts[1]))] = float(parts[2])
     return {"meta": meta, "cables": cables, "camber": camber,
-            "erected": erected, "u": u}
+            "erected": erected, "u": u, "main_cable": main_cable,
+            "hangers": hangers, "girder": girder, "reaction": reaction,
+            "cable_shape": shape}
 
 
 def solve_cable_bridge(model, out_dir: str | Path,

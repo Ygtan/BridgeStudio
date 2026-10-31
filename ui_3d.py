@@ -433,6 +433,44 @@ def _cable_extras(doc: ModelDoc, res: SolveResult) -> None:
     else:
         c2.caption("计算书内的表格与界面显示逐项一致：同一个 SolveResult。")
 
+
+def _susp_extras(doc: ModelDoc, res: SolveResult) -> None:
+    """悬索桥计算书出口。
+
+    与斜拉桥分开，不是因为排版不同，而是因为**内容不同**：悬索桥要讲的是
+    主缆找形（H 由矢高反求，不是人为给定）、两种体系只差边界条件、以及
+    平衡边跨这个自锚式独有的几何约束。这些东西塞进斜拉桥那 7 章里会互相
+    打架，所以 report_docx 里本来就是两套 `_sec_*`。
+    """
+    st.markdown("**详细计算书（7 章，含找形推导与体系校核）**")
+    c1, c2 = st.columns([1.2, 2.0])
+    if c1.button("生成详细计算书 (.docx)", key="susp_report_btn"):
+        with st.spinner("排版计算书（表格、插图、目录）…"):
+            try:
+                from report_docx import build_suspension_report
+
+                out = build_suspension_report(
+                    model=doc.model, info=doc.info, res=res,
+                    params=dict(doc.params),
+                    out_path=f"out/susp/report_{res.fingerprint}.docx",
+                    project=res.title or res.kind_label,
+                    fig_dir=f"out/susp/figs_{res.fingerprint}")
+                st.session_state["susp_report_path"] = str(out)
+            except Exception as e:                  # noqa: BLE001
+                st.session_state.pop("susp_report_path", None)
+                st.error(f"计算书生成失败：{e}")
+    _rp = st.session_state.get("susp_report_path")
+    if _rp and Path(_rp).exists():
+        c2.download_button(
+            "下载计算书 (.docx)", data=Path(_rp).read_bytes(),
+            file_name="悬索桥成桥态计算书.docx",
+            mime=("application/vnd.openxmlformats-officedocument"
+                  ".wordprocessingml.document"), key="susp_dl_docx")
+        c2.caption(f"已生成 {Path(_rp).stat().st_size / 1024:.0f} KB。")
+    else:
+        c2.caption("计算书与界面显示同源：主缆/吊索/加劲梁三张表直接取 "
+                   "SolveResult，不做二次力学计算。")
+
     c3, c4 = st.columns([1.2, 2.0])
     if c3.button("导出 ANSYS / Abaqus / MIDAS", key="cb_export_btn"):
         try:
@@ -565,9 +603,11 @@ def render(doc: ModelDoc) -> None:
     # ---- 报告导出 ----
     _report_block(doc, res)
 
-    # ---- 斜拉桥专属出口 ----
+    # ---- 索承体系专属出口 ----
     if res.kind == "cable_stayed":
         _cable_extras(doc, res)
+    elif res.kind == "suspension":
+        _susp_extras(doc, res)
 
     with st.expander(f"内核原始输出（{res.solver}）"):
         for d in res.diagnostics:

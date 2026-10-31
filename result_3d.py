@@ -45,12 +45,18 @@ import combination
 KIND_LABELS: dict[str, str] = {
     "grillage3d": "三维梁格",
     "cable_stayed": "斜拉桥成桥态",
+    "suspension": "悬索桥成桥态",
 }
 
 #: 索的最小安全系数下限（JTG/T 3365-01-2020 拉索安全系数 ≥ 2.5）
 CABLE_SAFETY_MIN = 2.5
+#: 悬索桥主缆安全系数下限（JTG/T D65-05-2015：主缆 ≥ 2.0、吊索 ≥ 2.5）。
+#: 主缆不可更换，限值反而比可换的吊索低——这是规范里的既有取舍，不是笔误。
+MAIN_CABLE_SAFETY_MIN = 2.0
 #: 索破断强度默认值（1860 级钢绞线，GB/T 5224）
 CABLE_FPU_DEFAULT = 1860e6
+#: 主缆破断强度（1770 级镀锌高强钢丝，GB/T 17101）
+MAIN_CABLE_FPU = 1770e6
 
 
 # ---------------------------------------------------------------- 校核
@@ -150,6 +156,21 @@ class SolveResult:
     cables: list[dict[str, Any]] = field(default_factory=list)
     camber: dict[int, tuple[float, float, float]] = field(default_factory=dict)
     erected: dict[int, tuple[float, float, float]] = field(default_factory=dict)
+
+    # ---- 悬索桥专用（其他内核留空，不填假数据）--------------------------
+    # 主缆分段 / 吊索 / 加劲梁内力 / 支座反力。
+    # 悬索桥和斜拉桥的差别不只是"多了个 H"：主缆是一条连续索，它的分段
+    # 索力由找形而非优化给出；加劲梁在恒载下本该几乎不受力（地锚式），
+    # 或只受 H 的轴压（自锚式）。这四张表就是把这两条讲清楚的地方。
+    main_cable: list[dict[str, Any]] = field(default_factory=list)
+    hangers: list[dict[str, Any]] = field(default_factory=list)
+    girder: list[dict[str, Any]] = field(default_factory=list)
+    reaction: dict[tuple[int, int], float] = field(default_factory=dict)
+    # 找形后的主缆节点坐标 {node: (x, z)}。**这张图不能拿模型坐标画**：
+    # .dat 里的主缆坐标只是建造器给的初始抛物线，边跨那一段甚至是按
+    # "锚点到塔顶的直线"插的，与找形结果能差几米（锚点处主缆必须水平，
+    # V=0，线形是顶点在锚点的抛物线）。画错不报错，但设计线形全错。
+    cable_shape: dict[int, tuple[float, float]] = field(default_factory=dict)
 
     diagnostics: list[str] = field(default_factory=list)
 
@@ -282,6 +303,31 @@ class SolveResult:
                 out.append(Metric(
                     "索最小安全系数", f"{sf[1]:.2f}",
                     hint=f"索 {sf[0]}，限值 ≥ {CABLE_SAFETY_MIN:.1f}"))
+        elif self.kind == "suspension":
+            m = self.meta
+            sys_name = str(m.get("susp_system") or "EARTH").upper()
+            out += [
+                Metric("体系", "地锚式" if sys_name == "EARTH" else "自锚式",
+                       hint="主缆锚在锚碇" if sys_name == "EARTH"
+                            else "主缆锚在加劲梁端，H 压进梁"),
+                Metric("收敛", "是" if self.converged else "否",
+                       hint=f"{self.iterations or 0} 轮 / {(self.elapsed_ms or 0):.0f} ms"),
+                Metric("主缆水平力 H", f"{(m.get('H_kN') or 0):,.0f}", "kN",
+                       hint="找形结果，非人为给定"),
+                Metric("成桥矢高", f"{(m.get('sag_m') or 0):.2f}", "m",
+                       hint=f"目标 {(m.get('sag_target_m') or 0):.2f} m，"
+                            f"矢跨比 1/{(m.get('sag_ratio') or 0):.1f}"),
+                Metric("主缆索力",
+                       f"{(m.get('tension_max_kN') or 0):,.0f}", "kN",
+                       hint=f"全长分段最大；吊索 "
+                            f"{(m.get('hanger_T_min_kN') or 0):.0f}~"
+                            f"{(m.get('hanger_T_max_kN') or 0):.0f} kN"),
+                Metric("加劲梁轴力 N", f"{(m.get('girder_N_max_kN') or 0):,.0f}", "kN",
+                       hint=f"弯矩 My {(m.get('girder_M_max_kNm') or 0):,.0f} kN·m"),
+                Metric("竖向平衡偏差", f"{(m.get('balance_pct') or 0):+.3f}", "%",
+                       hint=f"支座 ΣV {(m.get('support_v_sum_kN') or 0):,.0f} kN / "
+                            f"荷载 {(m.get('applied_v_kN') or m.get('total_load_kN') or 0):,.0f} kN"),
+            ]
         else:
             mvd = self.max_vertical_deflection()
             out.append(Metric(
@@ -345,6 +391,14 @@ class SolveResult:
     def combination_checks(self, model: Any = None) -> list[Check]:
         """组合是否可用、量级是否合理。不做承载力判定——那要配筋。"""
         if self.kind != "grillage3d":
+            if self.kind == "suspension":
+                g = max((abs(float(x.get("My") or 0.0)) for x in self.girder),
+                        default=0.0)
+                return [Check(
+                    "运营期荷载组合", True,
+                    f"悬索桥成桥态内核给恒载内力（加劲梁 My 最大 {g / 1e3:,.0f} kN·m）"
+                    "与索力，但不含活载效应，故只做标准值验算：索按安全系数、"
+                    "加劲梁按恒载内力。运营期组合需另接活载模块。", level="info")]
             return [Check(
                 "运营期荷载组合", True,
                 f"{self.kind_label}内核不输出梁内力与活载效应，不做运营期组合；"
@@ -392,6 +446,8 @@ class SolveResult:
                              level="error"))
         if self.kind == "cable_stayed":
             out += self._checks_cable(model)
+        elif self.kind == "suspension":
+            out += self._checks_suspension(model)
         else:
             out += self._checks_grillage(model)
         out += self.combination_checks(model)
@@ -451,6 +507,173 @@ class SolveResult:
                 value=sf[1], limit=CABLE_SAFETY_MIN))
 
         out += _same_span_smoothness(self.cables, model)
+        out.append(self._camber_check(model))
+        return out
+
+    def _checks_suspension(self, model: Any) -> list[Check]:
+        """悬索桥校核。
+
+        与斜拉桥的校核**不能共用**，因为要判的东西不同：
+
+        - 斜拉桥校核"索力有没有达到人为给定的目标"；悬索桥的索力是找形的
+          结果，该判的是"找形出来的线形对不对"（矢高命中）和"由它反算的
+          下料长度能不能把设计线形做成"（索力达到目标）。
+        - 斜拉桥没有"体系自洽"这一项；悬索桥有，而且它是最能拦住错的一项：
+          自锚式的梁轴力**必须**≈ −H，地锚式的**必须**≈ 0。若纵向约束放错
+          位置，H 会被支座吃掉，两条判据同时不过，而位移、索力全都正常。
+        """
+        m = self.meta
+        out: list[Check] = []
+        sys_name = str(m.get("susp_system") or "EARTH").upper()
+        is_self = sys_name == "SELF"
+
+        # ---- 找形：矢高是否命中目标 ----
+        sag = float(m.get("sag_m") or 0.0)
+        sag_t = float(m.get("sag_target_m") or 0.0)
+        if sag_t > 0:
+            err = abs(sag - sag_t) / sag_t
+            out.append(Check(
+                "找形矢高命中", err < 1e-3,
+                f"成桥矢高 {sag:.4f} m / 目标 {sag_t:.4f} m（偏差 {err:.1e}）",
+                value=err, limit=1e-3, unit="1"))
+
+        ratio = float(m.get("sag_ratio") or 0.0)
+        if ratio > 0:
+            out.append(Check(
+                "矢跨比", 1 / 14.0 <= 1 / ratio <= 1 / 7.0,
+                f"1/{ratio:.1f}（公路悬索桥常在 1/12 ~ 1/8；过小则 H 与塔顶"
+                f"竖向反力畸高，过大则吊索过长、梁的刚度靠不上主缆）",
+                value=ratio, limit=1.0, unit="1", level="warn"))
+
+        # ---- 竖向平衡：Σ 支座反力 = Σ 竖向荷载 ----
+        sup = float(m.get("support_v_sum_kN") or 0.0)
+        app = float(m.get("applied_v_kN") or 0.0)
+        if app > 0:
+            resid = abs(sup - app) / app
+            out.append(Check(
+                "竖向平衡（Σ支座反力 = Σ竖向荷载）", resid < 1e-4,
+                f"{sup:,.0f} kN / {app:,.0f} kN（残差 {resid:.1e}）",
+                value=resid, limit=1e-4, unit="1"))
+
+        # ---- 达成索力 vs 目标索力 ----
+        terr = m.get("tension_err")
+        if terr is not None:
+            out.append(Check(
+                "索力达到找形目标（偏差 ≤ 10%）", float(terr) < 0.10,
+                f"最大相对偏差 {float(terr) * 100:.2f}%（含主缆与吊索；"
+                f"偏差来自加劲梁的弹性压缩改变了索的弦长）",
+                value=float(terr), limit=0.10, unit="1", level="warn"))
+
+        # ---- 无受压 ----
+        tmin = m.get("tension_min_kN")
+        if tmin is not None:
+            out.append(Check(
+                "主缆与吊索无受压", float(tmin) > 0.0,
+                f"最小索力 {float(tmin):.1f} kN", value=float(tmin),
+                limit=0.0, unit="kN"))
+
+        # ---- 安全系数：主缆与吊索的截面积差几十倍，必须逐根取实常数 ----
+        for tag, rows, lim, fpu in (
+            ("主缆", self.main_cable, MAIN_CABLE_SAFETY_MIN, MAIN_CABLE_FPU),
+            ("吊索", self.hangers, CABLE_SAFETY_MIN, CABLE_FPU_DEFAULT),
+        ):
+            worst: tuple[int, float] | None = None
+            for r in rows:
+                a = _elem_area_m2(model, r["elem"])
+                t = float(r.get("T") or 0.0)
+                if not a or t <= 0:
+                    continue
+                k = a * fpu / t
+                if worst is None or k < worst[1]:
+                    worst = (r["elem"], k)
+            if worst is not None:
+                out.append(Check(
+                    f"{tag}最小安全系数（≥ {lim:.1f}）", worst[1] >= lim,
+                    f"单元 {worst[0]}：{worst[1]:.2f}"
+                    f"（A·fpu/T，fpu={fpu / 1e6:.0f} MPa）",
+                    value=worst[1], limit=lim))
+
+        # ---- 体系自洽：加劲梁轴力 ----
+        #
+        # 这一条是自锚式悬索桥唯一"能一把抓住模型错"的判据。自锚式的定义就是
+        # 主缆水平力 H 压进加劲梁，所以恒载下梁内轴力必然 ≈ −H。若把纵向约束
+        # 放在梁端，H 直接进支座，梁轴力算成 0，而位移、索力、平衡全都正常。
+        H = float(m.get("H_kN") or 0.0)
+        Nmax = float(m.get("girder_N_max_kN") or 0.0)
+        if H > 0 and abs(Nmax) > 0:
+            if is_self:
+                rel = abs(abs(Nmax) - H) / H
+                out.append(Check(
+                    "自锚体系自洽（梁轴力 ≈ −H）", rel < 0.10,
+                    f"梁轴力 {Nmax:,.0f} kN / H {H:,.0f} kN（偏差 {rel * 100:.1f}%）"
+                    f"；梁端纵向必须自由，纵向约束应放跨中",
+                    value=rel, limit=0.10, unit="1"))
+            else:
+                rel = abs(Nmax) / H
+                out.append(Check(
+                    "地锚体系自洽（梁轴力 ≈ 0）", rel < 0.05,
+                    f"梁轴力 {Nmax:,.0f} kN，H {H:,.0f} kN 由锚碇直接承受"
+                    f"（{rel * 100:.1f}% H）",
+                    value=rel, limit=0.05, unit="1"))
+
+        # ---- 吊索力均匀性 ----
+        ht = [float(h.get("T") or 0.0) for h in self.hangers if (h.get("T") or 0) > 0]
+        if len(ht) >= 2:
+            spread = max(ht) / min(ht)
+            out.append(Check(
+                "吊索力均匀（最大/最小 ≤ 1.30）", spread <= 1.30,
+                f"{max(ht) / 1e3:.1f} / {min(ht) / 1e3:.1f} kN = {spread:.2f}",
+                value=spread, limit=1.30, level="warn"))
+
+        # ---- 锚点竖向分力：地锚式靠抗拔，自锚式靠梁端支座 ----
+        #
+        # 这条是本工具最能给出"设计结论"的地方，而不只是校核算术：
+        # 主缆水平力 H 由主跨矢高定，边跨必须共用同一个 H。于是主缆在锚点的
+        # 竖向分力 V = H·(Δz/L) − qL/2 是几何决定量，不是可调参数。
+        #   · 地锚式：锚碇靠自重 + 摩阻抗拔，V 为负（向上拔）是常态；
+        #   · 自锚式：锚点就在加劲梁端，竖向支座不能承拉，|V|/H 必须很小，
+        #     否则梁端要被拔起来。满足 V≈0 的边跨长度 L=√(2HΔz/q)，明显长于
+        #     地锚式惯用的 1/3 主跨——这是几何要求，不是偏好。
+        if self.reaction and H > 0:
+            neg = [(n, v) for (n, d), v in self.reaction.items()
+                   if d == 3 and v < -1.0]
+            if neg:
+                n0, v0 = min(neg, key=lambda kv: kv[1])
+                rel = abs(v0) / (H * 1e3)
+                if is_self:
+                    out.append(Check(
+                        "自锚式梁端不被拔起（|V锚|/H ≤ 0.15）", rel <= 0.15,
+                        f"节点 {n0} 竖向反力 {v0 / 1e3:,.0f} kN（|V|/H = {rel:.2f}）。"
+                        f"主缆在锚点仍有竖向分力，梁端需抗拔支座或压重；"
+                        f"把边跨调到 L≈√(2HΔz/q) 附近可使其趋于 0",
+                        value=rel, limit=0.15, unit="1"))
+                else:
+                    out.append(Check(
+                        "锚碇抗拔", True,
+                        f"节点 {n0} 竖向反力 {v0 / 1e3:,.0f} kN（负 = 锚碇需下拉主缆，"
+                        f"|V|/H = {rel:.2f}；锚碇设计须计抗拔与抗滑）",
+                        value=v0 / 1e3, unit="kN", level="info"))
+
+        # ---- 自锚式的梁体轴向缩短：这一项不是预拱度 ----
+        #
+        # 主缆 H 压进梁，成桥态梁体缩短 Δ = H·L/(EA)。它要靠梁端伸缩缝或
+        # 合龙段预留，和竖向预抬高**不是同一件事**：把两者混成一个"预变形"
+        # 数字，现场就会照大数起拱，反而错。实测值直接取 [U] 里两端节点
+        # 的纵向位移，不靠 H·L/EA 反推（反推要猜 EA，模型里的实常数才是准的）。
+        if is_self and model is not None:
+            ds = sorted((n for n in model.nodes if 1000 < n.id < 2000),
+                        key=lambda n: n.x)
+            if len(ds) >= 2:
+                ua = float(self.disp.get((ds[0].id, 1), (0.0, 0.0))[0])
+                ub = float(self.disp.get((ds[-1].id, 1), (0.0, 0.0))[0])
+                short = abs((ua - ub) * 1000.0)
+                out.append(Check(
+                    "梁体轴向缩短（制造长度补偿）", True,
+                    f"成桥态梁体缩短 {short:.1f} mm，两端各内移 "
+                    f"{max(abs(ua), abs(ub)) * 1000:.1f} mm；须由梁端伸缩缝 / "
+                    f"合龙段预留，与竖向预抬高分开处理",
+                    value=short, unit="mm", level="info"))
+
         out.append(self._camber_check(model))
         return out
 
@@ -540,10 +763,15 @@ class SolveResult:
         x_of = {n.id: n.x for n in model.nodes} if model is not None else {}
 
         if self.cables:
-            area = _cable_area_m2(model) if model is not None else None
             rows = []
             for c in sorted(self.cables, key=lambda c: x_of.get(c["anchor"], 0.0)):
                 t = float(c.get("T") or 0.0)
+                # 逐根取实常数截面：悬索桥主缆与吊索的 A 差 20 倍，用同一个
+                # 面积算安全系数会把吊索判重 20 倍（看起来"吊索很安全"）。
+                if model is not None:
+                    area = _elem_area_m2(model, c["elem"])
+                else:
+                    area = _cable_area_m2(model)
                 # 逐根安全系数：只有最不利值进指标卡，但施工方要核对的是
                 # "哪几根索偏紧"，所以每根都得列出来。
                 k = (area * CABLE_FPU_DEFAULT / t) if (area and t > 0) else None
@@ -627,6 +855,85 @@ class SolveResult:
                           _r(max(abs(v.get("Tmin", 0)), abs(v.get("Tmax", 0))) / 1e3, 1)]
                          for e, v in sorted(self.beam.items())],
             }
+
+        # ---- 悬索桥四张专项表 --------------------------------------------
+        if self.main_cable:
+            H = float(self.meta.get("H_kN") or 0.0)
+            rows = []
+            for r in self.main_cable:
+                t = float(r.get("T") or 0.0)
+                a = _elem_area_m2(model, r["elem"])
+                k = (a * MAIN_CABLE_FPU / t) if (a and t > 0) else None
+                ch = float(r.get("chord") or 0.0)
+                rows.append([r["elem"], _r(r.get("z"), 3),
+                             _r(t / 1e3, 1), _r(r.get("L0"), 4),
+                             _r(ch, 4) if ch > 0 else "—",
+                             _r(k, 2) if k is not None else "—",
+                             _r(100.0 * t / H, 1) if H > 0 else "—"])
+            out["main_cable_table"] = {
+                "title": "主缆分段索力、下料长度与安全系数",
+                "note": "主缆是一条连续索，各段索力 = √(H² + V²)，水平分力 H 全长"
+                        "不变（这正是塔顶不受不平衡水平力的条件）。下料长度 L0 "
+                        "按浅垂度弹性悬链线由**平衡态弦长**与目标索力反算——不是"
+                        "设计弦长，两者相差一个弹性缩短量，自锚式可达 150 mm。"
+                        f"安全系数 = A·fpu/T，fpu = {MAIN_CABLE_FPU / 1e6:.0f} MPa，"
+                        f"限值 ≥ {MAIN_CABLE_SAFETY_MIN:.1f}。",
+                "headers": ["单元", "低端高程 (m)", "索力 (kN)", "下料 L0 (m)",
+                            "平衡弦长 (m)", "安全系数", "T/H (%)"],
+                "rows": rows,
+            }
+
+        if self.hangers:
+            rows = []
+            for r in self.hangers:
+                t = float(r.get("T") or 0.0)
+                a = _elem_area_m2(model, r["elem"])
+                k = (a * CABLE_FPU_DEFAULT / t) if (a and t > 0) else None
+                chord = float(r.get("chord") or 0.0)
+                L0 = float(r.get("L0") or 0.0)
+                rows.append([r["elem"], r.get("deck_node"),
+                             _r(chord, 3), _r(L0, 3),
+                             _r((chord - L0) * 1000, 1) if chord and L0 else "—",
+                             _r(t / 1e3, 1),
+                             _r(k, 2) if k is not None else "—"])
+            out["hanger_table"] = {
+                "title": "吊索索力、下料长度与安全系数",
+                "note": "吊索目标索力 = 该梁节点承担的竖向恒载（找形直接从荷载取，"
+                        "不做迭代）。弦长 − 下料长 = 弹性伸长量，是正常量而非误差。"
+                        f"安全系数限值 ≥ {CABLE_SAFETY_MIN:.1f}（JTG/T D65-05-2015）。",
+                "headers": ["单元", "梁节点", "成桥弦长 (m)", "下料 L0 (m)",
+                            "伸长 (mm)", "索力 (kN)", "安全系数"],
+                "rows": rows,
+            }
+
+        if self.girder:
+            H = float(self.meta.get("H_kN") or 0.0)
+            out["girder_table"] = {
+                "title": "加劲梁恒载内力",
+                "note": "成桥态（恒载）下加劲梁几乎不受力——这正是悬索桥与斜拉桥"
+                        "的根本差别：恒载全部由主缆承担。地锚式梁轴力应 ≈ 0；"
+                        "自锚式梁轴力应 ≈ −H（H 压进梁是自锚式的定义）。"
+                        "若两者都不成立，说明模型的纵向约束位置错了。",
+                "headers": ["单元", "N (kN)", "My (kN·m)", "Vz (kN)"],
+                "rows": [[g["elem"], _r(g["N"] / 1e3, 1), _r(g["My"] / 1e3, 1),
+                          _r(g["Vz"] / 1e3, 1)] for g in self.girder],
+            }
+
+        if self.reaction:
+            rows = []
+            x_of2 = x_of
+            for (nid, dof), v in sorted(self.reaction.items(),
+                                        key=lambda kv: (kv[0][0], kv[0][1])):
+                rows.append([nid, _r(x_of2.get(nid, float("nan")), 2),
+                             f"U{'XYZ'[dof - 1]}" if 1 <= dof <= 3 else str(dof),
+                             _r(v / 1e3, 1)])
+            out["reaction_table"] = {
+                "title": "支座反力",
+                "note": "向上为正。锚碇节点出现负值表示主缆在该处把锚碇**向上拔**，"
+                        "锚碇设计须按抗拔与抗滑验算，不能只按承压考虑。",
+                "headers": ["节点", "x (m)", "方向", "反力 (kN)"],
+                "rows": rows,
+            }
         combos = self.combinations()
         if combos:
             out["combo_coef"] = combination.coefficient_table()
@@ -672,6 +979,10 @@ class SolveResult:
             "stats": dict(self.stats), "meta": dict(self.meta),
             "n_disp": len(self.disp), "n_beam": len(self.beam),
             "n_cables": len(self.cables),
+            "n_main_cable": len(self.main_cable),
+            "n_hangers": len(self.hangers),
+            "n_girder": len(self.girder),
+            "n_reaction": len(self.reaction),
             "diagnostics": list(self.diagnostics),
             "metrics": [m.to_dict() for m in self.metrics()],
             "checks": [c.to_dict() for c in self.checks()],
@@ -693,6 +1004,27 @@ def _r(v: Any, nd: int) -> Any:
     # 取整之后才可能出现 -0.0（如 -0.04 保留 1 位）：符号位在 float 里是独立的，
     # 不显式归一，表里就会出现 "-0.0" 这种只说明格式没处理干净的东西。
     return 0.0 if v == 0 else v
+
+
+def _elem_area_m2(model: Any, elem_id: int) -> float | None:
+    """按**单元**取实常数截面积（m²）。
+
+    悬索桥的主缆与吊索截面积差几十倍（0.06 m² 对 0.003 m²）。用"取第一根索
+    的面积"去统一算安全系数，会把吊索判轻、把主缆判重，两张表一起错。
+    """
+    try:
+        et = {t.id: t for t in model.etypes}
+        el = {e.id: e for e in model.elements}
+        e = el.get(int(elem_id))
+        if e is None:
+            return None
+        rid = et[e.etype].real
+        for rc in model.reals:
+            if rc.id == rid and rc.A:
+                return float(rc.A)
+    except (AttributeError, KeyError):
+        return None
+    return None
 
 
 def _cable_area_m2(model: Any) -> float | None:

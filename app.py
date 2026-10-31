@@ -101,9 +101,14 @@ EXAMPLES: list[tuple[str, str]] = [
     ("桥 · 桁架", "跨度60米桁架桥，8个节间，桁高6米，每个下弦节点100kN"),
     ("三维 · 梁格", "三跨连续箱梁，边跨30米中跨50米，梁高2.5米，箱宽12米，逐跨施工"),
     ("三维 · 斜拉桥", "双塔三跨斜拉桥，主跨200米，边跨80米，塔高60米，每塔每侧12根索"),
+    ("三维 · 地锚式悬索桥",
+     "地锚式悬索桥，主跨300米，矢跨比1/10，桥面恒载100kN/m"),
+    ("三维 · 自锚式悬索桥",
+     "自锚式悬索桥，主跨300米，矢跨比1/10，桥面恒载100kN/m"),
 ]
 
-KIND_OPTIONS = ["自动识别", "单梁", "拱桥", "桁架桥", "梁桥", "三维梁格", "斜拉桥"]
+KIND_OPTIONS = ["自动识别", "单梁", "拱桥", "桁架桥", "梁桥", "三维梁格", "斜拉桥",
+                "三维 · 悬索桥"]
 
 st.set_page_config(page_title="NL-FE 前处理原型", layout="wide")
 st.title("自然语言驱动有限元前处理 · 原型")
@@ -197,11 +202,14 @@ hint = st.selectbox(
 # 示例按钮必须在 text_area「之前」：若在 text_area 实例化之后再赋值
 # session_state.nl_input，widget 状态会在下一次运行把它覆盖掉。
 st.write("示例（点击直接建模；也可改写下方输入框后点「解析并更新模型」）：")
-_ec = st.columns(len(EXAMPLES))
+# 示例多到 9 个，排成两行；一行 9 个按钮每个只有几十像素宽，字全被截断。
 _clicked = None
-for _i, (_label, _txt) in enumerate(EXAMPLES):
-    if _ec[_i].button(_label, key=f"ex{_i}", use_container_width=True):
-        _clicked = _txt
+_PER_ROW = 5
+for _r0 in range(0, len(EXAMPLES), _PER_ROW):
+    _ec = st.columns(_PER_ROW)
+    for _j, (_label, _txt) in enumerate(EXAMPLES[_r0:_r0 + _PER_ROW]):
+        if _ec[_j].button(_label, key=f"ex{_r0 + _j}", use_container_width=True):
+            _clicked = _txt
 
 if "nl_input" not in st.session_state:
     st.session_state.nl_input = ""

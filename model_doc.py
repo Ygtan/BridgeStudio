@@ -39,10 +39,11 @@ from typing import Any, Callable, Literal
 
 from model_spec import Load, ModelSpec, Section, Support
 
-Kind = Literal["beam", "arch", "truss", "beam_bridge", "grillage3d", "cable_stayed"]
+Kind = Literal["beam", "arch", "truss", "beam_bridge", "grillage3d",
+               "cable_stayed", "suspension"]
 
 #: 三维结构：走 FEM-Eigen 三维内核，而不是 2D 的 example_mixed。
-KINDS_3D: tuple[str, ...] = ("grillage3d", "cable_stayed")
+KINDS_3D: tuple[str, ...] = ("grillage3d", "cable_stayed", "suspension")
 
 KIND_LABELS: dict[str, str] = {
     "beam": "单梁",
@@ -51,6 +52,7 @@ KIND_LABELS: dict[str, str] = {
     "beam_bridge": "梁桥",
     "grillage3d": "三维梁格",
     "cable_stayed": "斜拉桥成桥态",
+    "suspension": "悬索桥成桥态",
 }
 
 KIND_HINTS: dict[str, str] = {
@@ -60,6 +62,9 @@ KIND_HINTS: dict[str, str] = {
     "梁桥": "beam_bridge",
     "三维梁格": "grillage3d",
     "斜拉桥": "cable_stayed",
+    "悬索桥": "suspension",
+    "自锚式悬索桥": "suspension",
+    "地锚式悬索桥": "suspension",
 }
 
 # 材料名 → (E, ρ)
@@ -133,6 +138,24 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "fpu": 1860.0,                       # 索破断强度 (MPa)
         "tower_b": 3.0, "tower_h": 4.5,
         "panel": 8.0,
+    },
+    # 悬索桥的默认值刻意让边跨自动：Ls=0 时由建造器按体系定
+    # 边跨（自锚式取"锚点主缆水平"的平衡边跨，地锚式取 1/3 主跨）。这不是
+    # 偷懒——自锚式的边跨被 V=0 约束死，随手填一个数就会把梁端拔起来。
+    "suspension": {
+        "system": "EARTH",                  # EARTH 地锚式 | SELF 自锚式
+        "Lm": 300.0, "Ls": 0.0,             # 0 = 自动
+        "sag": 10.0,                        # 矢跨比分母（1/10）
+        "clear": 5.0,                       # 跨中主缆至桥面净空 (m)
+        "h": 3.0, "B": 12.0, "tf": 0.028, "tw": 0.020,
+        "q": 100.0,                         # 桥面恒载 (kN/m)
+        "A": 60000.0,                       # 单根主缆面积 (mm²)
+        "Ah": 3000.0,                       # 单根吊索面积 (mm²)
+        "panel": 10.0,                      # 吊索间距 (m)
+        "tower_b": 3.0, "tower_h": 4.0,
+        "tp": 6,                            # 每塔分段数
+        "sh": True,                         # 边跨是否挂吊索
+        "fpu": 1770.0,                      # 主缆破断强度 (MPa)
     },
 }
 
@@ -296,6 +319,49 @@ FIELDS: dict[str, list[list[Field]]] = {
              "min": 2.0, "max": 12.0, "step": 0.5},
         ],
     ],
+    "suspension": [
+        [
+            {"key": "system", "label": "体系", "type": "choice",
+             "choices": ["EARTH", "SELF"],
+             "fmt": {"EARTH": "地锚式（主缆锚在锚碇）",
+                     "SELF": "自锚式（主缆锚在梁端）"}},
+            {"key": "Lm", "label": "主跨 (m)", "type": "float",
+             "min": 100.0, "max": 800.0, "step": 10.0},
+            {"key": "Ls", "label": "边跨 (m，0=自动)", "type": "float",
+             "min": 0.0, "max": 300.0, "step": 5.0},
+            {"key": "sag", "label": "矢跨比 1/n", "type": "float",
+             "min": 7.0, "max": 14.0, "step": 0.5},
+        ],
+        [
+            {"key": "h", "label": "加劲梁高 (m)", "type": "float",
+             "min": 1.5, "max": 6.0, "step": 0.1},
+            {"key": "B", "label": "加劲梁宽 (m)", "type": "float",
+             "min": 6.0, "max": 30.0, "step": 0.5},
+            {"key": "q", "label": "桥面恒载 (kN/m)", "type": "float",
+             "min": 20.0, "max": 500.0, "step": 10.0},
+            {"key": "clear", "label": "跨中净空 (m)", "type": "float",
+             "min": 2.0, "max": 30.0, "step": 1.0},
+        ],
+        [
+            {"key": "A", "label": "单根主缆面积 (mm²)", "type": "float",
+             "min": 10000.0, "max": 300000.0, "step": 5000.0},
+            {"key": "Ah", "label": "单根吊索面积 (mm²)", "type": "float",
+             "min": 500.0, "max": 10000.0, "step": 250.0},
+            {"key": "panel", "label": "吊索间距 (m)", "type": "float",
+             "min": 5.0, "max": 20.0, "step": 1.0},
+            {"key": "fpu", "label": "主缆破断强度 (MPa)", "type": "float",
+             "min": 1400.0, "max": 2000.0, "step": 10.0},
+        ],
+        [
+            {"key": "tower_b", "label": "塔柱宽 (m)", "type": "float",
+             "min": 1.5, "max": 10.0, "step": 0.5},
+            {"key": "tower_h", "label": "塔柱深 (m)", "type": "float",
+             "min": 2.0, "max": 12.0, "step": 0.5},
+            {"key": "tp", "label": "每塔分段", "type": "int",
+             "min": 3, "max": 12, "step": 1},
+            {"key": "sh", "label": "边跨挂吊索", "type": "bool"},
+        ],
+    ],
 }
 
 
@@ -325,11 +391,27 @@ def classify_text(text: str, hint: str | None = None) -> str:
     普通桥/单梁。因为「拱桥」「桁架桥」「斜拉桥」都含「桥」，「简支梁桥」
     含「梁」，而「三跨连续箱梁」这类描述里一个「桥」字都没有。
     """
-    if hint and hint in KIND_HINTS:
-        return KIND_HINTS[hint]
+    if hint:
+        # 界面上的标签带分组前缀（"三维 · 斜拉桥"），而 KIND_HINTS 的键是
+        # 纯名字（"斜拉桥"）。旧版只做 `hint in KIND_HINTS` 的精确比较，
+        # 于是**用户明确选了的类型被静默忽略**，退回关键词猜测——选中
+        # "三维 · 斜拉桥"能对上纯属关键词恰好也命中，选中"悬索桥"就会
+        # 因为句子里带"矢跨比"被判成拱桥。这里先剥前缀，再按最长键包含匹配。
+        h = hint.replace("三维", "").replace("·", "").replace("・", "").strip()
+        if hint in KIND_HINTS:
+            return KIND_HINTS[hint]
+        if h in KIND_HINTS:
+            return KIND_HINTS[h]
+        hits = [k for k in KIND_HINTS if k and k in hint]
+        if hits:
+            return KIND_HINTS[max(hits, key=len)]
     t = text.strip()
+    if re.search(r"悬索|主缆|吊索", t):
+        return "suspension"
     if re.search(r"斜拉|拉索桥|斜拉索", t):
         return "cable_stayed"
+    # 「矢高」「矢跨比」在悬索桥里也用，但悬索已经先一步判掉了，
+    # 落到这里的基本都是真拱桥。
     if re.search(r"拱|矢高|矢跨比", t):
         return "arch"
     if re.search(r"桁架|truss", t, re.I):
@@ -382,6 +464,8 @@ class ModelDoc:
             self._model = self._build_grillage3d()
         elif self.kind == "cable_stayed":
             self._model = self._build_cable_stayed()
+        elif self.kind == "suspension":
+            self._model = self._build_suspension()
         else:
             self._model = self._build_beam_bridge()
         return self
@@ -511,6 +595,39 @@ class ModelDoc:
         self._info["fpu"] = float(p.get("fpu", 1860.0)) * 1e6
         return model
 
+    def _build_suspension(self):
+        """悬索桥：主缆线形由恒载决定，建造器只给初值，真线形由内核找形。
+
+        界面这一层不预设边跨：`Ls = 0` 交给建造器按体系取——自锚式取使
+        锚点 V=0 的平衡边跨（√(2HΔz/q)），地锚式取 1/3 主跨。若在这里写死
+        一个默认值，自锚式会被随手填的数把梁端拔起来，而算出来的位移、
+        索力全都"正常"，只有梁端支反力是负的。
+        """
+        from suspension_3d import build_suspension_3d
+
+        p = self.params
+        n_sag = float(p.get("sag", 10.0))
+        model, info = build_suspension_3d(
+            system=str(p.get("system", "EARTH")).upper(),
+            main_span=float(p["Lm"]),
+            side_span=float(p.get("Ls", 0.0) or 0.0),
+            sag_ratio=(1.0 / n_sag) if n_sag > 0 else 0.10,
+            clearance=float(p.get("clear", 5.0)),
+            panel=float(p.get("panel", 10.0)),
+            side_hangers=bool(p.get("sh", True)),
+            B=float(p["B"]), h=float(p["h"]),
+            tf=float(p.get("tf", 0.028)), tw=float(p.get("tw", 0.020)),
+            tower_b=float(p.get("tower_b", 3.0)),
+            tower_h=float(p.get("tower_h", 4.0)),
+            n_tower_seg=int(p.get("tp", 6)),
+            q_deck=float(p["q"]) * 1e3,
+            main_area_mm2=float(p.get("A", 60000.0)),
+            hanger_area_mm2=float(p.get("Ah", 3000.0)),
+        )
+        self._info = dict(info)
+        self._info["fpu"] = float(p.get("fpu", 1770.0)) * 1e6
+        return model
+
     # ------------------------------------------------------------ 校验
 
     def validate(self) -> list[str]:
@@ -598,6 +715,28 @@ class ModelDoc:
             nl = p.get("n_lines")
             if not isinstance(nl, int) or nl < 3 or nl % 2 == 0:
                 e.append(f"纵梁线条数 {nl} 必须是 ≥3 的奇数（含中梁线，对称）")
+        elif self.kind == "suspension":
+            Lm = pos("Lm", "主跨")
+            pos("h", "加劲梁高")
+            pos("B", "加劲梁宽")
+            pos("q", "桥面恒载")
+            A = pos("A", "单根主缆面积")
+            Ah = pos("Ah", "单根吊索面积")
+            pos("panel", "吊索间距")
+            n = p.get("sag")
+            if not isinstance(n, (int, float)) or isinstance(n, bool) or n <= 0:
+                e.append("矢跨比分母必须为正数（如 10 表示 1/10）")
+            elif not 7.0 <= float(n) <= 14.0:
+                e.append(f"矢跨比 1/{n:g} 超出常规（1/12~1/8）。过小则 H 与塔顶"
+                         "竖向反力畸高，过大则吊索过长、梁的刚度靠不上主缆")
+            Ls = p.get("Ls") or 0.0
+            if Ls and float(Ls) > 0 and Lm and float(Ls) > 0.8 * Lm:
+                e.append(f"边跨 {float(Ls):g} m 接近主跨 {Lm:g} m；边跨通常取"
+                         " 1/3 主跨（地锚式）或平衡边跨 √(2HΔz/q)（自锚式）")
+            if A and A < 5000:
+                e.append(f"单根主缆面积 {A:g} mm² 过小，请核对是否写成 cm²")
+            if Ah and A and Ah > A:
+                e.append(f"吊索面积 {Ah:g} mm² 大于主缆面积 {A:g} mm²，请核对")
         else:
             Lm = pos("Lm", "主跨")
             Ls = pos("Ls", "边跨")
@@ -979,6 +1118,65 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
         else:
             p["A"] = d["A"]
             default("A", "单索面积")
+    elif kind == "suspension":
+        # 体系：只有两个选项，关键词足够，不必等 LLM。同时接受"锚在梁上"
+        # 这类说法——用户描述体系时往往不说"自锚"三个字。
+        if re.search(r"自锚|锚在梁|锚于梁|锚在加劲梁", text):
+            p["system"] = "SELF"
+        elif re.search(r"地锚|锚碇|隧道锚|重力锚", text):
+            p["system"] = "EARTH"
+        else:
+            p["system"] = d["system"]
+            notes.append(f"未说明体系，默认{'地锚式' if d['system'] == 'EARTH' else '自锚式'}"
+                         "（自锚式请写明「自锚式」）")
+        if not grab("Lm", "主跨", "跨径", "主孔"):
+            if grab("Lm", "跨度", "总长", "全长"):
+                notes.append(f"只给了一个跨度，按主跨 {p['Lm']:g} m 处理")
+            else:
+                p["Lm"] = d["Lm"]
+                default("Lm", "主跨")
+        p["Lm"] = guard_bridge_span(float(p["Lm"]), notes)
+        # 边跨：**不给默认值**，交给建造器按体系算（自锚式取平衡边跨）。
+        # 在这里随手写个 0.4L，自锚式的梁端就会被主缆拔起来。
+        if not grab("Ls", "边跨", "边孔"):
+            p["Ls"] = 0.0
+            notes.append("未说明边跨，按体系自动取：自锚式取平衡边跨 √(2HΔz/q)"
+                         "（锚点主缆水平），地锚式取 1/3 主跨")
+        else:
+            L_bal = 0.0
+            if p.get("Lm"):
+                L_bal = float(p["Lm"]) / 3.0
+            if p.get("system") == "SELF" and L_bal and p["Ls"] < 0.8 * L_bal:
+                notes.append(f"自锚式边跨 {p['Ls']:g} m 明显短于平衡边跨附近值，"
+                             "梁端可能出现向上的支反力（需抗拔支座或压重）")
+        # 矢跨比：接受「1/10」「矢跨比 0.1」「矢高 30 米」三种说法
+        m = re.search(r"矢跨比\s*1\s*[/:：]\s*(\d+(?:\.\d+)?)", text)
+        if m:
+            p["sag"] = float(m.group(1))
+        else:
+            m = re.search(r"矢跨比\s*([0-9.]+)", text)
+            if m and float(m.group(1)) < 1.0:
+                p["sag"] = round(1.0 / max(float(m.group(1)), 1e-6), 1)
+            else:
+                m = re.search(r"矢高\s*([0-9.]+)\s*(?:m|米)", text)
+                if m and p.get("Lm"):
+                    p["sag"] = round(float(p["Lm"]) / max(float(m.group(1)), 1e-6), 1)
+                else:
+                    p["sag"] = d["sag"]
+                    default("sag", "矢跨比 1/n")
+        if not grab("h", "主梁高", "加劲梁高", "梁高"):
+            p["h"] = max(2.0, round(float(p["Lm"]) / 100.0, 2))
+            notes.append(f"未说明加劲梁高，按 L/100 = {p['h']:g} m")
+        for key, names, label in (
+            ("B", ("主梁宽", "桥宽", "加劲梁宽"), "加劲梁宽"),
+            ("q", ("恒载", "桥面荷载", "均布荷载"), "桥面恒载"),
+            ("panel", ("吊索间距", "吊索间距离"), "吊索间距"),
+            ("A", ("主缆面积",), "单根主缆面积"),
+            ("Ah", ("吊索面积",), "单根吊索面积"),
+        ):
+            if not grab(key, *names):
+                p[key] = d[key]
+                default(key, label)
     else:
         if not grab("sp1", "边跨"):
             p["sp1"] = d["sp1"]

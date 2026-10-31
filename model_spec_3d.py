@@ -309,6 +309,10 @@ class CableBridge3D(BaseModel):
         （= 预抬高）。这是"施工控制"真正要的东西。
       - TENSION：已给全目标索力，只做无应力索长迭代找形。
       - STATIC：按 .dat 里给的 L0（无应力索长）直接做几何非线性静力。
+
+    悬索桥额外用 ``system`` / ``sag`` / ``tower1`` / ``tower2`` /
+    ``main_cable`` / ``hangers`` 描述主缆体系（内核 *SUSP_BRIDGE 段）。
+    ``system`` 非空即走悬索桥找形：主缆线形由恒载决定，不能由几何给定。
     """
     mode: Literal["COMPLETION", "TENSION", "STATIC"] = "COMPLETION"
     method: Literal["MINENERGY", "RIGID"] = "MINENERGY"   # 自动定索力方法
@@ -321,6 +325,16 @@ class CableBridge3D(BaseModel):
     deck_load: float = 0.0          # 桥面恒载合计 N（仅用于竖向平衡校核）
     verbose: bool = False
     cables: list[CableSpec3D] = Field(default_factory=list)
+
+    # ---- 悬索桥（*SUSP_BRIDGE / *MAINCABLE / *HANGER）----
+    system: Literal["", "EARTH", "SELF"] = ""   # 地锚式 / 自锚式；空 = 斜拉桥
+    sag: float = 0.0                # 主跨矢高 m（>0 时优先于矢跨比）
+    tower1: int = 0                 # 塔顶节点（必须在主缆链上）
+    tower2: int = 0
+    main_cable: list[int] = Field(default_factory=list)   # 主缆单元，按链序
+    hangers: list[int] = Field(default_factory=list)      # 吊索单元
+    deck_e0: float = 0.0            # 加劲梁单元号区间（输出梁轴力用）
+    deck_e1: float = 1e12
 
 
 class ModelSpec3D(BaseModel):
@@ -416,9 +430,29 @@ class ModelSpec3D(BaseModel):
         if self.cable_bridge is not None:
             kind_of_et = {t.id: t.kind for t in self.etypes}
             elem_by_id = {e.id: e for e in self.elements}
-            if not self.cable_bridge.cables:
-                raise ValueError("成桥态工况未指定任何索（cable_bridge.cables 为空）")
-            for c in self.cable_bridge.cables:
+            cb = self.cable_bridge
+            if cb.system:
+                # 悬索桥的索力由内核找形推出（荷载 + 矢高定 H），不需要在
+                # 模型里预先给目标索力；此时 cables 允许为空，改为校验主缆链
+                # 与吊索的引用是否成立。
+                if not cb.main_cable:
+                    raise ValueError("悬索桥工况未指定主缆单元（main_cable 为空）")
+                if not cb.hangers:
+                    raise ValueError("悬索桥工况未指定吊索单元（hangers 为空）")
+                if cb.sag <= 0:
+                    raise ValueError("悬索桥工况必须给定主跨矢高 sag")
+                for eid in list(cb.main_cable) + list(cb.hangers):
+                    if eid not in elem_by_id:
+                        raise ValueError(f"悬索桥工况引用了不存在的单元 {eid}")
+                    if kind_of_et[elem_by_id[eid].etype] != "CABLE":
+                        raise ValueError(f"悬索桥工况的单元 {eid} 不是 CABLE 类型")
+                for nid in (cb.tower1, cb.tower2):
+                    if nid not in node_ids:
+                        raise ValueError(f"悬索桥工况引用了不存在的塔顶节点 {nid}")
+            else:
+                if not cb.cables:
+                    raise ValueError("成桥态工况未指定任何索（cable_bridge.cables 为空）")
+            for c in cb.cables:
                 if c.elem not in elem_by_id:
                     raise ValueError(f"成桥态工况引用了不存在的单元 {c.elem}")
                 e = elem_by_id[c.elem]
@@ -596,6 +630,27 @@ class ModelSpec3D(BaseModel):
             if cb.deck_load > 0:
                 L.append(f"DECKLOAD={fmt(cb.deck_load)}")
             L.append(f"VERBOSE={1 if cb.verbose else 0}")
+            if cb.system:
+                # 悬索桥：主缆线形由找形确定，必须告诉内核哪条链是主缆、
+                # 哪些是吊索、塔顶在哪里——它无法从几何自行分辨
+                # （斜拉索与吊索都是 CABLE 单元，形状也都能斜能竖）。
+                L.append("# 悬索桥：主缆找形的定位信息（地锚式/自锚式仅边界不同）")
+                L.append("*SUSP_BRIDGE")
+                L.append(f"SYSTEM={cb.system}")
+                L.append(f"TOWER1={cb.tower1}")
+                L.append(f"TOWER2={cb.tower2}")
+                if cb.sag > 0:
+                    L.append(f"SAG={fmt(cb.sag)}")
+                L.append(f"DECKE0={fmt(cb.deck_e0)}")
+                L.append(f"DECKE1={fmt(cb.deck_e1)}")
+                L.append("# 主缆单元，按链序排列（锚 → 塔1 → 塔2 → 锚）")
+                L.append("*MAINCABLE")
+                for eid in cb.main_cable:
+                    L.append(str(eid))
+                L.append("# 吊索单元")
+                L.append("*HANGER")
+                for eid in cb.hangers:
+                    L.append(str(eid))
             L.append("# <elemId> <anchorNode> <targetTension_N>  （索力 0 = 自动）")
             L.append("*CABLE")
             for c in cb.cables:

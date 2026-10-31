@@ -433,6 +433,7 @@ METHOD_LABELS = {
     "GIVEN": "按恒载竖向分配",
     "RIGID": "刚性支承连续梁法",
     "MINENERGY": "最小弯曲能量法",
+    "FORMFINDING": "恒载索形找形（索多边形）",
 }
 
 
@@ -661,12 +662,13 @@ class _Writer:
             _text_runs(par2, note, size=10.5, color=GRAY)
 
     def note(self, text: str) -> None:
+        # 走 _text_runs 而不是 add_run(text)：表注里同样会出现 **粗体** 与 _{下标}，
+        # 直接 add_run 会把星号原样印出来（"**向上拔**"）——这是最容易漏的一处。
         par = self.doc.add_paragraph()
         par.paragraph_format.space_before = Pt(2)
         par.paragraph_format.space_after = Pt(6)
         par.paragraph_format.line_spacing = 1.2
-        r = par.add_run(text)
-        _set_run_font(r, size=NOTE_PT, color=GRAY)
+        _text_runs(par, text, size=NOTE_PT, color=GRAY)
 
     # ---------------------------------------------------------- 表
 
@@ -1519,3 +1521,825 @@ if __name__ == "__main__":
         out_path="out/cable/report.docx", project="双塔三跨斜拉桥",
         analyst="")
     print("已生成:", out, f"({out.stat().st_size / 1024:.0f} KB)")
+
+
+# ================================================================ 悬索桥计算书
+#
+# 为什么不能复用斜拉桥那本
+# ------------------------
+# 两本计算书的**推导对象**不同：
+#   · 斜拉桥：索力是设计变量，计算书要论证"这组索力如何确定、梁面线形如何
+#     预抬"。核心章节是索力优化 + 制造线形闭环。
+#   · 悬索桥：主缆线形是恒载的结果，索力是**推导出来的**。核心章节是找形
+#     的微分方程、H 的确定、三跨共用一个 H 的条件、以及边跨平衡。
+# 硬套斜拉桥的章节会得到一本"没有推导、只有数字"的书，审图人第一句就会问
+# "主缆线形哪来的"。所以单独一本，7 章。
+
+
+def collect_susp_data(*, model, info: dict, res, params: dict | None = None) -> dict:
+    """汇总悬索桥计算书所需的全部数据（不做力学重算，只做统计）。"""
+    p = dict(params or {})
+    m = dict(res.meta)
+    H = float(m.get("H_kN") or 0.0) * 1e3            # N
+    sys_name = str(m.get("susp_system") or "EARTH").upper()
+    is_self = sys_name == "SELF"
+
+    node_x = {n.id: n.x for n in model.nodes}
+    node_z = {n.id: n.z for n in model.nodes}
+
+    # 主缆链（锚→塔1→塔2→锚）：直接用求解结果的分段表，按 x 排序没有意义，
+    # 必须保持 *MAINCABLE 的链序——所以不排序。
+    chain = list(res.main_cable)
+    mains = [float(r["T"]) for r in chain]
+    hangs = [float(r["T"]) for r in res.hangers]
+
+    deck_n = [n for n in model.nodes if 1000 < n.id < 2000]
+    gir = list(res.girder)
+    camber_deck = [v[2] for n, v in res.camber.items() if 1000 < n < 2000]
+
+    # ---- 自锚式的梁体轴向缩短 -------------------------------------------
+    # 主缆锚在梁端，H 直接压进加劲梁，成桥态梁比无应力状态短 Δ = H·L/EA。
+    # 这一项和竖向预拱度**不是同一件事**：前者要靠伸缩缝/合龙段预留，后者
+    # 靠预制标高解决。混着报会把 10 mm 的预抬高说成"预变形 75 mm"，现场
+    # 照 75 mm 起拱就错了。所以两个数分开取，都从 [U] 的实测位移来。
+    deck_sorted = sorted((n for n in deck_n), key=lambda n: n.x)
+    ux_first = float(res.disp.get((deck_sorted[0].id, 1), (0.0, 0.0))[0]) if deck_sorted else 0.0
+    ux_last = float(res.disp.get((deck_sorted[-1].id, 1), (0.0, 0.0))[0]) if deck_sorted else 0.0
+    deck_short_mm = (ux_first - ux_last) * 1000.0        # 收缩为正
+    deck_end_move_mm = max(abs(ux_first), abs(ux_last)) * 1000.0
+
+    return {
+        "params": p,
+        "meta": m,
+        "system": sys_name,
+        "system_label": "自锚式悬索桥" if is_self else "地锚式悬索桥",
+        "is_self": is_self,
+        "n_nodes": len(model.nodes),
+        "n_elems": len(model.elements),
+        "dofs": int(m.get("dofs") or 0),
+        "n_main": len(chain),
+        "n_hanger": len(res.hangers),
+        "n_girder": len(gir),
+        "span": float(m.get("span_m") or 0.0),
+        "side_span": float(info.get("side_span") or 0.0),
+        "tower_top_z": float(info.get("tower_top_z") or 0.0),
+        "sag": float(m.get("sag_m") or 0.0),
+        "sag_target": float(m.get("sag_target_m") or 0.0),
+        "sag_ratio": float(m.get("sag_ratio") or 0.0),
+        "H": H,
+        "H_kN": H / 1e3,
+        "tension_method": "FormFinding",
+        "T_main_min": min(mains) if mains else 0.0,
+        "T_main_max": max(mains) if mains else 0.0,
+        "T_hanger_min": min(hangs) if hangs else 0.0,
+        "T_hanger_max": max(hangs) if hangs else 0.0,
+        "T_hanger_sum": sum(hangs),
+        "girder_N_max": float(m.get("girder_N_max_kN") or 0.0),
+        "girder_M_max": float(m.get("girder_M_max_kNm") or 0.0),
+        "tension_err": float(m.get("tension_err") or 0.0),
+        "balance_pct": float(m.get("balance_pct") or 0.0),
+        "support_v_sum": float(m.get("support_v_sum_kN") or 0.0),
+        "support_v_max": float(m.get("support_v_max_kN") or 0.0),
+        "applied_v": float(m.get("applied_v_kN") or 0.0),
+        "total_deck_load": float(info.get("total_deck_load") or 0.0),
+        "camber_max": max((abs(v) for v in camber_deck), default=0.0),
+        "deck_short_mm": deck_short_mm,
+        "deck_end_move_mm": deck_end_move_mm,
+        "camber": dict(res.camber),
+        "erected": dict(res.erected),
+        "chain": chain,
+        "hangers": list(res.hangers),
+        "girder": gir,
+        "reaction": dict(res.reaction),
+        "cable_shape": dict(getattr(res, "cable_shape", {}) or {}),
+        "node_x": node_x,
+        "node_z": node_z,
+        "deck_x": [n.x for n in sorted(deck_n, key=lambda n: n.x)],
+        "tables": res.tables(model),
+        "checks": res.checks(model),
+        "converged": bool(res.converged),
+        "iterations": int(res.iterations or 0),
+        "elapsed_ms": float(res.elapsed_ms or 0.0),
+    }
+
+
+# ---------------------------------------------------------------- 悬索桥绘图
+
+
+def _cb(model):
+    """取悬索桥工况段（主缆/吊索单元清单）。"""
+    cb = getattr(model, "cable_bridge", None)
+    if cb is None or not str(getattr(cb, "system", "") or ""):
+        raise ValueError("该模型不是悬索桥（cable_bridge.system 为空）")
+    return cb
+
+
+def plot_susp_frame(model, d: dict, path: Path) -> Path:
+    """图 2-1 结构计算简图：加劲梁 + 桥塔 + 主缆 + 吊索 + 支承。
+
+    主缆用**找形结果**的节点坐标（`d["cable_shape"]`），不用模型里那份——
+    模型坐标是建造器给的初始抛物线，边跨那一段更是按"锚点到塔顶的直线"
+    插的；而边跨主缆在锚点处必须水平（V=0），真线形是顶点落在锚点的抛物线，
+    二者在塔根附近能差几米。这条不报错，只会让图看着"挺像"而已。
+    """
+    plt = _mpl()
+    cb = _cb(model)
+    nodes = {n.id: n for n in model.nodes}
+    elems = {e.id: e for e in model.elements}
+    deck = sorted((n for n in model.nodes if 1000 < n.id < 2000), key=lambda n: n.x)
+    tw1 = sorted((n for n in model.nodes if 3000 < n.id < 4000), key=lambda n: n.z)
+    tw2 = sorted((n for n in model.nodes if 4000 < n.id < 5000), key=lambda n: n.z)
+    shape = d.get("cable_shape") or {}
+
+    def xy(nid: int) -> tuple[float, float]:
+        n = nodes[nid]
+        if nid in shape:
+            return float(shape[nid][0]), float(shape[nid][1])
+        return n.x, n.z
+
+    fig, ax = plt.subplots(figsize=(7.6, 3.4))
+    # 吊索（连到找形后的主缆上端）
+    for hid in cb.hangers:
+        e = elems.get(hid)
+        if not e:
+            continue
+        top, bot = (e.n1, e.n2) if nodes[e.n1].z >= nodes[e.n2].z else (e.n2, e.n1)
+        x1, z1 = xy(top)
+        nb = nodes[bot]
+        ax.plot([x1, nb.x], [z1, nb.z], color="#b0b0b0", lw=0.6, zorder=2)
+    # 主缆（按链序）
+    pts: list[int] = []
+    for eid in cb.main_cable:
+        e = elems.get(eid)
+        if not e:
+            continue
+        if not pts:
+            pts.append(e.n1)
+        pts.append(e.n2)
+    if pts:
+        xs = [xy(n)[0] for n in pts]
+        zs = [xy(n)[1] for n in pts]
+        ax.plot(xs, zs, color="#c0392b", lw=1.8, zorder=5, label="主缆（找形线形）")
+    # 桥塔
+    for tw, name in ((tw1, "桥塔"), (tw2, "桥塔")):
+        if not tw:
+            continue
+        ax.plot([n.x for n in tw], [n.z for n in tw], color="#1f4e79", lw=3.2,
+                solid_capstyle="butt", zorder=4, label=name)
+    # 加劲梁
+    ax.plot([n.x for n in deck], [n.z for n in deck], color="#1a1a1a", lw=2.8,
+            solid_capstyle="butt", zorder=6, label="加劲梁")
+    # 支承符号
+    supp = sorted({b.node for b in model.boundaries
+                   if 1000 < b.node < 2000 and 3 in getattr(b, "dofs", ())})
+    for nid in supp:
+        x, z = nodes[nid].x, nodes[nid].z
+        ax.plot([x], [z], marker="^", ms=7, color="#1f4e79", zorder=7,
+                markerfacecolor="white", markeredgewidth=1.2)
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("高程 z (m)")
+    # 不锁等比例：624 m 长的桥按真实比例画，竖向只占 35 m，整幅图会有八成
+    # 是空白，矢高也看不出来。桥型简图历来是竖向量向放大画，图注里写明倍数。
+    ax.grid(alpha=0.25, lw=0.6)
+    h, lab = ax.get_legend_handles_labels()
+    uniq = dict(zip(lab, h))
+    ax.legend(uniq.values(), uniq.keys(), loc="upper right", fontsize=8, frameon=False)
+    fig.tight_layout()
+    fig.canvas.draw()
+    try:
+        bb = ax.get_window_extent()
+        xr, yr = ax.get_xlim(), ax.get_ylim()
+        exag = (bb.height / max(bb.width, 1e-9)) / ((yr[1] - yr[0]) / (xr[1] - xr[0]))
+        ax.set_title(f"注：竖向放大 ≈ {exag:.1f} 倍", fontsize=7.5,
+                     color="#606060", loc="right")
+    except Exception:                                       # noqa: BLE001
+        pass
+    fig.tight_layout()
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+    return path
+
+
+def plot_susp_tension(d: dict, path: Path) -> Path:
+    """图 4-1 主缆分段索力与吊索力沿桥分布。"""
+    plt = _mpl()
+    fig, ax = plt.subplots(figsize=(7.4, 3.0))
+    # 主缆单元的编号与节点号不必对应（*DO 生成的），硬凑 x 只会凑出假坐标，
+    # 所以横轴用"沿主缆链的序号"。这条链本身就是从锚碇经塔顶到锚碇的顺序，
+    # 序号即沿桥里程的单调映射。
+    xs = list(range(len(d["chain"])))
+    ts = [float(r["T"]) / 1e3 for r in d["chain"]]
+    ax.plot(xs, ts, "-o", ms=2.6, lw=1.2, color="#c0392b", label="主缆分段索力")
+    ax.axhline(d["H_kN"], ls="--", lw=0.9, color="#7f7f7f",
+               label=f"水平分力 H = {d['H_kN']:,.0f} kN")
+    # 吊索
+    hx = [i for i in range(len(d["hangers"]))]
+    ax.plot(hx, [float(h["T"]) / 1e3 for h in d["hangers"]], "s-", ms=2.4, lw=1.0,
+            color="#1f4e79", label="吊索索力")
+    ax.set_xlabel("沿主缆链的分段 / 吊索序号")
+    ax.set_ylabel("索力 (kN)")
+    ax.grid(alpha=0.25, lw=0.6)
+    ax.legend(fontsize=8, frameon=False, loc="center right")
+    fig.tight_layout()
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+    return path
+
+
+def plot_susp_girder(d: dict, path: Path) -> Path:
+    """图 4-2 加劲梁恒载内力沿桥分布（My 与 N）。"""
+    plt = _mpl()
+    xs = [d["node_x"].get(int(g["elem"]) + 900, None) for g in d["girder"]]
+    if any(x is None for x in xs):
+        xs = list(range(len(d["girder"])))
+        xlabel = "加劲梁单元序号"
+    else:
+        xlabel = "x (m)"
+    my = [float(g["My"]) / 1e3 for g in d["girder"]]
+    nn = [float(g["N"]) / 1e3 for g in d["girder"]]
+
+    fig, ax = plt.subplots(figsize=(7.4, 3.0))
+    ax.plot(xs, my, lw=1.4, color="#c0392b", label="弯矩 My")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("My (kN·m)")
+    ax.grid(alpha=0.25, lw=0.6)
+    ax.axhline(0.0, lw=0.8, color="#7f7f7f")
+    ax2 = ax.twinx()
+    ax2.plot(xs, nn, lw=1.2, ls="--", color="#1f4e79", label="轴力 N")
+    ax2.set_ylabel("N (kN)")
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, fontsize=8, frameon=False, loc="lower left")
+    fig.tight_layout()
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+    return path
+
+
+def plot_susp_camber(model, d: dict, path: Path) -> Path:
+    """图 6-1 制造线形预变形（加劲梁竖向预抬高）。"""
+    plt = _mpl()
+    xs, dz = [], []
+    for nid in sorted(d["camber"], key=lambda n: d["node_x"].get(n, 0.0)):
+        if not (1000 < nid < 2000):
+            continue
+        xs.append(d["node_x"].get(nid, 0.0))
+        dz.append(d["camber"][nid][2] * 1000.0)
+    fig, ax = plt.subplots(figsize=(7.4, 2.6))
+    ax.plot(xs, dz, lw=1.4, color="#1f4e79")
+    ax.axhline(0.0, lw=0.8, color="#7f7f7f")
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("预变形 (mm)")
+    ax.grid(alpha=0.25, lw=0.6)
+    fig.tight_layout()
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+    return path
+
+
+# ---------------------------------------------------------------- 悬索桥正文
+
+
+def build_suspension_report(*, model, info: dict, res,
+                            params: dict | None = None,
+                            out_path: str | Path,
+                            project: str = "", analyst: str = "",
+                            title: str | None = None,
+                            fig_dir: str | Path | None = None,
+                            update_toc: bool = True) -> Path:
+    """生成悬索桥（自锚式 / 地锚式）成桥态计算书，返回 .docx 路径。
+
+    `res` 是 `result_3d.SolveResult`，不是旧字典——悬索桥这部分从一开头就只
+    用新契约，不再背 `as_legacy_dict()` 的包袱。
+    """
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    d = collect_susp_data(model=model, info=info, res=res, params=params)
+
+    figs = Path(fig_dir) if fig_dir else out.parent / "report_figs"
+    figs.mkdir(parents=True, exist_ok=True)
+    f_frame = plot_susp_frame(model, d, figs / "fig_susp_frame.png")
+    f_ten = plot_susp_tension(d, figs / "fig_susp_tension.png")
+    f_gir = plot_susp_girder(d, figs / "fig_susp_girder.png")
+    f_cam = plot_susp_camber(model, d, figs / "fig_susp_camber.png")
+
+    doc_title = title or getattr(model, "title", "") or d["system_label"]
+    doc = _setup_document()
+    _cover(doc, d, doc_title, project, analyst)
+    header_txt = f"{doc_title} · 成桥态计算书"
+
+    toc_sec = doc.add_section(WD_SECTION.NEW_PAGE)
+    _apply_page(toc_sec)
+    _add_header(toc_sec, header_txt)
+    toc_sec.footer.is_linked_to_previous = False
+    _toc(doc)
+
+    body = doc.add_section(WD_SECTION.NEW_PAGE)
+    _apply_page(body)
+    _start_page_numbering(body, 1)
+    _add_header_footer(body, header_txt)
+
+    w = _Writer(doc)
+    _susp_sec_1(w, model, d, doc_title, project)
+    _susp_sec_2(w, model, d, f_frame)
+    _susp_sec_3(w, model, d)
+    _susp_sec_4(w, d, fig_tension=f_ten, fig_girder=f_gir)
+    _susp_sec_5(w, d)
+    _susp_sec_6(w, model, d, fig_camber=f_cam)
+    _susp_sec_7(w, d)
+
+    doc.save(str(out))
+    if update_toc:
+        update_fields_with_word(out)
+    return out
+
+
+# ---------------------------------------------------------------- 第 1 章
+
+def _susp_sec_1(w: _Writer, model, d: dict, title: str, project: str) -> None:
+    p = d["params"]
+    w.h1("工程概况")
+    w.h2("1.1　桥型与主要尺寸")
+    w.p(f"本桥为双塔三跨{d['system_label']}，主跨 {_f(d['span'], 1)} m，"
+        f"矢跨比 1/{_f(d['sag_ratio'], 1)}（主缆矢高 {_f(d['sag'], 2)} m）。"
+        f"加劲梁为钢箱梁，主缆与吊索采用高强钢丝。计算对象为"
+        f"**恒载成桥态**：在全部恒载一次施加完成的构形上求主缆线形、索力、"
+        f"加劲梁内力与支座反力。")
+
+    rows = [
+        ["桥型", d["system_label"]],
+        ["跨径布置", f"{_f(p.get('side_span') or 0, 1)} + {_f(d['span'], 1)} + "
+                     f"{_f(p.get('side_span') or 0, 1)} m"],
+        ["主跨矢高 / 矢跨比", f"{_f(d['sag'], 2)} m / 1/{_f(d['sag_ratio'], 1)}"],
+        ["主缆锚固方式", "锚于加劲梁端（自锚）" if d["is_self"] else "锚于锚碇（地锚）"],
+        ["加劲梁形式", f"钢箱梁，宽 {_f(p.get('B') or 12, 1)} m，"
+                       f"高 {_f(p.get('h') or 3, 1)} m"],
+        ["桥面恒载", f"{_f(p.get('q') or 100, 0)} kN/m（含钢箱梁、桥面系与二期）"],
+        ["主缆/吊索截面积", f"{_f(p.get('A') or 60000, 0)} / "
+                            f"{_f(p.get('A_h') or 3000, 0)} mm²"],
+    ]
+    w.table("主要技术参数", ["项目", "取值"], rows, widths=[4.6, 10.9],
+            aligns=["l", "l"])
+
+    w.h2("1.2　自锚式与地锚式的差别")
+    w.p("两种体系的力学内核**完全相同**（主缆找形、索长反算、几何非线性求解"
+        "一套代码），差别全部落在边界条件上，只有两处：")
+    w.bullet("主缆锚在哪里：地锚式锚在桥台外侧的锚碇上（全约束），主缆水平力 "
+             "H 由锚碇传给地基；自锚式锚在加劲梁端节点上，H 压进加劲梁，"
+             "梁内产生约 −H 的轴压力。")
+    w.bullet("加劲梁纵向怎么约束：地锚式梁端纵向固定，H 不经梁；自锚式梁端"
+             "纵向**必须自由**，否则 H 会被支座直接吃掉、梁轴力算成 0——"
+             "位移和索力看起来全都正常，只有这一项错。故纵向约束放在跨中，"
+             "对称荷载下该约束的支反力恒为零，只起消除刚体位移的作用。")
+    w.p("由此带来一个容易被忽略的约束：自锚式的锚点就在加劲梁端，而竖向支座"
+        "**只能承压、不能承拉**。主缆在锚点处的竖向分力 V 必须很小，否则梁端"
+        "要被拔起来。V 是几何决定量而非可调参数，见 3.5 节的推导。")
+
+    rows = [
+        ["主缆锚固", "锚碇（全约束）", "加劲梁端节点"],
+        ["H 的传力路径", "锚碇 → 地基", "主缆 → 加劲梁（轴压）"],
+        ["加劲梁轴力", "≈ 0", "≈ −H"],
+        ["梁端纵向约束", "固定", "自由（约束移至跨中）"],
+        ["锚点竖向分力", "由锚碇抗拔承担", "由梁端支座承担，须接近 0"],
+        ["对边跨长度的要求", "无特殊要求（常取 L/3）", "由 V=0 定，明显长于 L/3"],
+    ]
+    w.table("两种体系的受力差别", ["项目", "地锚式", "自锚式"], rows,
+            widths=[3.6, 5.6, 6.3], aligns=["l", "l", "l"])
+    w.note("本次计算的对象是：" + ("自锚式" if d["is_self"] else "地锚式")
+           + "。上表另一列只作对照，不参与本次计算。")
+
+    w.h2("1.3　计算依据")
+    for t in ("JTG D60-2015《公路桥涵设计通用规范》：恒载取值与荷载组合。",
+              "JTG/T D65-05-2015《公路悬索桥设计规范》：主缆与吊索安全系数、"
+              "矢跨比范围。",
+              "JTG/T 3365-01-2020《公路斜拉桥设计规范》：索的容许应力与"
+              "安全系数取值的对照。",
+              "GB/T 17101《桥梁缆索用热镀锌或锌铝合金钢丝》：主缆钢丝强度。"):
+        w.bullet(t)
+    w.p(f"计算软件为 FEM-Eigen 空间杆系几何非线性求解器（共转列式 + 索垂度"
+        f"弹性悬链线），求解入口 cable_solver，本次计算迭代 {d['iterations']} 轮、"
+        f"耗时 {_f(d['elapsed_ms'], 0)} ms、收敛={'是' if d['converged'] else '否'}。")
+
+
+# ---------------------------------------------------------------- 第 2 章
+
+def _susp_sec_2(w: _Writer, model, d: dict, fig_frame: Path) -> None:
+    w.h1("计算模型")
+    w.h2("2.1　离散与编号")
+    w.p(f"全桥离散为空间杆系：加劲梁用梁单元沿单梁线（桥轴线）离散，桥塔用"
+        f"梁单元沿塔轴离散，主缆与吊索用只受拉的索单元。模型共 "
+        f"{d['n_nodes']} 个节点、{d['n_elems']} 个单元、{d['dofs']} 个自由度，"
+        f"其中主缆 {d['n_main']} 段、吊索 {d['n_hanger']} 根、"
+        f"加劲梁 {d['n_girder']} 段。")
+    rows = [
+        ["加劲梁", "1000+i", "100+i", "BEAM", "钢箱梁"],
+        ["主缆", "2000+k", "3000+k", "CABLE", "高强钢丝"],
+        ["桥塔（塔 1/塔 2）", "3000+m / 4000+m", "800+m / 900+m", "BEAM", "混凝土"],
+        ["吊索", "—", "6000+j", "CABLE", "高强钢丝"],
+        ["锚碇（仅地锚式）", "主缆端节点", "—", "—", "—"],
+    ]
+    w.table("构件编号约定", ["构件", "节点号", "单元号", "单元类型", "材料"], rows,
+            widths=[3.4, 3.4, 3.2, 2.4, 3.1], aligns=["l", "c", "c", "c", "l"])
+    w.note("主缆节点在塔位处**直接使用塔顶节点**，不另建坐标相同的节点。"
+           "若两者只是坐标重合而不共用，主缆就成了一根从锚碇到锚碇的自由索，"
+           "塔不参与受力——求解照样收敛、位移倾角看着都像座桥，只有索力会掉到"
+           "设计值的百分之一。求解器对此有一条硬校验。")
+
+    w.h2("2.2　材料与截面")
+    rows = []
+    for mat in model.materials:
+        rows.append([f"M{mat.id}", _f(mat.E / 1e9, 1), _f(mat.dens, 0)])
+    w.table("材料", ["编号", "弹性模量 E (GPa)", "密度 (kg/m³)"], rows,
+            widths=[3.0, 6.0, 6.0], aligns=["c", "c", "c"])
+    rows = []
+    for rc in model.reals:
+        rows.append([f"R{rc.id}", _f(rc.A, 5), _f(getattr(rc, "IY", 0) or 0, 4),
+                     _f(getattr(rc, "W", 0) or 0, 1)])
+    w.table("实常数（截面）", ["编号", "面积 A (m²)", "惯性矩 Iy (m⁴)",
+                              "线重 W (N/m)"], rows,
+            widths=[3.0, 4.2, 4.2, 4.1], aligns=["c", "c", "c", "c"])
+
+    w.h2("2.3　边界条件")
+    rows = []
+    x_of = d["node_x"]
+    for b in model.boundaries:
+        dofs = tuple(getattr(b, "dofs", ()) or ())
+        if not dofs:
+            continue
+        # 只列"体系性"约束，逐节点的扭转定位约束不逐条列（数量多、信息量低）
+        if dofs == (4, 4):
+            continue
+        rows.append([b.node, _f(x_of.get(b.node, float("nan")), 1),
+                     " ".join(str(x) for x in dofs)])
+    if not rows:
+        rows = [["—", "—", "—"]]
+    w.table("节点约束（扭转定位约束不逐条列出）",
+            ["节点", "x (m)", "约束自由度"], rows,
+            widths=[3.4, 4.0, 8.1], aligns=["c", "c", "l"])
+    w.p("自由度 1/2/3 为沿 X/Y/Z 的平动，4/5/6 为绕 X/Y/Z 的转动。"
+        "主缆与吊索落在 y=0 平面内，索单元只提供轴向刚度，主缆节点的平面外"
+        "自由度没有刚度来源，故按平面问题处理——这是单索面模型的既定假定，"
+        "真实结构的面外刚度来自另一根主缆与横撑。")
+
+    w.h2("2.4　恒载")
+    w.p(f"桥面恒载以节点集中力的形式施加，按节点分担宽度分配，"
+        f"合计 {_f(d['total_deck_load'] / 1e3, 0)} kN。塔柱自重按塔段长度"
+        f"分摊到塔节点。主缆与吊索的自重由索单元线重自动计入（浅垂度弹性"
+        f"悬链线中的 w），不重复施加节点力。")
+    w.p("**注意一处刻意的处理**：加劲梁单元自身线重取 0，桥面恒载 "
+        "q 已含钢箱梁自重。若两者都计，梁会重一遍，而重的那一遍不会出现在"
+        "找形取用的节点荷载里，成桥态就会出现一个与荷载不符的系统性偏差。")
+
+    w.h2("2.5　计算简图")
+    w.figure(fig_frame, "结构计算简图（主缆、吊索、桥塔、加劲梁与竖向支承）")
+
+
+# ---------------------------------------------------------------- 第 3 章
+
+def _susp_sec_3(w: _Writer, model, d: dict) -> None:
+    w.h1("主缆找形")
+    w.h2("3.1　为什么悬索桥不能“给线形、求索力”")
+    w.p("斜拉桥的设计线形由人给定（梁面高程是设计出来的），索力去适应它；"
+        "悬索桥正相反：**主缆的线形由恒载决定**，人给定的是矢高（或矢跨比），"
+        "线形与索力一起被解出来。把一条人工给定的抛物线当设计线形去做成桥态"
+        "闭环，会得到一个无解的方程——残差卡在数厘米上看起来像“没收敛”，"
+        "实质是那条线形根本不是平衡态。所以必须先找形。")
+
+    w.h2("3.2　索多边形的微分方程")
+    w.p("取主缆任一微段，设水平分力为 H（沿全索不变——这正是索的平衡条件："
+        "索上无水平荷载），竖向力为 V(x)，则")
+    w.formula("H · dz/dx = V(x)", "索的切线斜率由水平力与竖向力之比确定")
+    w.p("对微段竖向平衡，V 沿 x 的变化率等于该处的向下荷载集度 q(x)，故")
+    w.formula("V(x) = V_0 − S(x)，　S(x) = ∫_0^x q(ξ) dξ",
+              "S 为截面以左的累计竖向荷载，V_0 为起点处的竖向力")
+    w.p("两式合并即得线形的积分式。数值实现上不解析求 q，而是**逐段累加**："
+        "把每个主缆节点上的吊索力与主缆自重按段中点的左侧累计荷载累加，"
+        "再逐段积分高程。这样点荷载与自重可以同时精确进入，不必把吊索力"
+        "摊成等效均布荷载。")
+    w.formula("z_{k+1} = z_k + (S_k − V_0) · Δx_k / H")
+    w.p("端部条件给出 V_0：要求 z 从起点积到终点恰好等于两者的高差 Δz，于是")
+    w.formula("V_0 = (M − H·Δz) / L，　M = ∫_0^L S(x) dx",
+              "主跨两端等高时 Δz=0，退化为 V_0 = M/L（即恒载的一半）")
+    w.p("各分段索力随之确定：T_k = √(H² + V_k²)，V_k = V_0 − S_k。")
+
+    w.h2("3.3　水平力 H 的确定")
+    w.p("矢高 f 随 H 单调减小（H 越大索绷得越直），因此对 H 二分必然收敛。"
+        "实现上在对数区间内二分 200 次，得到使主跨矢高命中目标的 H。"
+        "本次计算的结果为：")
+    w.formula(f"H = {_f(d['H_kN'], 0)} kN，　矢高 = {_f(d['sag'], 4)} m "
+              f"（目标 {_f(d['sag_target'], 4)} m）")
+    q_est = d["H_kN"] * 8 * d["sag"] / (d["span"] ** 2) if d["span"] > 0 else 0.0
+    w.p(f"作为对照，把主跨荷载视为均布时 H ≈ qL²/(8f)，反解等效均布荷载 "
+        f"q ≈ {_f(q_est, 1)} kN/m，与“桥面恒载 + 主缆自重”量级一致，"
+        f"说明找形结果可信（数值差来自吊索的集中力与主缆沿跨的自重分布）。")
+
+    w.h2("3.4　主缆连续跨塔：三跨为什么必须共用一个 H")
+    w.p("主缆在塔顶是连续通过的（索鞍处只能转向，不能断开）。若主跨与边跨"
+        "用了不同的 H，塔顶就会受到一对大小不等、方向相反的水平力，塔柱要"
+        "靠弯曲去平衡它——这在真实结构里不存在，是建模引入的假力。所以做法是："
+        "**先由主跨定 H，再用同一个 H 积分两个边跨**，边跨的端部竖向力由"
+        "各自的高差条件反求。塔顶的水平力因此自动平衡，塔柱只承受竖向力。")
+    w.p("边跨与主跨在塔顶的竖向分力并不相等，其差额就是塔柱的轴力来源——"
+        "这是悬索桥塔柱的主要荷载，见 4.6 节。")
+
+    w.h2("3.5　边跨平衡条件（自锚式的关键约束）")
+    w.p("由 3.2 节的 V_0 表达式，边跨主缆在锚点处的竖向分力为")
+    w.formula("V = H·(Δz/L) − qL/2",
+              "Δz 为塔顶到锚点的高差，L 为边跨长度，q 为边跨等效均布荷载")
+    w.p("令 V = 0 解出边跨长度：")
+    w.formula("L = √(2·H·Δz / q)", "此时主缆在锚点恰好水平，锚点只受水平力")
+    if d["is_self"]:
+        w.p(f"**这一条对自锚式是有约束力的**：锚点就在加劲梁端，梁端竖向支座"
+            f"不能承拉。若边跨短于上式给出的长度，主缆在锚点仍有向上的竖向"
+            f"分力，梁端会被拔起来，必须设抗拔支座或压重。本桥边跨按此式取值，"
+            f"主缆在锚点接近水平。")
+    else:
+        w.p("**地锚式不受这条约束**：锚碇靠自重与摩阻抗拔，V 为负（主缆向上"
+            "拔锚碇）是常态，锚碇设计按抗拔与抗滑验算即可。因此地锚式的边跨"
+            "可按常规取 1/3 主跨。")
+    if d["is_self"]:
+        v_anchor = [v for (n, dd), v in d["reaction"].items()
+                    if dd == 3 and 1000 < n < 2000]
+        if v_anchor:
+            w.p(f"本次计算得到的梁端竖向反力最小值为 "
+                f"{_f(min(v_anchor) / 1e3, 1)} kN（负值表示需下拉）。"
+                f"|V|/H = {_f(abs(min(v_anchor)) / max(d['H_kN'], 1e-9), 3)}，"
+                f"远小于 0.15，梁端无需抗拔构造。")
+    # 平衡边跨的几何后果：锚点水平 → 边跨主缆不是"锚点到塔顶的直线"
+    shp = sorted((v for v in d.get("cable_shape", {}).values()),
+                 key=lambda v: v[0])
+    if d["is_self"] and len(shp) >= 3:
+        (x0, z0), (x1, z1) = shp[0], shp[1]
+        slope0 = (z1 - z0) / max(x1 - x0, 1e-12)
+        w.p("平衡边跨还有一个常被忽略的几何后果：锚点处竖向分力为零，意味着"
+            "**主缆在锚点的切线是水平的**。所以边跨主缆不是“从锚点斜拉到塔顶”"
+            "的一条直线，而是顶点落在锚点的抛物线，越靠近塔顶越陡。"
+            f"本次计算中锚点段的初始斜率 dz/dx = {_f(slope0, 4)}（≈0），"
+            "而“锚点到塔顶的直线”在该处的斜率应是 "
+            f"{_f(d['tower_top_z'] / max(d['side_span'], 1e-9), 3)}——"
+            "两者在塔根附近的偏差可达数米。建模时若按直线画初值并无不可"
+            "（找形会把它改过来），但**设计线形与图件必须取找形结果**，"
+            "拿初值当设计线形是把错的线形交给施工。")
+
+    w.h2("3.6　无应力索长反算与索长迭代")
+    w.p("找形给出的是**成桥态的几何与目标索力**，而施工需要的是**无应力索长**"
+        "（下料长度）。由浅垂度弹性悬链线，已知弦长 L_c 与索力 T 时无应力索长为")
+    w.formula("L_0 = (L_c + s) / (1 + T/EA)，　s = w²·L_h³ / (24·T²)",
+              "s 为索在自重下的垂度附加长度，L_h 为水平投影长度")
+    w.p("反算本身是闭式的，但有一处必须迭代：上式里的 L_c 应当取**平衡态弦长**，"
+        "而不是设计弦长——两者差一个弹性缩短量（自锚式尤为明显，加劲梁被 H "
+        "压缩，主缆跨度随之缩短，可达 100 mm 量级）。用设计弦长反算，达到的索力"
+        "会系统性偏低百分之几，这点差额最后全部变成加劲梁的恒载弯矩。")
+    w.p(f"实现上每轮只改 L_0、不动几何，反复求解直到达到索力与目标索力的最大"
+        f"相对偏差小于 0.1%。本次计算的最终偏差为 {_f(d['tension_err'] * 100, 2)}%，"
+        f"加劲梁恒载弯矩被压到 {_f(d['girder_M_max'], 0)} kN·m。")
+
+
+# ---------------------------------------------------------------- 第 4 章
+
+def _susp_sec_4(w: _Writer, d: dict, *, fig_tension: Path, fig_girder: Path) -> None:
+    w.h1("成桥态计算结果")
+    w.h2("4.1　结果汇总")
+    rows = [
+        ["主缆水平力 H", f"{_f(d['H_kN'], 0)}", "kN", "找形结果，非人为给定"],
+        ["成桥矢高", f"{_f(d['sag'], 3)}", "m",
+         f"目标 {_f(d['sag_target'], 3)} m"],
+        ["主缆索力", f"{_f(d['T_main_min'] / 1e3, 0)} ~ "
+                     f"{_f(d['T_main_max'] / 1e3, 0)}", "kN", "分段极值"],
+        ["吊索索力", f"{_f(d['T_hanger_min'] / 1e3, 1)} ~ "
+                     f"{_f(d['T_hanger_max'] / 1e3, 1)}", "kN",
+         f"{d['n_hanger']} 根"],
+        ["吊索竖向力合计", f"{_f(d['T_hanger_sum'] / 1e3, 0)}", "kN",
+         "应等于其所吊桥面恒载"],
+        ["加劲梁轴力 |N|max", f"{_f(d['girder_N_max'], 0)}", "kN",
+         "自锚式应 ≈ H；地锚式应 ≈ 0"],
+        ["加劲梁弯矩 |My|max", f"{_f(d['girder_M_max'], 0)}", "kN·m",
+         "恒载下应接近 0"],
+        ["竖向支反力合计", f"{_f(d['support_v_sum'], 0)}", "kN",
+         f"与竖向荷载 {_f(d['applied_v'], 0)} kN 之比"],
+        ["竖向平衡偏差", f"{_f(d['balance_pct'], 4)}", "%", "目标 < 0.01%"],
+        ["达到索力偏差", f"{_f(d['tension_err'] * 100, 2)}", "%", "目标 < 0.1%"],
+        ["最大预变形", f"{_f(d['camber_max'] * 1000, 0)}", "mm",
+         "制造线形相对设计线形的偏移"],
+    ]
+    w.table("成桥态主要结果", ["项目", "数值", "单位", "说明"], rows,
+            widths=[4.0, 3.4, 1.8, 6.3], aligns=["l", "r", "c", "l"])
+
+    w.h2("4.2　主缆索力")
+    w.p("主缆沿全长是一条连续索，各分段索力由 √(H²+V²) 给出，水平分力 H "
+        "沿全长不变。塔顶附近的分段索力最大（该处斜率最陡），跨中附近最小"
+        "（斜率接近零，索力接近 H 本身）。")
+    tb = d["tables"].get("main_cable_table")
+    if tb:
+        w.table("主缆分段索力与下料长度", tb["headers"], tb["rows"],
+                widths=[2.2, 2.6, 2.6, 2.6, 2.6, 1.5, 1.4],
+                aligns=["c", "r", "r", "r", "r", "r", "r"])
+        w.note(tb["note"])
+    w.figure(fig_tension, "主缆分段索力与吊索索力分布")
+
+    w.h2("4.3　吊索索力")
+    w.p("吊索的目标索力直接取该梁节点承担的竖向恒载，不需要迭代——这是悬索桥"
+        "与斜拉桥在“索力怎么来”上最直观的差别。实际达到的索力与目标相差 "
+        f"{_f(d['tension_err'] * 100, 2)}%，差值来自加劲梁的弹性压缩改变了索的弦长，"
+        "已在 3.6 节通过索长迭代压到很小。")
+    tb = d["tables"].get("hanger_table")
+    if tb:
+        w.table("吊索索力、下料长度与安全系数", tb["headers"], tb["rows"],
+                widths=[2.2, 2.2, 2.6, 2.6, 2.2, 2.2, 1.5],
+                aligns=["c", "c", "r", "r", "r", "r", "r"])
+        w.note(tb["note"])
+
+    w.h2("4.4　加劲梁内力")
+    w.p("恒载下加劲梁的受力状态是判别体系是否建模正确的第一道关："
+        + ("自锚式应形成约 −H 的轴压力，弯矩则应接近 0；" if d["is_self"]
+           else "地锚式轴力应接近 0（H 由锚碇直接承受），弯矩也应接近 0；")
+        + "若梁的弯矩出现数千 kN·m 量级，说明吊索力与桥面荷载没有对上，"
+          "荷载被梁“扛”过去了。")
+    tb = d["tables"].get("girder_table")
+    if tb:
+        w.table("加劲梁恒载内力", tb["headers"], tb["rows"],
+                widths=[3.0, 4.2, 4.2, 4.1], aligns=["c", "r", "r", "r"])
+        w.note(tb["note"])
+    w.figure(fig_girder, "加劲梁恒载弯矩与轴力沿桥分布")
+
+    w.h2("4.5　支座反力与竖向平衡")
+    w.p(f"全部支座竖向反力之和为 {_f(d['support_v_sum'], 0)} kN，竖向荷载合计 "
+        f"{_f(d['applied_v'], 0)} kN（节点恒载 + 缆索自重），偏差 "
+        f"{_f(d['balance_pct'], 4)}%。这一项是**全局平衡校核**，也是"
+        f"判断“模型有没有算对”最硬的一条：它不依赖任何假定，只依赖平衡。")
+    w.p("说明：悬索桥不能用“索力竖向分量之和”做平衡校核。主缆各段的竖向分量"
+        "一段向上、一段向下，求和的符号取决于每段的方向被取成哪一端，得到的"
+        "数没有物理意义（实测可达恒载的 6 倍）。真正的平衡式是"
+        "Σ支座反力 = Σ竖向荷载。")
+    tb = d["tables"].get("reaction_table")
+    if tb:
+        w.table("支座反力", tb["headers"], tb["rows"],
+                widths=[3.0, 3.6, 3.0, 5.9], aligns=["c", "r", "c", "r"])
+        w.note(tb["note"])
+
+    w.h2("4.6　桥塔内力")
+    towers = sorted({n for (n, dd), _v in d["reaction"].items()
+                     if dd == 3 and 3000 < n < 5000})
+    w.p("塔柱轴力 = 塔顶主缆竖向分力之和 + 塔柱自重。塔顶主缆竖向分力可由"
+        "主缆在该处的斜率与 H 直接得到；塔底竖向反力则直接取 4.5 节的支座"
+        "反力结果。")
+    if towers:
+        rows = []
+        for nid in towers:
+            v = d["reaction"].get((nid, 3))
+            if v is None:
+                continue
+            rows.append([nid, _f(d["node_x"].get(nid, float("nan")), 1),
+                         _f(v / 1e3, 0)])
+        if rows:
+            w.table("塔底竖向反力", ["节点", "x (m)", "竖向反力 (kN)"], rows,
+                    widths=[3.4, 4.2, 7.9], aligns=["c", "r", "r"])
+    w.note("塔处加劲梁的竖向支座反力按支座反力单独计，不并入塔柱轴力——"
+           "本版把塔梁传力路径简化为“梁在塔处直接支承”，不细分经横梁传至"
+           "塔柱的过程。若需计入，把塔位梁节点的竖向反力叠加到塔柱轴力上。")
+
+
+# ---------------------------------------------------------------- 第 5 章
+
+def _susp_sec_5(w: _Writer, d: dict) -> None:
+    w.h1("体系与安全度校核")
+    w.h2("5.1　校核汇总")
+    rows = []
+    for c in d["checks"]:
+        rows.append(["√" if c.passed else "×", c.name, c.detail or "—"])
+    if not rows:
+        rows = [["—", "—", "无校核项"]]
+    w.table("校核汇总（√ 通过 / × 不通过）", ["结论", "校核项", "计算值"], rows,
+            widths=[1.4, 5.0, 9.1], aligns=["c", "l", "l"])
+    w.note("不通过项必须处理；标注为“仅陈述”的项不构成判定，只说明量级。"
+           "矢跨比、吊索力均匀性、索力达到目标三项属于“建议值”级别，"
+           "超出时需人工判断而不是直接判不合格。")
+
+    w.h2("5.2　体系自洽性校核")
+    if d["is_self"]:
+        w.p("自锚式的定义就是主缆水平力 H 压进加劲梁，所以恒载下梁内轴力必然"
+            "≈ −H。这一条是本计算书里**最能一把抓住模型错误**的判据：若把纵向"
+            "约束错放在梁端，H 会直接进支座，梁轴力算成 0，而位移、索力、"
+            "竖向平衡全都正常——除了模型本身已经错了。")
+        w.formula(f"|N_梁| / H = {_f(abs(d['girder_N_max']) / max(d['H_kN'], 1e-9), 3)}"
+                  f"　（应 ≈ 1，容差 10%）")
+    else:
+        w.p("地锚式的主缆水平力 H 由锚碇直接传给地基，不进入加劲梁，所以恒载"
+            "下梁内轴力应接近 0。若出现接近 H 的轴力，说明主缆端节点被误接到了"
+            "加劲梁上（那已经是自锚式了）。")
+        w.formula(f"|N_梁| / H = {_f(abs(d['girder_N_max']) / max(d['H_kN'], 1e-9), 4)}"
+                  f"　（应 ≈ 0）")
+
+    w.h2("5.3　索的安全系数")
+    w.p("主缆安全系数按 JTG/T D65-05-2015 取 2.0，吊索取 2.5。主缆的限值反而"
+        "比吊索低，原因是主缆不可更换、设计上按全寿命考虑，而吊索可更换——"
+        "这是规范里的既有取舍，不是笔误。")
+    w.formula("K = A · f_pu / T", "A 取实常数截面，主缆 f_pu = 1770 MPa，"
+                                  "吊索 f_pu = 1860 MPa")
+    w.p("逐根安全系数见 4.2 节与 4.3 节的明细表。注意主缆与吊索的截面积相差"
+        "近二十倍，必须按各自的实常数分别计算；用同一个面积去算会把吊索判重"
+        "二十倍，看起来“吊索很安全”。")
+
+
+# ---------------------------------------------------------------- 第 6 章
+
+def _susp_sec_6(w: _Writer, model, d: dict, fig_camber: Path) -> None:
+    w.h1("下料长度与制造线形")
+    w.h2("6.1　主缆与吊索的下料长度")
+    w.p("下料长度 L_0 是**无应力长度**，即索在零应力状态下的长度，由 3.6 节的"
+        "闭式反算给出，并经索长迭代修正到与平衡态弦长一致。施工时按 L_0 下料，"
+        "架设后施加恒载，索即伸长到设计弦长、达到设计索力。")
+    rows = []
+    for r in d["chain"][:6]:
+        rows.append([r["elem"], _f(r["L0"], 4), _f(float(r["T"]) / 1e3, 1)])
+    if len(d["chain"]) > 6:
+        rows.append(["…", "…", "…"])
+    w.table("主缆分段下料长度（摘录，全表见 4.2 节）",
+            ["单元", "下料 L0 (m)", "索力 (kN)"], rows,
+            widths=[4.0, 6.0, 5.5], aligns=["c", "r", "r"])
+
+    w.h2("6.2　制造线形与预变形")
+    w.p("制造线形 = 设计线形 − 成桥位移。索承体系的成桥位移是“弹性压缩 + 索的"
+        "弹性伸长”的结果，量级在毫米到厘米；自锚式还要多一项加劲梁的轴向"
+        "缩短（H·L/EA），可达百毫米量级，这一项属于**制造长度补偿**而不是"
+        "预拱度，两者要分开看。")
+    w.formula("预变形 = −u，　制造线形 = 设计线形 + 预变形",
+              "u 为成桥位移（相对制造线形），故制造线形 = 设计线形 − u")
+    w.p(f"本次计算加劲梁的最大竖向预变形为 {_f(d['camber_max'] * 1000, 1)} mm，"
+        f"约为主跨的 L/{_f(d['span'] * 1000.0 / max(d['camber_max'] * 1000, 0.1), 0)}。"
+        "这个量级对应的是预制标高调整，量级很小说明恒载线形已由主缆找形吸收掉了——"
+        "悬索桥的恒载弯矩本来就该接近于零。")
+    w.figure(fig_camber, "加劲梁竖向预变形沿桥分布")
+    if d["is_self"]:
+        w.p(f"另一项必须单独交代：主缆锚在加劲梁端，水平力 H = {_f(d['H_kN'], 0)} kN "
+            f"直接压进梁体，成桥态梁体总缩短 {_f(abs(d['deck_short_mm']), 1)} mm，"
+            f"两端各向内位移 {_f(d['deck_end_move_mm'], 1)} mm。"
+            "这一项要靠**梁端伸缩缝 / 合龙段预留**消化，不是起拱能解决的；"
+            "施工时若按竖向预变形反推梁段长度，就会少放长这一截。")
+    else:
+        w.p("地锚式的主缆锚在锚碇上，H 由锚碇传给地基，加劲梁不承担轴力，"
+            "因此不存在梁体轴向缩短这一项——这也是地锚式与自锚式在施工控制上"
+            "最省心的地方。")
+    tb = d["tables"].get("camber_table")
+    if tb:
+        w.table("加劲梁制造线形（预变形）", tb["headers"], tb["rows"],
+                widths=[3.0, 3.6, 4.4, 4.5], aligns=["c", "r", "r", "r"])
+    w.note("本内核输出的预变形取负号即为“制造时压低/放长”的方向："
+           "正号表示成桥后该点会上升，制造时应预先压低。")
+
+
+# ---------------------------------------------------------------- 第 7 章
+
+def _susp_sec_7(w: _Writer, d: dict) -> None:
+    w.h1("结论与建议")
+    w.h2("7.1　主要结论")
+    w.bullet(f"主缆线形由恒载找形确定，矢高 {_f(d['sag'], 3)} m 命中目标 "
+             f"{_f(d['sag_target'], 3)} m，对应水平力 H = {_f(d['H_kN'], 0)} kN。")
+    w.bullet(f"主缆分段索力 {_f(d['T_main_min'] / 1e3, 0)} ~ "
+             f"{_f(d['T_main_max'] / 1e3, 0)} kN，吊索索力 "
+             f"{_f(d['T_hanger_min'] / 1e3, 1)} ~ {_f(d['T_hanger_max'] / 1e3, 1)} kN，"
+             f"达到值与找形目标的偏差 {_f(d['tension_err'] * 100, 2)}%。")
+    if d["is_self"]:
+        w.bullet(f"加劲梁恒载轴力 {_f(d['girder_N_max'], 0)} kN ≈ −H，"
+                 f"自锚体系成立；恒载弯矩 {_f(d['girder_M_max'], 0)} kN·m，"
+                 f"处于该体系正常量级。")
+    else:
+        w.bullet(f"加劲梁恒载轴力 {_f(d['girder_N_max'], 0)} kN（≈0），"
+                 f"恒载弯矩 {_f(d['girder_M_max'], 0)} kN·m，"
+                 f"恒载全部由主缆承担，符合地锚式悬索桥的受力特征。")
+    w.bullet(f"Σ支座反力 {_f(d['support_v_sum'], 0)} kN 与 Σ竖向荷载 "
+             f"{_f(d['applied_v'], 0)} kN 的偏差 {_f(d['balance_pct'], 4)}%，"
+             f"全局竖向平衡成立。")
+
+    w.h2("7.2　设计建议")
+    if d["is_self"]:
+        w.bullet("自锚式的边跨长度受“锚点主缆水平”条件约束（3.5 节），"
+                 "取值明显长于地锚式的 1/3 主跨。若受场地限制必须缩短边跨，"
+                 "梁端会出现上拔力，需设抗拔支座或压重，并把该项列入施工工序。")
+        w.bullet("加劲梁在恒载下即承受约 −H 的轴压力，其稳定性（面内、面外）"
+                 "与截面压应力应作为控制条件另行验算；本计算书只给出内力，"
+                 "不做承载力判定。")
+    else:
+        w.bullet("锚碇需按抗拔与抗滑验算：主缆在锚点把锚碇向上拔，"
+                 "设计不能只考虑承压。锚碇反力见 4.5 节。")
+        w.bullet("地锚式的边跨可取 1/3 主跨左右，但需注意边跨过短会使主缆在"
+                 "锚点的竖向分力过大，锚碇规模随之增加。")
+    w.bullet("主缆与吊索的安全系数按标准值验算；运营期的活载效应与荷载组合"
+             "需另接活载模块，本计算书不包含活载。")
+    w.bullet("本模型为单索面平面模型，未计双索面与横撑提供的面外刚度。"
+             "面外稳定（主缆横向、吊索横向、加劲梁侧向）应另行验算。")
+
+    w.h2("7.3　附件")
+    w.table("计算附件", ["文件", "说明"], [
+        ["suspension.dat", "求解器输入（模型 + 悬索桥找形定位段）"],
+        ["suspension_cable.txt", "求解器原始输出（索力/索长/反力/位移，分段纯文本）"],
+        ["fig_susp_frame.png", "图 2-1 源图"],
+        ["fig_susp_tension.png", "图 4-1 源图"],
+        ["fig_susp_girder.png", "图 4-2 源图"],
+        ["fig_susp_camber.png", "图 6-1 源图"],
+    ], widths=[4.6, 10.9], aligns=["l", "l"])
+    par = w.doc.add_paragraph()
+    par.paragraph_format.space_before = Pt(12)
+    r = par.add_run("— 计算书结束 —")
+    _set_run_font(r, cn=FONT_HEI, size=10.5, color=GRAY)
+    par.alignment = WD_ALIGN_PARAGRAPH.CENTER

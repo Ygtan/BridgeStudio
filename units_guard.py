@@ -90,6 +90,18 @@ _SCALARS: dict[str, dict[str, tuple[float, float, str, str, str]]] = {
         "B": (BRIDGE_MAX_WIDTH, 1000.0, "mm", "主梁宽", "m"),
         "q": (BEAM_MAX_UDL, 1000.0, "N/m", "桥面恒载", "kN/m"),
     },
+    # 悬索桥同样不能漏登记：`_SCALARS.get(kind, {})` 对未知 kind 是**空操作**，
+    # 于是"主跨300000"（本意 300 m）会一路建成 300 km 的悬索桥，找形照样收敛、
+    # 平衡偏差照样是 0.00%——只是 H 差了六个量级。
+    "suspension": {
+        "Lm": (BRIDGE_MAX_SPAN, 1000.0, "mm", "主跨", "m"),
+        "Ls": (BRIDGE_MAX_SPAN, 1000.0, "mm", "边跨", "m"),
+        "h": (BEAM_MAX_SECTION, 1000.0, "mm", "加劲梁高", "m"),
+        "B": (BRIDGE_MAX_WIDTH, 1000.0, "mm", "加劲梁宽", "m"),
+        "q": (BEAM_MAX_UDL, 1000.0, "N/m", "桥面恒载", "kN/m"),
+        "panel": (BEAM_MAX_SECTION, 1000.0, "mm", "吊索间距", "m"),
+        "clear": (BEAM_MAX_SECTION, 1000.0, "mm", "跨中净空", "m"),
+    },
 }
 
 
