@@ -49,7 +49,11 @@ def main() -> int:
     # ---------------------------------------------------------- ① 注册表
     print("\n[① 注册表]")
     keys = solver_keys()
-    check("注册表含两个内核", set(keys) == {"grillage3d", "cable_stayed"}, str(keys))
+    # 三个内核：梁格、斜拉桥成桥态、悬索桥成桥态。后两个共用同一个 exe，
+    # 但 adapt 与出口不同，在注册表里是两个键——"同一个 exe"不等于"同一个
+    # 内核"，混成一个键会让 detect_kind 的分支无处落地。
+    check("注册表含三个内核",
+          set(keys) == {"grillage3d", "cable_stayed", "suspension"}, str(keys))
     caps = capabilities()
     check("capabilities 与注册表同键", set(caps) == set(keys), str(caps))
     for k in keys:
