@@ -87,6 +87,9 @@ def build_suspension_3d(
     deck_grade: str = "Q345qD",           # 加劲梁钢材牌号（应力验算用，不参与求解）
     tower_grade: str = "C50",             # 桥塔混凝土等级（同上）
     q_deck: float = 100e3,                # 桥面恒载 N/m（含桥面系与二期）
+    lane_count: int = 3,                  # 横向设计车道数
+    lane_reduction: float = 0.78,         # 多车道横向折减系数（JTG D60 表 4.3.1-5）
+    eccentricity: float = 1.15,           # 偏载增大系数（横向偏载放大，需按实际确认）
     title: str = "",
 ) -> tuple[ModelSpec3D, dict]:
     """生成悬索桥 ModelSpec3D（成桥态工况）与派生量字典。"""
@@ -394,7 +397,10 @@ def build_suspension_3d(
         cable_bridge=cable_bridge,
         # 车道：加劲梁纵向节点序列，按 JTG D60 自动生成 qk/Pk。
         # 索承体系内核在成桥态切线刚度上算活载梁内力包络（见 cable_solver）。
-        lanes=[Lane3D(nodes=deck_ids, code="JTG_D60")],
+        # 横向布载用横向分布系数法：m = lane_count·lane_reduction·eccentricity。
+        lanes=[Lane3D(nodes=deck_ids, code="JTG_D60",
+                      lane_count=lane_count, reduction=lane_reduction,
+                      eccentricity=eccentricity)],
     )
 
     # 解析手算水平力：均布近似 H = qL²/(8f)，仅作对照（真正值由内核找形给出）
@@ -426,6 +432,8 @@ def build_suspension_3d(
         "H_estimate": q_main * L_main ** 2 / (8 * f_sag),
         "n_nodes": len(nodes),
         "n_elements": len(elements),
+        "lane_count": lane_count,
+        "transverse_distribution": lane_count * lane_reduction * eccentricity,
     }
     return model, meta
 

@@ -70,6 +70,9 @@ def build_cable_stayed_3d(
     E_conc: float = 34.5e9,
     dens_conc: float = 2500.0,
     deck_grade: str = "C50",              # 主梁混凝土等级（应力验算用，不参与求解）
+    lane_count: int = 3,                  # 横向设计车道数
+    lane_reduction: float = 0.78,         # 多车道横向折减系数（JTG D60 表 4.3.1-5）
+    eccentricity: float = 1.15,           # 偏载增大系数（横向偏载放大，需按实际确认）
     mode: str = "COMPLETION",
     method: str = "DECK",                 # DECK | MINENERGY | RIGID
     cable_tensions: dict[int, float] | None = None,   # 指定索力（N），缺省按 method 定
@@ -298,7 +301,11 @@ def build_cable_stayed_3d(
         cable_bridge=cable_bridge,
         # 车道：主梁纵向节点序列，按 JTG D60 自动生成 qk/Pk。
         # 索承体系内核在成桥态切线刚度上算活载梁内力包络（见 cable_solver）。
-        lanes=[Lane3D(nodes=[gid(i) for i in range(len(xs))], code="JTG_D60")],
+        # 横向布载用横向分布系数法：m = lane_count·lane_reduction·eccentricity
+        # 折进纵向影响线包络（单梁模型算不出严格横向影响面，见 model_spec_3d.Lane3D）。
+        lanes=[Lane3D(nodes=[gid(i) for i in range(len(xs))], code="JTG_D60",
+                      lane_count=lane_count, reduction=lane_reduction,
+                      eccentricity=eccentricity)],
     )
     # 供界面/验证脚本读取的派生量（不算模型字段，避免污染 pydantic 契约）
     model_meta = {
@@ -313,6 +320,8 @@ def build_cable_stayed_3d(
         "tension_method": method,
         "n_nodes": len(nodes),
         "n_tower_seg": n_tower_seg,
+        "lane_count": lane_count,
+        "transverse_distribution": lane_count * lane_reduction * eccentricity,
     }
     return model, model_meta
 

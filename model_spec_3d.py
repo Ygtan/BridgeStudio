@@ -350,13 +350,20 @@ class Lane3D(BaseModel):
 
     CODE="JTG_D60" 时由内核按车道首末节点距离 L 自动取
     qk=10.5 kN/m、Pk(L)（L≤5m:270kN，L≥50m:360kN，线性内插）。
+
+    横向布载（横向分布系数法）：单梁模型横向只有一个节点，算不出严格
+    横向影响面，规范上用「横向分布系数」把多车道并排布载折进纵向影响线
+    包络：m = lane_count · reduction · eccentricity。三个量缺省（1, 1.0, 1.0）
+    时退化为旧的单车道近似。
     """
     nodes: list[int] = Field(min_length=2)   # 车道纵列节点（顺序即行车方向）
     q: float = 0.0                           # N/m（CODE 模式下可缺省）
     p: float = 0.0                           # N
     dof: int = 3                             # 加载方向自由度（3=竖向）
     impact: float = 1.0                      # 冲击系数
-    reduction: float = 1.0                   # 多车道横向折减
+    reduction: float = 1.0                   # 多车道横向折减系数（JTG D60 表 4.3.1-5）
+    lane_count: int = 1                      # 横向设计车道数
+    eccentricity: float = 1.0                # 偏载增大系数（横向偏载放大）
     code: str = ""                           # "JTG_D60" 或空
 
 
@@ -699,6 +706,10 @@ class ModelSpec3D(BaseModel):
                 parts.append(f"IMPACT={fmt(lane.impact)}")
             if lane.reduction != 1.0:
                 parts.append(f"REDUCTION={fmt(lane.reduction)}")
+            if lane.lane_count != 1:
+                parts.append(f"LANE_COUNT={lane.lane_count}")
+            if lane.eccentricity != 1.0:
+                parts.append(f"ECCENTRICITY={fmt(lane.eccentricity)}")
             L.append(" ".join(parts))
 
         if self.cable_bridge is not None:

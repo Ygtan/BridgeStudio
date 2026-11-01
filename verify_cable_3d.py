@@ -161,6 +161,31 @@ def main() -> int:
     check("最大索力安全系数 > 2.0", bl / max(tmax, 1e-9) > 2.0,
           f"{bl/tmax:.2f}（{tmax/1e3:.0f} kN / 破断 {bl/1e3:.0f} kN）")
 
+    # ------------------------------------------------------------ 5 横向分布系数
+    print("\n[5] 横向分布系数（横向影响面 → 系数法）")
+    # 建模侧：横向布载参数已写进 .dat 与 meta（默认 3 车道 × 0.78 × 1.15）
+    check(".dat 含 LANE_COUNT=3", "LANE_COUNT=3" in dat)
+    check(".dat 含 REDUCTION=0.78", "REDUCTION=0.78" in dat)
+    check(".dat 含 ECCENTRICITY=1.15", "ECCENTRICITY=1.15" in dat)
+    m_dist = info["transverse_distribution"]
+    check("横向分布系数 = 车道数×折减×偏载 = 2.691",
+          abs(m_dist - 3 * 0.78 * 1.15) < 1e-9, f"{m_dist:.4f}")
+
+    # 求解侧：活载包络确实被放大 m 倍（对照单车道，锁死内核乘子不回归）
+    res0 = solve_cable_bridge(
+        build_cable_stayed_3d(main_span=200.0, side_span=80.0,
+                              tower_height=60.0, n_cable=12,
+                              lane_count=1, lane_reduction=1.0,
+                              eccentricity=1.0)[0],
+        out_dir="out/verify_cable", dat_name="cable_lane1.dat")
+    gl1 = {(d["elem"], d["end"]): d for d in res["girder_live"]}
+    gl0 = {(d["elem"], d["end"]): d for d in res0["girder_live"]}
+    key = max(gl1, key=lambda k: abs(gl1[k]["MyMax"]))
+    ratio = gl1[key]["MyMax"] / gl0[key]["MyMax"]
+    check("活载包络放大 = 横向分布系数（<1e-3）",
+          gl1 and gl0 and abs(ratio - m_dist) < 1e-3,
+          f"MyMax {ratio:.4f} vs 系数 {m_dist:.4f}")
+
     n_pass = sum(1 for r in RESULTS if r[0])
     print("=" * 62)
     print(f"  {n_pass}/{len(RESULTS)} 通过")
