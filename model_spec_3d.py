@@ -293,19 +293,23 @@ class NodalLoad3D(BaseModel):
 
 
 class Prestress3D(BaseModel):
-    """一条直线预应力筋（施工阶段 *STAGE 的 PRESTRESS=，等效荷载法）。
+    """一条预应力筋（施工阶段 *STAGE 的 PRESTRESS=，等效荷载法）。
 
     - ``elems``：连续梁单元 id（首尾即锚固端，必须首尾相接成一条开链）
-    - ``P``：张拉控制力 N（正）；``e``：竖向偏心 m（**形心上方为正**）
+    - ``P``：张拉控制力 N（正）；``e``：**端部**偏心 m（形心上方为正）
+    - ``s``：矢高 = 跨中偏心 − 端部偏心（m，向上为正）。``s=0`` 是直线筋；
+      ``s<0`` 跨中筋更低 → 跨内向上均布力 → **上拱**。
     - ``loss``：有效/张拉比（0 < loss ≤ 1）
 
-    能力边界要写死：这是**直线筋 + 常偏心**，等效荷载只有「两端一对轴压 +
-    两端一对偏心弯矩」。它**不产生上拱**——上拱来自曲线筋的跨内反向均布力
-    （w = 8Pe·s/L²，s 为矢高），本版不做。把直线筋当"上拱手段"用是错的。
+    直线筋（s=0）的等效荷载只有「两端一对轴压 + 两端一对偏心弯矩」，**不产生
+    上拱**；上拱来自曲线筋（s≠0）的跨内反向均布力（q = −8Pe·s/L²）+ 两端锚固
+    切线竖向力（4Pe·s/L）。曲线筋要求单元链**共线**（抛物线定义在首尾弦上），
+    且上拱精度依赖跨内单元细分——单元越细越接近抛物线的二次弯矩。
     """
     elems: list[int] = Field(min_length=1)
     P: float = Field(gt=0)
     e: float = 0.0
+    s: float = 0.0
     loss: float = Field(default=1.0, gt=0.0, le=1.0)
 
 
@@ -321,8 +325,9 @@ class Stage3D(BaseModel):
     - `unstrained`：直接给**下料长度**，不迭代。用于"我知道这根索下多长"。
     同一根索同时出现在两处会被内核判为语义冲突并报错。
 
-    预应力束（`prestress`）独立于索张拉：直线筋的等效荷载是状态量（张拉一次、
-    永久存在），阶段内只施加一次，效应通过累计位移延续。
+    预应力束（`prestress`）独立于索张拉：等效荷载是状态量（张拉一次、
+    永久存在），阶段内只施加一次，效应通过累计位移延续。直线筋（s=0）与
+    曲线筋（s≠0）都走这个字段，区别只在矢高。
     """
 
     id: int
@@ -331,7 +336,7 @@ class Stage3D(BaseModel):
     loads: list[NodalLoad3D] = Field(default_factory=list)
     tensions: dict[int, float] = Field(default_factory=dict)    # 单元号 → 目标索力 N
     unstrained: dict[int, float] = Field(default_factory=dict)  # 单元号 → 无应力索长 m
-    prestress: list[Prestress3D] = Field(default_factory=list)  # 本阶段张拉的直线束
+    prestress: list[Prestress3D] = Field(default_factory=list)  # 本阶段张拉的预应力束
 
 
 class Influence3D(BaseModel):
@@ -661,8 +666,16 @@ class ModelSpec3D(BaseModel):
                 parts.append("L0=" + ",".join(
                     f"{k}:{fmt(s.unstrained[k])}" for k in sorted(s.unstrained)))
             for ps in s.prestress:
-                body = (_int_list_ranges(sorted(ps.elems)) + f":{fmt(ps.P)}:{fmt(ps.e)}"
-                        + (f":{fmt(ps.loss)}" if ps.loss != 1.0 else ""))
+                if ps.s == 0.0:
+                    # 直线筋：位置模式（向后兼容，旧 .dat 与测试都认这个）
+                    body = (_int_list_ranges(sorted(ps.elems))
+                            + f":{fmt(ps.P)}:{fmt(ps.e)}"
+                            + (f":{fmt(ps.loss)}" if ps.loss != 1.0 else ""))
+                else:
+                    # 曲线筋：关键字模式（矢高 S 必须命名，否则与 loss 位置冲突）
+                    body = (_int_list_ranges(sorted(ps.elems))
+                            + f":P={fmt(ps.P)}:E={fmt(ps.e)}:S={fmt(ps.s)}"
+                            + (f":LOSS={fmt(ps.loss)}" if ps.loss != 1.0 else ""))
                 parts.append("PRESTRESS=" + body)
             L.append(" ".join(parts))
             for ld in s.loads:
