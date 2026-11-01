@@ -31,6 +31,7 @@ from console_utf8 import setup_console
 setup_console()          # 输出被重定向到管道/文件时，GBK 会崩（见模块说明）
 
 import sys
+import math
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -185,6 +186,29 @@ def main() -> int:
     check("活载包络放大 = 横向分布系数（<1e-3）",
           gl1 and gl0 and abs(ratio - m_dist) < 1e-3,
           f"MyMax {ratio:.4f} vs 系数 {m_dist:.4f}")
+
+    # ------------------------------------------------------------ 6 汽车冲击系数
+    print("\n[6] 汽车冲击系数（JTG D60，竖向一阶弯曲基频）")
+    f1 = md.get("f1_vertical")
+    mu = md.get("impact_mu")
+    fac = md.get("impact_factor")
+    check("meta 输出竖向一阶弯曲基频 f1 > 0",
+          isinstance(f1, (int, float)) and f1 > 0,
+          f"f1={f1:.3f} Hz" if f1 else "缺失")
+    check("冲击系数 μ 在 JTG D60 范围 [0.05, 0.45]",
+          isinstance(mu, (int, float)) and 0.05 - 1e-9 <= mu <= 0.45 + 1e-9,
+          f"μ={mu:.3f}")
+    if isinstance(f1, (int, float)) and f1 > 0:
+        mu_exp = 0.05 if f1 < 1.5 else (0.1767 * math.log(f1) - 0.0157
+                                        if f1 <= 14.0 else 0.45)
+        check("μ 符合 JTG D60 分段公式", abs(mu - mu_exp) < 1e-9,
+              f"μ={mu:.3f} vs 公式 {mu_exp:.3f}（f1={f1:.3f} Hz）")
+    check("活载冲击放大 1+μ 正确",
+          isinstance(fac, (int, float)) and abs(fac - (1.0 + mu)) < 1e-9,
+          f"1+μ={fac:.3f}")
+    # 冲击只乘活载、不碰恒载：横向分布对拍 ratio 仍 = m（1+μ 在两端抵消）
+    check("冲击系数未污染恒载（横向分布对拍仍=2.691）",
+          abs(ratio - m_dist) < 1e-3, f"{ratio:.4f}")
 
     n_pass = sum(1 for r in RESULTS if r[0])
     print("=" * 62)

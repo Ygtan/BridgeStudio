@@ -116,6 +116,8 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        `*LANE_3D` 优先、空则自动识别主梁；活载包络三联图（填充带 + 灰虚线恒载对照）。
        **边界**：横向布载用横向分布系数法（车道数 × 多车道横向折减 × 偏载增大，
        默认 3×0.78×1.15=2.691，偏载系数为经验值，严格做法需梁格横向影响面）。
+       汽车冲击按 JTG D60 计入（成桥态切线刚度求竖向一阶弯曲基频 f1→μ，活载放大
+       1+μ）。
        组合应力验算已接入（基本/频遇/准永久，正应力枚举 N×My 角点取最不利、
        包络法偏保守）。
        `verify_report_3d.py` 92/92、`verify_section_strength.py` 59/59 —— 2026-11-01
@@ -123,7 +125,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 19 个脚本、735 项全绿）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 19 个脚本、740 项全绿）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

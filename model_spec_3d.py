@@ -355,12 +355,16 @@ class Lane3D(BaseModel):
     横向影响面，规范上用「横向分布系数」把多车道并排布载折进纵向影响线
     包络：m = lane_count · reduction · eccentricity。三个量缺省（1, 1.0, 1.0）
     时退化为旧的单车道近似。
+
+    汽车冲击（JTG D60）：`impact` 是**放大倍数**（1+μ），不是纯冲击系数 μ。
+    索承体系下若 `impact` 缺省（1.0），内核按成桥态切线刚度求竖向一阶弯曲
+    基频 f1 自动填 1+μ；显式写非 1.0 则尊重手动值。
     """
     nodes: list[int] = Field(min_length=2)   # 车道纵列节点（顺序即行车方向）
     q: float = 0.0                           # N/m（CODE 模式下可缺省）
     p: float = 0.0                           # N
     dof: int = 3                             # 加载方向自由度（3=竖向）
-    impact: float = 1.0                      # 冲击系数
+    impact: float = 1.0                      # 冲击放大倍数（1+μ；缺省 1=不计冲击）
     reduction: float = 1.0                   # 多车道横向折减系数（JTG D60 表 4.3.1-5）
     lane_count: int = 1                      # 横向设计车道数
     eccentricity: float = 1.0                # 偏载增大系数（横向偏载放大）

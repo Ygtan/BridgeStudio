@@ -51,7 +51,7 @@ from typing import Any, Iterable, Sequence
 import view_3d
 from result_3d import (CABLE_FPU_DEFAULT, CABLE_SAFETY_MIN,
                        CABLE_SAFETY_MIN_STAGE, Check, Metric,
-                       SolveResult, _cable_area_m2, support_x)
+                       SolveResult, _cable_area_m2, _impact_note, support_x)
 
 # ---------------------------------------------------------------- 配色
 # 与界面、Word 计算书同一套，避免"屏幕上蓝、报告里灰"
@@ -850,7 +850,8 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
             note="**基于成桥态切线刚度影响线**（索的切线刚度远大于弹性刚度，"
                  "不能用线弹性影响线）；填充带为活载 min/max 包络，灰虚线为"
                  "成桥态恒载对照。横向布载已按横向分布系数法计入（车道数 × "
-                 "多车道横向折减 × 偏载增大，见模型车道定义）。" + lnote)
+                 "多车道横向折减 × 偏载增大，见模型车道定义）"
+                 f"{_impact_note(res.meta)}。" + lnote)
     if res.live:
         # 阶段包络为 0 不是漏算：施工中间态下影响点还没与任何单元连通
         # （阶段 1 只建边跨，中跨跨中尚无单元）。不说清楚，读者会以为

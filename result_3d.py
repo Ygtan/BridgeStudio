@@ -1021,7 +1021,8 @@ class SolveResult:
             "不同加载位置，角点组合偏保守；梁几何刚度（P-Δ）按一阶略去。"
             "活载横向布载按横向分布系数法计入（车道数 × 多车道横向折减 × "
             "偏载增大，见模型 *LANE_3D 的 LANE_COUNT/REDUCTION/ECCENTRICITY；"
-            "单梁模型算不出严格横向影响面，偏载系数为经验值）。",
+            "单梁模型算不出严格横向影响面，偏载系数为经验值）"
+            f"{_impact_note(self.meta)}。",
             level="info"))
         if len(ult) > len(shown):
             out.append(Check(
@@ -1070,9 +1071,10 @@ class SolveResult:
             "活载内力包络口径", True,
             f"活载内力取自 {len(self.girder_live) // 2} 根主梁两端的包络，"
             "基于成桥态切线刚度影响线（JTG D60 车道荷载，横向布载按横向分布"
-            "系数法计入——车道数 × 多车道横向折减 × 偏载增大），梁几何刚度"
-            "（P-Δ）按一阶略去。该包络已按 JTG D60 系数接入组合应力验算"
-            "（基本/频遇/准永久，见「组合应力验算」）。",
+            "系数法计入——车道数 × 多车道横向折减 × 偏载增大"
+            f"{_impact_note(self.meta)}），梁几何刚度（P-Δ）按一阶略去。"
+            "该包络已按 JTG D60 系数接入组合应力验算（基本/频遇/准永久，见"
+            "「组合应力验算」）。",
             level="info"))
         return out
 
@@ -1736,6 +1738,20 @@ def _strength_sections(model: Any) -> list[tuple[str, Any, set[int]]]:
         head = "主梁" if t.id == main_et else f"截面#{t.real}"
         out.append((f"{head}（{sec.describe()}）", sec, eids))
     return out
+
+
+def _impact_note(meta: dict) -> str:
+    """汽车冲击系数（JTG D60）的口径描述；无基频/μ 时返回空串。"""
+    f1 = meta.get("f1_vertical")
+    mu = meta.get("impact_mu")
+    try:
+        f1v, muv = float(f1), float(mu)
+    except (TypeError, ValueError):
+        return ""
+    if f1v <= 0:
+        return ""
+    return (f"，汽车冲击按 JTG D60 计入：竖向一阶弯曲基频 f1={f1v:.2f} Hz、"
+            f"冲击系数 μ={muv:.3f}（活载放大 1+μ={1+muv:.3f}）")
 
 
 def _combo_stress(sec: Any, row: dict[str, float]) -> section_strength.StressResult:
