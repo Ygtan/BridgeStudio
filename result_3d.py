@@ -192,6 +192,9 @@ class SolveResult:
     # 绝对值较大者"的摘要，max|N| 与 max|My| 可能来自不同端，拼出来的
     # (N, My) 在梁上并不存在。应力 σ = N/A ± My/W 必须**同一端**配对。
     girder_ends: dict[tuple[int, int], dict[str, float]] = field(default_factory=dict)
+    # 活载梁内力包络（成桥态切线刚度影响线）：min/max 成对，与 girder_ends
+    # 恒载标准值配对做荷载组合。缺 = 模型未定义车道或旧内核。
+    girder_live: dict[tuple[int, int], dict[str, float]] = field(default_factory=dict)
     reaction: dict[tuple[int, int], float] = field(default_factory=dict)
     # 找形后的主缆节点坐标 {node: (x, z)}。**这张图不能拿模型坐标画**：
     # .dat 里的主缆坐标只是建造器给的初始抛物线，边跨那一段甚至是按
@@ -588,6 +591,7 @@ class SolveResult:
             out += self._checks_grillage(model)
         out += self.combination_checks(model)
         out += self._checks_strength(model)
+        out += self._checks_girder_live(model)
         out += self._checks_stage_cable(model)
         out += self._checks_stage_prestress(model)
         return out
@@ -1003,6 +1007,50 @@ class SolveResult:
                 f"模型含 {len(ranked)} 个梁截面，上列只给利用率最高的 "
                 f"{len(shown)} 个；其余 {len(ranked) - len(shown)} 个更低。",
                 level="info"))
+        return out
+
+    def _checks_girder_live(self, model: Any = None) -> list[Check]:
+        """活载梁内力包络（成桥态切线刚度影响线）的校核。
+
+        只回答两件事：
+        1. 有没有活载包络——缺 = 模型没定义车道或旧内核，如实说「没做」。
+        2. 活载弯矩峰值在哪、多大——这是量级提示，不是判定：索承体系的
+           恒载弯矩（尤其斜拉桥）本就接近零（最小弯曲能法的目标），所以
+           「活载/恒载弯矩比」没有意义，不能拿它当判据。真正的判定是组合
+           应力（1.2S_G + 1.4S_Q），本版未接，如实标注。
+        """
+        if self.kind not in ("cable_stayed", "suspension"):
+            return []
+        if not self.girder_live:
+            return [Check(
+                "活载梁内力包络", True,
+                "结果里没有活载内力包络（[GIRDER_LIVE] 段缺失）：模型未定义"
+                "车道荷载（LANE_3D）或旧版 cable_solver.exe。本次只算恒载，"
+                "不做活载内力——这不是「通过」，是「没做」。",
+                level="info")]
+        out: list[Check] = []
+        # 活载弯矩峰值：量级提示（不设限值、不做承载力判定）。
+        worst = None
+        for (eid, end), lv in self.girder_live.items():
+            my = max(abs(float(lv.get("MyMax", 0.0))),
+                     abs(float(lv.get("MyMin", 0.0))))
+            if worst is None or my > worst[0]:
+                worst = (my, eid, end)
+        if worst is not None:
+            out.append(Check(
+                "活载弯矩峰值（量级提示）",
+                True,
+                f"主梁活载弯矩包络峰值 {worst[0]/1e3:.0f} kN·m，"
+                f"位于单元 {worst[1]}·{worst[2]} 端。此为量级提示，"
+                "承载力判定须做组合应力验算。",
+                level="info"))
+        out.append(Check(
+            "活载内力包络口径", True,
+            f"活载内力取自 {len(self.girder_live) // 2} 根主梁两端的包络，"
+            "基于成桥态切线刚度影响线（JTG D60 车道荷载，纵向单车道 + 多车道"
+            "折减近似），梁几何刚度（P-Δ）按一阶略去。组合应力验算"
+            "（1.2S_G + 1.4S_Q）未在本版接入——恒载应力验算仍按恒载单项出。",
+            level="info"))
         return out
 
     def _checks_cable(self, model: Any) -> list[Check]:

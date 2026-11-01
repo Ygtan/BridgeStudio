@@ -117,7 +117,7 @@ def main() -> int:
                         for k, f in rep.figures.items()))
         want = {"grillage3d": {"layout", "deflection", "moment"},
                 "cable_stayed": {"layout", "deflection", "tension", "camber",
-                                 "girder"}}[kind]
+                                 "girder", "girder_live"}}[kind]
         check("该有的图都有", want <= set(rep.figures), str(sorted(rep.figures)))
         # 轴测图：与界面里的可旋转视图同一份场景，报告里必须有一张
         check("轴测图已生成且不是空白",
@@ -143,6 +143,11 @@ def main() -> int:
                   "girder" in rep.figures
                   and "不是活载包络" in rep.figures["girder"].note,
                   rep.figures["girder"].caption if "girder" in rep.figures else "缺")
+            check("活载梁内力包络图存在且图注写明切线刚度口径",
+                  "girder_live" in rep.figures
+                  and "切线刚度" in rep.figures["girder_live"].note,
+                  rep.figures["girder_live"].caption
+                  if "girder_live" in rep.figures else "缺")
 
         paths = R.write_all(rep, f"out/verify_report/{kind}", stem=f"{kind}_report")
         check("三种格式都写出来了",

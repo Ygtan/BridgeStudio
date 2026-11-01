@@ -36,6 +36,7 @@ from model_spec_3d import (
     CableSpec3D,
     Element3D,
     ElemTypeDef3D,
+    Lane3D,
     Material3D,
     ModelSpec3D,
     Node3D,
@@ -295,6 +296,9 @@ def build_cable_stayed_3d(
         boundaries=boundaries,
         loads=loads,
         cable_bridge=cable_bridge,
+        # 车道：主梁纵向节点序列，按 JTG D60 自动生成 qk/Pk。
+        # 索承体系内核在成桥态切线刚度上算活载梁内力包络（见 cable_solver）。
+        lanes=[Lane3D(nodes=[gid(i) for i in range(len(xs))], code="JTG_D60")],
     )
     # 供界面/验证脚本读取的派生量（不算模型字段，避免污染 pydantic 契约）
     model_meta = {

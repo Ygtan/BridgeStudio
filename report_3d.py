@@ -471,8 +471,107 @@ def figure_girder_forces(res: SolveResult, model: Any,
     return p, note
 
 
+def figure_girder_live(res: SolveResult, model: Any,
+                       path: Path) -> tuple[Path, str]:
+    """索承体系的活载梁内力包络图：My / Vz / N 沿桥长，三联（共享 x 轴）。
+
+    与 `figure_girder_forces`（恒载单状态、一条线）的区别：活载是包络，每个
+    断面有 min/max 两条，画成**填充带**；恒载那条线叠在上面作对照（虚线）。
+
+    数据来源是成桥态切线刚度影响线（见 cable_solver 的 [GIRDER_LIVE]），不是
+    梁格那套线弹性影响线——索承体系必须用成桥态切线刚度，否则把索算软、活载
+    失真。图注必须写明这个口径，避免被读成"和梁格同一套活载"。
+    """
+    if not res.girder_live:
+        raise ValueError("没有活载梁内力包络（模型未定义车道）")
+    plt = _plt()
+    nodes = {n.id: n for n in model.nodes}
+    rows = (("My", "My (kN·m)", 1e3), ("Vz", "Vz (kN)", 1e3), ("N", "N (kN)", 1e3))
+    fig, axes = plt.subplots(3, 1, figsize=(7.4, 5.2), sharex=True)
+    n_skip = 0
+    for ax, (key, ylabel, scale) in zip(axes, rows):
+        # 收集每端点 (x, min, max, 恒载)，再按 x 聚合去重（共享节点两端重复）。
+        byx: dict[float, list[float]] = {}
+        for e in model.elements:
+            a, b = nodes.get(e.n1), nodes.get(e.n2)
+            if a is None or b is None:
+                continue
+            li = res.girder_live.get((e.id, 1))
+            lj = res.girder_live.get((e.id, 2))
+            if li is None or lj is None:
+                continue
+            dx, dy, dz = b.x - a.x, b.y - a.y, b.z - a.z
+            if abs(dx) < 1e-9 or abs(dx) < max(abs(dy), abs(dz)):
+                n_skip += 1
+                continue
+            gi = res.girder_ends.get((e.id, 1))
+            gj = res.girder_ends.get((e.id, 2))
+            kmin, kmax = key + "Min", key + "Max"
+            pts = [
+                (a.x, float(li.get(kmin, 0.0)) / scale,
+                 float(li.get(kmax, 0.0)) / scale,
+                 float(gi.get(key, 0.0)) / scale if gi else 0.0),
+                (b.x, float(lj.get(kmin, 0.0)) / scale,
+                 float(lj.get(kmax, 0.0)) / scale,
+                 float(gj.get(key, 0.0)) / scale if gj else 0.0),
+            ]
+            for x, mn, mx, dd in pts:
+                kx = round(x, 6)
+                if kx not in byx:
+                    byx[kx] = [mn, mx, dd]
+                else:
+                    byx[kx][0] = min(byx[kx][0], mn)
+                    byx[kx][1] = max(byx[kx][1], mx)
+                    byx[kx][2] = dd   # 恒载两端一致，取后者即可
+        xs = sorted(byx)
+        ymn = [byx[x][0] for x in xs]
+        ymx = [byx[x][1] for x in xs]
+        yd = [byx[x][2] for x in xs]
+        # 包络带：min/max 之间填充，两条边界线淡色
+        ax.fill_between(xs, ymn, ymx, color=C_BLUE, alpha=0.14, lw=0)
+        ax.plot(xs, ymn, "-", lw=0.9, color=C_BLUE, alpha=0.65)
+        ax.plot(xs, ymx, "-", lw=0.9, color=C_BLUE, alpha=0.65)
+        # 恒载（成桥态单值）作对照：虚线
+        ax.plot(xs, yd, "--", lw=0.9, color=C_GRAY, alpha=0.85)
+        ax.axhline(0.0, color=C_GRAY, lw=0.8)
+        ax.set_ylabel(ylabel)
+        ax.grid(alpha=0.22, lw=0.5)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+
+        # 峰值点名：标包络绝对值最大的一个（min/max 两者里更大的）。
+        if ymx:
+            k = max(range(len(ymx)), key=lambda i: max(abs(ymx[i]), abs(ymn[i])))
+            v = ymx[k] if abs(ymx[k]) >= abs(ymn[k]) else ymn[k]
+            # ylim 容纳恒载虚线，避免其越界被裁剪——恒载可能大于活载（如
+            # method=DECK 索力分配下恒载弯矩可达活载的 3 倍），裁剪会让人
+            # 以为恒载曲线"没算完"。
+            allv = ymn + ymx + yd + [0.0]
+            lo, hi = min(allv), max(allv)
+            rng = max(hi - lo, 1e-9)
+            ax.annotate(f"{v:+,.0f} @ x={xs[k]:.0f} m", (xs[k], v),
+                        textcoords="offset points",
+                        xytext=(0, 12), ha="center", va="bottom",
+                        fontsize=7.5, color=C_RED)
+            ax.set_ylim(lo - 0.10 * rng, hi + 0.14 * rng)
+
+    for sx in support_x(model):
+        for ax in axes:
+            ax.axvline(x=sx, color=C_RED, ls="--", lw=0.7, alpha=0.45)
+    axes[-1].set_xlabel("顺桥向 x (m)　（红虚线 = 支承断面）")
+    axes[0].set_title("活载梁内力包络（成桥态切线刚度影响线）", fontsize=9.5, pad=6)
+    fig.tight_layout()
+    p = _save(fig, path)
+    note = ("填充带为活载 min/max 包络，灰虚线为成桥态恒载对照。"
+            "梁几何刚度（P-Δ）按一阶略去。")
+    if n_skip:
+        note += (f" 另有 {n_skip} 个竖向/横向构件（桥塔、横梁）未绘入。")
+    return p, note
+
+
 def figure_live(res: SolveResult, model: Any, path: Path) -> Path:
     """活载包络：各施工阶段影响点处车道荷载产生的竖向位移。
+
 
     内核只给标量（每个阶段一对 max/min），没有沿桥分布——所以是成对柱状图，
     不是曲线。画成曲线会是伪造的：三个点连成的"曲线"没有物理含义。
@@ -647,7 +746,8 @@ def figure_camber(res: SolveResult, model: Any, path: Path) -> Path:
 #: 报告正文里图的排列顺序。与 figures() 的生成顺序解耦：报告要有稳定的
 #: 叙事顺序（先简图、再变形、再内力、再索），而生成顺序由判据决定。
 _FIGURE_ORDER = ("layout", "axon", "deflection", "moment", "axial", "shear",
-                 "girder", "live", "stage_tension", "tension", "safety", "camber")
+                 "girder", "girder_live", "live", "stage_tension", "tension",
+                 "safety", "camber")
 
 #: 进「施工阶段索力」章的明细表键。与荷载组合同理：过程的**结论**要一页看完，
 #: 逐阶段原始数据才翻明细表——但这里反过来，过程表本身就是结论（每根索
@@ -739,9 +839,17 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
         gp, gnote = figure_girder_forces(res, model, d / "girder.png")
         out["girder"] = Figure(
             "girder", "成桥态梁内力（My / Vz / N）", gp,
-            note="**这是成桥态的单一状态，不是活载包络**：本内核不含活载，"
-                 "所以每条梁只有一根线、没有上下包。要包络必须走梁格内核（活载"
-                 "影响面在那里）。" + gnote)
+            note="**这是成桥态的单一状态（恒载标准值），不是活载包络**："
+                 "每条梁只有一根线、没有上下包。" + gnote)
+    if res.girder_live:
+        # 活载梁内力包络：与上面的恒载单一状态是两张图。这张图是这轮新增的
+        # 核心——索承体系此前"没有活载包络"的缺口在这里补上。
+        lp, lnote = figure_girder_live(res, model, d / "girder_live.png")
+        out["girder_live"] = Figure(
+            "girder_live", "活载梁内力包络（My / Vz / N）", lp,
+            note="**基于成桥态切线刚度影响线**（索的切线刚度远大于弹性刚度，"
+                 "不能用线弹性影响线）；填充带为活载 min/max 包络，灰虚线为"
+                 "成桥态恒载对照。" + lnote)
     if res.live:
         # 阶段包络为 0 不是漏算：施工中间态下影响点还没与任何单元连通
         # （阶段 1 只建边跨，中跨跨中尚无单元）。不说清楚，读者会以为

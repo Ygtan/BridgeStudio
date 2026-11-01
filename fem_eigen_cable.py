@@ -95,6 +95,7 @@ def parse_cable_result(path: str | Path) -> dict:
     hangers: list[dict] = []
     girder: list[dict] = []
     girder_ends: list[dict] = []
+    girder_live: list[dict] = []
     reaction: dict[tuple[int, int], float] = {}
     shape: dict[int, tuple[float, float]] = {}
     sec = ""
@@ -156,6 +157,20 @@ def parse_cable_result(path: str | Path) -> dict:
                 "elem": int(parts[0]), "end": int(parts[1]),
                 "N": float(parts[2]), "My": float(parts[3]), "Vz": float(parts[4]),
             })
+        elif sec == "GIRDER_LIVE" and len(parts) >= 8:
+            # 活载梁内力包络（成桥态切线刚度影响线）：每端一行，min/max 成对。
+            # 与 [GIRDEREND] 恒载标准值配对做荷载组合。
+            kv: dict[str, float] = {}
+            for tok in parts[2:]:
+                p = _kv(tok)
+                if p:
+                    kv[p[0]] = float(p[1])
+            girder_live.append({
+                "elem": int(parts[0]), "end": int(parts[1]),
+                "NMin": kv.get("NMin", 0.0), "NMax": kv.get("NMax", 0.0),
+                "MyMin": kv.get("MyMin", 0.0), "MyMax": kv.get("MyMax", 0.0),
+                "VzMin": kv.get("VzMin", 0.0), "VzMax": kv.get("VzMax", 0.0),
+            })
         elif sec == "REACTION" and len(parts) >= 3:
             reaction[(int(parts[0]), int(parts[1]))] = float(parts[2])
         elif sec == "CABLESHAPE" and len(parts) >= 3:
@@ -171,7 +186,8 @@ def parse_cable_result(path: str | Path) -> dict:
     return {"meta": meta, "cables": cables, "camber": camber,
             "erected": erected, "u": u, "main_cable": main_cable,
             "hangers": hangers, "girder": girder, "girder_ends": girder_ends,
-            "reaction": reaction, "cable_shape": shape}
+            "girder_live": girder_live, "reaction": reaction,
+            "cable_shape": shape}
 
 
 def solve_cable_bridge(model, out_dir: str | Path,

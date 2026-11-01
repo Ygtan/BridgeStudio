@@ -44,6 +44,7 @@ from model_spec_3d import (
     CableBridge3D,
     Element3D,
     ElemTypeDef3D,
+    Lane3D,
     Material3D,
     ModelSpec3D,
     Node3D,
@@ -391,6 +392,9 @@ def build_suspension_3d(
         boundaries=boundaries,
         loads=loads,
         cable_bridge=cable_bridge,
+        # 车道：加劲梁纵向节点序列，按 JTG D60 自动生成 qk/Pk。
+        # 索承体系内核在成桥态切线刚度上算活载梁内力包络（见 cable_solver）。
+        lanes=[Lane3D(nodes=deck_ids, code="JTG_D60")],
     )
 
     # 解析手算水平力：均布近似 H = qL²/(8f)，仅作对照（真正值由内核找形给出）
