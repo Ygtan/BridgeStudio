@@ -17,7 +17,7 @@
 - 材料等级没登记 → 抛 KeyError，不许退回某个默认强度；
 - 索承体系（斜拉桥/悬索桥）的梁应力：内核输出梁端内力后必须真的算出来，
   而且必须**同端配对**（σ 用同一端的 N 与 My）；早期这里写的是"做不了"，
-  现在它变成了"能算，但口径是恒载标准值、不是组合值"——两句话不能混着说。
+  现在它变成了"能算，且已接入活载组合（基本/频遇/准永久）"——两句话不能混着说。
 """
 
 from __future__ import annotations
@@ -270,25 +270,37 @@ def part_suspension() -> None:
     check("出现加劲梁正应力校核", any("正应力" in n for n in names),
           "、".join(n for n in names if "应力" in n)[:60])
     sig = [c for c in res.checks(model) if "正应力" in c.name]
-    check("索承体系正应力条目一律 warn（恒载标准值，不是组合值）",
-          all(c.level == "warn" for c in sig), str({c.level for c in sig}))
-    check("口径条目写清「未含活载」",
-          any("未含活载" in c.detail for c in res.checks(model)))
+    check("正应力条目是组合口径（基本组合），钢 error / 混凝土 warn",
+          any("基本组合" in c.name for c in sig)
+          and all(c.level in ("error", "warn") for c in sig),
+          str({c.level for c in sig}))
+    check("口径条目写清活载包络已接入组合",
+          any("活载包络" in c.detail for c in res.checks(model)))
 
-    # ---- 同端配对：这是 [GIRDER]（跨端各取最大）与 [GIRDEREND] 的分水岭 ----
-    # 拿表里那一行反算：σ 必须由**同一端**的 N 与 My 得到。若程序把 i 端的 N
-    # 与 j 端的 My 拼在一起，这条就对不上（而报告照样生成、数字照样好看）。
+    # ---- 同端配对 + 角点枚举：这是 [GIRDER]（跨端各取最大）与 [GIRDEREND] 的分水岭 ----
+    # 现在 stress_table 是基本组合（1.2G+1.4Q），N 与 My 来自**同一端**，正应力
+    # 枚举 N×My 角点取最不利。手算重放这一过程，σ 必须对得上——若程序把 i 端的
+    # N 与 j 端的 My 拼在一起，这条就对不上（而报告照样生成、数字照样好看）。
     tab = res.tables(model)["stress_table"]
-    check("报告里有应力表", "应力" in tab["title"], tab["title"])
+    check("报告应力表是基本组合", "基本组合" in tab["title"], tab["title"])
     label, unit_end, s_top, s_bot = tab["rows"][0][:4]
     eid, end = (int(x) for x in unit_end.split("·"))
-    v = res.girder_ends[(eid, end)]
     sec = {lbl: s for lbl, s, _ in R._strength_sections(model)}[label]
-    sig_top = v["N"] / sec.A / 1e6 - v["My"] / sec.WT / 1e6
-    sig_bot = v["N"] / sec.A / 1e6 + v["My"] / sec.WB / 1e6
-    check("表内上下缘应力 = 同一端的 N/A ± My/W（手算对拍）",
-          abs(sig_top - float(s_top)) < 0.06 and abs(sig_bot - float(s_bot)) < 0.06,
-          f"手算 {sig_top:+.2f}/{sig_bot:+.2f} vs 表 {s_top}/{s_bot}")
+    import combination
+    ult = next(c for c in combination.cable_combinations(res)
+               if c.spec.key == "ultimate")
+    row = ult.rows[(eid, end)]
+    vz = row["VzMin"] if abs(row["VzMin"]) >= abs(row["VzMax"]) else row["VzMax"]
+    best = None
+    for n in (row["NMin"], row["NMax"]):
+        for my in (row["MyMin"], row["MyMax"]):
+            rr = ss.check(sec, n, my, vz)
+            if best is None or rr.util > best.util:
+                best = rr
+    check("表内上下缘应力 = 组合角点枚举最不利（手算对拍）",
+          abs(best.sigma_top - float(s_top)) < 0.06
+          and abs(best.sigma_bot - float(s_bot)) < 0.06,
+          f"手算 {best.sigma_top:+.2f}/{best.sigma_bot:+.2f} vs 表 {s_top}/{s_bot}")
 
     # 牌号确实落到了模型里（否则梁端内力也无从验算）
     grades = {m.grade for m in model.materials if m.grade}

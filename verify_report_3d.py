@@ -302,8 +302,9 @@ def main() -> int:
     repc = reps["cable_stayed"][0]
     check("斜拉桥不出组合表", not any(k.startswith("combo") for k in repc.tables),
           str(sorted(repc.tables)))
-    check("斜拉桥在校核里说明「不做运营期组合」",
-          any("不做运营期组合" in c.detail for c in repc.checks()))
+    check("斜拉桥在校核里已接入活载组合应力验算",
+          any("已接入活载组合" in c.detail for c in repc.checks())
+          and any("基本组合 1.2G+1.4Q" in c.name for c in repc.checks()))
 
     # ---------------------------------------------------------- 故障注入
     print("\n[故障注入：渲染器必须把「不通过」写出来]")

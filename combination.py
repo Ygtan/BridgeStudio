@@ -164,6 +164,37 @@ class BeamCombo:
 
 
 @dataclass
+class CableCombo:
+    """索承体系（斜拉桥 / 悬索桥）一种组合下的梁端内力包络。
+
+    与 `BeamCombo` 的关键差别在**轴力**：索承体系的活载包络（内核
+    `[GIRDER_LIVE]`）同时给了轴力 NMin/NMax——自锚式悬索桥的梁轴力 ≈ 主缆
+    水平力 H，活载会改变 H，因此活载轴力是真实存在且必须纳入组合的。所以
+    这里 N 保留 min/max 两侧，而不是梁格那样的「单值、只含恒载」。
+
+    `rows[(单元, 端)] = {"NMin","NMax","MyMin","MyMax","VzMin","VzMax"}`，
+    单位 N / N·m。各分量是逐分量叠加的包络：恒载单值 + 活载同号侧分别加。
+    """
+
+    spec: ComboSpec
+    rows: dict[tuple[int, int], dict[str, float]] = field(default_factory=dict)
+    has_live: bool = True
+
+    def worst(self, comp: str = "My") -> tuple[tuple[int, int], float] | None:
+        """|分量| 最大的截面 → ((单元, 端), 值)。`comp` 取 N/My/Vz。"""
+        lo, hi = f"{comp}Min", f"{comp}Max"
+        best: tuple[tuple[int, int], float] | None = None
+        for key, v in self.rows.items():
+            for k in (lo, hi):
+                val = v.get(k)
+                if val is None:
+                    continue
+                if best is None or abs(val) > abs(best[1]):
+                    best = (key, val)
+        return best
+
+
+@dataclass
 class DispCombo:
     """位移组合（影响点处的一个标量）。
 
@@ -208,6 +239,41 @@ def beam_combinations(res: Any) -> list[BeamCombo]:
             }
         out.append(BeamCombo(spec=spec, rows=rows, has_live=has_live,
                              has_axial_live=has_axial_live))
+    return out
+
+
+def cable_combinations(res: Any) -> list[CableCombo]:
+    """索承体系组合：恒载（`girder_ends` 单值）+ 活载（`girder_live` 包络）。
+
+    与 `beam_combinations` 同一套铁律：按 (单元, 端) 逐截面、恒载单值 +
+    活载包络同号侧分别叠加。差别只在于活载轴力有包络（见 `CableCombo`）。
+    缺活载包络时退化为 γ_G·G（只含恒载），并标 `has_live=False`。
+    """
+    g = getattr(res, "girder_ends", None) or {}
+    q = getattr(res, "girder_live", None) or {}
+    if not g:
+        return []
+    has_live = bool(q)
+    out: list[CableCombo] = []
+    for spec in ALL:
+        rows: dict[tuple[int, int], dict[str, float]] = {}
+        for key, gv in g.items():
+            qv = q.get(key) or {}
+            rows[key] = {
+                "NMin": spec.gamma_g * gv.get("N", 0.0)
+                        + spec.gamma_q * qv.get("NMin", 0.0),
+                "NMax": spec.gamma_g * gv.get("N", 0.0)
+                        + spec.gamma_q * qv.get("NMax", 0.0),
+                "MyMin": spec.gamma_g * gv.get("My", 0.0)
+                        + spec.gamma_q * qv.get("MyMin", 0.0),
+                "MyMax": spec.gamma_g * gv.get("My", 0.0)
+                        + spec.gamma_q * qv.get("MyMax", 0.0),
+                "VzMin": spec.gamma_g * gv.get("Vz", 0.0)
+                        + spec.gamma_q * qv.get("VzMin", 0.0),
+                "VzMax": spec.gamma_g * gv.get("Vz", 0.0)
+                        + spec.gamma_q * qv.get("VzMax", 0.0),
+            }
+        out.append(CableCombo(spec=spec, rows=rows, has_live=has_live))
     return out
 
 
