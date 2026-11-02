@@ -413,6 +413,14 @@ class CableBridge3D(BaseModel):
     deck_e0: float = 0.0            # 加劲梁单元号区间（输出梁轴力用）
     deck_e1: float = 1e12
 
+    # ---- 悬索桥施工阶段（内核 *ERECTION 段）----
+    # 给定成桥主缆下料长度 L0 的逐阶段找形：空缆 → 从跨中对称吊装一期恒载
+    # （钢箱梁自重 Q1）→ 合拢 → 二期铺装 Q2（成桥态）。矢高是结果不是输入。
+    erection: bool = False          # 是否生成施工阶段模拟方案
+    erection_q1: float = 0.0        # 一期恒载 N/m（钢箱梁自重，吊装阶段施加）
+    erection_q2: float = 0.0        # 二期恒载 N/m（铺装+护栏，合拢后施加）
+    erection_panels: int = 1        # 每次对称吊装的吊点对数（每次对称吊 2 段）
+
 
 class ModelSpec3D(BaseModel):
     """三维模型完整规范。to_dat() 输出 fem_3d.hpp 可直接读取的 .dat。"""
@@ -751,6 +759,13 @@ class ModelSpec3D(BaseModel):
                 L.append("*HANGER")
                 for eid in cb.hangers:
                     L.append(str(eid))
+                if cb.erection:
+                    L.append("# 施工阶段：给定主缆下料长度 L0 的逐阶段找形")
+                    L.append("# 空缆 → 从跨中对称吊装一期恒载 Q1 → 合拢 → 二期铺装 Q2（成桥态）")
+                    L.append("*ERECTION")
+                    L.append(f"Q1={fmt(cb.erection_q1)}")
+                    L.append(f"Q2={fmt(cb.erection_q2)}")
+                    L.append(f"PANELS={cb.erection_panels}")
             L.append("# <elemId> <anchorNode> <targetTension_N>  （索力 0 = 自动）")
             L.append("*CABLE")
             for c in cb.cables:

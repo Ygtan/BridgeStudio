@@ -86,7 +86,10 @@ def build_suspension_3d(
     tower_dens: float = 2500.0,
     deck_grade: str = "Q345qD",           # 加劲梁钢材牌号（应力验算用，不参与求解）
     tower_grade: str = "C50",             # 桥塔混凝土等级（同上）
-    q_deck: float = 100e3,                # 桥面恒载 N/m（含桥面系与二期）
+    q_deck: float = 100e3,                # 桥面恒载 N/m（= 一期 + 二期）
+    q2_deck: float = 0.0,                 # 二期恒载 N/m（铺装+护栏）；0 = 二期为 0
+    erection: bool = False,               # 是否生成施工阶段模拟方案（*ERECTION 段）
+    erection_panels: int = 2,             # 每次对称吊装的吊点对数
     lane_count: int = 3,                  # 横向设计车道数
     lane_reduction: float = 0.78,         # 多车道横向折减系数（JTG D60 表 4.3.1-5）
     eccentricity: float = 1.15,           # 偏载增大系数（横向偏载放大，需按实际确认）
@@ -105,6 +108,14 @@ def build_suspension_3d(
 
     L_main = float(main_span)
     f_sag = sag_ratio * L_main                     # 主跨矢高
+    # 一期/二期恒载拆分：一期 = 钢箱梁自重，二期 = 铺装+护栏。
+    # 成桥态按 q_deck 全量施加；施工阶段按 q1/q2 分级（见 cable_bridge.erection）。
+    q2 = float(q2_deck)
+    if q2 < 0.0:
+        raise ValueError("二期恒载不能为负")
+    if q2 > q_deck:
+        raise ValueError(f"二期恒载 {q2} 超过总恒载 {q_deck}，请检查 q2_deck")
+    q1 = q_deck - q2
     z_top = f_sag + clearance                      # 塔顶高程（桥面为 0）
     z_base = -abs(tower_below)
     z_anchor = 0.0
@@ -381,6 +392,10 @@ def build_suspension_3d(
         hangers=hangers,
         deck_e0=deck_e0,
         deck_e1=deck_e1,
+        erection=erection,
+        erection_q1=q1,
+        erection_q2=q2,
+        erection_panels=erection_panels,
     )
 
     if not title:
@@ -426,6 +441,10 @@ def build_suspension_3d(
         "side_span_balanced": L_bal,
         "total_length": L_tot,
         "deck_load": q_deck,
+        "deck_load_q1": q1,
+        "deck_load_q2": q2,
+        "erection": erection,
+        "erection_panels": erection_panels,
         "total_deck_load": q_deck * L_tot,
         "cable_area": cable_A,
         "cable_w": cable_w,

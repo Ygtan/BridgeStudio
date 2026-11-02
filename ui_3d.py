@@ -489,7 +489,7 @@ def _susp_extras(doc: ModelDoc, res: SolveResult) -> None:
     导出段则与斜拉桥共用（`_export_block`）——那里没有力学差异，
     只有目录与文件名的差别。
     """
-    st.markdown("**详细计算书（7 章，含找形推导与体系校核）与第三方复核**")
+    st.markdown("**详细计算书（含找形推导、施工阶段与体系校核）与第三方复核**")
     c1, c2 = st.columns([1.2, 2.0])
     if c1.button("生成详细计算书 (.docx)", key="susp_report_btn"):
         with st.spinner("排版计算书（表格、插图、目录）…"):

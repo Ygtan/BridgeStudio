@@ -98,6 +98,8 @@ def parse_cable_result(path: str | Path) -> dict:
     girder_live: list[dict] = []
     reaction: dict[tuple[int, int], float] = {}
     shape: dict[int, tuple[float, float]] = {}
+    erection: list[dict] = []
+    erection_shape: dict[int, list[float]] = {}
     sec = ""
     for raw in txt:
         line = raw.strip()
@@ -183,11 +185,23 @@ def parse_cable_result(path: str | Path) -> dict:
             erected[int(parts[0])] = (float(parts[1]), float(parts[2]), float(parts[3]))
         elif sec == "U" and len(parts) >= 3:
             u[(int(parts[0]), int(parts[1]))] = float(parts[2])
+        elif sec == "ERECTION" and len(parts) >= 3:
+            # 每阶段一行：<stage> <名称> H=.. sag=.. midz=.. hmin=.. hmax=..
+            row: dict = {"stage": int(parts[0]), "name": parts[1]}
+            for tok in parts[2:]:
+                p = _kv(tok)
+                if p:
+                    row[p[0]] = float(p[1])
+            erection.append(row)
+        elif sec == "ERECTION_SHAPE" and len(parts) >= 2:
+            # 每阶段一行：<stage> <主跨主缆节点高程序列>
+            erection_shape[int(parts[0])] = [float(v) for v in parts[1:]]
     return {"meta": meta, "cables": cables, "camber": camber,
             "erected": erected, "u": u, "main_cable": main_cable,
             "hangers": hangers, "girder": girder, "girder_ends": girder_ends,
             "girder_live": girder_live, "reaction": reaction,
-            "cable_shape": shape}
+            "cable_shape": shape, "erection": erection,
+            "erection_shape": erection_shape}
 
 
 def solve_cable_bridge(model, out_dir: str | Path,

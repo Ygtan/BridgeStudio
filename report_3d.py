@@ -743,6 +743,91 @@ def figure_camber(res: SolveResult, model: Any, path: Path) -> Path:
     return _save(fig, path)
 
 
+def _erection_main_span_x(res: SolveResult, model: Any) -> list[float]:
+    """主跨主缆节点 x 序列（塔1→塔2，含两端塔顶），与 [ERECTION_SHAPE] 的
+    z 序列逐点对齐。x 坐标取自找形结果 cable_shape（.dat 里的初始抛物线不是
+    设计线形，不能拿来当横轴）。"""
+    cb = getattr(model, "cable_bridge", None)
+    if cb is None:
+        return []
+    nid = {n.id: n for n in model.nodes}
+    t1x = nid.get(cb.tower1).x if nid.get(cb.tower1) else None
+    t2x = nid.get(cb.tower2).x if nid.get(cb.tower2) else None
+    if t1x is None or t2x is None:
+        return []
+    lo, hi = min(t1x, t2x), max(t1x, t2x)
+    pts = sorted(
+        (n for n, (x, _z) in res.cable_shape.items() if lo - 1e-6 <= x <= hi + 1e-6),
+        key=lambda n: res.cable_shape[n][0])
+    return [res.cable_shape[n][0] for n in pts]
+
+
+def figure_erection_shape(res: SolveResult, model: Any, path: Path) -> Path:
+    """主缆随吊装逐级下沉的线形（各阶段主跨主缆高程序列叠画）。"""
+    plt = _plt()
+    xs = _erection_main_span_x(res, model)
+    stages = sorted(res.erection, key=lambda r: r["stage"])
+    fig, ax = plt.subplots(figsize=(7.4, 3.4))
+    if xs:
+        first, last = stages[0], stages[-1]
+        for r in stages:
+            zs = res.erection_shape.get(r["stage"])
+            if not zs or len(zs) != len(xs):
+                continue
+            if r is first:
+                ax.plot(xs, zs, "-", lw=1.5, color=C_BLUE, alpha=0.9, label="空缆")
+            elif r is last:
+                ax.plot(xs, zs, "-", lw=1.8, color=C_RED, label="铺装（成桥）")
+            else:
+                ax.plot(xs, zs, "-", lw=0.7, color=C_LIGHT, alpha=0.7)
+    ax.set_xlabel("顺桥向 x (m)")
+    ax.set_ylabel("主缆高程 z (m)")
+    ax.grid(alpha=0.25, lw=0.5)
+    ax.legend(frameon=False, fontsize=8, loc="upper right")
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
+def figure_erection_H(res: SolveResult, model: Any, path: Path) -> Path:
+    """主缆水平力 H 与矢高随施工阶段的变化。
+
+    为什么第二轴放矢高而不是吊索力：吊装阶段尚未挂梁的吊索力是 0（不是
+    数据缺失），"吊索力范围"的下界全程是 0、画不出带状；而矢高是分级找形
+    真正的**结果量**，它的"空缆最小 → 吊装中期峰值 → 合拢回落 → 铺装回升"
+    正是施工控制要盯的线形演变。吊索力范围见「施工阶段」章的数据表。
+    """
+    plt = _plt()
+    stages = sorted(res.erection, key=lambda r: r["stage"])
+    x = [r["stage"] for r in stages]
+    H = [float(r.get("H") or 0.0) / 1e6 for r in stages]
+    sag = [float(r.get("sag") or 0.0) for r in stages]
+    fig, ax = plt.subplots(figsize=(7.4, 3.1))
+    ax.plot(x, H, "o-", ms=3.6, lw=1.3, color=C_BLUE, mfc=C_BLUE, label="主缆水平力 H")
+    ax.set_xlabel("施工阶段")
+    ax.set_ylabel("H (MN)", color=C_BLUE)
+    ax.tick_params(axis="y", labelcolor=C_BLUE)
+    # 阶段名只在关键阶段标出，吊装中间阶段用序号，避免 16 个"吊装"重叠
+    labels = [f"{r['stage']}\n{r.get('name','')}" if r.get("name") in ("空缆", "合拢", "铺装")
+              else str(r["stage"]) for r in stages]
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=7.5)
+    ax2 = ax.twinx()
+    ax2.plot(x, sag, "s--", ms=3.4, lw=1.1, color=C_GREEN, mfc="white",
+             label="矢高")
+    ax2.set_ylabel("矢高 (m)", color=C_GREEN)
+    ax2.tick_params(axis="y", labelcolor=C_GREEN)
+    ax.grid(alpha=0.25, lw=0.5)
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, frameon=False, fontsize=8, loc="center left")
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
 #: 报告正文里图的排列顺序。与 figures() 的生成顺序解耦：报告要有稳定的
 #: 叙事顺序（先简图、再变形、再内力、再索），而生成顺序由判据决定。
 _FIGURE_ORDER = ("layout", "axon", "deflection", "moment", "axial", "shear",
@@ -888,6 +973,19 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
     if res.camber:
         out["camber"] = Figure("camber", "制造线形预抬高",
                                figure_camber(res, model, d / "camber.png"))
+    if res.erection and res.erection_shape:
+        out["erection_shape"] = Figure(
+            "erection_shape", "主缆随吊装逐级下沉的线形",
+            figure_erection_shape(res, model, d / "erection_shape.png"),
+            note="主缆下料长度 L0 固定，从空缆（只受自重）起逐级加载：吊装初期"
+                 "荷载集中在跨中、跨中先下沉，随加劲梁向塔侧推进、荷载摊开，"
+                 "线形向成桥索形靠拢。蓝线为空缆、红线为铺装后的成桥态。")
+        out["erection_H"] = Figure(
+            "erection_H", "主缆水平力 H 与矢高随阶段变化",
+            figure_erection_H(res, model, d / "erection_H.png"),
+            note="H 随荷载单调增加（空缆最小、成桥最大）；矢高先升后降再升——"
+                 "吊装初期荷载集中在跨中使矢高出现峰值，随加劲梁向塔侧推进、"
+                 "荷载摊开而回落，合拢后加二期铺装再回升至成桥值。")
     return out
 
 
@@ -1008,6 +1106,27 @@ def _stage_paragraph(res: SolveResult) -> str:
     return txt
 
 
+def _erection_paragraph(res: SolveResult) -> str:
+    """悬索桥施工阶段章节的引言：讲清"矢高是结果"这条与常规施工模拟的分水岭。"""
+    stages = sorted(res.erection, key=lambda r: r["stage"])
+    if not stages:
+        return ""
+    first, last = stages[0], stages[-1]
+    H0, H1 = first.get("H", 0.0), last.get("H", 0.0)
+    f0, f1 = first.get("sag", 0.0), last.get("sag", 0.0)
+    txt = (f"全过程 {len(stages)} 个阶段。主缆下料长度 L0 一旦固定，各阶段的"
+           f"主缆水平力 H 与矢高由「二分 L0 命中」反算——矢高是结果不是输入。"
+           f"空缆态 H={H0/1e3:.0f} kN、矢高 {f0:.2f} m（只受主缆自重）；"
+           f"铺装成桥态 H={H1/1e3:.0f} kN、矢高 {f1:.2f} m。")
+    # 吊装阶段矢高峰值：荷载集中在跨中时矢高最大，是施工控制的关注点
+    peak = max(stages, key=lambda r: float(r.get("sag") or 0.0))
+    if peak is not first and peak is not last:
+        txt += (f" 吊装中期矢高出现峰值 {float(peak.get('sag') or 0.0):.2f} m"
+                f"（阶段 {peak['stage']}，{peak.get('name','')}），系荷载集中在跨中"
+                f"所致，是主缆下料与吊装顺序的校核要点。")
+    return txt
+
+
 def _conclusion_bullets(res: SolveResult, model: Any,
                         checks: Sequence[Check]) -> list[str]:
     """结论从校核结果**生成**，不手写——手写的结论会与数据脱节。"""
@@ -1111,11 +1230,18 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     blocks.append({"type": "checks", "items": checks})
 
     blocks.append({"type": "h1", "text": "计算结果"})
+    # 悬索桥施工阶段（分级找形）单独一章：回答"从跨中吊装到成桥的线形/索力
+    # 演变"，与成桥结果不是同一类问题。斜拉桥的"施工阶段索力"走 stage_chapter。
+    erection_chapter = bool(res.erection)
     # 施工阶段索力**单独一章**：它回答"施工过程是否可控"，与"成桥内力/线形"
     # 不是同一类问题；混在计算结果里会被当成又一张成桥索力图，而两者的横轴
     # 根本不是一回事（那里是桥纵向位置，这里是施工阶段）。
     stage_chapter = bool(res.stage_cables) and STAGE_TABLE_KEY in tabs
-    skip_fig = {STAGE_FIGURE_KEY} if stage_chapter else set()
+    skip_fig = set()
+    if stage_chapter:
+        skip_fig.add(STAGE_FIGURE_KEY)
+    if erection_chapter:
+        skip_fig.update(("erection_shape", "erection_H"))
     # 按**实际生成的图**出章节，而不是写死一份清单。写死的清单在加图时
     # 会静默漏掉：图生成了、报告里没有，而"报告生成成功"看不出来
     # （这正是 verify_report_3d 的 base64 对拍断言抓到的问题）。
@@ -1138,6 +1264,22 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
             "**成桥索力按设计目标验、施工过程按同一目标的过程偏差验**，"
             "两者都不是承载力验算——本程序不建钢筋、不计施工临时荷载"
             "（挂篮、配重、风），过程索力只反映恒载与张拉顺序的相互作用。")})
+
+    if erection_chapter:
+        blocks.append({"type": "h1", "text": "施工阶段（分级找形）"})
+        blocks.append({"type": "p", "text": _erection_paragraph(res)})
+        if "erection_shape" in figs:
+            blocks.append({"type": "figure", "key": "erection_shape"})
+        if "erection_H" in figs:
+            blocks.append({"type": "figure", "key": "erection_H"})
+        if "erection_table" in tabs:
+            blocks.append({"type": "table", "key": "erection_table"})
+        blocks.append({"type": "note", "text": (
+            "施工顺序：空缆 → 主跨加劲梁自跨中向两侧对称吊装（一期恒载 Q1，"
+            "铰接，不产生加劲梁弯矩）→ 合拢（全桥 Q1，加劲梁连续）→ 二期铺装"
+            "（Q2，成桥态）。主缆下料长度 L0 固定，各阶段 H 与矢高由二分 L0 "
+            "命中反算——矢高是结果不是输入。**自洽判据**：铺装态 H、矢高须与"
+            "成桥态一致；边跨加劲梁在合拢阶段一次就位（简化假设）。")})
 
     # 荷载组合单列一章，**不混进明细表**：明细表是被查的原始数据，
     # 组合是经过规范加工的设计值，读者找它时不会翻到第 15 页表格后面。
@@ -1164,6 +1306,8 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     # 施工阶段那张表已经跟着章节走了，明细表里不再重复一遍。
     if stage_chapter:
         rest.pop(STAGE_TABLE_KEY, None)
+    if erection_chapter:
+        rest.pop("erection_table", None)
     if rest:
         blocks.append({"type": "h1", "text": "明细表"})
         for key in rest:

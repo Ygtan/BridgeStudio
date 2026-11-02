@@ -1655,6 +1655,12 @@ def collect_susp_data(*, model, info: dict, res, params: dict | None = None) -> 
         "girder": gir,
         "reaction": dict(res.reaction),
         "cable_shape": dict(getattr(res, "cable_shape", {}) or {}),
+        # 施工阶段（分级找形）：空缆 → 对称吊装一期 → 合拢 → 二期铺装。
+        "erection": list(getattr(res, "erection", []) or []),
+        "erection_shape": dict(getattr(res, "erection_shape", {}) or {}),
+        "erection_q1": float(info.get("deck_load_q1") or 0.0),
+        "erection_q2": float(info.get("deck_load_q2") or 0.0),
+        "erection_panels": int(info.get("erection_panels") or 2),
         "node_x": node_x,
         "node_z": node_z,
         "deck_x": [n.x for n in sorted(deck_n, key=lambda n: n.x)],
@@ -1840,6 +1846,69 @@ def plot_susp_camber(model, d: dict, path: Path) -> Path:
     return path
 
 
+def plot_susp_erection(model, d: dict, path: Path) -> Path:
+    """图 8-1 施工阶段：主缆线形随吊装下沉 + H/矢高随阶段变化。"""
+    plt = _mpl()
+    er = d["erection"]
+    shp = d["erection_shape"]
+    stages = sorted(er, key=lambda r: r["stage"])
+
+    # 主跨主缆节点 x 序列（塔1→塔2），与 [ERECTION_SHAPE] 的 z 序列对齐
+    cb = getattr(model, "cable_bridge", None)
+    xs: list[float] = []
+    if cb is not None:
+        nid = {n.id: n for n in model.nodes}
+        a, b = nid.get(cb.tower1), nid.get(cb.tower2)
+        if a is not None and b is not None:
+            lo, hi = min(a.x, b.x), max(a.x, b.x)
+            pts = sorted((n for n, (x, _z) in d["cable_shape"].items()
+                          if lo - 1e-6 <= x <= hi + 1e-6),
+                         key=lambda n: d["cable_shape"][n][0])
+            xs = [d["cable_shape"][n][0] for n in pts]
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7.4, 5.6))
+    if xs:
+        first, last = stages[0], stages[-1]
+        for r in stages:
+            zs = shp.get(r["stage"])
+            if not zs or len(zs) != len(xs):
+                continue
+            if r is first:
+                ax1.plot(xs, zs, "-", lw=1.5, color="#1f4e79", label="空缆")
+            elif r is last:
+                ax1.plot(xs, zs, "-", lw=1.8, color="#c0392b", label="铺装（成桥）")
+            else:
+                ax1.plot(xs, zs, "-", lw=0.6, color="#9db6cc", alpha=0.7)
+        ax1.set_xlabel("x (m)")
+        ax1.set_ylabel("主缆高程 z (m)")
+        ax1.grid(alpha=0.25, lw=0.6)
+        ax1.legend(fontsize=8, frameon=False, loc="upper right")
+
+    xx = [r["stage"] for r in stages]
+    H = [float(r.get("H") or 0.0) / 1e6 for r in stages]
+    sag = [float(r.get("sag") or 0.0) for r in stages]
+    ax2.plot(xx, H, "o-", ms=3.4, lw=1.3, color="#1f4e79", label="主缆水平力 H")
+    ax2.set_xlabel("施工阶段")
+    ax2.set_ylabel("H (MN)", color="#1f4e79")
+    ax2.tick_params(axis="y", labelcolor="#1f4e79")
+    labels = [f"{r['stage']}\n{r.get('name','')}" if r.get("name") in ("空缆", "合拢", "铺装")
+              else str(r["stage"]) for r in stages]
+    ax2.set_xticks(xx)
+    ax2.set_xticklabels(labels, fontsize=7.5)
+    ax3 = ax2.twinx()
+    ax3.plot(xx, sag, "s--", ms=3.2, lw=1.1, color="#c0392b", label="矢高")
+    ax3.set_ylabel("矢高 (m)", color="#c0392b")
+    ax3.tick_params(axis="y", labelcolor="#c0392b")
+    h1, l1 = ax2.get_legend_handles_labels()
+    h2, l2 = ax3.get_legend_handles_labels()
+    ax2.legend(h1 + h2, l1 + l2, fontsize=8, frameon=False, loc="center left")
+    ax2.grid(alpha=0.25, lw=0.6)
+    fig.tight_layout()
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+    return path
+
+
 # ---------------------------------------------------------------- 悬索桥正文
 
 
@@ -1865,6 +1934,8 @@ def build_suspension_report(*, model, info: dict, res,
     f_ten = plot_susp_tension(d, figs / "fig_susp_tension.png")
     f_gir = plot_susp_girder(d, figs / "fig_susp_girder.png")
     f_cam = plot_susp_camber(model, d, figs / "fig_susp_camber.png")
+    f_erec = (plot_susp_erection(model, d, figs / "fig_susp_erection.png")
+              if d["erection"] else None)
 
     doc_title = title or getattr(model, "title", "") or d["system_label"]
     doc = _setup_document()
@@ -1889,7 +1960,9 @@ def build_suspension_report(*, model, info: dict, res,
     _susp_sec_4(w, d, fig_tension=f_ten, fig_girder=f_gir)
     _susp_sec_5(w, d)
     _susp_sec_6(w, model, d, fig_camber=f_cam)
-    _susp_sec_7(w, d)
+    if d["erection"]:
+        _susp_sec_7_erection(w, model, d, fig_erection=f_erec)
+    _susp_sec_8(w, d)
 
     doc.save(str(out))
     if update_toc:
@@ -2368,9 +2441,83 @@ def _susp_sec_6(w: _Writer, model, d: dict, fig_camber: Path) -> None:
 
 # ---------------------------------------------------------------- 第 7 章
 
-def _susp_sec_7(w: _Writer, d: dict) -> None:
+def _susp_sec_7_erection(w: _Writer, model, d: dict, fig_erection) -> None:
+    """施工阶段（分级找形）：空缆 → 从跨中对称吊装 → 合拢 → 二期铺装。"""
+    er = d["erection"]
+    stages = sorted(er, key=lambda r: r["stage"])
+    first, last = stages[0], stages[-1]
+    q1, q2 = d["erection_q1"], d["erection_q2"]
+
+    w.h1("施工阶段（从跨中吊装到成桥）")
+    w.h2("7.1　施工顺序")
+    w.p(f"施工阶段按「分级找形」模拟：主缆下料长度 L_0 一旦固定，各阶段的"
+        f"主缆水平力 H 与矢高就不再是输入，而是由「二分 H 使整根主缆的无应力"
+        f"长度命中 L_0」反算出来的结果。施工顺序为：")
+    w.bullet("空缆：只受主缆自重，矢高最小、H 最小。")
+    w.bullet("吊装：主跨加劲梁自跨中向两侧对称吊装一期恒载 Q_1（钢箱梁自重，"
+             "铰接，不产生加劲梁弯矩），每步对称吊 2×PANELS 段。")
+    w.bullet("合拢：主跨加劲梁合拢成连续梁，边跨加劲梁同步就位，全桥 Q_1 上齐。")
+    w.bullet("铺装：二期恒载 Q_2（铺装 + 护栏）全桥施加，达到成桥态。")
+
+    w.h2("7.2　分级找形原理")
+    w.formula("L_0(H) = Σ_k (c_k + s_k) / (1 + T_k/EA)，　s_k = w²·Lh³/(24T_k²)",
+              "c_k 为分段弦长、T_k 为分段索力、w 为主缆单位重；对 H 二分使 L_0(H)=L_0")
+    w.p("与成桥找形「给定矢高反算 H」不同，施工阶段找形是「给定 L_0 反算 H」："
+        "主缆不可伸长（下料长度固定），从空缆到成桥主缆逐级下沉、矢高从 "
+        f"{_f(first['sag'], 2)} m 增大到 {_f(last['sag'], 2)} m。")
+    if q2 > 0:
+        w.p(f"一期恒载 Q_1 = {_f(q1 / 1e3, 1)} kN/m（钢箱梁自重），"
+            f"二期恒载 Q_2 = {_f(q2 / 1e3, 1)} kN/m（铺装 + 护栏），"
+            f"合计 {_f((q1 + q2) / 1e3, 1)} kN/m。")
+
+    w.h2("7.3　各阶段主缆线形与索力")
+    rows = []
+    for r in stages:
+        hmn = float(r.get("hmin") or 0.0)
+        hmx = float(r.get("hmax") or 0.0)
+        rows.append([
+            str(r["stage"]), r.get("name", ""),
+            _f(float(r.get("H") or 0.0) / 1e3, 0),
+            _f(float(r.get("sag") or 0.0), 3),
+            _f(float(r.get("midz") or 0.0), 3),
+            _f(hmn / 1e3, 0) if hmn > 0 else "—",
+            _f(hmx / 1e3, 0) if hmx > 0 else "—",
+        ])
+    w.table("各阶段主缆 H、矢高、跨中高程与吊索力",
+            ["阶段", "名称", "H (kN)", "矢高 (m)", "跨中高程 (m)",
+             "吊索力 min (kN)", "吊索力 max (kN)"],
+            rows, widths=[1.4, 2.0, 2.6, 2.4, 2.8, 2.6, 2.6],
+            aligns=["c", "l", "r", "r", "r", "r", "r"])
+    if fig_erection is not None:
+        w.figure(fig_erection, "主缆线形随吊装下沉 + H / 矢高随阶段变化")
+
+    w.h2("7.4　自洽判据与施工控制要点")
+    w.p(f"铺装态 H = {_f(float(last.get('H') or 0.0) / 1e3, 0)} kN、"
+        f"矢高 {_f(float(last.get('sag') or 0.0), 2)} m，与成桥态"
+        f"（H = {_f(d['H_kN'], 0)} kN、矢高 {_f(d['sag'], 2)} m）一致——"
+        "铺装完成后的状态必须精确重现成桥态，这是施工阶段模拟正确性的自洽判据。")
+    peak = max(stages, key=lambda r: float(r.get("sag") or 0.0))
+    if peak is not first and peak is not last:
+        w.p(f"吊装中期矢高出现峰值 {_f(float(peak.get('sag') or 0.0), 2)} m"
+            f"（阶段 {peak['stage']}，{peak.get('name', '')}）：荷载集中在跨中时"
+            "主缆下沉最多，是主缆下料长度与吊装顺序的校核要点。")
+    w.note("本次施工阶段模拟的简化假设：边跨加劲梁在合拢阶段一次就位（不逐段"
+           "吊装）；一期恒载吊装阶段按铰接处理（加劲梁不产生恒载弯矩）；"
+           "未计吊机/配重/风等施工临时荷载；单索面平面模型，双索面与横撑"
+           "不在本版范围。")
+
+    w.h2("7.5　施工阶段与成桥态的衔接")
+    w.p("成桥态的恒载内力 = 各施工阶段恒载增量的叠加。主缆索力是状态量"
+        "（不累加），加劲梁内力按各阶段增量累加；本算例一期恒载在吊装阶段"
+        "铰接上梁、不产生加劲梁弯矩，因此加劲梁恒载弯矩主要来自二期铺装与"
+        "成桥后的活载组合。")
+
+
+# ---------------------------------------------------------------- 第 8 章
+
+def _susp_sec_8(w: _Writer, d: dict) -> None:
     w.h1("结论与建议")
-    w.h2("7.1　主要结论")
+    w.h2("8.1　主要结论")
     w.bullet(f"主缆线形由恒载找形确定，矢高 {_f(d['sag'], 3)} m 命中目标 "
              f"{_f(d['sag_target'], 3)} m，对应水平力 H = {_f(d['H_kN'], 0)} kN。")
     w.bullet(f"主缆分段索力 {_f(d['T_main_min'] / 1e3, 0)} ~ "
@@ -2389,7 +2536,7 @@ def _susp_sec_7(w: _Writer, d: dict) -> None:
              f"{_f(d['applied_v'], 0)} kN 的偏差 {_f(d['balance_pct'], 4)}%，"
              f"全局竖向平衡成立。")
 
-    w.h2("7.2　设计建议")
+    w.h2("8.2　设计建议")
     if d["is_self"]:
         w.bullet("自锚式的边跨长度受“锚点主缆水平”条件约束（3.5 节），"
                  "取值明显长于地锚式的 1/3 主跨。若受场地限制必须缩短边跨，"
@@ -2407,7 +2554,7 @@ def _susp_sec_7(w: _Writer, d: dict) -> None:
     w.bullet("本模型为单索面平面模型，未计双索面与横撑提供的面外刚度。"
              "面外稳定（主缆横向、吊索横向、加劲梁侧向）应另行验算。")
 
-    w.h2("7.3　附件")
+    w.h2("8.3　附件")
     w.table("计算附件", ["文件", "说明"], [
         ["suspension.dat", "求解器输入（模型 + 悬索桥找形定位段）"],
         ["suspension_cable.txt", "求解器原始输出（索力/索长/反力/位移，分段纯文本）"],
@@ -2415,6 +2562,7 @@ def _susp_sec_7(w: _Writer, d: dict) -> None:
         ["fig_susp_tension.png", "图 4-1 源图"],
         ["fig_susp_girder.png", "图 4-2 源图"],
         ["fig_susp_camber.png", "图 6-1 源图"],
+        ["fig_susp_erection.png", "图 7-1 源图（仅施工阶段模拟时生成）"],
     ], widths=[4.6, 10.9], aligns=["l", "l"])
     par = w.doc.add_paragraph()
     par.paragraph_format.space_before = Pt(12)

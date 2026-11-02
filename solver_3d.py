@@ -169,6 +169,14 @@ def _adapt_suspension(model: Any, raw: dict, res: SolveResult) -> None:
     res.reaction = dict(raw.get("reaction") or {})
     res.cable_shape = {int(k): tuple(v)
                        for k, v in (raw.get("cable_shape") or {}).items()}
+    res.erection = list(raw.get("erection") or [])
+    res.erection_shape = {int(k): list(v)
+                          for k, v in (raw.get("erection_shape") or {}).items()}
+    if res.erection:
+        res.diagnostics.append(
+            "施工阶段按分级找形模拟：主缆下料长度 L0 固定，从空缆起，主跨加劲梁"
+            "自跨中向两侧对称吊装一期恒载（钢箱梁自重），合拢后施加二期铺装。"
+            "铺装态矢高与成桥态一致是本次模拟的自洽判据。")
     sys_name = str(res.meta.get("susp_system") or "EARTH").upper()
     res.diagnostics.append(
         "体系：" + ("地锚式（主缆锚在锚碇，H 传给地基，梁端纵向固定）"

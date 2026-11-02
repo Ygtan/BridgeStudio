@@ -201,6 +201,12 @@ class SolveResult:
     # "锚点到塔顶的直线"插的，与找形结果能差几米（锚点处主缆必须水平，
     # V=0，线形是顶点在锚点的抛物线）。画错不报错，但设计线形全错。
     cable_shape: dict[int, tuple[float, float]] = field(default_factory=dict)
+    # 施工阶段（分级找形）：每阶段一行 {stage, name, H, sag, midz, hmin, hmax}。
+    # 空缆 → 从跨中对称吊装一期恒载 Q1 → 合拢 → 二期铺装 Q2（成桥态）。
+    # 只有模型开了 erection（*ERECTION 段）才非空。
+    erection: list[dict[str, Any]] = field(default_factory=list)
+    # 每阶段主跨主缆高程序列 {stage: [z…]}，画"主缆随吊装下沉"曲线用。
+    erection_shape: dict[int, list[float]] = field(default_factory=dict)
 
     diagnostics: list[str] = field(default_factory=list)
 
@@ -1625,6 +1631,31 @@ class SolveResult:
                 "note": "向上为正。锚碇节点出现负值表示主缆在该处把锚碇**向上拔**，"
                         "锚碇设计须按抗拔与抗滑验算，不能只按承压考虑。",
                 "headers": ["节点", "x (m)", "方向", "反力 (kN)"],
+                "rows": rows,
+            }
+
+        if self.erection:
+            rows = []
+            for r in self.erection:
+                hmn = r.get("hmin", 0.0)
+                hmx = r.get("hmax", 0.0)
+                rows.append([
+                    r["stage"], r.get("name", ""),
+                    _r(float(r.get("H") or 0.0) / 1e3, 0),
+                    _r(float(r.get("sag") or 0.0), 3),
+                    _r(float(r.get("midz") or 0.0), 3),
+                    _r(hmn / 1e3, 0) if hmn > 0 else "—",
+                    _r(hmx / 1e3, 0) if hmx > 0 else "—",
+                ])
+            out["erection_table"] = {
+                "title": "施工阶段主缆线形与索力",
+                "note": "主缆下料长度 L0 一旦固定，各阶段的 H 与矢高由二分 L0 命中反算"
+                        "（矢高是结果不是输入）。空缆矢高最小；吊装初期荷载集中在"
+                        "跨中，矢高出现峰值；随吊装向塔侧推进、荷载摊开，矢高回落；"
+                        "合拢后加二期铺装，矢高回升至成桥值。铺装态 H、矢高须与成桥态"
+                        "一致（本表的自洽判据）。hmin/hmax 为当前阶段吊索力范围。",
+                "headers": ["阶段", "名称", "H (kN)", "矢高 (m)", "跨中高程 (m)",
+                            "吊索力 min (kN)", "吊索力 max (kN)"],
                 "rows": rows,
             }
         combos = self.combinations()
