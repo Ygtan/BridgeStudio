@@ -74,6 +74,12 @@ MATERIALS: dict[str, tuple[float, float]] = {
 }
 MATERIAL_NAMES = list(MATERIALS)
 
+# 多车道横向布载折减系数（JTG D60-2015 表 4.3.1-5）
+_LANE_REDUCTION: dict[int, float] = {
+    1: 1.00, 2: 1.00, 3: 0.78, 4: 0.67,
+    5: 0.60, 6: 0.55, 7: 0.52, 8: 0.50,
+}
+
 SHAPE_LABELS = {
     "rectangular": "矩形",
     "i_beam": "工字形",
@@ -148,7 +154,8 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "sag": 10.0,                        # 矢跨比分母（1/10）
         "clear": 5.0,                       # 跨中主缆至桥面净空 (m)
         "h": 3.0, "B": 12.0, "tf": 0.028, "tw": 0.020,
-        "q": 100.0,                         # 桥面恒载 (kN/m)
+        "q": 100.0,                         # 桥面恒载 (kN/m，= 一期 + 二期)
+        "q2_deck": 0.0,                     # 二期恒载 (kN/m，铺装+护栏)；0 = 二期为 0
         "A": 60000.0,                       # 单根主缆面积 (mm²)
         "Ah": 3000.0,                       # 单根吊索面积 (mm²)
         "panel": 10.0,                      # 吊索间距 (m)
@@ -156,6 +163,10 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "tp": 6,                            # 每塔分段数
         "sh": True,                         # 边跨是否挂吊索
         "fpu": 1770.0,                      # 主缆破断强度 (MPa)
+        "erection": False,                  # 是否生成施工阶段模拟（空缆→吊装→合拢→铺装）
+        "erection_panels": 2,               # 每次对称吊装的吊点对数
+        "lane_count": 3,                    # 横向设计车道数
+        "lane_reduction": 0.78,             # 多车道横向折减系数（JTG D60 表 4.3.1-5）
     },
 }
 
@@ -326,9 +337,9 @@ FIELDS: dict[str, list[list[Field]]] = {
              "fmt": {"EARTH": "地锚式（主缆锚在锚碇）",
                      "SELF": "自锚式（主缆锚在梁端）"}},
             {"key": "Lm", "label": "主跨 (m)", "type": "float",
-             "min": 100.0, "max": 800.0, "step": 10.0},
+             "min": 100.0, "max": 1500.0, "step": 10.0},
             {"key": "Ls", "label": "边跨 (m，0=自动)", "type": "float",
-             "min": 0.0, "max": 300.0, "step": 5.0},
+             "min": 0.0, "max": 500.0, "step": 5.0},
             {"key": "sag", "label": "矢跨比 1/n", "type": "float",
              "min": 7.0, "max": 14.0, "step": 0.5},
         ],
@@ -360,6 +371,16 @@ FIELDS: dict[str, list[list[Field]]] = {
             {"key": "tp", "label": "每塔分段", "type": "int",
              "min": 3, "max": 12, "step": 1},
             {"key": "sh", "label": "边跨挂吊索", "type": "bool"},
+        ],
+        [
+            {"key": "lane_count", "label": "车道数", "type": "int",
+             "min": 1, "max": 8, "step": 1},
+            {"key": "q2_deck", "label": "二期恒载 (kN/m)", "type": "float",
+             "min": 0.0, "max": 300.0, "step": 5.0},
+            {"key": "erection", "label": "施工阶段模拟", "type": "bool"},
+            {"key": "erection_panels", "label": "每次对称吊装对数", "type": "int",
+             "min": 1, "max": 10, "step": 1,
+             "when": lambda p: p.get("erection")},
         ],
     ],
 }
@@ -607,6 +628,12 @@ class ModelDoc:
 
         p = self.params
         n_sag = float(p.get("sag", 10.0))
+        # 车道折减系数：车道数变了但折减系数仍是 3 车道默认值时，按
+        # JTG D60 表 4.3.1-5 自动跟正（UI 只改车道数不会联动折减系数）。
+        _lc = int(p.get("lane_count", 3))
+        _lr = float(p.get("lane_reduction", 0.78))
+        if _lc != 3 and abs(_lr - 0.78) < 1e-9:
+            _lr = _LANE_REDUCTION.get(_lc, _lr)
         model, info = build_suspension_3d(
             system=str(p.get("system", "EARTH")).upper(),
             main_span=float(p["Lm"]),
@@ -621,8 +648,13 @@ class ModelDoc:
             tower_h=float(p.get("tower_h", 4.0)),
             n_tower_seg=int(p.get("tp", 6)),
             q_deck=float(p["q"]) * 1e3,
+            q2_deck=float(p.get("q2_deck", 0.0) or 0.0) * 1e3,
             main_area_mm2=float(p.get("A", 60000.0)),
             hanger_area_mm2=float(p.get("Ah", 3000.0)),
+            erection=bool(p.get("erection", False)),
+            erection_panels=int(p.get("erection_panels", 2)),
+            lane_count=_lc,
+            lane_reduction=_lr,
         )
         self._info = dict(info)
         self._info["fpu"] = float(p.get("fpu", 1770.0)) * 1e6
@@ -737,6 +769,13 @@ class ModelDoc:
                 e.append(f"单根主缆面积 {A:g} mm² 过小，请核对是否写成 cm²")
             if Ah and A and Ah > A:
                 e.append(f"吊索面积 {Ah:g} mm² 大于主缆面积 {A:g} mm²，请核对")
+            q2 = p.get("q2_deck") or 0.0
+            if isinstance(q2, (int, float)) and q2 > 0 and p.get("q") and q2 > float(p["q"]):
+                e.append(f"二期恒载 {q2:g} kN/m 超过总恒载 {float(p['q']):g} kN/m，"
+                         "一期恒载会变负")
+            lc = p.get("lane_count")
+            if not isinstance(lc, int) or not 1 <= lc <= 8:
+                e.append(f"车道数 {lc} 超出范围（1~8）")
         else:
             Lm = pos("Lm", "主跨")
             Ls = pos("Ls", "边跨")
@@ -1171,12 +1210,62 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
             ("B", ("主梁宽", "桥宽", "加劲梁宽"), "加劲梁宽"),
             ("q", ("恒载", "桥面荷载", "均布荷载"), "桥面恒载"),
             ("panel", ("吊索间距", "吊索间距离"), "吊索间距"),
-            ("A", ("主缆面积",), "单根主缆面积"),
-            ("Ah", ("吊索面积",), "单根吊索面积"),
         ):
             if not grab(key, *names):
                 p[key] = d[key]
                 default(key, label)
+        # 缆索面积单位是 mm²，不是长度——不能走 _grab 的 _to_m 换算，否则
+        # 「主缆面积 280000 mm²」会被除以 1000 变成 280 m²。
+        def _area(*names: str) -> float | None:
+            for nm in names:
+                m = re.search(nm + r"[\s:：为约]*?([0-9]+(?:\.[0-9]+)?)"
+                              r"\s*(?:mm2|mm²|平方毫米|mm)", text, re.I)
+                if m:
+                    return float(m.group(1))
+            return None
+
+        for key, names, label in (
+            ("A", ("主缆面积",), "单根主缆面积"),
+            ("Ah", ("吊索面积",), "单根吊索面积"),
+        ):
+            v = _area(*names)
+            if v is None:
+                p[key] = d[key]
+                default(key, label)
+            else:
+                p[key] = v
+        # 二期铺装：与一期拆分（一期 = q - q2），供施工阶段分级施加。
+        m = re.search(r"二期(?:恒载|铺装|荷载|自重)?[\s:：为约]*"
+                      r"([0-9]+(?:\.[0-9]+)?)\s*(?:kN/m|kn/m|kN·m-1|千牛/米)",
+                      text, re.I)
+        if m:
+            p["q2_deck"] = float(m.group(1))
+        else:
+            p["q2_deck"] = d["q2_deck"]
+        # 车道数：多车道横向折减系数按 JTG D60 表 4.3.1-5。
+        m = re.search(r"(?:双向|单向)?[\s]*([一二三四五六七八1-8])\s*车道", text)
+        if m:
+            cn = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6,
+                  "七": 7, "八": 8}.get(m.group(1))
+            n_lane = cn if cn is not None else int(m.group(1))
+            p["lane_count"] = n_lane
+            p["lane_reduction"] = _LANE_REDUCTION.get(n_lane, 0.78)
+        else:
+            p["lane_count"] = d["lane_count"]
+            p["lane_reduction"] = d["lane_reduction"]
+            default("lane_count", "车道数")
+        # 施工阶段：出现吊装/合拢/施工等过程描述才生成
+        # （空缆 → 从跨中对称吊装 → 合拢 → 铺装）。
+        if re.search(r"施工阶段|施工过程|吊装|合拢|对称吊装|从跨中|从中间", text):
+            p["erection"] = True
+            m = re.search(r"每次(?:对称)?吊装\s*(\d+)\s*(?:对|段|个)?", text)
+            if m:
+                p["erection_panels"] = int(m.group(1))
+            else:
+                p["erection_panels"] = d["erection_panels"]
+        else:
+            p["erection"] = d["erection"]
+            p["erection_panels"] = d["erection_panels"]
     else:
         if not grab("sp1", "边跨"):
             p["sp1"] = d["sp1"]

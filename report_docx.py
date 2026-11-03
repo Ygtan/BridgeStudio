@@ -1984,15 +1984,15 @@ def _susp_sec_1(w: _Writer, model, d: dict, title: str, project: str) -> None:
 
     rows = [
         ["桥型", d["system_label"]],
-        ["跨径布置", f"{_f(p.get('side_span') or 0, 1)} + {_f(d['span'], 1)} + "
-                     f"{_f(p.get('side_span') or 0, 1)} m"],
+        ["跨径布置", f"{_f(d['side_span'], 1)} + {_f(d['span'], 1)} + "
+                     f"{_f(d['side_span'], 1)} m"],
         ["主跨矢高 / 矢跨比", f"{_f(d['sag'], 2)} m / 1/{_f(d['sag_ratio'], 1)}"],
         ["主缆锚固方式", "锚于加劲梁端（自锚）" if d["is_self"] else "锚于锚碇（地锚）"],
         ["加劲梁形式", f"钢箱梁，宽 {_f(p.get('B') or 12, 1)} m，"
                        f"高 {_f(p.get('h') or 3, 1)} m"],
         ["桥面恒载", f"{_f(p.get('q') or 100, 0)} kN/m（含钢箱梁、桥面系与二期）"],
         ["主缆/吊索截面积", f"{_f(p.get('A') or 60000, 0)} / "
-                            f"{_f(p.get('A_h') or 3000, 0)} mm²"],
+                            f"{_f(p.get('Ah') or p.get('A_h') or 3000, 0)} mm²"],
     ]
     w.table("主要技术参数", ["项目", "取值"], rows, widths=[4.6, 10.9],
             aligns=["l", "l"])
