@@ -629,20 +629,48 @@ class SolveResult:
         out: list[Check] = []
         all_stages = sorted({s for s, _ in self.stage_cables})
 
+        # 临时索（被 DEACTIVE 拆掉的，如拱肋吊装的斜拉扣索）：合拢后就退出工作，
+        # 其「末阶段 vs 设计目标」的偏差是"结构闭合后卸载"的施工物理，不是
+        # 调索失败——那条判据只对永久索（成桥后仍在工作）有意义。拆索前只要
+        # 全程受拉、不超上限即可。
+        temp_elems: set[int] = set()
+        if model is not None:
+            for s in getattr(model, "stages", []) or []:
+                for e in getattr(s, "deactivate", []) or []:
+                    try:
+                        temp_elems.add(int(e))
+                    except (TypeError, ValueError):
+                        continue
+
         # ---- 1. 全程不出现受压 -------------------------------------------
+        # 永久索受压 = 施工顺序不成立（error）；临时索（合拢后 DEACTIVE 拆除）
+        # 受压 = 拆除前已退出工作、被闭合后的结构接管，属正常施工物理，降级为
+        # 提示（warn）——不是"这顺序错了"，而是"这几根临时索在拆除前已松弛"。
         neg = [r for r in rows if r["Tmin"] <= 0.0]
-        if neg:
-            worst = min(neg, key=lambda r: r["Tmin"])
-            detail = (f"{len(neg)} 根索全过程出现过轴力 ≤ 0，最小 "
+        neg_perm = [r for r in neg if r["elem"] not in temp_elems]
+        neg_temp = [r for r in neg if r["elem"] in temp_elems]
+        if neg_perm:
+            worst = min(neg_perm, key=lambda r: r["Tmin"])
+            detail = (f"{len(neg_perm)} 根索全过程出现过轴力 ≤ 0，最小 "
                       f"{worst['Tmin']/1e3:.0f} kN（单元 {worst['elem']}，"
                       f"阶段 {worst['TminStage']}）；线性阶段把索当桁架，允许受压"
                       "——真实索受压即退出工作，该施工顺序在这几根索上不成立")
+            out.append(Check("施工阶段索不出现受压（全过程）", False, detail,
+                             level="error"))
+        elif neg_temp:
+            worst = min(neg_temp, key=lambda r: r["Tmin"])
+            detail = (f"{len(neg_temp)} 根临时索在拆除前轴力松弛到 ≤ 0（最小 "
+                      f"{worst['Tmin']/1e3:.0f} kN，单元 {worst['elem']}，阶段 "
+                      f"{worst['TminStage']}）；临时索合拢后被闭合结构接管，"
+                      "先张卸载到松弛属正常施工物理，不构成受压破坏")
+            out.append(Check("施工阶段索不出现受压（全过程）", True, detail,
+                             level="warn"))
         else:
             detail = (f"{len(rows)} 根索在 {len(all_stages)} 个阶段"
                       f"（{'、'.join(map(str, all_stages))}）内全部受拉，"
                       f"最小 {min(r['Tmin'] for r in rows)/1e3:.0f} kN")
-        out.append(Check("施工阶段索不出现受压（全过程）", not neg, detail,
-                         level="error"))
+            out.append(Check("施工阶段索不出现受压（全过程）", True, detail,
+                             level="error"))
 
         # ---- 2. 全程峰值 ≤ A·fpu / 2.0 -----------------------------------
         # 逐根取面积：主缆与吊索的 A 差几十倍，用同一个面积会把吊索判重。
@@ -678,23 +706,37 @@ class SolveResult:
                 level="warn" if ratio <= 1.0 else "error"))
 
         # ---- 3. 末阶段 vs 设计目标 ---------------------------------------
-        tgt = [r for r in rows if r["Tdes"] > 0.0]
-        if tgt:
-            r = max(tgt, key=lambda x: x["devLast"])
+        # 只对永久索判定：临时索在末阶段已被（或即将被）拆除，末阶段索力偏离
+        # 目标是"先张卸载"的正常施工物理，不构成调索失败。
+        perm = [r for r in rows if r["Tdes"] > 0.0 and r["elem"] not in temp_elems]
+        n_temp = sum(1 for r in rows if r["Tdes"] > 0.0 and r["elem"] in temp_elems)
+        if perm:
+            r = max(perm, key=lambda x: x["devLast"])
             dev = r["devLast"]
+            detail = (f"最大偏差 {dev*100:.2f}%（单元 {r['elem']}："
+                      f"{r['Tlast']/1e3:.0f} / {r['Tdes']/1e3:.0f} kN）。"
+                      + ("" if dev <= 0.02 else
+                         "分批张拉时先张的索会被后张的带跑，属正常现象——"
+                         "按目标再补调一轮（加一个只给 TENSION= 的阶段）即可拉回。"))
+            if n_temp:
+                detail += f"（另有 {n_temp} 根临时索在合拢后拆除，不参与本判据）"
             out.append(Check(
-                f"末阶段索力 vs 设计目标（{len(tgt)} 根）",
-                dev <= 0.02,
-                f"最大偏差 {dev*100:.2f}%（单元 {r['elem']}："
-                f"{r['Tlast']/1e3:.0f} / {r['Tdes']/1e3:.0f} kN）。"
-                + ("" if dev <= 0.02 else
-                   "分批张拉时先张的索会被后张的带跑，属正常现象——"
-                   "按目标再补调一轮（加一个只给 TENSION= 的阶段）即可拉回。"),
+                f"末阶段索力 vs 设计目标（{len(perm)} 根）",
+                dev <= 0.02, detail,
                 value=dev, limit=0.02,
                 level="warn" if dev <= 0.02 else "error"))
+        elif n_temp:
+            out.append(Check(
+                f"末阶段索力 vs 设计目标（0 根永久索）", True,
+                f"全部 {n_temp} 根为临时索（合拢后 DEACTIVE 拆除），"
+                "末阶段卸载是正常施工物理，无永久索需要命中设计目标",
+                level="info"))
 
         # ---- 4. 全过程峰值 vs 设计目标 ------------------------------------
-        peak = [r for r in tgt if r["ratio"] is not None]
+        # 临时索也参与这条：张拉目标就是"吊住该段"，峰值偏离目标意味着张拉量
+        # 给错了（超张）或被后续吊装带偏（先张卸载），两者都要在过程中暴露。
+        all_tgt = [r for r in rows if r["Tdes"] > 0.0]
+        peak = [r for r in all_tgt if r["ratio"] is not None]
         if peak:
             r = max(peak, key=lambda x: abs(x["ratio"] - 1.0))
             dev = abs(r["ratio"] - 1.0)

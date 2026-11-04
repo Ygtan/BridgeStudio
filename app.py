@@ -108,13 +108,14 @@ EXAMPLES: list[tuple[str, str]] = [
 ]
 
 KIND_OPTIONS = ["自动识别", "单梁", "拱桥", "桁架桥", "梁桥", "三维梁格", "斜拉桥",
-                "三维 · 悬索桥"]
+                "三维 · 悬索桥", "大跨拱桥"]
 
 st.set_page_config(page_title="NL-FE 前处理原型", layout="wide")
 st.title("自然语言驱动有限元前处理 · 原型")
 st.caption(
     "一条输入 → 自动识别 单梁 / 拱桥 / 桁架桥 / 梁桥 / 三维梁格 / 斜拉桥 "
-    "→ 统一 ModelDoc → .dat → FEM-Eigen（2D / 3D 双链路）求解与出图"
+    "/ 悬索桥 / 大跨拱桥 → 统一 ModelDoc → .dat → FEM-Eigen（2D / 3D 双链路）"
+    "求解与出图"
 )
 
 # ---------------------------------------------------------------- 侧栏：LLM

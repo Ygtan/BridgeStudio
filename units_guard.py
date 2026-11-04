@@ -102,6 +102,19 @@ _SCALARS: dict[str, dict[str, tuple[float, float, str, str, str]]] = {
         "panel": (BEAM_MAX_SECTION, 1000.0, "mm", "吊索间距", "m"),
         "clear": (BEAM_MAX_SECTION, 1000.0, "mm", "跨中净空", "m"),
     },
+    # 大跨拱桥：跨度/矢高/截面/恒载的阈值与桥侧其余结构一致。
+    "arch_3d": {
+        "span": (BRIDGE_MAX_SPAN, 1000.0, "mm", "主跨", "m"),
+        "rise": (BRIDGE_MAX_RISE, 1000.0, "mm", "矢高", "m"),
+        "arch_h": (BRIDGE_MAX_DEPTH, 1000.0, "mm", "拱肋高", "m"),
+        "arch_b": (BRIDGE_MAX_WIDTH, 1000.0, "mm", "拱肋宽", "m"),
+        "arch_tf": (BEAM_MAX_SECTION, 1000.0, "mm", "拱肋翼缘厚", "m"),
+        "arch_tw": (BEAM_MAX_SECTION, 1000.0, "mm", "拱肋腹板厚", "m"),
+        "deck_h": (BEAM_MAX_SECTION, 1000.0, "mm", "主梁高", "m"),
+        "deck_b": (BRIDGE_MAX_WIDTH, 1000.0, "mm", "主梁宽", "m"),
+        "q_deck": (BEAM_MAX_UDL, 1000.0, "N/m", "一期恒载", "kN/m"),
+        "q2_deck": (BEAM_MAX_UDL, 1000.0, "N/m", "二期恒载", "kN/m"),
+    },
 }
 
 
@@ -164,7 +177,8 @@ def _guard_scalars(data: dict, kind: str, notes: list[str]) -> None:
 def guard_units(data: dict, kind: str, notes: list[str] | None = None) -> list[str]:
     """就地修正 `data` 里的单位误写，返回提示列表。
 
-    kind ∈ {"beam", "arch", "truss", "beam_bridge", "grillage3d", "cable_stayed"}。
+    kind ∈ {"beam", "arch", "truss", "beam_bridge", "grillage3d", "cable_stayed",
+    "suspension", "arch_3d"}。
     只做"量级明显不可能"的换算，不做业务范围校验（那是 validate() 的事）。
     """
     notes = notes if notes is not None else []

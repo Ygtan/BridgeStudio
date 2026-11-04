@@ -365,7 +365,8 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
         with st.spinner("排版报告（表格、插图、结论）…"):
             try:
                 rep = build_document(res, doc.model, project=res.title,
-                                     out_dir=Path("out") / doc.kind / "report")
+                                     out_dir=Path("out") / doc.kind / "report",
+                                     kind_label=KIND_LABELS.get(doc.kind))
                 paths = write_all(rep, Path("out") / doc.kind / "report",
                                   stem=f"{doc.kind}_report")
                 st.session_state[SS_REPORT] = {

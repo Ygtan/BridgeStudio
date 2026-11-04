@@ -1195,17 +1195,23 @@ def _conclusion_bullets(res: SolveResult, model: Any,
 
 def build_document(res: SolveResult, model: Any, *, project: str = "",
                    out_dir: str | Path | None = None,
-                   params: dict[str, Any] | None = None) -> Report:
-    """把 SolveResult 拼成与排版无关的报告结构。"""
+                   params: dict[str, Any] | None = None,
+                   kind_label: str | None = None) -> Report:
+    """把 SolveResult 拼成与排版无关的报告结构。
+
+    `kind_label` 可覆盖「桥型」标签：大跨拱桥（arch_3d）走线性阶段内核，
+    `res.kind` 是 grillage3d，但报告该写「大跨拱桥施工」而不是「三维梁格」。
+    """
     out_dir = Path(out_dir or "out") / f"report_{res.kind}"
     figs = figures(res, model, out_dir)
     tabs = res.tables(model)
     metrics = res.metrics(model)
     checks = res.checks(model)
     title = project or res.title or res.kind_label
+    bridge_label = kind_label or res.kind_label
 
     meta: list[tuple[str, str]] = [
-        ("桥型", res.kind_label),
+        ("桥型", bridge_label),
         ("结构规模", f"{res.stats.get('nodes', 0)} 节点 / "
                      f"{res.stats.get('elements', 0)} 单元 / "
                      f"{res.stats.get('dofs', '—')} 自由度"),
@@ -1313,7 +1319,7 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
         for key in rest:
             blocks.append({"type": "table", "key": key})
 
-    return Report(title=title, subtitle=res.kind_label, kind=res.kind, meta=meta,
+    return Report(title=title, subtitle=bridge_label, kind=res.kind, meta=meta,
                   blocks=blocks, figures=figs, tables=tabs,
                   diagnostics=list(res.diagnostics), fingerprint=res.fingerprint,
                   generated_at=_dt.datetime.now().strftime("%Y-%m-%d %H:%M"))

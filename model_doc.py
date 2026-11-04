@@ -40,10 +40,10 @@ from typing import Any, Callable, Literal
 from model_spec import Load, ModelSpec, Section, Support
 
 Kind = Literal["beam", "arch", "truss", "beam_bridge", "grillage3d",
-               "cable_stayed", "suspension"]
+               "cable_stayed", "suspension", "arch_3d"]
 
 #: 三维结构：走 FEM-Eigen 三维内核，而不是 2D 的 example_mixed。
-KINDS_3D: tuple[str, ...] = ("grillage3d", "cable_stayed", "suspension")
+KINDS_3D: tuple[str, ...] = ("grillage3d", "cable_stayed", "suspension", "arch_3d")
 
 KIND_LABELS: dict[str, str] = {
     "beam": "单梁",
@@ -53,6 +53,7 @@ KIND_LABELS: dict[str, str] = {
     "grillage3d": "三维梁格",
     "cable_stayed": "斜拉桥成桥态",
     "suspension": "悬索桥成桥态",
+    "arch_3d": "大跨拱桥施工",
 }
 
 KIND_HINTS: dict[str, str] = {
@@ -65,6 +66,9 @@ KIND_HINTS: dict[str, str] = {
     "悬索桥": "suspension",
     "自锚式悬索桥": "suspension",
     "地锚式悬索桥": "suspension",
+    "大跨拱桥": "arch_3d",
+    "拱桥施工": "arch_3d",
+    "拱肋吊装": "arch_3d",
 }
 
 # 材料名 → (E, ρ)
@@ -170,6 +174,21 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "erection_panels": 2,               # 每次对称吊装的吊点对数
         "lane_count": 3,                    # 横向设计车道数
         "lane_reduction": 0.78,             # 多车道横向折减系数（JTG D60 表 4.3.1-5）
+    },
+    # 大跨钢箱拱桥（拱肋分段吊装 + 斜拉扣索辅助 + 合拢 + 吊杆主梁 + 铺装）。
+    # 走 3D 线性阶段内核（cable_bridge=None），与 grillage3d 同一求解链。
+    "arch_3d": {
+        "span": 500.0, "rise": 100.0,       # 主跨 / 矢高 (m)，矢跨比 1/5
+        "n_seg_half": 8,                    # 半跨拱肋吊装段数（全跨 2·n_seg_half 段）
+        "arch_h": 7.0, "arch_b": 5.0,       # 拱肋钢箱截面 (m)
+        "arch_tf": 0.05, "arch_tw": 0.045,  # 拱肋翼缘/腹板厚 (m)
+        "deck_h": 3.2, "deck_b": 24.0,      # 主梁钢箱截面 (m)
+        "deck_tf": 0.03, "deck_tw": 0.022,  # 主梁翼缘/腹板厚 (m)
+        "hanger_area_mm2": 30000.0,         # 单根吊杆面积 (mm²，刚性吊杆)
+        "cable_area_mm2": 8000.0,           # 单根临时扣索面积 (mm²)
+        "cable_fpu": 1860.0,                # 扣索破断强度 (MPa)
+        "q_deck": 200.0,                    # 一期恒载 (kN/m，主梁+桥面系)
+        "q2_deck": 60.0,                    # 二期恒载 (kN/m，铺装+护栏)
     },
 }
 
@@ -394,6 +413,44 @@ FIELDS: dict[str, list[list[Field]]] = {
              "when": lambda p: p.get("erection")},
         ],
     ],
+    "arch_3d": [
+        [
+            {"key": "span", "label": "主跨 (m)", "type": "float",
+             "min": 100.0, "max": 600.0, "step": 10.0},
+            {"key": "rise", "label": "矢高 (m)", "type": "float",
+             "min": 20.0, "max": 150.0, "step": 5.0},
+            {"key": "n_seg_half", "label": "半跨吊装段数", "type": "int",
+             "min": 3, "max": 16, "step": 1},
+            {"key": "cable_fpu", "label": "扣索破断强度 (MPa)", "type": "float",
+             "min": 1200.0, "max": 2200.0, "step": 10.0},
+        ],
+        [
+            {"key": "arch_h", "label": "拱肋高 (m)", "type": "float",
+             "min": 3.0, "max": 12.0, "step": 0.5},
+            {"key": "arch_b", "label": "拱肋宽 (m)", "type": "float",
+             "min": 2.0, "max": 10.0, "step": 0.5},
+            {"key": "arch_tf", "label": "拱肋翼缘厚 (m)", "type": "float",
+             "min": 0.02, "max": 0.12, "step": 0.005},
+            {"key": "arch_tw", "label": "拱肋腹板厚 (m)", "type": "float",
+             "min": 0.02, "max": 0.12, "step": 0.005},
+        ],
+        [
+            {"key": "deck_h", "label": "主梁高 (m)", "type": "float",
+             "min": 2.0, "max": 6.0, "step": 0.1},
+            {"key": "deck_b", "label": "主梁宽 (m)", "type": "float",
+             "min": 8.0, "max": 40.0, "step": 0.5},
+            {"key": "hanger_area_mm2", "label": "吊杆面积 (mm²)", "type": "float",
+             "min": 5000.0, "max": 100000.0, "step": 1000.0},
+            {"key": "cable_area_mm2", "label": "扣索面积 (mm²)", "type": "float",
+             "min": 1000.0, "max": 20000.0, "step": 500.0},
+        ],
+        [
+            {"key": "q_deck", "label": "一期恒载 (kN/m)", "type": "float",
+             "min": 50.0, "max": 500.0, "step": 10.0},
+            {"key": "q2_deck", "label": "二期恒载 (kN/m)", "type": "float",
+             "min": 0.0, "max": 200.0, "step": 5.0},
+        ],
+    ],
 }
 
 
@@ -440,6 +497,12 @@ def classify_text(text: str, hint: str | None = None) -> str:
     t = text.strip()
     if re.search(r"悬索|主缆|吊索", t):
         return "suspension"
+    # 大跨拱桥施工必须先于「斜拉」判：拱肋吊装用的「斜拉扣索」含「斜拉」二字，
+    # 但那是临时扣索、不是斜拉桥。判据 = 有「拱」且带施工过程词（分段吊装 /
+    # 扣索 / 扣挂 / 缆索吊 / 合拢）。普通拱桥（只有矢高/吊杆）仍走 2D arch。
+    if re.search(r"拱", t) and re.search(
+            r"拱肋|分段吊装|吊装|扣索|扣挂|缆索吊|斜拉扣|合拢", t):
+        return "arch_3d"
     if re.search(r"斜拉|拉索桥|斜拉索", t):
         return "cable_stayed"
     # 「矢高」「矢跨比」在悬索桥里也用，但悬索已经先一步判掉了，
@@ -498,6 +561,8 @@ class ModelDoc:
             self._model = self._build_cable_stayed()
         elif self.kind == "suspension":
             self._model = self._build_suspension()
+        elif self.kind == "arch_3d":
+            self._model = self._build_arch_3d()
         else:
             self._model = self._build_beam_bridge()
         return self
@@ -674,6 +739,34 @@ class ModelDoc:
         self._info["fpu"] = float(p.get("fpu", 1770.0)) * 1e6
         return model
 
+    def _build_arch_3d(self):
+        """大跨钢箱拱桥（拱肋分段吊装 + 斜拉扣索辅助 + 合拢 + 吊杆主梁 + 铺装）。
+
+        与 cable_stayed 的 staged 模式同一条链：建造器不挂 `cable_bridge`，
+        `detect_kind` 落到线性阶段内核（grillage3d），施工序列由 `*STAGE` 承载，
+        临时扣索按 `TENSION=` 目标索力张拉、合拢后 `DEACTIVE` 拆除。
+        """
+        from arch_3d import build_arch_3d
+
+        p = self.params
+        model, info = build_arch_3d(
+            span=float(p["span"]), rise=float(p["rise"]),
+            n_seg_half=int(p["n_seg_half"]),
+            arch_h=float(p["arch_h"]), arch_b=float(p["arch_b"]),
+            arch_tf=float(p["arch_tf"]), arch_tw=float(p["arch_tw"]),
+            deck_h=float(p["deck_h"]), deck_b=float(p["deck_b"]),
+            deck_tf=float(p.get("deck_tf", 0.03)),
+            deck_tw=float(p.get("deck_tw", 0.022)),
+            hanger_area_mm2=float(p["hanger_area_mm2"]),
+            cable_area_mm2=float(p["cable_area_mm2"]),
+            cable_fpu=float(p.get("cable_fpu", 1860.0)) * 1e6,
+            q_deck=float(p["q_deck"]) * 1e3,
+            q2_deck=float(p.get("q2_deck", 0.0) or 0.0) * 1e3,
+        )
+        self._info = dict(info)
+        self._info["fpu"] = float(p.get("cable_fpu", 1860.0)) * 1e6
+        return model
+
     # ------------------------------------------------------------ 校验
 
     def validate(self) -> list[str]:
@@ -790,6 +883,28 @@ class ModelDoc:
             lc = p.get("lane_count")
             if not isinstance(lc, int) or not 1 <= lc <= 8:
                 e.append(f"车道数 {lc} 超出范围（1~8）")
+        elif self.kind == "arch_3d":
+            span = pos("span", "主跨")
+            rise = pos("rise", "矢高")
+            pos("arch_h", "拱肋高")
+            pos("arch_b", "拱肋宽")
+            pos("arch_tf", "拱肋翼缘厚")
+            pos("arch_tw", "拱肋腹板厚")
+            pos("deck_h", "主梁高")
+            pos("deck_b", "主梁宽")
+            pos("q_deck", "一期恒载")
+            nseg = p.get("n_seg_half")
+            if not isinstance(nseg, int) or nseg < 3:
+                e.append(f"半跨吊装段数 {nseg} 太少（≥3：拱脚段 + 吊装段 + 合拢段）")
+            if span and rise and not 2.0 <= span / rise <= 8.0:
+                e.append(f"矢跨比 span/rise = {span / rise:.2f} 超出合理范围 2~8，"
+                         "过坦则水平推力畸高、过陡则失稳")
+            if span and rise and rise > 0.35 * span:
+                e.append(f"矢高 {rise:g} m 超过主跨 {span:g} m 的 0.35，矢跨比过陡")
+            q2 = p.get("q2_deck") or 0.0
+            if isinstance(q2, (int, float)) and q2 > 0 and p.get("q_deck") and q2 > float(p["q_deck"]):
+                e.append(f"二期恒载 {q2:g} kN/m 超过一期 {float(p['q_deck']):g} kN/m，"
+                         "一期恒载会变负")
         else:
             Lm = pos("Lm", "主跨")
             Ls = pos("Ls", "边跨")
@@ -955,6 +1070,17 @@ class ModelDoc:
                 + " m")
             lines.append(f"定索力方法：{info.get('tension_method', '—')}"
                          "（DECK = 按恒载竖向分配）")
+        elif self.kind == "arch_3d":
+            info = self.info
+            lines.append(
+                f"主跨 {info.get('span', 0):.0f} m / 矢高 {info.get('rise', 0):.0f} m，"
+                f"矢跨比 1/{info.get('sag_ratio', 0):.1f}")
+            lines.append(
+                f"拱肋 {info.get('n_arch_seg', 0)} 段 + 吊杆 {info.get('n_hanger', 0)} 根"
+                f" + 临时扣索 {len(info.get('cable_ids', []))} 根")
+            lines.append(
+                f"施工阶段 {st.get('stages', 0)} 个：拱脚段 → 对称吊装+扣索张拉 → 合拢"
+                " → 拆扣索 → 吊杆主梁 → 二期铺装")
         else:
             lines.append(f"施工阶段 {st.get('stages', 0)} 个，"
                          f"活载工况 {len(getattr(m, 'influences', []) or [])} 个")
@@ -1300,6 +1426,62 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
         else:
             p["erection"] = d["erection"]
             p["erection_panels"] = d["erection_panels"]
+    elif kind == "arch_3d":
+        # 主跨：与斜拉/悬索同一套「先主跨后跨度」的优先级。
+        if not grab("span", "主跨", "跨径", "主孔"):
+            if not grab("span", "跨度", "总长", "全长"):
+                # 「大跨度拱桥500米」里「跨度」被「拱桥」隔开，_grab 抓不到；
+                # 单独抓紧贴「拱桥/拱」的裸数字。
+                m = re.search(r"(?:拱桥|拱)\s*([0-9]+(?:\.[0-9]+)?)\s*(?:米|m|M)", text)
+                if m:
+                    p["span"] = float(m.group(1))
+                    notes.append(f"从「拱桥 {p['span']:g} 米」识别主跨")
+                else:
+                    p["span"] = d["span"]
+                    default("span", "主跨")
+            else:
+                notes.append(f"只给了一个跨度，按主跨 {p['span']:g} m 处理")
+        p["span"] = guard_bridge_span(float(p["span"]), notes)
+        if not grab("rise", "矢高", "拱矢高"):
+            p["rise"] = round(float(p["span"]) / 5.0, 1)
+            notes.append(f"未说明矢高，按 L/5 = {p['rise']:g} m")
+        # 半跨吊装段数：显式「半跨 8 段」「分 8 段」「8 段吊装」；缺省 8。
+        m = re.search(r"半跨\s*(\d+)\s*段|拱肋\s*分\s*(\d+)\s*段|分\s*(\d+)\s*段\s*(?:吊装|拼装)", text)
+        if m:
+            p["n_seg_half"] = int(next(g for g in m.groups() if g))
+        else:
+            p["n_seg_half"] = d["n_seg_half"]
+            default("n_seg_half", "半跨吊装段数")
+        # 截面/荷载：拱肋、主梁截面与吊杆/扣索面积属"拟定合理参数"，
+        # 大多走默认；只抽显式给出的桥宽与恒载。
+        for key, names, label in (
+            ("deck_b", ("桥宽", "主梁宽", "桥面宽"), "主梁宽"),
+            ("q_deck", ("一期恒载", "桥面恒载", "恒载", "均布荷载"), "一期恒载"),
+        ):
+            if not grab(key, *names):
+                p[key] = d[key]
+                default(key, label)
+        # 二期铺装
+        m2 = re.search(r"二期(?:恒载|铺装|荷载|自重)?[\s:：为约]*"
+                       r"([0-9]+(?:\.[0-9]+)?)\s*(?:kN/m|kn/m|kN·m-1|千牛/米)", text, re.I)
+        if m2:
+            p["q2_deck"] = float(m2.group(1))
+        else:
+            p["q2_deck"] = d["q2_deck"]
+            default("q2_deck", "二期恒载")
+        # 车道数 → 桥宽（6 车道 → 24 m 桥面；给出桥宽时以桥宽为准，不覆盖）
+        m3 = re.search(r"([一二三四五六七八1-8])\s*车道", text)
+        if m3 and "deck_b" not in p:
+            cn = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6,
+                  "七": 7, "八": 8}.get(m3.group(1))
+            n_lane = cn if cn is not None else int(m3.group(1))
+            p["deck_b"] = round(3.75 * n_lane + 3.0, 1)
+            notes.append(f"{n_lane} 车道按 3.75 m/车道 + 3 m 检修道取桥宽 "
+                         f"{p['deck_b']:g} m")
+        # 施工关键词已由 classify_text 判到 arch_3d，这里把施工顺序写清楚。
+        notes.append("识别到拱肋分段吊装 + 斜拉扣索辅助，生成「拱脚段 → 对称吊装"
+                     " + 扣索张拉 → 拱顶合拢 → 拆扣索 → 吊杆主梁 → 二期铺装」"
+                     "阶段序列")
     else:
         if not grab("sp1", "边跨"):
             p["sp1"] = d["sp1"]

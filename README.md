@@ -121,11 +121,20 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        组合应力验算已接入（基本/频遇/准永久，正应力枚举 N×My 角点取最不利、
        包络法偏保守）。
        `verify_report_3d.py` 92/92、`verify_section_strength.py` 59/59 —— 2026-11-01
+- [x] **P3** 大跨钢箱拱桥施工（`arch_3d`）：`arch_3d.py` 参数化建造器，下承式单肋平面
+       模型（拱轴线二次抛物线、无铰拱拱脚固结、塔顶锚点简化为固定边界），施工序列
+       18 阶段：拱脚段 → 对称吊装 + 斜拉扣索张拉（`TENSION=` 目标 = 段自重 / 竖向方向
+       余弦，截断到 0.7·A·fpu）→ 拱顶合拢 → 拆扣索（`DEACTIVE`）→ 吊杆主梁 → 二期铺装。
+       自然语言识别：`arch_3d` 关键字（拱肋/分段吊装/扣索/合拢）先于「斜拉」判（
+       「斜拉扣索」是拱肋吊装的临时扣索、不是斜拉桥）；`model_doc` 加 `arch_3d` kind、
+       `units_guard` 登记单位阈值、`result_3d._checks_stage_cable` 识别被 `DEACTIVE` 的
+       临时索（「末阶段 vs 目标」与「受压」降级为提示——合拢后卸载到松弛是正常施工物理）。
+       `verify_arch_3d.py` 21/21、`example_arch_500m_nl.py` 端到端 —— 2026-11-04
 - [ ] **P4** 成果层：Word/PDF 计算书、3D 包络视图、MIDAS 双向互导
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 19 个脚本、740 项全绿）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 20 个脚本、761 项全绿）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
