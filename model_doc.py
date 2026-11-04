@@ -138,12 +138,15 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "Lm": 200.0, "Ls": 80.0, "Ht": 60.0,
         "n": 12,                            # 每塔每侧索数
         "h": 2.5, "B": 12.0,
-        "q": 100.0,                         # 桥面恒载 (kN/m)
+        "q": 100.0,                         # 桥面恒载 (kN/m，= 一期 + 二期)
+        "q2_deck": 0.0,                     # 二期恒载 (kN/m，铺装+护栏)；0 = 二期为 0
         "A": 6000.0,                        # 单索面积 (mm²)
         "method": "DECK",                   # DECK | RIGID | MINENERGY
         "fpu": 1860.0,                       # 索破断强度 (MPa)
         "tower_b": 3.0, "tower_h": 4.5,
         "panel": 8.0,
+        "staged": False,                    # 生成悬臂施工 + 张拉阶段序列
+        "retune": True,                     # 合拢后二次调索到成桥目标
     },
     # 悬索桥的默认值刻意让边跨自动：Ls=0 时由建造器按体系定
     # 边跨（自锚式取"锚点主缆水平"的平衡边跨，地锚式取 1/3 主跨）。这不是
@@ -328,6 +331,14 @@ FIELDS: dict[str, list[list[Field]]] = {
              "min": 1.5, "max": 10.0, "step": 0.5},
             {"key": "tower_h", "label": "塔柱深 (m)", "type": "float",
              "min": 2.0, "max": 12.0, "step": 0.5},
+        ],
+        [
+            {"key": "staged", "label": "悬臂施工 + 张拉", "type": "bool"},
+            {"key": "q2_deck", "label": "二期恒载 (kN/m)", "type": "float",
+             "min": 0.0, "max": 200.0, "step": 5.0,
+             "when": lambda p: p.get("staged")},
+            {"key": "retune", "label": "合拢后二次调索", "type": "bool",
+             "when": lambda p: p.get("staged")},
         ],
     ],
     "suspension": [
@@ -607,8 +618,11 @@ class ModelDoc:
             tower_b=float(p.get("tower_b", 3.0)),
             tower_h=float(p.get("tower_h", 4.5)),
             q_deck=float(p["q"]) * 1e3,
+            q2_deck=float(p.get("q2_deck", 0.0) or 0.0) * 1e3,
             cable_area_mm2=float(p["A"]),
             method=str(p.get("method", "DECK")),
+            staged=bool(p.get("staged", False)),
+            retune=bool(p.get("retune", True)),
         )
         # 派生量挂在外壳上：界面要支座 x 才能画红虚线，而 pydantic 契约里
         # 不该出现这种"只给界面用"的字段。
@@ -899,8 +913,10 @@ class ModelDoc:
         from solver_3d import solve as solve_3d_model
 
         out = out_dir or Path("out") / self.kind
-        return solve_3d_model(self.model, kind=self.kind, out_dir=out,
-                              dat_name=dat_name)
+        # 不硬传 kind：悬臂施工的斜拉桥（staged）摘掉了 cable_bridge，按
+        # detect_kind 该走线性阶段内核（grillage3d），而不是成桥态内核
+        # （cable_stayed）。内核键由模型自述决定，不靠 self.kind 猜。
+        return solve_3d_model(self.model, out_dir=out, dat_name=dat_name)
 
     # ------------------------------------------------------------ 展示
 
@@ -1157,6 +1173,24 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
         else:
             p["A"] = d["A"]
             default("A", "单索面积")
+        # 悬臂施工 + 张拉：识别施工关键词。悬索桥的施工叫"分级找形"，斜拉桥
+        # 的施工叫"悬臂施工 + 逐段张拉"，两条路在建造器里是两套 stage 序列。
+        if re.search(r"悬臂施工|悬臂|悬拼|挂篮|逐段|逐节|分段施工|施工阶段"
+                     r"|平衡悬臂|悬浇|从塔|向两侧", text):
+            p["staged"] = True
+            notes.append("识别到悬臂施工，生成「桥塔+0号块 → 悬臂逐段张拉 → 合拢 "
+                         "→ 二期铺装+二次调索」阶段序列")
+        else:
+            p["staged"] = d["staged"]
+        # 二期恒载（铺装+护栏）：单独给出才拆分 q1=q−q2，否则二期=0 全算一期。
+        m2 = re.search(r"二期(?:恒载|铺装|荷载|桥面)?\s*"
+                       r"([0-9]+(?:\.[0-9]+)?)\s*(?:kN/m|kN|kn/m|KN/m)", text)
+        if m2:
+            p["q2_deck"] = float(m2.group(1))
+            notes.append(f"二期恒载 {p['q2_deck']:g} kN/m（一期 = 桥面恒载 − 二期）")
+        else:
+            p["q2_deck"] = d["q2_deck"]
+        p["retune"] = d["retune"]
     elif kind == "suspension":
         # 体系：只有两个选项，关键词足够，不必等 LLM。同时接受"锚在梁上"
         # 这类说法——用户描述体系时往往不说"自锚"三个字。

@@ -42,6 +42,7 @@ from model_spec_3d import (
     Node3D,
     NodalLoad3D,
     RealConst3D,
+    Stage3D,
 )
 from grillage_3d import box_section
 
@@ -77,6 +78,9 @@ def build_cable_stayed_3d(
     method: str = "DECK",                 # DECK | MINENERGY | RIGID
     cable_tensions: dict[int, float] | None = None,   # 指定索力（N），缺省按 method 定
     min_tension_fraction: float = 0.02,
+    staged: bool = False,               # 生成悬臂施工 + 张拉阶段序列（走线性阶段内核）
+    q2_deck: float = 0.0,               # 二期恒载 N/m（铺装+护栏）；0 = 二期为 0
+    retune: bool = True,                # 合拢后二次调索到成桥目标（施工闭环）
     title: str = "双塔三跨斜拉桥",
 ) -> tuple[ModelSpec3D, dict]:
     """生成双塔三跨斜拉桥 ModelSpec3D（含成桥态工况）。
@@ -257,9 +261,22 @@ def build_cable_stayed_3d(
 
     # ---------------------------------------------------------- 约束
     boundaries: list[Boundary3D] = []
-    for i in support_idx:
-        boundaries.append(Boundary3D(node=gid(i), dofs=(2, 3)))   # 双支座体系
-    boundaries.append(Boundary3D(node=gid(0), dofs=(1, 1)))        # 纵向固定一端
+    if staged:
+        # 塔梁固结体系（悬臂施工的稳定性前提）：塔位主梁节点固结（6 自由度），
+        # 桥台处竖向+横向支座（纵向滑动释放温度）。3D 内核约束是全局固定的，
+        # 不支持"临时固结→合拢后解除"，故本施工算例直接采用塔梁固结体系——
+        # 这也是钢斜拉桥/部分混凝土斜拉桥的常用成桥体系，悬臂施工无需临时
+        # 配重或临时索，塔位固结即可保证每个悬臂阶段的静定稳定。
+        for i, s in enumerate(support_idx):
+            if i in (1, 2):                       # 塔位
+                boundaries.append(Boundary3D(node=gid(s), dofs=(1, 6)))
+            else:                                  # 桥台 x=0 / x=Ltot
+                boundaries.append(Boundary3D(node=gid(s), dofs=(2, 3)))
+    else:
+        # 半漂浮体系（成桥态默认）：4 支座竖向+横向，一端纵向固定。
+        for i in support_idx:
+            boundaries.append(Boundary3D(node=gid(i), dofs=(2, 3)))   # 双支座体系
+        boundaries.append(Boundary3D(node=gid(0), dofs=(1, 1)))        # 纵向固定一端
     for i in range(len(xs)):
         boundaries.append(Boundary3D(node=gid(i), dofs=(4, 4)))    # 扭转定位（单梁线）
     for ti in range(2):
@@ -280,9 +297,114 @@ def build_cable_stayed_3d(
             etypes=etypes, elements=elements, boundaries=boundaries, loads=loads)
         tensions = tensions_by_deck_load(model_tmp, q_deck, trib_map, x_sup)
         method_out = "GIVEN"
+    # ---------------------------------------------------------- 施工阶段（悬臂施工 + 张拉）
+    # staged=True 时走线性阶段内核（solveModel3DStages），不挂 cable_bridge：
+    # 成桥态的几何非线性找形与"逐阶段激活单元 + 张拉索力"是两条不同的力学
+    # 路线，混在一个 .dat 里会同时出现 *CABLE_BRIDGE 与 *STAGE 两套工况
+    # （见 verify_stage_cable 的说明）。成桥目标索力 tensions 仍按同一口径
+    # 算出，作为每根索的"施工张拉目标"。
+    stages: list[Stage3D] = []
+    if staged:
+        q1 = q_deck - q2_deck                      # 一期恒载（主梁自重等）
+        iT1 = min(range(len(xs)), key=lambda i: abs(xs[i] - xT1))
+        iT2 = min(range(len(xs)), key=lambda i: abs(xs[i] - xT2))
+        tower1_elems = [800 + k + 1 for k in range(n_tower_seg)]
+        tower2_elems = [900 + k + 1 for k in range(n_tower_seg)]
+        seg_t = tower_height / n_tower_seg
+
+        # 主梁单元一期恒载（两端各半，与建造器 trib 分配严格等价）
+        def deck_loads(idxs: list[int]) -> list[NodalLoad3D]:
+            out = []
+            for i in idxs:
+                w = q1 * (xs[i + 1] - xs[i])
+                out.append(NodalLoad3D(node=gid(i), dof=3, value=-w / 2))
+                out.append(NodalLoad3D(node=gid(i + 1), dof=3, value=-w / 2))
+            return out
+
+        # 塔柱自重（两端各半）
+        def tower_loads(base: int) -> list[NodalLoad3D]:
+            out = []
+            w = tower_A * dens_conc * G * seg_t
+            for k in range(n_tower_seg):
+                out.append(NodalLoad3D(node=base + k + 1, dof=3, value=-w / 2))
+                out.append(NodalLoad3D(node=base + k + 2, dof=3, value=-w / 2))
+            return out
+
+        node_of = {n.id: n for n in nodes}
+        elem_of = {e.id: e for e in elements}
+
+        def anchor_x(cid: int) -> float:
+            e = elem_of[cid]
+            a, b = node_of[e.n1], node_of[e.n2]
+            return (a if a.z < b.z else b).x
+
+        n = n_cable
+        groups = {
+            "t1s": cable_ids[0:n], "t1m": cable_ids[n:2 * n],
+            "t2m": cable_ids[2 * n:3 * n], "t2s": cable_ids[3 * n:4 * n],
+        }
+        # 每个方向：塔位 x。索按离塔近→远排（建造器已排好），边跨侧锚点 x
+        # 递减、主跨侧递增——物理上就是从塔向外悬臂。
+        dirs = [("t1s", xT1), ("t1m", xT1), ("t2m", xT2), ("t2s", xT2)]
+
+        active: set[int] = set()      # 已激活主梁单元索引 i
+
+        # 阶段 1：桥塔 + 0 号块（塔两侧各 1 段主梁，4 段）
+        zero = [iT1 - 1, iT1, iT2 - 1, iT2]
+        stages.append(Stage3D(
+            id=1,
+            activate=tower1_elems + tower2_elems + [100 + i + 1 for i in zero],
+            loads=tower_loads(2000) + tower_loads(3000) + deck_loads(zero),
+        ))
+        active.update(zero)
+
+        # 阶段 2..n+1：悬臂第 j 段 + 张拉第 j 对索。每塔"边跨侧 + 主跨侧"
+        # 各 1 根，共 4 根对称张拉——单侧张拉会让塔顶受很大不平衡水平力。
+        for j in range(n):
+            new_elems: list[int] = []
+            t_j: dict[int, float] = {}
+            for dname, xT in dirs:
+                xa = anchor_x(groups[dname][j])
+                lo, hi = sorted((xT, xa))
+                for i in range(len(xs) - 1):
+                    mid = (xs[i] + xs[i + 1]) / 2
+                    if lo < mid < hi and i not in active:
+                        new_elems.append(i)
+                        active.add(i)
+                t_j[groups[dname][j]] = tensions[groups[dname][j]]
+            stages.append(Stage3D(
+                id=2 + j,
+                activate=[100 + i + 1 for i in new_elems] + list(t_j.keys()),
+                loads=deck_loads(new_elems),
+                tensions=t_j,
+            ))
+
+        # 合拢：剩余主梁单元一次就位（跨中无索区 + 边跨端部余量）
+        rest = [i for i in range(len(xs) - 1) if i not in active]
+        stages.append(Stage3D(
+            id=2 + n,
+            activate=[100 + i + 1 for i in rest],
+            loads=deck_loads(rest),
+        ))
+        active.update(rest)
+
+        # 二期铺装 + 二次调索（成桥态）：先张的索被后张的索带偏后，合拢后
+        # 按成桥目标统一补调一轮，是施工闭环。
+        q2_loads: list[NodalLoad3D] = []
+        if q2_deck > 0:
+            for i in range(len(xs) - 1):
+                w = q2_deck * (xs[i + 1] - xs[i])
+                q2_loads.append(NodalLoad3D(node=gid(i), dof=3, value=-w / 2))
+                q2_loads.append(NodalLoad3D(node=gid(i + 1), dof=3, value=-w / 2))
+        stages.append(Stage3D(
+            id=3 + n,
+            loads=q2_loads,
+            tensions={cid: tensions[cid] for cid in cable_ids} if retune else {},
+        ))
+
     cables = [CableSpec3D(elem=eid, anchor=0, tension=float(tensions.get(eid, 0.0)))
               for eid in cable_ids]
-    cable_bridge = CableBridge3D(
+    cable_bridge = None if staged else CableBridge3D(
         mode=mode, method=method_out if method_out in ("MINENERGY", "RIGID") else "MINENERGY",
         cables=cables,
         min_tension_fraction=min_tension_fraction,
@@ -297,7 +419,8 @@ def build_cable_stayed_3d(
         etypes=etypes,
         elements=elements,
         boundaries=boundaries,
-        loads=loads,
+        loads=[] if staged else loads,
+        stages=stages,
         cable_bridge=cable_bridge,
         # 车道：主梁纵向节点序列，按 JTG D60 自动生成 qk/Pk。
         # 索承体系内核在成桥态切线刚度上算活载梁内力包络（见 cable_solver）。
@@ -322,6 +445,10 @@ def build_cable_stayed_3d(
         "n_tower_seg": n_tower_seg,
         "lane_count": lane_count,
         "transverse_distribution": lane_count * lane_reduction * eccentricity,
+        "staged": staged,
+        "n_stages": len(stages),
+        "q2_deck": q2_deck,
+        "target_tensions": tensions if staged else {},   # 施工张拉目标（成桥目标索力）
     }
     return model, model_meta
 
