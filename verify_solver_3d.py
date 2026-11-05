@@ -209,12 +209,13 @@ def main() -> int:
     # ---------------------------------------------------------- ⑦ ModelDoc 3D
     print("\n[⑦ ModelDoc 的三维类型]")
     for txt, want in (
-        ("双塔三跨斜拉桥，主跨200米，边塔60米", "cable_stayed"),
-        ("三跨连续箱梁，边跨30米中跨50米", "grillage3d"),
-        ("空间梁格法分析三跨连续箱梁", "grillage3d"),
+        ("双塔三跨斜拉桥，主跨200米，边塔60米", ("cable_stayed", "3d")),
+        ("三跨连续箱梁，边跨30米中跨50米", ("beam_bridge", "3d")),
+        ("空间梁格法分析三跨连续箱梁", ("beam_bridge", "3d")),
     ):
         d, src, _ = ModelDoc.from_text(txt)
-        check(f"识别「{txt[:12]}…」", d.kind == want, f"{d.kind} / {src}")
+        check(f"识别「{txt[:12]}…」", (d.kind, d.dimension) == want,
+              f"{d.kind}×{d.dimension} / {src}")
 
     doc = ModelDoc("cable_stayed")
     doc.build()

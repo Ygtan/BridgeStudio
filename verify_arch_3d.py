@@ -79,17 +79,18 @@ def main() -> int:
 
     # ---------------------------------------------------------------- 2 意图
     print("\n[2] 自然语言识别")
-    check("拱肋分段吊装+斜拉扣索 → arch_3d",
-          classify_text("大跨度拱桥500米，拱肋分段吊装，用斜拉扣索辅助吊装，合拢后铺装") == "arch_3d")
-    check("普通拱桥（矢高+吊杆）→ arch",
-          classify_text("跨度100米的拱桥，矢高20米，9对吊杆") == "arch")
+    check("拱肋分段吊装+斜拉扣索 → arch×3d",
+          classify_text("大跨度拱桥500米，拱肋分段吊装，用斜拉扣索辅助吊装，合拢后铺装") == ("arch", "3d"))
+    check("普通拱桥（矢高+吊杆）→ arch×2d",
+          classify_text("跨度100米的拱桥，矢高20米，9对吊杆") == ("arch", "2d"))
     check("斜拉桥不受「斜拉扣索」干扰",
-          classify_text("主跨200米斜拉桥，塔高60米，悬臂施工") == "cable_stayed")
+          classify_text("主跨200米斜拉桥，塔高60米，悬臂施工") == ("cable_stayed", "3d"))
 
     doc, src, diag = ModelDoc.from_text(
         "大跨度拱桥500米，矢高100米，拱肋分段吊装，用斜拉扣索辅助吊装，"
         "合拢后安装吊杆、主梁，主梁合拢后铺装")
-    check("from_text → arch_3d", doc.kind == "arch_3d", src)
+    check("from_text → arch×3d",
+          doc.kind == "arch" and doc.dimension == "3d", src)
     check("裸数字「拱桥500米」识别主跨", doc.params["span"] == 500.0,
           f"span={doc.params['span']}")
     check("矢高解析", doc.params["rise"] == 100.0, f"rise={doc.params['rise']}")

@@ -39,36 +39,72 @@ from typing import Any, Callable, Literal
 
 from model_spec import Load, ModelSpec, Section, Support
 
-Kind = Literal["beam", "arch", "truss", "beam_bridge", "grillage3d",
-               "cable_stayed", "suspension", "arch_3d"]
+Kind = Literal["beam", "arch", "truss", "beam_bridge",
+               "cable_stayed", "suspension"]
+Dimension = Literal["2d", "3d"]
 
-#: 三维结构：走 FEM-Eigen 三维内核，而不是 2D 的 example_mixed。
-KINDS_3D: tuple[str, ...] = ("grillage3d", "cable_stayed", "suspension", "arch_3d")
+#: (kind, dimension) -> 建造器键（DEFAULTS / FIELDS 的键）。
+#: 桥型 kind 只有 6 种；维度是正交的第二维。建造器键比 kind 多几个三维变体：
+#: grillage3d（梁桥三维梁格）、arch_3d（拱桥三维施工）。
+#: cable_stayed / suspension 的 2d 暂时回退到三维建造器，档三补 2d 简化后替换。
+BUILDERS: dict[tuple[str, str], str] = {
+    ("beam", "2d"): "beam",
+    ("arch", "2d"): "arch",
+    ("arch", "3d"): "arch_3d",
+    ("truss", "2d"): "truss",
+    ("beam_bridge", "2d"): "beam_bridge",
+    ("beam_bridge", "3d"): "grillage3d",
+    ("cable_stayed", "2d"): "cable_stayed",
+    ("cable_stayed", "3d"): "cable_stayed",
+    ("suspension", "2d"): "suspension",
+    ("suspension", "3d"): "suspension",
+}
+
+#: (kind, dimension) -> 标称内核键。只给报告/能力自述用；真正求解走
+#: `detect_kind(model)`（悬臂施工斜拉桥摘掉 cable_bridge 会落到 grillage3d）。
+SOLVER_OF: dict[tuple[str, str], str] = {
+    ("beam", "2d"): "2d",
+    ("arch", "2d"): "2d",
+    ("arch", "3d"): "grillage3d",
+    ("truss", "2d"): "2d",
+    ("beam_bridge", "2d"): "2d",
+    ("beam_bridge", "3d"): "grillage3d",
+    ("cable_stayed", "2d"): "2d",
+    ("cable_stayed", "3d"): "cable_stayed",
+    ("suspension", "2d"): "2d",
+    ("suspension", "3d"): "suspension",
+}
+
+#: 旧 8 值 kind -> (新 kind, dimension)。向后兼容 `ModelDoc("grillage3d")` 这类调用。
+_LEGACY_KIND: dict[str, tuple[str, str]] = {
+    "grillage3d": ("beam_bridge", "3d"),
+    "arch_3d": ("arch", "3d"),
+}
 
 KIND_LABELS: dict[str, str] = {
     "beam": "单梁",
     "arch": "拱桥",
     "truss": "桁架桥",
     "beam_bridge": "梁桥",
-    "grillage3d": "三维梁格",
-    "cable_stayed": "斜拉桥成桥态",
-    "suspension": "悬索桥成桥态",
-    "arch_3d": "大跨拱桥施工",
+    "cable_stayed": "斜拉桥",
+    "suspension": "悬索桥",
 }
+
+DIM_LABELS: dict[str, str] = {"2d": "二维", "3d": "三维"}
 
 KIND_HINTS: dict[str, str] = {
     "单梁": "beam",
     "拱桥": "arch",
     "桁架桥": "truss",
     "梁桥": "beam_bridge",
-    "三维梁格": "grillage3d",
+    "三维梁格": "beam_bridge",
     "斜拉桥": "cable_stayed",
     "悬索桥": "suspension",
     "自锚式悬索桥": "suspension",
     "地锚式悬索桥": "suspension",
-    "大跨拱桥": "arch_3d",
-    "拱桥施工": "arch_3d",
-    "拱肋吊装": "arch_3d",
+    "大跨拱桥": "arch",
+    "拱桥施工": "arch",
+    "拱肋吊装": "arch",
 }
 
 # 材料名 → (E, ρ)
@@ -470,8 +506,13 @@ class Diag:
 # ---------------------------------------------------------------- 意图分类
 
 
-def classify_text(text: str, hint: str | None = None) -> str:
-    """判断一句话属于哪种结构。
+_DIM_3D_RE = re.compile(
+    r"三维|空间|梁格|空间梁格|空间效应|空间刚架|偏载|扭转|横向分布|双索面|横梁|3d",
+    re.I)
+
+
+def _classify_kind(text: str, hint: str | None = None) -> str:
+    """判断结构类型（旧 8 值语义，含 grillage3d/arch_3d）。
 
     hint 来自界面的"结构类型"提示（"自动识别" 或具体桥型）；给了具体类型
     就完全跳过猜测——用户比自己写的分类器可靠。
@@ -482,11 +523,9 @@ def classify_text(text: str, hint: str | None = None) -> str:
     """
     if hint:
         # 界面上的标签带分组前缀（"三维 · 斜拉桥"），而 KIND_HINTS 的键是
-        # 纯名字（"斜拉桥"）。旧版只做 `hint in KIND_HINTS` 的精确比较，
-        # 于是**用户明确选了的类型被静默忽略**，退回关键词猜测——选中
-        # "三维 · 斜拉桥"能对上纯属关键词恰好也命中，选中"悬索桥"就会
-        # 因为句子里带"矢跨比"被判成拱桥。这里先剥前缀，再按最长键包含匹配。
-        h = hint.replace("三维", "").replace("·", "").replace("・", "").strip()
+        # 纯名字（"斜拉桥"）。这里先剥前缀，再按最长键包含匹配。
+        h = (hint.replace("三维", "").replace("二维", "")
+             .replace("·", "").replace("・", "").strip())
         if hint in KIND_HINTS:
             return KIND_HINTS[hint]
         if h in KIND_HINTS:
@@ -518,6 +557,37 @@ def classify_text(text: str, hint: str | None = None) -> str:
     return "beam"
 
 
+_DIM_2D_RE = re.compile(r"二维|平面|平面索面|平面杆系|平面模型|平面力学|简化", re.I)
+
+
+def classify_dimension(text: str, kind: str) -> str:
+    """由描述判定维度：默认 2d（大多数桥可简化二维），显式三维词转 3d。"""
+    if _DIM_3D_RE.search(text):
+        return "3d"
+    if _DIM_2D_RE.search(text):
+        return "2d"
+    # 梁格、大跨拱施工本质是空间问题（其建造器只做三维）。
+    if kind in ("grillage3d", "arch_3d"):
+        return "3d"
+    # 斜拉桥/悬索桥：档三补 2d 简化建造器后改默认 2d；此前只有三维实现。
+    if kind in ("cable_stayed", "suspension"):
+        return "3d"
+    return "2d"
+
+
+def classify_text(text: str, hint: str | None = None) -> tuple[str, str]:
+    """判断一句话属于「桥型 kind × 维度 dimension」两个正交维度。
+
+    返回 ``(kind, dimension)``。kind ∈ 6 桥型；dimension ∈ {2d, 3d}。
+    """
+    raw = _classify_kind(text, hint)
+    dim_src = text if hint is None else f"{text} {hint}"
+    dim = classify_dimension(dim_src, raw)
+    if raw in _LEGACY_KIND:
+        return _LEGACY_KIND[raw]
+    return raw, dim
+
+
 # ---------------------------------------------------------------- 外壳
 
 
@@ -533,11 +603,26 @@ class ModelDoc:
         doc.capability()["anastruct"]      # 能否本地草算
     """
 
-    def __init__(self, kind: str, params: dict[str, Any] | None = None):
-        if kind not in DEFAULTS:
+    def __init__(self, kind: str, params: dict[str, Any] | None = None,
+                 dimension: str | None = None):
+        # 向后兼容旧 8 值 kind（grillage3d/arch_3d）→ 归一化到 (kind, dimension)
+        if kind in _LEGACY_KIND:
+            kind, dimension = _LEGACY_KIND[kind]
+        if kind not in KIND_LABELS:
             raise ValueError(f"未知结构类型：{kind}")
+        if dimension is None:
+            # 斜拉/悬索桥档三前只有三维建造器，默认 3d；其余默认 2d。
+            dimension = "3d" if kind in ("cable_stayed", "suspension") else "2d"
+        if dimension not in DIM_LABELS:
+            raise ValueError(f"未知维度：{dimension}")
         self.kind: str = kind
-        merged = json.loads(json.dumps(DEFAULTS[kind]))   # 深拷贝
+        self.dimension: str = dimension
+        bk = self.builder_key
+        if bk not in DEFAULTS:
+            raise ValueError(
+                f"结构 {KIND_LABELS[kind]}×{DIM_LABELS[dimension]} 暂不支持"
+                f"（建造器 {bk} 缺失）")
+        merged = json.loads(json.dumps(DEFAULTS[bk]))   # 深拷贝
         if params:
             merged.update(params)
         self.params: dict[str, Any] = merged
@@ -549,19 +634,20 @@ class ModelDoc:
     def build(self) -> "ModelDoc":
         """params → 展开模型。幂等，可反复调用。"""
         self._info = None
-        if self.kind == "beam":
+        bk = self.builder_key
+        if bk == "beam":
             self._model = self._build_beam()
-        elif self.kind == "arch":
+        elif bk == "arch":
             self._model = self._build_arch()
-        elif self.kind == "truss":
+        elif bk == "truss":
             self._model = self._build_truss()
-        elif self.kind == "grillage3d":
+        elif bk == "grillage3d":
             self._model = self._build_grillage3d()
-        elif self.kind == "cable_stayed":
+        elif bk == "cable_stayed":
             self._model = self._build_cable_stayed()
-        elif self.kind == "suspension":
+        elif bk == "suspension":
             self._model = self._build_suspension()
-        elif self.kind == "arch_3d":
+        elif bk == "arch_3d":
             self._model = self._build_arch_3d()
         else:
             self._model = self._build_beam_bridge()
@@ -581,13 +667,18 @@ class ModelDoc:
         return self._info or {}
 
     @property
+    def builder_key(self) -> str:
+        """建造器键（DEFAULTS/FIELDS 的键），由 kind × dimension 路由得到。"""
+        return BUILDERS.get((self.kind, self.dimension), self.kind)
+
+    @property
     def is_3d(self) -> bool:
-        return self.kind in KINDS_3D
+        return self.dimension == "3d"
 
     @property
     def solver_kind(self) -> str:
-        """交给哪个内核。判据与 `ModelSpec3D.to_dat()` 的 CABLE 分叉一致。"""
-        return self.kind if self.is_3d else "2d"
+        """标称内核键。真正的内核由 `detect_kind(model)` 依模型内容定。"""
+        return SOLVER_OF.get((self.kind, self.dimension), "2d")
 
     def _build_beam(self) -> ModelSpec:
         p = self.params
@@ -833,7 +924,7 @@ class ModelDoc:
                 return 0.0
             return float(v)
 
-        if self.kind == "grillage3d":
+        if self.builder_key == "grillage3d":
             sp1 = pos("sp1", "边跨")
             sp2 = pos("sp2", "中跨")
             h = pos("h", "梁高")
@@ -883,7 +974,7 @@ class ModelDoc:
             lc = p.get("lane_count")
             if not isinstance(lc, int) or not 1 <= lc <= 8:
                 e.append(f"车道数 {lc} 超出范围（1~8）")
-        elif self.kind == "arch_3d":
+        elif self.builder_key == "arch_3d":
             span = pos("span", "主跨")
             rise = pos("rise", "矢高")
             pos("arch_h", "拱肋高")
@@ -990,7 +1081,7 @@ class ModelDoc:
             try:
                 from solver_3d import capabilities
 
-                ok3d = bool(capabilities().get(self.kind))
+                ok3d = bool(capabilities().get(self.solver_kind))
             except Exception:
                 ok3d = False
             return {
@@ -1070,7 +1161,7 @@ class ModelDoc:
                 + " m")
             lines.append(f"定索力方法：{info.get('tension_method', '—')}"
                          "（DECK = 按恒载竖向分配）")
-        elif self.kind == "arch_3d":
+        elif self.builder_key == "arch_3d":
             info = self.info
             lines.append(
                 f"主跨 {info.get('span', 0):.0f} m / 矢高 {info.get('rise', 0):.0f} m，"
@@ -1089,7 +1180,7 @@ class ModelDoc:
     def param_rows(self) -> list[list[Field]]:
         """当前类型下要显示的控件行（已按 when 过滤）。"""
         rows = []
-        for row in FIELDS[self.kind]:
+        for row in FIELDS[self.builder_key]:
             keep = [f for f in row if f.get("when") is None or f["when"](self.params)]
             if keep:
                 rows.append(keep)
@@ -1098,7 +1189,8 @@ class ModelDoc:
     # ------------------------------------------------------------ 序列化
 
     def to_dict(self) -> dict[str, Any]:
-        return {"version": 1, "kind": self.kind, "params": self.params}
+        return {"version": 1, "kind": self.kind, "dimension": self.dimension,
+                "params": self.params}
 
     def save(self, path: str | Path) -> Path:
         p = Path(path)
@@ -1109,7 +1201,8 @@ class ModelDoc:
     @classmethod
     def load(cls, path: str | Path) -> "ModelDoc":
         d = json.loads(Path(path).read_text(encoding="utf-8"))
-        return cls(kind=d["kind"], params=d.get("params", {}))
+        return cls(kind=d["kind"], params=d.get("params", {}),
+                   dimension=d.get("dimension"))
 
     # ------------------------------------------------------------ 构造入口
 
@@ -1145,16 +1238,22 @@ class ModelDoc:
         prev: "ModelDoc | None" = None,
         llm_config: Any = None,
         hint: str | None = None,
+        dim_hint: str | None = None,
     ) -> tuple["ModelDoc", str, Diag]:
         """统一解析入口：先分类，再走对应管线。
 
         返回值与 `nl_parser.parse_nl` 同构（doc, source, diag），界面不必分叉。
+
+        `dim_hint` 是界面维度下拉（"二维"/"三维"）；给了就覆盖描述判定，
+        不给则按描述关键词自动判（默认 2d）。
         """
         if prev is not None and not isinstance(prev, ModelDoc):
             # 最常见的误用：把 LLMConfig 当成第二个位置参数传进来
             raise TypeError(
                 "prev 必须是 ModelDoc 或 None；LLM 配置请用 llm_config= 传入")
-        kind = classify_text(text, hint)
+        kind, dimension = classify_text(text, hint)
+        if dim_hint in DIM_LABELS:
+            dimension = dim_hint
 
         if kind == "beam":
             from nl_parser import parse_nl
@@ -1168,13 +1267,16 @@ class ModelDoc:
                         if k in prev.params}
             return cls.from_beam_spec(spec, **opts), source, diag
 
-        if kind in KINDS_3D:
+        if dimension == "3d":
             # 三维只走规则解析：参数量少、名字确定（sp1/Lm/Ht），而 LLM 侧
             # 没有对应的 Schema。加 Schema 的成本高于收益——真正需要"理解"
             # 的是二维那座桥，三维这几十个参数正则就够了。
-            params, notes = extract_3d_params(text, kind)
+            # 注意传建造器键（bk）：extract_3d_params 按 grillage3d/arch_3d/
+            # cable_stayed/suspension 分支，不是按 6 值 kind。
+            bk = BUILDERS.get((kind, dimension), kind)
+            params, notes = extract_3d_params(text, bk)
             params = _keep_solver_opts(prev, kind, params)
-            return cls(kind, params), "rule(三维)", Diag(notes=notes)
+            return cls(kind, params, dimension=dimension), "rule(三维)", Diag(notes=notes)
 
         from bridge_spec import extract_bridge_params
 

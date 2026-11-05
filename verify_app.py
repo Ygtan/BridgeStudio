@@ -94,8 +94,10 @@ def main() -> int:
     print("\n[三维 · 梁格]")
     at.button(key="ex5").click().run()
     check("无异常", not _errors(at), _errors(at)[:1])
-    check("类型为 grillage3d", at.session_state["doc"].kind == "grillage3d", _subs(at)[:50])
-    check("出现三维区块", "模型与求解 · 三维梁格" in _subs(at), _subs(at)[:80])
+    check("类型为 beam_bridge×3d",
+          at.session_state["doc"].kind == "beam_bridge"
+          and at.session_state["doc"].dimension == "3d", _subs(at)[:50])
+    check("出现三维区块", "模型与求解 · 梁桥（三维）" in _subs(at), _subs(at)[:80])
     check("二维区块⑤不再出现", "FEM-Eigen 二维求解" not in _subs(at))
 
     _btn = next((b for b in at.button if b.key == "r3d_solve"), None)
@@ -248,7 +250,7 @@ def main() -> int:
 
         print("\n[梁格：改参数后结果过期]")
         _ver = at.session_state["doc_version"]
-        at.number_input(key=f"pgrillage3d{_ver}_sp2").set_value(60.0).run()
+        at.number_input(key=f"pbeam_bridge{_ver}_sp2").set_value(60.0).run()
         check("无异常", not _errors(at), _errors(at)[:1])
         _warn = " ".join(str(w.value) for w in at.warning)
         check("提示结果已过期并隐藏", "已修改" in _warn or "上一次求解" in _warn,
@@ -259,7 +261,7 @@ def main() -> int:
     check("无异常", not _errors(at), _errors(at)[:1])
     check("类型为 cable_stayed", at.session_state["doc"].kind == "cable_stayed",
           _subs(at)[:50])
-    check("出现斜拉桥区块", "模型与求解 · 斜拉桥成桥态" in _subs(at), _subs(at)[:80])
+    check("出现斜拉桥区块", "模型与求解 · 斜拉桥（三维）" in _subs(at), _subs(at)[:80])
 
     _btn = next((b for b in at.button if b.key == "r3d_solve"), None)
     check("斜拉桥求解按钮存在", _btn is not None)
@@ -364,7 +366,7 @@ def main() -> int:
     check("无异常", not _errors(at), _errors(at)[:1])
     check("类型为 suspension", at.session_state["doc"].kind == "suspension",
           _subs(at)[:50])
-    check("出现悬索桥区块", "悬索桥成桥态" in _subs(at), _subs(at)[:80])
+    check("出现悬索桥区块", "悬索桥（三维）" in _subs(at), _subs(at)[:80])
 
     _btn = next((b for b in at.button if b.key == "r3d_solve"), None)
     if _btn is not None:

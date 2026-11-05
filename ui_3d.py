@@ -29,7 +29,7 @@ from typing import Any
 
 import streamlit as st
 
-from model_doc import KIND_LABELS, ModelDoc
+from model_doc import DIM_LABELS, KIND_LABELS, ModelDoc
 from report_3d import build_document, figures as build_figures, write_all
 from result_3d import SolveResult
 
@@ -534,17 +534,18 @@ def render(doc: ModelDoc) -> None:
     try:
         from solver_3d import solvers
 
-        spec = solvers().get(doc.kind)
+        spec = solvers().get(doc.solver_kind)
         solver_name = spec.exe_name if spec else solver_name
     except Exception:                               # noqa: BLE001
         pass
 
     st.divider()
-    st.subheader(f"③④ 模型与求解 · {KIND_LABELS[doc.kind]}")
+    st.subheader(f"③④ 模型与求解 · {KIND_LABELS[doc.kind]}（{DIM_LABELS[doc.dimension]}）")
 
     if not cap["fem_eigen"]:
         st.warning(
-            f"未找到 {KIND_LABELS[doc.kind]} 对应的三维内核，本区块不可用。\n\n"
+            f"未找到 {KIND_LABELS[doc.kind]}（{DIM_LABELS[doc.dimension]}）对应的三维内核，"
+            f"本区块不可用。\n\n"
             f"可用环境变量 `FEM_EIGEN_DIR` 指向内核目录，然后编译对应目标。")
         st.text("\n".join(doc.summary()["lines"]))
         return
@@ -587,9 +588,9 @@ def render(doc: ModelDoc) -> None:
         return
 
     # 换过模型类型就不能拿旧结果凑数
-    if res.kind != doc.kind:
-        st.info(f"当前模型是{KIND_LABELS[doc.kind]}，缓存结果来自"
-                f"{res.kind_label}，已隐藏。请重新求解。")
+    if res.kind != doc.solver_kind:
+        st.info(f"当前模型是{KIND_LABELS[doc.kind]}（{DIM_LABELS[doc.dimension]}），"
+                f"缓存结果来自{res.kind_label}，已隐藏。请重新求解。")
         return
     if res.is_stale(doc.to_dat()):
         st.warning("模型参数已修改，结果来自上一次求解，已隐藏。请重新点求解。")

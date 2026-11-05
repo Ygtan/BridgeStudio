@@ -138,14 +138,14 @@ def t_capability():
 
 def t_classify():
     cases = [
-        (BEAM_TXT, "beam"),
-        ("跨度100米的拱桥", "arch"),
-        ("60米桁架桥", "truss"),
-        ("30米简支梁桥", "beam_bridge"),
+        (BEAM_TXT, ("beam", "2d")),
+        ("跨度100米的拱桥", ("arch", "2d")),
+        ("60米桁架桥", ("truss", "2d")),
+        ("30米简支梁桥", ("beam_bridge", "2d")),
     ]
     ok = all(classify_text(t) == k for t, k in cases)
-    check("意图分类", ok, "、".join(f"{k}" for _, k in cases))
-    check("意图分类：人工提示优先", classify_text(BEAM_TXT, "拱桥") == "arch")
+    check("意图分类", ok, "、".join(f"{k[0]}×{k[1]}" for _, k in cases))
+    check("意图分类：人工提示优先", classify_text(BEAM_TXT, "拱桥") == ("arch", "2d"))
 
 
 def main() -> int:

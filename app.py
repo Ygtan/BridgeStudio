@@ -32,7 +32,7 @@ import streamlit as st
 
 from fe_solver import solve
 from llm_parser import LLMConfig, probe
-from model_doc import KIND_LABELS, ModelDoc
+from model_doc import DIM_LABELS, KIND_LABELS, ModelDoc
 from viz import (
     draw_bridge_geometry,
     draw_deformed,
@@ -107,14 +107,14 @@ EXAMPLES: list[tuple[str, str]] = [
      "自锚式悬索桥，主跨300米，矢跨比1/10，桥面恒载100kN/m"),
 ]
 
-KIND_OPTIONS = ["自动识别", "单梁", "拱桥", "桁架桥", "梁桥", "三维梁格", "斜拉桥",
-                "三维 · 悬索桥", "大跨拱桥"]
+KIND_OPTIONS = ["自动识别", "单梁", "拱桥", "桁架桥", "梁桥", "斜拉桥", "悬索桥"]
+DIM_OPTIONS = ["自动", "二维", "三维"]
 
 st.set_page_config(page_title="NL-FE 前处理原型", layout="wide")
 st.title("自然语言驱动有限元前处理 · 原型")
 st.caption(
-    "一条输入 → 自动识别 单梁 / 拱桥 / 桁架桥 / 梁桥 / 三维梁格 / 斜拉桥 "
-    "/ 悬索桥 / 大跨拱桥 → 统一 ModelDoc → .dat → FEM-Eigen（2D / 3D 双链路）"
+    "一条输入 → 自动识别 桥型（单梁 / 拱桥 / 桁架 / 梁桥 / 斜拉桥 / 悬索桥）"
+    "× 维度（二维 / 三维）→ 统一 ModelDoc → .dat → FEM-Eigen（2D / 3D 双链路）"
     "求解与出图"
 )
 
@@ -178,11 +178,12 @@ if "doc_version" not in st.session_state:
     st.session_state.doc_version = 0
 
 
-def _load_text(text: str, hint: str) -> None:
+def _load_text(text: str, hint: str, dim_hint: str | None) -> None:
     """解析文本并整体替换当前模型。"""
     with st.spinner("解析中…"):
         new_doc, source, diag = ModelDoc.from_text(
             text, prev=st.session_state.doc, llm_config=llm_config, hint=hint,
+            dim_hint=dim_hint,
         )
     st.session_state.doc = new_doc
     st.session_state.source = source
@@ -199,6 +200,13 @@ hint = st.selectbox(
     help="拿不准就留「自动识别」：先按关键词判断梁/拱/桁架/梁桥，再走对应解析。"
          "指定类型时完全跳过判断——你的选择比关键词可靠。",
 )
+
+_dim_sel = st.selectbox(
+    "维度", DIM_OPTIONS, key="dim_hint",
+    help="自动 = 按描述判定（默认二维；出现「三维/空间/梁格/偏载/扭转」等词转三维）。"
+         "多数桥可简化二维，复杂空间结构选三维。",
+)
+_dim_hint: str | None = {"二维": "2d", "三维": "3d"}.get(_dim_sel)
 
 # 示例按钮必须在 text_area「之前」：若在 text_area 实例化之后再赋值
 # session_state.nl_input，widget 状态会在下一次运行把它覆盖掉。
@@ -217,7 +225,7 @@ if "nl_input" not in st.session_state:
 
 if _clicked is not None:
     st.session_state.nl_input = _clicked
-    _load_text(_clicked, hint)
+    _load_text(_clicked, hint, _dim_hint)
     st.rerun()
 
 _nl_text = st.text_area(
@@ -228,7 +236,7 @@ _nl_text = st.text_area(
 
 if st.button("解析并更新模型", type="primary"):
     if _nl_text.strip():
-        _load_text(_nl_text.strip(), hint)
+        _load_text(_nl_text.strip(), hint, _dim_hint)
         st.rerun()
     else:
         st.warning("请先输入一句描述。")
@@ -238,7 +246,8 @@ doc: ModelDoc = st.session_state.doc
 ver: int = st.session_state.doc_version
 
 st.caption(
-    f"识别结果：**{KIND_LABELS[doc.kind]}**　｜　解析来源：**{st.session_state.source}**"
+    f"识别结果：**{KIND_LABELS[doc.kind]}（{DIM_LABELS[doc.dimension]}）**"
+    f"　｜　解析来源：**{st.session_state.source}**"
 )
 
 _diag = st.session_state.get("diag")
