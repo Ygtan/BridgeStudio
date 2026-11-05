@@ -65,7 +65,7 @@ PARAMS = dict(
     tower_b=4.0, tower_h=5.0, # 桥塔矩形截面（实心）
     n_tower_seg=8,
     main_area_mm2=280000.0,   # 单根主缆
-    hanger_area_mm2=3000.0,
+    hanger_area_mm2=4000.0,   # 单根吊索（吊索安全系数 ≥ 2.5）
     q_deck=160e3,             # 桥面总恒载 N/m
     q2_deck=60e3,             # 二期恒载 → 一期 = 100 kN/m
     erection=True,            # 生成施工阶段模拟方案
