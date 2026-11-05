@@ -34,13 +34,10 @@ from report_docx import build_suspension_report
 
 OUT = Path(__file__).parent / "out" / "susp1000_nl"
 
-# 自然语言描述（唯一真源）：一句话，不写任何节点/单元。
-DESC = (
-    "主跨 1000 米的地锚式悬索桥，6 车道，矢跨比 1/10，加劲梁高 3.5 米，"
-    "桥宽 33.5 米，桥面恒载 160 kN/m，二期铺装 60 kN/m，吊索间距 16 米，"
-    "主缆面积 280000 mm²，吊索面积 3000 mm²，从跨中对称吊装主梁，"
-    "主梁合拢后再铺装"
-)
+# 自然语言描述的唯一真源在 examples/suspension_1000m.txt（与 run_nl.py 共用），
+# 这里从文件读，避免脚本与输入文件两处漂移。
+DESC = (Path(__file__).parent / "examples" / "suspension_1000m.txt").read_text(
+    encoding="utf-8").strip()
 
 
 def main() -> None:

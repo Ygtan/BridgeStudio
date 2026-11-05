@@ -37,11 +37,10 @@ from report_3d import build_document, write_html
 
 OUT = Path(__file__).parent / "out" / "arch_nl"
 
-# 自然语言描述（唯一真源）：一句话，不写任何节点/单元。
-DESC = (
-    "大跨度拱桥 500 米，矢高 100 米，拱肋分段吊装，用斜拉扣索辅助吊装，"
-    "合拢后安装吊杆、主梁，主梁合拢后铺装"
-)
+# 自然语言描述的唯一真源在 examples/arch_500m.txt（与 run_nl.py 共用），
+# 这里从文件读，避免脚本与输入文件两处漂移。
+DESC = (Path(__file__).parent / "examples" / "arch_500m.txt").read_text(
+    encoding="utf-8").strip()
 
 
 def main() -> None:

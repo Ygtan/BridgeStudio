@@ -35,12 +35,10 @@ from report_3d import build_document, write_html
 
 OUT = Path(__file__).parent / "out" / "cs_nl"
 
-# 自然语言描述（唯一真源）：一句话，不写任何节点/单元。
-DESC = (
-    "主跨 400 米的双塔三跨斜拉桥，边跨 160 米，塔高 120 米，每塔每侧 10 对索，"
-    "主梁高 3 米，桥宽 24 米，桥面恒载 180 kN/m，二期铺装 50 kN/m，"
-    "单索面积 10000 平方毫米，悬臂施工，从塔向两侧逐段张拉，合拢后二次调索"
-)
+# 自然语言描述的唯一真源在 examples/cable_stayed_400m.txt（与 run_nl.py 共用），
+# 这里从文件读，避免脚本与输入文件两处漂移。
+DESC = (Path(__file__).parent / "examples" / "cable_stayed_400m.txt").read_text(
+    encoding="utf-8").strip()
 
 
 def main() -> None:

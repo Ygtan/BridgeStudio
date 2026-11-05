@@ -130,6 +130,9 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        `units_guard` 登记单位阈值、`result_3d._checks_stage_cable` 识别被 `DEACTIVE` 的
        临时索（「末阶段 vs 目标」与「受压」降级为提示——合拢后卸载到松弛是正常施工物理）。
        `verify_arch_3d.py` 21/21、`example_arch_500m_nl.py` 端到端 —— 2026-11-04
+- [x] **P3.5** 自然语言输入文件：三个算例（悬索/斜拉/拱）的描述统一落到 `examples/*.txt`
+      （唯一真源），`run_nl.py` 作命令行统一入口（`--list` / 跑全部 / 跑单个），三个
+      `example_*_nl.py` 的 `DESC` 改为从 `.txt` 读 —— 2026-11-05
 - [ ] **P4** 成果层：Word/PDF 计算书、3D 包络视图、MIDAS 双向互导
 
 ## 质量保障闭环（铁律）
