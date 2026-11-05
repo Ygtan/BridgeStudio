@@ -161,6 +161,10 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "span": 40.0, "n_spans": 1, "udl": 20.0, "point": 0.0,
         "h": 2.0, "b": 8.0, "shape": "box",
         "material": "钢材 Q345", "self_weight": True,
+        # 档二：2D 施工阶段 + 车道活载（走 solve_2d 链，进 example_stage/example_influence）
+        "staged": False,          # 逐跨施工（每跨一个阶段 + 二期铺装阶段）
+        "q2_kN": 0.0,             # 二期铺装 (kN/m)，staged 时合拢后全桥施加
+        "lane": False,            # JTG D60 车道活载 + 影响线最不利布载包络
     },
     # ---- 三维：参数名沿用建造器（sp1/sp2 而不是 span/n_spans）----
     # 梁格是"三跨连续箱梁"专用建造器：三跨不对称就没有意义，
@@ -324,7 +328,14 @@ FIELDS: dict[str, list[list[Field]]] = {
             {"key": "material", "label": "材料", "type": "choice",
              "choices": MATERIAL_NAMES},
         ],
-        [{"key": "self_weight", "label": "计入自重", "type": "bool"}],
+        [
+            {"key": "self_weight", "label": "计入自重", "type": "bool"},
+            {"key": "staged", "label": "逐跨施工", "type": "bool"},
+            {"key": "lane", "label": "JTG D60 车道活载", "type": "bool"},
+            {"key": "q2_kN", "label": "二期铺装 (kN/m)", "type": "float",
+             "min": 0.0, "max": 100.0, "step": 5.0,
+             "when": lambda p: p.get("staged")},
+        ],
     ],
     "grillage3d": [
         [
@@ -745,6 +756,9 @@ class ModelDoc:
             udl_kN=float(p.get("udl", 0.0) or 0.0),
             point_kN=float(p.get("point", 0.0) or 0.0),
             gravity=self._gravity(),
+            staged=bool(p.get("staged", False)),
+            q2_kN=float(p.get("q2_kN", 0.0) or 0.0),
+            lane=bool(p.get("lane", False)),
         )
 
     def _build_grillage3d(self):
@@ -1096,6 +1110,8 @@ class ModelDoc:
 
         fem = fem_eigen_available()
         is_beam = self.kind == "beam"
+        from solve_2d import solve_2d_available
+
         return {
             "anastruct": is_beam,          # anastruct 只有梁单元
             "fem_eigen": fem,
@@ -1103,26 +1119,37 @@ class ModelDoc:
             # 互校的前提：梁（两边都能算）且不计自重（anastruct 无重力项）
             "cross_check": is_beam and fem and not self.params.get("self_weight", False),
             "solve3d": False,
+            # 二维桥型（梁桥/拱桥/桁架）走 solve_2d 链：施工阶段 + 车道 + 组合
+            "solve2d": (not is_beam) and solve_2d_available(),
             "cable": False,
             "nonlinear": False,
         }
 
     def solve(self, out_dir: str | Path | None = None, dat_name: str | None = None):
-        """三维求解的唯一入口，返回 `SolveResult`。
+        """求解的唯一入口，按维度路由到对应内核。
 
-        这就是"接入"的落点：界面不再知道内核叫什么名字、exe 在哪个目录、
-        输出文件分几段。它只问 `doc.capability()["solve3d"]`，然后拿结果。
+        三维 → `solver_3d.solve`（SolveResult）；二维桥型 → `solve_2d.solve_2d`
+        （Solve2DResult，施工阶段 + 车道活载 + 规范组合）。单梁（ModelSpec）没有
+        施工阶段/车道，仍走 `fem_eigen_export.run_fem_eigen` 的一次性静力。
         """
-        if not self.is_3d:
-            raise ValueError(f"{KIND_LABELS.get(self.kind, self.kind)}不是三维模型，"
-                             "二维模型请走 fem_eigen_export.run_fem_eigen")
-        from solver_3d import solve as solve_3d_model
+        if self.is_3d:
+            from solver_3d import solve as solve_3d_model
 
-        out = out_dir or Path("out") / self.kind
-        # 不硬传 kind：悬臂施工的斜拉桥（staged）摘掉了 cable_bridge，按
-        # detect_kind 该走线性阶段内核（grillage3d），而不是成桥态内核
-        # （cable_stayed）。内核键由模型自述决定，不靠 self.kind 猜。
-        return solve_3d_model(self.model, out_dir=out, dat_name=dat_name)
+            out = out_dir or Path("out") / self.kind
+            # 不硬传 kind：悬臂施工的斜拉桥（staged）摘掉了 cable_bridge，按
+            # detect_kind 该走线性阶段内核（grillage3d），而不是成桥态内核
+            # （cable_stayed）。内核键由模型自述决定，不靠 self.kind 猜。
+            return solve_3d_model(self.model, out_dir=out, dat_name=dat_name)
+
+        if self.kind == "beam":
+            raise ValueError(
+                f"{KIND_LABELS.get(self.kind, self.kind)}是单梁模型，"
+                "无施工阶段/车道，请走 fem_eigen_export.run_fem_eigen")
+
+        from solve_2d import solve_2d
+
+        out = out_dir or Path("out") / "2d"
+        return solve_2d(self.model, out_dir=out, dat_name=dat_name)
 
     # ------------------------------------------------------------ 展示
 

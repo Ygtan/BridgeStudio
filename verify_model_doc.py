@@ -148,12 +148,29 @@ def t_classify():
     check("意图分类：人工提示优先", classify_text(BEAM_TXT, "拱桥") == ("arch", "2d"))
 
 
+def t_beam_bridge_staged():
+    """档二：2D 梁桥的自然语言施工阶段 + 车道活载解析。"""
+    doc, src, _ = ModelDoc.from_text(
+        "三跨连续梁桥总长90米，逐跨施工，一期恒载20kN/m，二期铺装10kN/m，双向四车道")
+    check("梁桥：施工/车道/二期解析",
+          doc.kind == "beam_bridge" and doc.dimension == "2d"
+          and doc.params["staged"] is True and doc.params["lane"] is True
+          and doc.params["q2_kN"] == 10.0 and doc.params["n_spans"] == 3,
+          f"staged={doc.params['staged']} lane={doc.params['lane']} "
+          f"q2={doc.params['q2_kN']} ns={doc.params['n_spans']}")
+    spec = doc.model
+    check("梁桥：施工序列 + 车道生成",
+          len(spec.stages) == 4 and len(spec.lanes) == 1,
+          f"阶段{len(spec.stages)} 车道{len(spec.lanes)}")
+
+
 def main() -> int:
     print("=" * 74)
     print("ModelDoc（C 方案）验证")
     print("=" * 74)
     for fn in (t_beam_equivalent, t_bridge_dat_identical, t_topology_rebuild,
-               t_json_roundtrip, t_validate, t_capability, t_classify):
+               t_json_roundtrip, t_validate, t_capability, t_classify,
+               t_beam_bridge_staged):
         print(f"\n[{fn.__name__}]")
         fn()
 

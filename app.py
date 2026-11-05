@@ -559,3 +559,63 @@ else:
             st.code(_fr["dat_text"], language="text")
             st.code(_fr["stdout"][-1500:] or "（无输出）", language="text")
 
+# ---------------------------------------------------------------- ⑥ 施工阶段 + 规范组合
+# 档二：二维桥型的施工阶段正装 + 车道活载 + JTG D60 组合（solve_2d 链）。
+# 只有桥型（非单梁）才进这里；三维桥走 ui_3d 的 SolveResult，不经过本段。
+if doc.kind != "beam" and _cap.get("solve2d"):
+    st.subheader("⑥ 施工阶段与规范组合（JTG D60）")
+    st.caption(
+        "二维施工正装（`example_stage.exe`）→ 成桥态累计内力 + 车道活载影响线"
+        "包络（`example_influence.exe`）→ 基本/频遇/准永久三种组合。"
+    )
+    if not (doc.params.get("staged") or doc.params.get("lane")):
+        st.info("当前模型未开「逐跨施工」或「车道活载」，组合只有恒载项。可在②中勾选。")
+
+    _dat_now_2d = doc.to_dat()
+    if st.button("运行施工阶段 + 规范组合求解", type="primary"):
+        _outdir = Path("out/gui_2d")
+        _outdir.mkdir(parents=True, exist_ok=True)
+        with st.spinner("二维施工阶段 + 车道活载求解中…"):
+            try:
+                _res2d = doc.solve(out_dir=_outdir, dat_name="gui_2d.dat")
+                st.session_state.solve2d = {"dat_text": _dat_now_2d, "res": _res2d}
+            except Exception as _e:
+                st.session_state.solve2d = None
+                st.error(f"二维求解失败：{_e}")
+
+    _s2d = st.session_state.get("solve2d")
+    if _s2d and _s2d.get("dat_text") != _dat_now_2d:
+        st.warning("模型参数已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
+        _s2d = None
+    if _s2d:
+        _r2d = _s2d["res"]
+        _w = _r2d.max_vertical_deflection()
+        _env_m = max((v.get("Mmax", 0.0) for v in _r2d.beam.values()), default=0.0)
+        _c1, _c2, _c3, _c4 = st.columns(4)
+        _c1.metric("成桥态最大挠度", f"{_w[1] * 1000:.2f} mm" if _w else "—")
+        _c2.metric("施工阶段最大弯矩", f"{_env_m / 1e3:.1f} kN·m")
+        _c3.metric("单元数", f"{_r2d.stats.get('elements', 0)}")
+        _c4.metric("施工阶段数", f"{_r2d.stats.get('stages_solved', _r2d.stats.get('stages', 0))}")
+        st.caption(f"内核：`{_r2d.solver}`")
+
+        _combos = _r2d.combinations()
+        if _combos:
+            _rows = []
+            for _c in _combos:
+                _my = _c.worst("My")
+                _n = _c.worst("N")
+                _mycell = "—" if _my is None else f"{_my[1]/1e3:,.0f}（单元 {_my[0][0]}·{_my[0][1]}）"
+                _ncell = "—" if _n is None else f"{_n[1]/1e3:,.0f}"
+                _rows.append([_c.spec.name, _c.spec.expr, _mycell, _ncell,
+                              "含活载" if _c.has_live else "仅恒载"])
+            st.markdown(
+                "| 组合 | 表达式 | 控制弯矩 My (kN·m) | 控制轴力 N (kN) | 活载 |\n"
+                "|---|---|---|---|---|\n"
+                + "\n".join(f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[4]} |"
+                            for r in _rows))
+        else:
+            st.info("成桥态内力为空，无法组合（内核未产出）。")
+        for _d in _r2d.diagnostics:
+            st.caption(f"· {_d}")
+
+

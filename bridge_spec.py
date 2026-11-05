@@ -132,13 +132,19 @@ class Stage2D(BaseModel):
 
 
 class Lane2D(BaseModel):
-    """车道荷载（`*LANE_LOAD`）。按 JTG D60 影响线最不利布载取包络。"""
+    """车道荷载（`*LANE_LOAD`）。按 JTG D60 影响线最不利布载取包络。
+
+    `code="JTG_D60"` 时不写 Q/P，交给内核按规范自动填充（qk=10.5 kN/m、
+    Pk 按 L 内插 270~360 kN）；`code=""` 时用显式 q/p（自定义荷载）。
+    2D 内核的 `applyJtgD60LaneLoads2D` 会覆盖 Q/P，故两者互斥、不重复写。
+    """
 
     nodes: list[int] = Field(default_factory=list)   # 车道纵列节点（按行车方向）
-    q: float = -10.5e3           # 均布车道荷载 N/m（向下为负）
-    p: float = -360.0e3          # 集中荷载 N（向下为负）
+    q: float = -10.5e3           # 均布车道荷载 N/m（向下为负，code 为空时用）
+    p: float = -360.0e3          # 集中荷载 N（向下为负，code 为空时用）
     dir: str = "GY"
     method: str = "LINEAR"
+    code: str = "JTG_D60"        # "JTG_D60" = 内核自动车道荷载；"" = 用 q/p
 
 
 def _int_ranges(vals: list[int]) -> str:
@@ -410,10 +416,15 @@ class BridgeSpec(BaseModel):
             out.append("*LANE_LOAD")
             for i, ln in enumerate(self.lanes, 1):
                 parts = [f"{i}", f"NODES={_int_ranges(ln.nodes)}"]
-                if ln.q:
-                    parts.append(f"Q={ln.q:.6g}")
-                if ln.p:
-                    parts.append(f"P={ln.p:.6g}")
+                if ln.code == "JTG_D60":
+                    # 交给内核按规范自动填充 qk/Pk（含 Pk 随跨径内插），
+                    # 不再手写 Q/P 以免两处打架。
+                    parts.append("CODE=JTG_D60")
+                else:
+                    if ln.q:
+                        parts.append(f"Q={ln.q:.6g}")
+                    if ln.p:
+                        parts.append(f"P={ln.p:.6g}")
                 parts.append(f"DIR={ln.dir}")
                 if ln.method != "LINEAR":
                     parts.append(f"METHOD={ln.method}")
@@ -849,9 +860,22 @@ def extract_bridge_params(text: str) -> tuple[str, dict, list[str]]:
     if not _grab(t, "梁高", "截面高", "高度"):
         notes.append(f"未说明梁高，按 1/20 跨度取 {h:.2f} m")
     b = _grab(t, "宽", "桥宽") or 6.0
+    # 档二：2D 施工阶段 + 车道活载。施工词 → 逐跨施工；车道/活载词 → JTG D60
+    # 影响线最不利布载包络；二期铺装 → 合拢后全桥施加（自动开启逐跨施工）。
+    staged = bool(re.search(r"逐跨施工|分段施工|施工阶段|正装|悬臂|挂篮|从一侧|向另一侧", t))
+    lane = bool(re.search(r"车道|活载|影响线|汽车荷载", t))
+    q2 = 0.0
+    m2 = re.search(r"二期(?:恒载|铺装|荷载|桥面)?[\s:：为约]*"
+                   r"([0-9]+(?:\.[0-9]+)?)\s*(?:kN/m|kn/m|千牛/米)", t)
+    if m2:
+        q2 = float(m2.group(1))
+        if not staged:
+            staged = True
+            notes.append("识别到二期铺装，自动开启逐跨施工（二期在合拢后全桥施加）")
     return _finish("beam_bridge", dict(
         span=span, n_spans=ns, h=h, b=b, material=mat,
         udl=udl or 0.0, point=point or 0.0,
+        staged=staged, q2_kN=q2, lane=lane,
     ), notes)
 
 

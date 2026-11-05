@@ -67,6 +67,7 @@ _SCALARS: dict[str, dict[str, tuple[float, float, str, str, str]]] = {
         "h": (BEAM_MAX_SECTION, 1000.0, "mm", "梁高", "m"),
         "b": (BRIDGE_MAX_WIDTH, 1000.0, "mm", "桥宽", "m"),
         "udl": (BEAM_MAX_UDL, 1000.0, "N/m", "均布荷载", "kN/m"),
+        "q2_kN": (BEAM_MAX_UDL, 1000.0, "N/m", "二期铺装", "kN/m"),
         "point": (BEAM_MAX_POINT, 1000.0, "N", "集中力", "kN"),
     },
     # 三维：参数名与二维完全不同（sp1/sp2、Lm/Ls、Ht），必须单独登记。
