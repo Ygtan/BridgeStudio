@@ -100,6 +100,64 @@ class ElemLoadDef(BaseModel):
     q: float = 0.0
 
 
+class StageLoadDef(BaseModel):
+    """施工阶段节点荷载（`*STAGE_LOAD`）。"""
+
+    node: int
+    dof: int = 2
+    value: float = 0.0
+
+
+class StageElemLoadDef(BaseModel):
+    """施工阶段单元均布荷载（`*STAGE_ELEMENT_LOAD`）。"""
+
+    elems: list[int] = Field(default_factory=list)
+    dir: str = "GY"
+    q1: float = 0.0
+    q2: float = 0.0
+
+
+class Stage2D(BaseModel):
+    """施工阶段（`*STAGE`）。2D 内核用 ACTIVE=/DEACTIVE= 激活/钝化单元。
+
+    `time` 为阶段龄期（天），0 表示不参与时变（徐变/收缩）插值。
+    """
+
+    id: int
+    activate: list[int] = Field(default_factory=list)
+    deactivate: list[int] = Field(default_factory=list)
+    loads: list[StageLoadDef] = Field(default_factory=list)
+    elem_loads: list[StageElemLoadDef] = Field(default_factory=list)
+    time: float = 0.0
+
+
+class Lane2D(BaseModel):
+    """车道荷载（`*LANE_LOAD`）。按 JTG D60 影响线最不利布载取包络。"""
+
+    nodes: list[int] = Field(default_factory=list)   # 车道纵列节点（按行车方向）
+    q: float = -10.5e3           # 均布车道荷载 N/m（向下为负）
+    p: float = -360.0e3          # 集中荷载 N（向下为负）
+    dir: str = "GY"
+    method: str = "LINEAR"
+
+
+def _int_ranges(vals: list[int]) -> str:
+    """整数列表压缩成 `a-b,c-d`：连续段用 a-b，孤立值原样（内核 parseIntList 兼容）。"""
+    vals = sorted(set(vals))
+    if not vals:
+        return ""
+    parts: list[str] = []
+    a = b = vals[0]
+    for v in vals[1:]:
+        if v == b + 1:
+            b = v
+        else:
+            parts.append(str(a) if a == b else f"{a}-{b}")
+            a = b = v
+    parts.append(str(a) if a == b else f"{a}-{b}")
+    return ",".join(parts)
+
+
 def _dof_set(dofs: str) -> set[int]:
     """解析自由度写法："1-2"→{1,2}，"1-3"→{1,2,3}，"2"→{2}，"1,3"→{1,3}。"""
     out: set[int] = set()
@@ -129,6 +187,8 @@ class BridgeSpec(BaseModel):
     boundaries: list[BoundaryDef] = Field(default_factory=list)
     nodal_loads: list[NodalLoadDef] = Field(default_factory=list)
     elem_loads: list[ElemLoadDef] = Field(default_factory=list)
+    stages: list[Stage2D] = Field(default_factory=list)
+    lanes: list[Lane2D] = Field(default_factory=list)
     gravity: float = -9.81       # 0.0 表示不计自重
     note: str = ""
 
@@ -317,6 +377,49 @@ class BridgeSpec(BaseModel):
         out.append(f"0 {self.gravity:.6g}")
         out.append("")
 
+        if self.stages:
+            out.append("! 施工阶段：ACTIVE=/DEACTIVE= 激活/钝化单元")
+            out.append("*STAGE")
+            for s in self.stages:
+                parts = [str(s.id)]
+                if s.activate:
+                    parts.append("ACTIVE=" + _int_ranges(s.activate))
+                if s.deactivate:
+                    parts.append("DEACTIVE=" + _int_ranges(s.deactivate))
+                if s.time:
+                    parts.append(f"TIME={s.time:.6g}")
+                out.append(" ".join(parts))
+            out.append("")
+            if any(s.loads for s in self.stages):
+                out.append("*STAGE_LOAD")
+                for s in self.stages:
+                    for ld in s.loads:
+                        out.append(f"{s.id} NODE={ld.node} DOF={ld.dof} "
+                                   f"VALUE={ld.value:.6g}")
+                out.append("")
+            if any(s.elem_loads for s in self.stages):
+                out.append("*STAGE_ELEMENT_LOAD")
+                for s in self.stages:
+                    for ld in s.elem_loads:
+                        out.append(f"{s.id} ELEM={_int_ranges(ld.elems)} "
+                                   f"DIR={ld.dir} Q1={ld.q1:.6g} Q2={ld.q2:.6g}")
+                out.append("")
+
+        if self.lanes:
+            out.append("! 车道荷载（JTG D60 影响线最不利布载包络）")
+            out.append("*LANE_LOAD")
+            for i, ln in enumerate(self.lanes, 1):
+                parts = [f"{i}", f"NODES={_int_ranges(ln.nodes)}"]
+                if ln.q:
+                    parts.append(f"Q={ln.q:.6g}")
+                if ln.p:
+                    parts.append(f"P={ln.p:.6g}")
+                parts.append(f"DIR={ln.dir}")
+                if ln.method != "LINEAR":
+                    parts.append(f"METHOD={ln.method}")
+                out.append(" ".join(parts))
+            out.append("")
+
         out.append("*END")
         return "\n".join(out) + "\n"
 
@@ -372,8 +475,16 @@ def build_beam_bridge(
     udl_kN: float = 0.0,
     point_kN: float = 0.0,
     gravity: float = -9.81,
+    staged: bool = False,
+    q2_kN: float = 0.0,
+    lane: bool = False,
 ) -> BridgeSpec:
-    """简支 / 连续梁桥。用于与拱桥、桁架桥在同一内核上做对比。"""
+    """简支 / 连续梁桥。用于与拱桥、桁架桥在同一内核上做对比。
+
+    `staged=True`：逐跨施工（每跨一个阶段，激活该跨单元 + 施加该跨一期
+    恒载 udl_kN，自重按激活单元自动计入）；`q2_kN` 为二期铺装，合拢后
+    最后一个阶段全桥施加。`lane=True`：生成 JTG D60 车道荷载影响线包络。
+    """
     n_elem = n_elem or max(20, int(round(span / 1.0)))
     n_elem = max(4, n_elem)
     # 连续梁要保证中间支座落在节点上：单元数取跨数的整数倍
@@ -404,6 +515,31 @@ def build_beam_bridge(
         nloads.append(NodalLoadDef(node=nid, dof=2, value=-abs(point_kN) * 1000.0))
 
     title = f"{span:.0f}m 简支梁桥" if n_spans == 1 else f"{span:.0f}m {n_spans}跨连续梁桥"
+
+    # 逐跨施工：每跨激活单元 + 施加该跨一期恒载；自重按激活单元自动计入。
+    stages: list[Stage2D] = []
+    if staged and n_spans > 1:
+        per = n_elem // n_spans
+        for k in range(n_spans):
+            seg = list(range(k * per + 1, (k + 1) * per + 1))
+            s = Stage2D(id=k + 1, activate=seg)
+            if udl_kN:
+                s.elem_loads.append(StageElemLoadDef(
+                    elems=seg, q1=-abs(udl_kN) * 1000.0, q2=-abs(udl_kN) * 1000.0))
+            stages.append(s)
+        if q2_kN:
+            stages.append(Stage2D(
+                id=n_spans + 1,
+                elem_loads=[StageElemLoadDef(
+                    elems=list(range(1, n_elem + 1)),
+                    q1=-abs(q2_kN) * 1000.0, q2=-abs(q2_kN) * 1000.0)]))
+        # 一期恒载已折进阶段荷载，不再全局施加
+        loads = []
+
+    lanes: list[Lane2D] = []
+    if lane:
+        lanes.append(Lane2D(nodes=[n.id for n in nodes]))
+
     return BridgeSpec(
         title=title,
         nodes=nodes, elements=elements,
@@ -411,6 +547,7 @@ def build_beam_bridge(
         materials=[_mat(material)],
         boundaries=boundaries,
         nodal_loads=nloads, elem_loads=loads,
+        stages=stages, lanes=lanes,
         gravity=gravity,
         note=f"跨度{span}m 跨数{n_spans} {shape} 截面 h={h}m b={b}m UDL={udl_kN}kN/m",
     )
