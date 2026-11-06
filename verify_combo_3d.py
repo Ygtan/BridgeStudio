@@ -9,7 +9,7 @@
 所以要有一个能用笔算出答案的模型：**单跨简支梁**。
 
     M_G = q·L²/8
-    M_Q = q_k·L²/8 + P_k·L/4        （JTG D60 车道荷载，集中力置于跨中）
+    M_Q = (q_k·L²/8 + P_k·L/4)·(1+μ)  （μ 由竖向基频按 JTG D60 自动算）
     M_ud = 1.2·M_G + 1.4·M_Q
 
 这三条式子没有离散误差、没有迭代、没有反算，是混凝土课本第一章的内容。
@@ -38,6 +38,7 @@ from console_utf8 import setup_console
 
 setup_console()          # 输出被重定向到管道/文件时，GBK 会崩（见模块说明）
 
+import math
 import sys
 from pathlib import Path
 
@@ -110,11 +111,20 @@ def main() -> int:
 
     qk = 10.5e3                                        # JTG D60 qk
     pk = 270e3 + (360e3 - 270e3) / 45 * (L - 5)        # L=40 → 340 kN
+    # 未手写冲击系数：μ 由简支梁竖向基频决定。密度 2500 kg/m³。
+    f1 = (math.pi / (2.0 * L * L)) * math.sqrt(E * IY / (2500.0 * A))
+    if f1 < 1.5:
+        mu = 0.05
+    elif f1 <= 14.0:
+        mu = 0.1767 * math.log(f1) - 0.0157
+    else:
+        mu = 0.45
     m_g = Q * L * L / 8                                # 恒载跨中弯矩
-    m_q = qk * L * L / 8 + pk * L / 4                  # 活载跨中弯矩（含集中力）
+    m_q = (qk * L * L / 8 + pk * L / 4) * (1.0 + mu)  # 活载，含自动冲击
     defl = 5 * Q * L ** 4 / (384 * E * IY)             # 恒载跨中挠度
-    defl_q = (5 * qk * L ** 4 / (384 * E * IY)         # 活载跨中挠度：
+    defl_q = ((5 * qk * L ** 4 / (384 * E * IY)        # 活载跨中挠度：
               + pk * L ** 3 / (48 * E * IY))           # 均布 + 跨中集中力
+             * (1.0 + mu))                             # 与弯矩同一套 1+μ
 
     # ---------------------------------------------------------- 恒载与活载
     print("\n[单工况：内核 vs 解析]")
@@ -135,9 +145,12 @@ def main() -> int:
 
     lv = res.live_beam[mid]
     m_q_got = abs(lv["MyMin"])
-    check("活载跨中弯矩 = qk·L²/8 + Pk·L/4", near(m_q_got, m_q, 5e-3),
+    check("活载跨中弯矩 = (qk·L²/8 + Pk·L/4)·(1+μ)", near(m_q_got, m_q, 5e-3),
           f"FEM {m_q_got / 1e3:,.1f} / 解析 {m_q / 1e3:,.1f} kN·m"
-          f"（qk {qk / 1e3:.1f} + Pk {pk / 1e3:.0f}）")
+          f"（qk {qk / 1e3:.1f} + Pk {pk / 1e3:.0f}，μ={mu:.3f}）")
+    f_got = float(res.meta.get("f1_vertical") or 0.0)
+    check("竖向基频接近简支梁公式", near(f_got, f1, 2e-2) and f_got > 0,
+          f"FEM {f_got:.3f} / 解析 {f1:.3f} Hz")
     check("活载弯矩包络只有向下（简支梁无上拱）", abs(lv["MyMax"]) < 1.0,
           f"max={lv['MyMax']:.3g} N·m")
 
@@ -169,9 +182,16 @@ def main() -> int:
     # 活载位移：5qk·L⁴/(384EI) + Pk·L³/(48EI)。这条同时守住"影响点取的是
     # 最后一个阶段"——施工中间态的模型残缺，那里活载位移恒为 0。
     u_q = abs(res.live[max(res.live)][1]) if res.live else 0.0
-    check("活载跨中挠度 = 5qk·L⁴/(384EI) + Pk·L³/(48EI)",
+    check("活载跨中挠度 = (5qk·L⁴/(384EI) + Pk·L³/(48EI))·(1+μ)",
           near(u_q, defl_q, 5e-3),
           f"FEM {u_q * 1000:.2f} / 解析 {defl_q * 1000:.2f} mm")
+    live_chk = next((c for c in res.checks(simple_beam())
+                     if c.name.startswith("活载挠度")), None)
+    bare = u_q / float(res.meta.get("impact_factor") or 1.0)
+    check("活载挠度限值按不计冲击",
+          live_chk is not None and near(float(live_chk.value or 0.0), bare, 1e-6)
+          and "不计冲击" in live_chk.detail,
+          "" if live_chk is None else live_chk.detail)
 
     # 位移组合：1.2×恒载挠度 + 1.4×活载挠度（同一点、同方向）
     dc = {d.spec.key: d for d in res.disp_combinations()}

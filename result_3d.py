@@ -58,6 +58,11 @@ CABLE_SAFETY_MIN = 2.5
 MAIN_CABLE_SAFETY_MIN = 2.0
 #: 索破断强度默认值（1860 级钢绞线，GB/T 5224）
 CABLE_FPU_DEFAULT = 1860e6
+#: 钢绞线抗拉强度标准值默认，以及张拉控制应力上限系数。
+#: JTG 3362 对钢丝、钢绞线的规定是 σcon ≤ 0.75 fpk。
+#: 这里用有效预应力 σpe = Pe/Ap 去比这个上限：超了，控制应力只会更高。
+STRAND_FPK_DEFAULT = 1860e6
+STRAND_CONTROL_RATIO = 0.75
 #: 施工期索力上限对应的临时安全系数：T ≤ A·fpu / 2.0。
 #:
 #: 比运营期的 2.5 低——施工阶段是短暂工况、荷载组合系数更小，规范允许更低的
@@ -564,6 +569,12 @@ class SolveResult:
                     default=0.0)
             q = max((max(abs(v.get("MyMin", 0.0)), abs(v.get("MyMax", 0.0)))
                      for v in self.live_beam.values()), default=0.0)
+            note = _impact_note(self.meta)
+            if note:
+                out.append(Check(
+                    "汽车冲击系数", True,
+                    note.lstrip("，") + "。未手写冲击系数时，由竖向基频按 JTG D60 计算。",
+                    value=float(self.meta["impact_mu"]), level="info"))
             if g > 0:
                 ratio = q / g
                 # 经验判据，不是条文：常规梁桥活载弯矩约为恒载的 0.2~0.6，
@@ -779,9 +790,8 @@ class SolveResult:
         2. 张拉了多少、有效预加力多少——让"这一阶段到底干了什么"有数。
         3. 模型声明了预应力、结果里却没有 → 旧内核没编译，明说"没做"。
 
-        应力的「张拉控制应力 ≤ 0.75·fpk」判据本版**不做**：那需要束面积 Ap 与
-        钢绞线等级 fpk，而 Prestress3D 当前没有 Ap 输入。不是忘了——输入没给齐
-        就下结论，等于造一个假的判据。
+        张拉控制应力：只有本束给了面积 Ap 才比较 σpe = Pe/Ap 与 0.75 fpk。
+        没给面积就明确写成「没做」，不用一个缺省面积把校核做成通过。
         """
         out: list[Check] = []
         declared = 0
@@ -815,7 +825,51 @@ class SolveResult:
             f"阶段 {last} 有效预加力合计", True,
             f"{len(last_pe)} 束，ΣPe = {sum(last_pe)/1e3:,.0f} kN（损失后）",
             value=sum(last_pe), unit="N", level="info"))
+        out.extend(self._checks_strand_stress(model))
         return out
+
+    def _checks_strand_stress(self, model: Any = None) -> list[Check]:
+        """σpe = Pe/Ap 与 0.75 fpk 比较。没给 Ap 的束不参与，也不算通过。"""
+        tendons = []
+        if model is not None:
+            for s in getattr(model, "stages", []) or []:
+                for i, ps in enumerate(getattr(s, "prestress", []) or [], 1):
+                    tendons.append((getattr(s, "id", 0), i, ps))
+        given = [(sid, i, ps) for sid, i, ps in tendons if float(getattr(ps, "Ap", 0) or 0) > 0]
+        if not given:
+            if tendons:
+                return [Check(
+                    "张拉控制应力", True,
+                    "未给钢束面积 Ap，不做 σpe ≤ 0.75 fpk 校核。"
+                    "这不是「通过」，是「没做」。",
+                    level="info")]
+            return []
+        rows = []
+        for sid, i, ps in given:
+            pe = self.stage_prestress.get((sid, i), {}).get("Pe")
+            if pe is None:
+                continue
+            ap = float(ps.Ap)
+            fpk = float(getattr(ps, "fpk", 0) or 0) or STRAND_FPK_DEFAULT
+            cap = STRAND_CONTROL_RATIO * fpk
+            rows.append((sid, i, pe / ap, cap, ap, fpk))
+        if not rows:
+            return [Check(
+                "张拉控制应力", True,
+                "给了钢束面积，但结果里没有对应的有效预加力，本次没做应力校核。",
+                level="info")]
+        worst = max(rows, key=lambda r: r[2] / r[3])
+        ok = all(sig <= cap * (1.0 + 1e-9) for _, _, sig, cap, _, _ in rows)
+        sid, i, sig, cap, ap, fpk = worst
+        return [Check(
+            "有效预应力未超过 0.75 fpk",
+            ok,
+            f"阶段 {sid} 束 {i}：σpe = Pe/Ap = {sig/1e6:.0f} MPa，"
+            f"上限 {STRAND_CONTROL_RATIO:g}×{fpk/1e6:.0f} = {cap/1e6:.0f} MPa"
+            f"（Ap = {ap*1e6:.0f} mm²）。"
+            "这是有效应力与钢绞线张拉控制应力上限的比较，不是分项损失验算。",
+            value=sig, limit=cap, unit="Pa",
+            level="error" if not ok else "info")]
 
     def _checks_strength(self, model: Any) -> list[Check]:
         """截面应力验算：把组合内力换成应力，跟材料强度比。
@@ -1390,6 +1444,7 @@ class SolveResult:
         # 活载挠度单独校核：规范限值针对的是**车道荷载产生的挠度**，
         # 不是恒载 + 活载的总量。上面那条拿全量对 L/600，只能当量级判据；
         # 这条才是条文对应的量，分母用最大跨径（不是总长）。
+        # 表 4.3.2 的挠度不计冲击。包络里的位移已经乘了 1+μ，比对限值时除掉。
         lw = self.live_worst()
         if lw is not None:
             sup = support_x(model)
@@ -1397,11 +1452,16 @@ class SolveResult:
                     if len(sup) >= 2 else 0.0)
             if span > 0:
                 lim = span / 600.0
+                factor = float(self.meta.get("impact_factor") or 1.0)
+                if factor <= 0.0:
+                    factor = 1.0
+                bare = lw[1] / factor
                 out.append(Check(
-                    "活载挠度 ≤ L₁/600（JTG D60 4.3.2）", abs(lw[1]) <= lim,
-                    f"阶段 {lw[0]} 影响点 |{lw[1] * 1000:.2f}| mm ≤ "
-                    f"{lim * 1000:.1f} mm（最大跨径 {span:.0f} m）",
-                    value=abs(lw[1]), limit=lim, unit="m"))
+                    "活载挠度 ≤ L₁/600（JTG D60 4.3.2）", abs(bare) <= lim,
+                    f"阶段 {lw[0]} 影响点含冲击 |{lw[1] * 1000:.2f}| mm，"
+                    f"不计冲击 |{bare * 1000:.2f}| mm ≤ "
+                    f"{lim * 1000:.1f} mm（最大跨径 {span:.0f} m，1+μ={factor:.3f}）",
+                    value=abs(bare), limit=lim, unit="m"))
         if self.beam:
             mmax = self.max_bending()
             out.append(Check(
@@ -1910,8 +1970,18 @@ def support_x(model: Any) -> list[float]:
         return []
     try:
         deck_ids = {n.id for n in model.nodes if n.id < 2000}
+
+        def covers(dofs, target: int) -> bool:
+            # dofs 是闭区间 [a, b]，不是自由度列表。(1, 4) 含竖向 3。
+            if not dofs:
+                return False
+            lo, hi = int(dofs[0]), int(dofs[-1])
+            if lo > hi:
+                lo, hi = hi, lo
+            return lo <= target <= hi
+
         constrained = {b.node for b in model.boundaries
-                       if b.node in deck_ids and (2 in b.dofs or 3 in b.dofs)}
+                       if b.node in deck_ids and (covers(b.dofs, 2) or covers(b.dofs, 3))}
         x_of = {n.id: n.x for n in model.nodes}
         return sorted({round(x_of[i], 6) for i in constrained})
     except (AttributeError, KeyError):

@@ -68,6 +68,7 @@ def parse_summary(path: Path) -> dict:
     final_beam: dict = {}
     final_disp: dict = {}
     live_beam: dict = {}
+    lane_impact: dict = {}
     stage_cables: dict = {}
     stage_prestress: dict = {}
 
@@ -79,6 +80,7 @@ def parse_summary(path: Path) -> dict:
         "final stage beam force",
         "final stage displacement",
         "stage live envelope",
+        "lane impact",
         "live beam envelope",
         "stage cable tension",
         "stage prestress force",
@@ -90,7 +92,8 @@ def parse_summary(path: Path) -> dict:
     re_end_id = re.compile(r"^E(\d+)\s+([ij])\s+(.*)$")
     # 键名允许字母后跟数字：L0= 这类键（无应力索长）首字母后就是数字，
     # 只写 [A-Za-z]+ 会把它整条丢掉——不报错，只是字段"凭空消失"。
-    re_kv = re.compile(r"([A-Za-z][A-Za-z0-9]*)=(\S+)")
+    # 下划线要留着：基频行是 f1_vertical= / impact_mu=。
+    re_kv = re.compile(r"([A-Za-z][A-Za-z0-9_]*)=(\S+)")
     re_live = re.compile(r"^STAGE(\d+) max=(\S+) min=(\S+)$")
     re_stage_cable = re.compile(r"^STAGE(\d+)\s+E(\d+)\s+(.*)$")
     re_stage_prestress = re.compile(r"^STAGE(\d+)\s+P(\d+)\s+(.*)$")
@@ -136,6 +139,12 @@ def parse_summary(path: Path) -> dict:
                 if vals:
                     target = final_beam if section.startswith("final") else live_beam
                     target[(int(m.group(1)), m.group(2))] = vals
+        elif section == "lane impact":
+            for key, raw in re_kv.findall(line):
+                try:
+                    lane_impact[key] = float(raw)
+                except ValueError:
+                    continue
         elif section == "stage live envelope":
             m = re_live.match(line)
             if m:
@@ -158,7 +167,8 @@ def parse_summary(path: Path) -> dict:
                     stage_prestress[(int(m.group(1)), int(m.group(2)))] = vals
     return {"disp": disp, "beam": beam, "live": live,
             "final_beam": final_beam, "final_disp": final_disp,
-            "live_beam": live_beam, "stage_cables": stage_cables,
+            "live_beam": live_beam, "lane_impact": lane_impact,
+            "stage_cables": stage_cables,
             "stage_prestress": stage_prestress}
 
 

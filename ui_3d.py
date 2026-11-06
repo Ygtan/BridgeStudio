@@ -356,6 +356,41 @@ def _interop_block(doc: ModelDoc) -> None:
 # ---------------------------------------------------------------- 报告导出
 
 
+def _opt_block(doc: ModelDoc, res: SolveResult) -> None:
+    """减一档索面积，用最小弯曲能重算，并按弯矩和塔偏决定是否采纳。"""
+    st.markdown("**一轮优化**")
+    st.caption("把拉索面积向安全系数 2.5 收一档（最多减 30%），清掉预先给定的索力，"
+               "由求解器按最小弯曲能重算。主梁弯矩或塔顶偏位变差时退回原方案。")
+    if st.button("重算一轮", key="r3d_opt_btn"):
+        with st.spinner("调整拉索面积并调用 cable_solver …"):
+            try:
+                from cable_opt import run_opt_round
+
+                opt = run_opt_round(doc.model, res, out_dir=f"out/{doc.kind}/opt")
+                st.session_state["r3d_opt"] = {"fp": res.fingerprint, "opt": opt}
+            except Exception as e:                  # noqa: BLE001
+                st.session_state.pop("r3d_opt", None)
+                st.error(f"优化重算失败：{e}")
+    cached = st.session_state.get("r3d_opt")
+    if not cached or cached.get("fp") != res.fingerprint:
+        return
+    opt = cached["opt"]
+    if opt.get("status") == "accepted":
+        st.success(opt.get("reason") or "采纳")
+    elif opt.get("status") == "rejected":
+        st.warning(opt.get("reason") or "退回原方案")
+    else:
+        st.info(opt.get("reason") or "本轮不重算")
+    rows = opt.get("rows") or []
+    if rows:
+        st.table({
+            "项目": [r[0] for r in rows],
+            "基准": [r[1] for r in rows],
+            "重算": [r[2] for r in rows],
+            "接受条件": [r[3] for r in rows],
+        })
+
+
 def _report_block(doc: ModelDoc, res: SolveResult) -> None:
     """Word / HTML / CSV 三出口，同一份 Report。"""
     st.markdown("**报告与数据导出**")
@@ -364,9 +399,13 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
                  help="同一份内容同时产出 Word、HTML 与 CSV 数据包"):
         with st.spinner("排版报告（表格、插图、结论）…"):
             try:
+                _opt = st.session_state.get("r3d_opt")
+                _opt_payload = (_opt.get("opt") if _opt and _opt.get("fp") == res.fingerprint
+                                else None)
                 rep = build_document(res, doc.model, project=res.title,
                                      out_dir=Path("out") / doc.kind / "report",
-                                     kind_label=KIND_LABELS.get(doc.kind))
+                                     kind_label=KIND_LABELS.get(doc.kind),
+                                     opt=_opt_payload)
                 paths = write_all(rep, Path("out") / doc.kind / "report",
                                   stem=f"{doc.kind}_report")
                 st.session_state[SS_REPORT] = {
@@ -568,9 +607,15 @@ def render(doc: ModelDoc) -> None:
         _interop_block(doc)
 
     # ---- 求解 ----
+    if doc.params.get("nonlinear_stages") and doc.params.get("staged"):
+        solver_name = "example_3d_stage_nl.exe"
+        case = "非线性施工阶段（全量平衡，索力由无应力索长命中）"
+    elif cap["nonlinear"]:
+        case = "几何非线性成桥态（索垂度 + 索长反算）"
+    else:
+        case = "线性阶段 + 活载包络"
     st.caption(
-        f"求解器：`{solver_name}`　｜　"
-        f"工况：{'几何非线性成桥态（索垂度 + 索长反算）' if cap['nonlinear'] else '线性阶段 + 活载包络'}"
+        f"求解器：`{solver_name}`　｜　工况：{case}"
         f"　｜　能力自述：{', '.join(k for k, v in cap.items() if v) or '—'}")
 
     if st.button(f"求解（{KIND_LABELS[doc.kind]}）", type="primary", key="r3d_solve"):
@@ -625,6 +670,10 @@ def render(doc: ModelDoc) -> None:
     # ---- 表 ----
     _tables_block(res, doc.model,
                   skip=("combo_coef", "combo_summary", "combo_ultimate"))
+
+    # ---- 一轮优化（只对斜拉桥成桥态；力学仍由 cable_solver 做）----
+    if res.kind == "cable_stayed":
+        _opt_block(doc, res)
 
     # ---- 报告导出 ----
     _report_block(doc, res)

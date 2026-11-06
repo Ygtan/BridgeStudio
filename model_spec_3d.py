@@ -311,6 +311,10 @@ class Prestress3D(BaseModel):
     e: float = 0.0
     s: float = 0.0
     loss: float = Field(default=1.0, gt=0.0, le=1.0)
+    # 束面积 m²。0 表示没给：校核不得用缺省面积去判 σpe ≤ 0.75 fpk。
+    Ap: float = 0.0
+    # 抗拉强度标准值 Pa。0 表示校核时用 1860 MPa。
+    fpk: float = 0.0
 
 
 class Stage3D(BaseModel):
@@ -337,6 +341,10 @@ class Stage3D(BaseModel):
     tensions: dict[int, float] = Field(default_factory=dict)    # 单元号 → 目标索力 N
     unstrained: dict[int, float] = Field(default_factory=dict)  # 单元号 → 无应力索长 m
     prestress: list[Prestress3D] = Field(default_factory=list)  # 本阶段张拉的预应力束
+    # 相对已积累内力的徐变增量。静定梁最终位移约为瞬时值的 (1+Δφ) 倍。
+    creep_dphi: float = 0.0
+    # 阶段末龄期（天）。>0 且模型写了徐变曲线时，内核用 φ(t)−φ(上一阶段) 代替 creep_dphi。
+    time: float = 0.0
 
 
 class Influence3D(BaseModel):
@@ -436,6 +444,18 @@ class ModelSpec3D(BaseModel):
     influences: list[Influence3D] = Field(default_factory=list)
     lanes: list[Lane3D] = Field(default_factory=list)
     cable_bridge: "CableBridge3D | None" = None
+    # 全模型一个徐变系数。刚度用 E/(1+χφ)。0 表示不折减。
+    # 这不是按龄期分阶段的 AEMM。
+    creep_phi: float = 0.0
+    creep_chi: float = 0.8
+    # 徐变曲线 φ=φ0·[(t−t0)/(βH+t−t0)]^power。φ0=0 表示不按龄期。
+    # 阶段 TIME 给出后，增量是相邻龄期的 φ 差，后加的荷载不从第一天起徐变。
+    creep_phi0: float = 0.0
+    creep_t0: float = 7.0
+    creep_beta_h: float = 700.0
+    creep_power: float = 0.3
+    # 自由收缩应变，正值为缩短。0 表示不计。全模型一个值，不按龄期。
+    shrinkage_ecs: float = 0.0
 
     # -------------------------------------------------- 校验
     @model_validator(mode="after")
@@ -598,6 +618,19 @@ class ModelSpec3D(BaseModel):
         nonlinear = self.cable_bridge is not None
         L.append(f"# {self.title}")
         L.append("# 由 BridgeStudio 导出（FEM-Eigen 3D new format，单位 m/N/Pa）")
+        if self.creep_phi or self.creep_phi0:
+            bits = ["*CREEP"]
+            if self.creep_phi:
+                bits.append(f"PHI={fmt(self.creep_phi)}")
+            if self.creep_phi0:
+                bits.append(f"PHI0={fmt(self.creep_phi0)}")
+                bits.append(f"T0={fmt(self.creep_t0)}")
+                bits.append(f"BETAH={fmt(self.creep_beta_h)}")
+                bits.append(f"POWER={fmt(self.creep_power)}")
+            bits.append(f"CHI={fmt(self.creep_chi)}")
+            L.append(" ".join(bits))
+        if self.shrinkage_ecs:
+            L.append(f"*SHRINKAGE ECS={fmt(self.shrinkage_ecs)}")
         if compact:
             L.append("# 紧凑写法：*FILL 补等间距节点、*DO 展开规则单元（内核可读回）")
 
@@ -676,6 +709,10 @@ class ModelSpec3D(BaseModel):
                 parts.append("ACTIVE=" + ",".join(str(i) for i in s.activate))
             if s.deactivate:
                 parts.append("DEACTIVE=" + ",".join(str(i) for i in s.deactivate))
+            if s.creep_dphi:
+                parts.append(f"DPHI={fmt(s.creep_dphi)}")
+            if s.time:
+                parts.append(f"TIME={fmt(s.time)}")
             # 张拉规格按单元号排序输出：dict 的插入顺序取决于调用方怎么建的，
             # 同一份模型两次导出得到不同文本会让 .dat 对拍失去意义。
             if s.tensions:

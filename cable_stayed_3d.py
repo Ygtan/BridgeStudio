@@ -14,7 +14,8 @@
 - 桥塔：两座竖向悬臂柱，塔底固结（独立节点，与主梁不刚接）
 - 拉索：CABLE 单元，梁侧锚点均匀取自该侧梁节点，塔侧锚点沿塔高分散
   （anchor_low~1.0 塔高，形成扇形索面，而非全部挤在塔顶一个点）
-- 支承：两桥台 + 两塔处竖向/横向支承；一端纵向固定（半漂浮体系）
+- 支承：成桥默认半漂浮（竖向+横向，一端纵向固定）。
+  `staged=True` 或 `system="fixed"` 时改为塔梁固结，施工与成桥用同一套约束。
 - 荷载：桥面恒载 q 按节点受荷宽度分配 + 塔柱自重
 
 编号规范（X20 分块）
@@ -79,6 +80,7 @@ def build_cable_stayed_3d(
     cable_tensions: dict[int, float] | None = None,   # 指定索力（N），缺省按 method 定
     min_tension_fraction: float = 0.02,
     staged: bool = False,               # 生成悬臂施工 + 张拉阶段序列（走线性阶段内核）
+    system: str = "semi",               # semi 半漂浮 | fixed 塔梁固结；staged 时强制 fixed
     q2_deck: float = 0.0,               # 二期恒载 N/m（铺装+护栏）；0 = 二期为 0
     retune: bool = True,                # 合拢后二次调索到成桥目标（施工闭环）
     title: str = "双塔三跨斜拉桥",
@@ -260,13 +262,12 @@ def build_cable_stayed_3d(
             cable_ids.append(eid_cable)
 
     # ---------------------------------------------------------- 约束
+    # 悬臂施工必须塔梁固结才能在每个阶段保持稳定，而三维约束不能中途释放。
+    # 因此 staged 一律固结，成桥与施工是同一个结构，不在合拢后改成半漂浮。
+    use_fixed = bool(staged) or str(system).lower() == "fixed"
     boundaries: list[Boundary3D] = []
-    if staged:
-        # 塔梁固结体系（悬臂施工的稳定性前提）：塔位主梁节点固结（6 自由度），
-        # 桥台处竖向+横向支座（纵向滑动释放温度）。3D 内核约束是全局固定的，
-        # 不支持"临时固结→合拢后解除"，故本施工算例直接采用塔梁固结体系——
-        # 这也是钢斜拉桥/部分混凝土斜拉桥的常用成桥体系，悬臂施工无需临时
-        # 配重或临时索，塔位固结即可保证每个悬臂阶段的静定稳定。
+    if use_fixed:
+        # 塔位主梁节点固结（6 自由度），桥台处竖向+横向支座（纵向滑动）。
         for i, s in enumerate(support_idx):
             if i in (1, 2):                       # 塔位
                 boundaries.append(Boundary3D(node=gid(s), dofs=(1, 6)))
@@ -446,6 +447,7 @@ def build_cable_stayed_3d(
         "lane_count": lane_count,
         "transverse_distribution": lane_count * lane_reduction * eccentricity,
         "staged": staged,
+        "system": "fixed" if use_fixed else "semi",
         "n_stages": len(stages),
         "q2_deck": q2_deck,
         "target_tensions": tensions if staged else {},   # 施工张拉目标（成桥目标索力）

@@ -4,7 +4,8 @@
 默认 2d，`BUILDERS` 把 `(cable_stayed, 2d)` / `(suspension, 2d)` 路由到两个
 平面索面建造器。本脚本守的是这条链上的物理量，不是"能跑通"：
 
-1. **默认维度**：斜拉/悬索不写三维词 → 2d；写「双索面/空间」→ 3d。
+1. **默认维度**：斜拉/悬索不写三维词 → 2d；写「空间」→ 3d。
+   「双索面」不再当成三维词，解析后由 validate() 拒绝。
 2. **斜拉桥 2D**：CABLE 以 ISTRN 预张，主梁成桥态有弯矩、索在承重（最大索力
    与桥面恒载同一量级），挠度在 L/200 内。
 3. **悬索桥 2D 地锚式**：主缆最大轴力 ≈ H0 = qL²/8f（误差 < 10%）——这是主缆
@@ -47,12 +48,17 @@ def main() -> int:
     cases = [
         ("双塔三跨斜拉桥，主跨200米", ("cable_stayed", "2d")),
         ("地锚式悬索桥，主跨300米", ("suspension", "2d")),
-        ("双索面空间斜拉桥，主跨200米", ("cable_stayed", "3d")),
-        ("空间双索面地锚式悬索桥，主跨300米", ("suspension", "3d")),
+        ("空间单索面斜拉桥，主跨200米", ("cable_stayed", "3d")),
+        ("空间单索面地锚式悬索桥，主跨300米", ("suspension", "3d")),
+        ("双索面斜拉桥，主跨200米", ("cable_stayed", "2d")),
     ]
     ok = all(classify_text(t) == want for t, want in cases)
     verdicts.append(("默认维度 2d / 三维词转 3d", PASS if ok else FAIL,
                      "、".join(f"{w[0]}×{w[1]}" for _, w in cases)))
+    dual, _, _ = ModelDoc.from_text("双索面空间斜拉桥，主跨200米")
+    verdicts.append(("双索面被拒绝、不静默建成",
+                     PASS if any("单索面" in e for e in dual.validate()) else FAIL,
+                     "；".join(dual.validate())[:48]))
 
     # ---------------- 2. 斜拉桥 2D ----------------
     cs, _, _ = ModelDoc.from_text(

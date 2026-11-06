@@ -60,6 +60,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 import code_material
+from result_3d import CABLE_SAFETY_MIN, MAIN_CABLE_SAFETY_MIN
 
 # ---------------------------------------------------------------- 版式常量
 
@@ -939,8 +940,12 @@ def _cover(doc: Document, data: dict, title: str, project: str,
     _set_run_font(r, size=10.5, color=GRAY)
 
     # 封面信息表（无框线，靠列宽对齐）
+    sys = str((data.get("params") or {}).get("system") or "semi")
     rows = [
         ("计算内容", "恒载成桥态几何非线性分析"),
+        ("结构体系", "塔梁固结。施工与成桥同一套约束，合拢后不解除。"
+         if sys == "fixed" else "半漂浮。塔梁不固结，梁端一端纵向固定。"),
+        ("索面", "单索面。未建立第二索面和横梁。"),
         ("计算软件", "FEM-Eigen 空间刚架/索单元非线性求解器"),
         ("索力确定方法", METHOD_LABELS.get(
             str(data["tension_method"]).upper(),
@@ -1098,10 +1103,17 @@ def _sec_1_overview(w: _Writer, d: dict, title: str, project: str) -> None:
 def _sec_2_model(w: _Writer, model, d: dict, fig_elev: Path) -> None:
     w.h1("计算模型")
     w.h2("2.1　结构离散")
-    w.p("主梁沿顺桥向离散为梁单元（BEAM），桥塔为竖向悬臂梁单元，"
-        "拉索采用只受拉的索单元（CABLE）。主梁与桥塔之间不刚接——"
-        "塔、梁各自独立成链，仅通过拉索传力，这与半漂浮体系的实际构造一致；"
-        "若把塔梁刚接，塔的弯曲刚度会被主梁“借走”，成桥索力将系统偏小。")
+    sys = str((d.get("params") or {}).get("system") or "semi")
+    if sys == "fixed":
+        w.p("主梁沿顺桥向离散为梁单元（BEAM），桥塔为竖向悬臂梁单元，"
+            "拉索采用只受拉的索单元（CABLE）。本计算按塔梁固结：塔位主梁节点"
+            "六个自由度固定，施工阶段与成桥使用同一套约束。"
+            "内核不能在合拢后解除临时固结，因此结果不按半漂浮体系解释。")
+    else:
+        w.p("主梁沿顺桥向离散为梁单元（BEAM），桥塔为竖向悬臂梁单元，"
+            "拉索采用只受拉的索单元（CABLE）。主梁与桥塔之间不刚接——"
+            "塔、梁各自独立成链，仅通过拉索传力，这与半漂浮体系的实际构造一致；"
+            "若把塔梁刚接，塔的弯曲刚度会被主梁“借走”，成桥索力将系统偏小。")
     w.figure(fig_elev, "结构计算简图（▲ 为支承断面）", width_cm=15.0)
 
     cnt = d["counts"]
@@ -1431,10 +1443,11 @@ def _sec_5_cables(w: _Writer, d: dict) -> None:
         f"以 f_{{pk}} = {_f(d['fpu'], 0)} MPa、单索面积 {_f(d['area'] * 1e6, 0)} mm² 计，"
         f"破断力 {_f(d['break_load'] / 1e3, 0)} kN，"
         f"最小安全系数 {_f(d['sf_min'], 2)}（出现在最长索）。")
-    ok = d["sf_min"] >= 2.0
-    w.p(("安全系数满足 JTG/T 3365-01—2020 关于拉索安全系数不小于 2.0 的要求。"
+    ok = d["sf_min"] >= CABLE_SAFETY_MIN
+    w.p(("安全系数满足 JTG/T 3365-01—2020 关于拉索安全系数不小于 "
+         f"{CABLE_SAFETY_MIN:.1f} 的要求。"
          if ok else
-         f"安全系数 {_f(d['sf_min'], 2)} 低于 2.0，不满足规范要求，"
+         f"安全系数 {_f(d['sf_min'], 2)} 低于 {CABLE_SAFETY_MIN:.1f}，不满足规范要求，"
          "应加大单索面积或增加索数。"))
     # 反向校核：按容许应力反算所需面积，指出截面富余程度（避免“安全系数越大越好”的误读）
     # 注意 d["fpu"] 的单位是 MPa，乘 1e6 才是 Pa，否则反算面积会大 6 个量级、
@@ -1449,7 +1462,8 @@ def _sec_5_cables(w: _Writer, d: dict) -> None:
             "可把单索面积降至上述反算值后重算——注意面积变化会小幅改变结构刚度，"
             "进而影响索力分配，需迭代一次。")
     rows = [["最大索应力", _f(d["sigma_max"] / 1e6, 0), "MPa", "—"],
-            ["最小安全系数", _f(d["sf_min"], 2), "—", "≥ 2.0 满足" if ok else "＜ 2.0 不满足"],
+            ["最小安全系数", _f(d["sf_min"], 2), "—",
+             f"≥ {CABLE_SAFETY_MIN:.1f} 满足" if ok else f"＜ {CABLE_SAFETY_MIN:.1f} 不满足"],
             ["索力不均匀系数 Tmax/Tmin", _f(d["uniformity"], 2), "—",
              "斜拉桥常规 2~4"]]
     w.table("拉索强度校核", ["项目", "数值", "单位", "结论"], rows,
@@ -1508,7 +1522,8 @@ def _sec_7_conclusion(w: _Writer, d: dict) -> None:
         f"{_f(d['Tmax'] / 1e3, 0)} kN，索力竖向分量与支座反力之和闭合于总恒载，"
         f"索承担桥面恒载 {_f(d['deck_share_pct'], 2)}%。")
     w.p(f"（3）最小索力安全系数 {_f(d['sf_min'], 2)}，"
-        + ("满足规范不小于 2.0 的要求。" if d["sf_min"] >= 2.0
+        + (f"满足规范不小于 {CABLE_SAFETY_MIN:.1f} 的要求。"
+           if d["sf_min"] >= CABLE_SAFETY_MIN
            else "低于规范要求，需调整索面积或索数。"))
     w.p(f"（4）主梁预抬高 {_f(d['camber_min'], 1)} ~ {_f(d['camber_max'], 1)} mm"
         f"（约 L/{_f(d['camber_ratio'], 0)}），可作为梁段预制标高控制依据。")
@@ -2382,7 +2397,8 @@ def _susp_sec_5(w: _Writer, d: dict) -> None:
                   f"　（应 ≈ 0）")
 
     w.h2("5.3　索的安全系数")
-    w.p("主缆安全系数按 JTG/T D65-05-2015 取 2.0，吊索取 2.5。主缆的限值反而"
+    w.p(f"主缆安全系数按 JTG/T D65-05-2015 取 {MAIN_CABLE_SAFETY_MIN:.1f}，"
+        f"吊索取 {CABLE_SAFETY_MIN:.1f}。主缆的限值反而"
         "比吊索低，原因是主缆不可更换、设计上按全寿命考虑，而吊索可更换——"
         "这是规范里的既有取舍，不是笔误。")
     w.formula("K = A · f_pu / T", "A 取实常数截面，主缆 f_pu = 1770 MPa，"

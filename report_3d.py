@@ -1193,10 +1193,32 @@ def _conclusion_bullets(res: SolveResult, model: Any,
     return out
 
 
+def _cover_facts(model: Any) -> list[tuple[str, str]]:
+    """从网格本身读出封面必须写明的体系，不靠界面参数。"""
+    bounds = list(getattr(model, "boundaries", None) or [])
+    facts: list[tuple[str, str]] = []
+    deck_fixed = any(tuple(getattr(b, "dofs", ())) == (1, 6)
+                     and 1000 <= int(b.node) < 2000 for b in bounds)
+    semi = any(tuple(getattr(b, "dofs", ())) == (1, 1) for b in bounds)
+    if deck_fixed:
+        facts.append(("结构体系",
+                      "塔梁固结。施工阶段与成桥使用同一约束，合拢后不解除临时固结。"))
+    elif semi:
+        facts.append(("结构体系", "半漂浮。塔梁不固结，梁端一端纵向固定。"))
+    nodes = list(getattr(model, "nodes", None) or [])
+    kinds = {t.id: str(t.kind) for t in getattr(model, "etypes", []) or []}
+    has_cable = any(kinds.get(e.etype) == "CABLE"
+                    for e in getattr(model, "elements", []) or [])
+    if has_cable and nodes and max(abs(n.y) for n in nodes) < 1e-6:
+        facts.append(("索面", "单索面。未建立第二索面和横梁。"))
+    return facts
+
+
 def build_document(res: SolveResult, model: Any, *, project: str = "",
                    out_dir: str | Path | None = None,
                    params: dict[str, Any] | None = None,
-                   kind_label: str | None = None) -> Report:
+                   kind_label: str | None = None,
+                   opt: dict[str, Any] | None = None) -> Report:
     """把 SolveResult 拼成与排版无关的报告结构。
 
     `kind_label` 可覆盖「桥型」标签：大跨拱桥（arch_3d）走线性阶段内核，
@@ -1219,6 +1241,7 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
         ("数据来源", res.result_path or "—"),
         ("生成时间", _dt.datetime.now().strftime("%Y-%m-%d %H:%M")),
     ]
+    meta.extend(_cover_facts(model))
 
     blocks: list[dict[str, Any]] = []
 
@@ -1300,6 +1323,30 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
                 "基本组合的逐截面结果（每个单元 × i/j 两端）见文末明细表"
                 "「基本组合（承载力）：梁端弯矩与剪力」；本页不重复 222 行。")})
 
+    if opt:
+        from cable_opt import opt_table
+
+        tab = opt_table(opt)
+        blocks.append({"type": "h1", "text": "优化建议"})
+        blocks.append({"type": "p", "text": opt.get("reason") or ""})
+        if tab:
+            tabs["opt_round"] = tab
+            blocks.append({"type": "table", "key": "opt_round"})
+            blocks.append({"type": "note", "text": tab["note"]})
+
+    from monitor_plan import monitoring_table
+
+    monitor = monitoring_table(res, model, params)
+    if monitor:
+        tabs["monitor_plan"] = monitor
+        blocks.append({"type": "h1", "text": "施工监控细则"})
+        blocks.append({"type": "p", "text": (
+            "测点、理论值和允许偏差取自基准求解结果。"
+            "允许偏差是程序拟定的施工控制带宽。超限后按表中「回算」列只改那一个"
+            "参数，然后重算相邻索力和标高。")})
+        blocks.append({"type": "table", "key": "monitor_plan"})
+        blocks.append({"type": "note", "text": monitor["note"]})
+
     blocks.append({"type": "h1", "text": "结论与说明"})
     blocks.append({"type": "bullets", "items": _conclusion_bullets(res, model, checks)})
     if res.diagnostics:
@@ -1314,6 +1361,8 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
         rest.pop(STAGE_TABLE_KEY, None)
     if erection_chapter:
         rest.pop("erection_table", None)
+    rest.pop("monitor_plan", None)
+    rest.pop("opt_round", None)
     if rest:
         blocks.append({"type": "h1", "text": "明细表"})
         for key in rest:

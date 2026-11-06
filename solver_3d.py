@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from result_3d import KIND_LABELS, SolveResult
+from result_3d import KIND_LABELS, SolveResult, _impact_note
 
 
 class SolverUnavailable(RuntimeError):
@@ -85,6 +85,13 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
                         for (s, e), v in (raw.get("stage_cables") or {}).items()}
     res.stage_prestress = {(int(s), int(p)): dict(v)
                            for (s, p), v in (raw.get("stage_prestress") or {}).items()}
+    impact = raw.get("lane_impact") or {}
+    if impact.get("f1_vertical"):
+        res.meta = {
+            "f1_vertical": float(impact["f1_vertical"]),
+            "impact_mu": float(impact.get("impact_mu") or 0.0),
+            "impact_factor": float(impact.get("impact_factor") or 1.0),
+        }
     st = model.stats() if hasattr(model, "stats") else {}
     res.stats = {**st, "dofs": _dofs(model)}
     res.converged = True                       # 线性求解，无迭代
@@ -100,6 +107,8 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
     if not res.live_beam:
         res.diagnostics.append(
             "模型未定义车道荷载（LANE_3D），无活载内力，荷载组合只出恒载项。")
+    elif res.meta.get("f1_vertical"):
+        res.diagnostics.append(_impact_note(res.meta).lstrip("，") + "。")
     if any(t.kind == "CABLE" for t in getattr(model, "etypes", [])):
         res.diagnostics.append(
             "模型含 CABLE 单元，但线性内核把它们当 TRUSS 处理（可压）。"

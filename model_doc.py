@@ -49,6 +49,7 @@ Dimension = Literal["2d", "3d"]
 #: suspension_2d（斜拉/悬索平面索面简化，档三落地）。
 BUILDERS: dict[tuple[str, str], str] = {
     ("beam", "2d"): "beam",
+    ("beam", "3d"): "ps_beam",
     ("arch", "2d"): "arch",
     ("arch", "3d"): "arch_3d",
     ("truss", "2d"): "truss",
@@ -64,6 +65,7 @@ BUILDERS: dict[tuple[str, str], str] = {
 #: `detect_kind(model)`（悬臂施工斜拉桥摘掉 cable_bridge 会落到 grillage3d）。
 SOLVER_OF: dict[tuple[str, str], str] = {
     ("beam", "2d"): "2d",
+    ("beam", "3d"): "grillage3d",
     ("arch", "2d"): "2d",
     ("arch", "3d"): "grillage3d",
     ("truss", "2d"): "2d",
@@ -130,7 +132,31 @@ SHAPE_LABELS = {
 
 # ---------------------------------------------------------------- 参数默认值
 
+# 程序口径，不是规范条文：主跨达到这个值的悬臂斜拉改走非线性施工阶段。
+# 短于它的仍走线性；句子里写「线性施工」可以强制保持线性。
+CABLE_STAYED_LARGE_SPAN_M = 400.0
+
 DEFAULTS: dict[str, dict[str, Any]] = {
+    "ps_beam": {
+        "length": 10.0,
+        "n_seg": 2,
+        "P_kN": 1000.0,
+        "e": 0.0,
+        "s": -0.3,
+        "loss": 1.0,
+        "E": 2.0e11,
+        "A": 0.01,
+        "I": 0.01,
+        "creep_phi": 0.0,
+        "creep_chi": 0.8,
+        "shrinkage_ecs": 0.0,
+        "support": "simple",
+        "Ap_mm2": 0.0,
+        "fpk_MPa": 1860.0,
+        "lane_q_kNpm": 0.0,
+        "lane_code": "",
+        "lane_impact": 1.0,
+    },
     "beam": {
         "name": "未命名模型",
         "length": 30.0,
@@ -191,6 +217,8 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "panel": 8.0,
         "staged": False,                    # 生成悬臂施工 + 张拉阶段序列
         "retune": True,                     # 合拢后二次调索到成桥目标
+        # 悬臂施工默认仍走线性阶段。主跨达到 CABLE_STAYED_LARGE_SPAN_M 时自动改非线性。
+        "nonlinear_stages": False,
     },
     # 2D 平面斜拉桥：与三维共用同一套工程参数（Lm/Ls/Ht/n/q/A），主梁降成一条
     # 平面梁线、扇形索面压进 x-y 平面。塔梁固结体系，无 method/fpu/retune（三维
@@ -274,6 +302,35 @@ DEFAULTS: dict[str, dict[str, Any]] = {
 
 Field = dict[str, Any]
 FIELDS: dict[str, list[list[Field]]] = {
+    "ps_beam": [
+        [
+            {"key": "length", "label": "跨度 (m)", "type": "float",
+             "min": 5.0, "max": 80.0, "step": 1.0},
+            {"key": "support", "label": "支承", "type": "choice",
+             "choices": ["simple", "cantilever"],
+             "fmt": {"simple": "简支", "cantilever": "悬臂"}},
+            {"key": "P_kN", "label": "张拉力 (kN)", "type": "float",
+             "min": 100.0, "max": 20000.0, "step": 50.0},
+            {"key": "s", "label": "矢高 (m，下缘为负)", "type": "float",
+             "min": -2.0, "max": 2.0, "step": 0.05},
+            {"key": "e", "label": "端部偏心 (m，下缘为负)", "type": "float",
+             "min": -1.5, "max": 1.5, "step": 0.05},
+            {"key": "Ap_mm2", "label": "钢束面积 (mm²，0 不校核)", "type": "float",
+             "min": 0.0, "max": 20000.0, "step": 10.0},
+        ],
+        [
+            {"key": "loss", "label": "有效系数", "type": "float",
+             "min": 0.5, "max": 1.0, "step": 0.01},
+            {"key": "n_seg", "label": "梁段数", "type": "int",
+             "min": 2, "max": 8, "step": 1},
+            {"key": "creep_phi", "label": "徐变系数 φ", "type": "float",
+             "min": 0.0, "max": 5.0, "step": 0.1},
+            {"key": "shrinkage_ecs", "label": "收缩应变", "type": "float",
+             "min": 0.0, "max": 0.002, "step": 0.00005},
+            {"key": "lane_q_kNpm", "label": "车道均布 (kN/m，向下)", "type": "float",
+             "min": 0.0, "max": 50.0, "step": 0.5},
+        ],
+    ],
     "beam": [
         [
             {"key": "length", "label": "跨度 L (m)", "type": "float",
@@ -440,6 +497,8 @@ FIELDS: dict[str, list[list[Field]]] = {
              "min": 0.0, "max": 200.0, "step": 5.0,
              "when": lambda p: p.get("staged")},
             {"key": "retune", "label": "合拢后二次调索", "type": "bool",
+             "when": lambda p: p.get("staged")},
+            {"key": "nonlinear_stages", "label": "非线性施工阶段", "type": "bool",
              "when": lambda p: p.get("staged")},
         ],
     ],
@@ -641,8 +700,11 @@ class Diag:
 
 
 _DIM_3D_RE = re.compile(
-    r"三维|空间|梁格|空间梁格|空间效应|空间刚架|偏载|扭转|横向分布|双索面|横梁|3d",
+    r"三维|空间|梁格|空间梁格|空间效应|空间刚架|偏载|扭转|横向分布|横梁|3d",
     re.I)
+_DUAL_PLANE_RE = re.compile(r"双索面|两索面|双缆面|双主缆")
+_FLOATING_RE = re.compile(r"半漂浮|漂浮体系|纵向漂浮")
+_FIXED_RE = re.compile(r"塔梁固结|固结体系")
 
 
 def _classify_kind(text: str, hint: str | None = None) -> str:
@@ -678,6 +740,9 @@ def _classify_kind(text: str, hint: str | None = None) -> str:
         return "arch_3d"
     if re.search(r"斜拉|拉索桥|斜拉索", t):
         return "cable_stayed"
+    # 预应力梁也会写「矢高」。这不是拱。斜拉、悬索、拱桥自己的预应力仍留给原桥型。
+    if re.search(r"预应力|钢束|预加力", t) and not re.search(r"拱肋|拱桥|斜拉|悬索", t):
+        return "beam"
     # 「矢高」「矢跨比」在悬索桥里也用，但悬索已经先一步判掉了，
     # 落到这里的基本都是真拱桥。
     if re.search(r"拱|矢高|矢跨比", t):
@@ -704,7 +769,8 @@ def classify_dimension(text: str, kind: str) -> str:
     if kind in ("grillage3d", "arch_3d"):
         return "3d"
     # 斜拉桥/悬索桥：档三已补 2D 平面索面建造器，默认 2d；只有显式三维词
-    # （空间/双索面/偏载/扭转/横向分布…）才转 3d。
+    # （空间/偏载/扭转/横向分布…）才转 3d。「双索面」不在这份词表里：
+    # 它表示第二索面，当前建造器做不出来，由 validate() 拒绝，而不是当成三维。
     return "2d"
 
 
@@ -786,6 +852,8 @@ class ModelDoc:
             self._model = self._build_cable_stayed_2d()
         elif bk == "suspension_2d":
             self._model = self._build_suspension_2d()
+        elif bk == "ps_beam":
+            self._model = self._build_ps_beam()
         else:
             self._model = self._build_beam_bridge()
         return self
@@ -814,8 +882,98 @@ class ModelDoc:
 
     @property
     def solver_kind(self) -> str:
-        """标称内核键。真正的内核由 `detect_kind(model)` 依模型内容定。"""
+        """实际求解内核键。三维按模型内容判定，与 `solve()` 同一条路由。
+
+        悬臂施工的斜拉桥不挂 `cable_bridge`，走线性阶段内核；成桥斜拉和悬索
+        走 `cable_solver`。界面若仍用名义键，会把线性结果藏起来，或把 exe
+        名称写成几何非线性求解器。
+        """
+        if self.is_3d:
+            from solver_3d import detect_kind
+
+            return detect_kind(self.model)
         return SOLVER_OF.get((self.kind, self.dimension), "2d")
+
+    def _build_ps_beam(self):
+        """一跨梁加一束预应力。简支曲线束的跨中上拱、悬臂直线束的自由端挠度各对得上闭式解。"""
+        from model_spec_3d import (
+            Boundary3D, Element3D, ElemTypeDef3D, Material3D, ModelSpec3D,
+            Lane3D, Node3D, Prestress3D, RealConst3D, Stage3D,
+        )
+
+        p = self.params
+        L = float(p["length"])
+        n = max(2, int(p.get("n_seg") or 2))
+        E = float(p.get("E") or 2.0e11)
+        A = float(p.get("A") or 0.01)
+        I = float(p.get("I") or 0.01)
+        nodes = [Node3D(id=i + 1, x=L * i / n, y=0.0, z=0.0) for i in range(n + 1)]
+        elements = [Element3D(id=i + 1, etype=1, n1=i + 1, n2=i + 2) for i in range(n)]
+        cantilever = p.get("support") == "cantilever"
+        if cantilever:
+            # 固端约束全部 6 个自由度。其余节点只锁出平面，竖向和绕 y 转动留着。
+            bounds = [Boundary3D(node=1, dofs=(1, 6))]
+            for i in range(2, n + 2):
+                bounds.append(Boundary3D(node=i, dofs=(2, 2)))
+                bounds.append(Boundary3D(node=i, dofs=(4, 4)))
+                bounds.append(Boundary3D(node=i, dofs=(6, 6)))
+        else:
+            bounds = [
+                Boundary3D(node=1, dofs=(1, 3)),
+                Boundary3D(node=1, dofs=(4, 4)),
+                Boundary3D(node=1, dofs=(6, 6)),
+                Boundary3D(node=n + 1, dofs=(2, 3)),
+                Boundary3D(node=n + 1, dofs=(4, 4)),
+                Boundary3D(node=n + 1, dofs=(6, 6)),
+            ]
+            for i in range(2, n + 1):
+                bounds.append(Boundary3D(node=i, dofs=(2, 2)))
+                bounds.append(Boundary3D(node=i, dofs=(4, 4)))
+                bounds.append(Boundary3D(node=i, dofs=(6, 6)))
+        ap_mm2 = float(p.get("Ap_mm2") or 0.0)
+        tendon = Prestress3D(
+            elems=list(range(1, n + 1)),
+            P=float(p["P_kN"]) * 1e3,
+            e=float(p.get("e") or 0.0),
+            s=float(p.get("s") or 0.0),
+            loss=float(p.get("loss") or 1.0),
+            Ap=ap_mm2 * 1e-6,
+            fpk=float(p.get("fpk_MPa") or 1860.0) * 1e6,
+        )
+        stages = [Stage3D(id=1, activate=list(range(1, n + 1)), prestress=[tendon])]
+        dphis = [float(x) for x in (p.get("creep_dphis") or [])]
+        if not dphis and float(p.get("creep_dphi") or 0.0):
+            dphis = [float(p["creep_dphi"])]
+        for i, dphi in enumerate(dphis, start=2):
+            if dphi:
+                stages.append(Stage3D(id=i, creep_dphi=dphi))
+        lane_q = float(p.get("lane_q_kNpm") or 0.0)
+        impact = float(p.get("lane_impact") or 1.0)
+        lanes = []
+        if p.get("lane_code") == "JTG_D60":
+            # qk、Pk 由内核按跨径填写。冲击只在句子写了系数时乘上。
+            lanes.append(Lane3D(
+                nodes=[nd.id for nd in nodes], code="JTG_D60", dof=3,
+                impact=impact))
+        elif lane_q:
+            # 正值向下。内核里沿 +z 为正，所以均布写成负号。
+            lanes.append(Lane3D(
+                nodes=[nd.id for nd in nodes], q=-lane_q * 1e3, p=0.0, dof=3,
+                impact=impact))
+        return ModelSpec3D(
+            title="预应力悬臂梁" if cantilever else "预应力简支梁",
+            nodes=nodes,
+            materials=[Material3D(id=1, E=E, dens=float(p.get("dens") or 2500.0))],
+            reals=[RealConst3D(id=1, A=A, IY=I, IZ=I, J=max(I * 0.01, 1e-6), G=E / 2.6)],
+            etypes=[ElemTypeDef3D(id=1, kind="BEAM", mat=1, real=1)],
+            elements=elements,
+            boundaries=bounds,
+            stages=stages,
+            creep_phi=float(p.get("creep_phi") or 0.0),
+            creep_chi=float(p.get("creep_chi") or 0.8),
+            shrinkage_ecs=float(p.get("shrinkage_ecs") or 0.0),
+            lanes=lanes,
+        )
 
     def _build_beam(self) -> ModelSpec:
         p = self.params
@@ -919,6 +1077,7 @@ class ModelDoc:
             method=str(p.get("method", "DECK")),
             staged=bool(p.get("staged", False)),
             retune=bool(p.get("retune", True)),
+            system=str(p.get("system") or "semi"),
         )
         # 派生量挂在外壳上：界面要支座 x 才能画红虚线，而 pydantic 契约里
         # 不该出现这种"只给界面用"的字段。
@@ -1060,7 +1219,17 @@ class ModelDoc:
         except Exception as e:                       # 参数缺失/类型错
             return [f"模型参数不完整或非法：{e}"]
 
-        if self.kind == "beam":
+        if self.builder_key == "ps_beam":
+            p = self.params
+            if float(p.get("length") or 0) <= 0:
+                errs.append("跨度必须大于 0")
+            if float(p.get("P_kN") or 0) <= 0:
+                errs.append("张拉力必须大于 0")
+            loss = float(p.get("loss") or 0)
+            if not 0 < loss <= 1:
+                errs.append("预应力有效系数必须在 (0, 1]")
+            errs.extend(self.warnings_3d())
+        elif self.kind == "beam":
             m: ModelSpec = self._model
             if m.length <= 0:
                 errs.append("跨度必须大于 0")
@@ -1112,6 +1281,14 @@ class ModelDoc:
         """
         p = self.params
         e: list[str] = []
+        if int(p.get("cable_planes") or 1) > 1:
+            e.append("当前只建立单索面。描述里的「双索面」不会生成第二索面和横梁，"
+                     "请改为「单索面」后再计算。")
+        if p.get("system_conflict"):
+            e.append("悬臂施工与半漂浮成桥不能写在同一次计算里。"
+                     "内核不能在合拢后解除塔梁临时固结。"
+                     "请只保留一种体系：悬臂施工按塔梁固结贯穿全程，"
+                     "或单独计算半漂浮成桥。")
 
         def pos(key: str, label: str) -> float:
             v = p.get(key)
@@ -1276,19 +1453,33 @@ class ModelDoc:
         if self.is_3d:
             # 三维只有一条路：三维内核。没有 anastruct 草算，也没有第三方互校。
             try:
-                from solver_3d import capabilities
+                from solver_3d import capabilities, detect_kind
 
-                ok3d = bool(capabilities().get(self.solver_kind))
+                sk = detect_kind(self.model)
+                ok3d = bool(capabilities().get(sk))
+                nonlinear = sk in ("cable_stayed", "suspension")
             except Exception:
                 ok3d = False
+                nonlinear = False
+            has_cable = (self.kind in ("cable_stayed", "suspension")
+                         or self.builder_key == "arch_3d")
+            if (self.kind == "cable_stayed" and self.params.get("staged")
+                    and self.params.get("nonlinear_stages")):
+                nonlinear = True
+                try:
+                    from fem_eigen_stage_nl import find_stage_nl_exe
+                    find_stage_nl_exe()
+                    ok3d = True
+                except Exception:
+                    ok3d = False
             return {
                 "anastruct": False,
-                "fem_eigen": ok3d,          # 三维内核是否可用
+                "fem_eigen": ok3d,          # 实际内核是否可用
                 "matplotlib": False,
                 "cross_check": False,
                 "solve3d": ok3d,
-                "cable": self.kind == "cable_stayed",
-                "nonlinear": self.kind == "cable_stayed",
+                "cable": has_cable,
+                "nonlinear": nonlinear,
             }
 
         fem = fem_eigen_available()
@@ -1304,8 +1495,9 @@ class ModelDoc:
             "solve3d": False,
             # 二维桥型（梁桥/拱桥/桁架）走 solve_2d 链：施工阶段 + 车道 + 组合
             "solve2d": (not is_beam) and solve_2d_available(),
-            "cable": False,
-            "nonlinear": False,
+            "cable": self.kind in ("cable_stayed", "suspension"),
+            "nonlinear": str(getattr(self.model, "analysis", "LINEAR")).upper()
+                         == "NONLINEAR",
         }
 
     def solve(self, out_dir: str | Path | None = None, dat_name: str | None = None):
@@ -1319,6 +1511,14 @@ class ModelDoc:
             from solver_3d import solve as solve_3d_model
 
             out = out_dir or Path("out") / self.kind
+            # 悬臂斜拉默认仍走线性阶段。显式打开非线性施工阶段时，改用共转
+            # 全量平衡；结果 kind 仍是 grillage3d，界面不会把结果藏起来。
+            if (self.kind == "cable_stayed" and self.params.get("staged")
+                    and self.params.get("nonlinear_stages")):
+                from fem_eigen_stage_nl import solve_staged_result
+
+                return solve_staged_result(
+                    self.model, out_dir=out, dat_name=dat_name or "stage_nl.dat")
             # 不硬传 kind：悬臂施工的斜拉桥（staged）摘掉了 cable_bridge，按
             # detect_kind 该走线性阶段内核（grillage3d），而不是成桥态内核
             # （cable_stayed）。内核键由模型自述决定，不靠 self.kind 猜。
@@ -1339,6 +1539,49 @@ class ModelDoc:
     def summary(self) -> dict[str, Any]:
         """给界面渲染的摘要：标题 + 若干行文本。"""
         self.build()
+        if self.builder_key == "ps_beam":
+            p = self.params
+            s = float(p.get("s") or 0)
+            cantilever = p.get("support") == "cantilever"
+            if cantilever and not s:
+                camber = "直线束作用在悬臂自由端，挠度对得上 Pe·e·L²/(2EI)。筋在下缘时自由端下挠。"
+            elif cantilever:
+                camber = ("两段悬臂时，自由端挠度对得上 Pe·s·L²/(4EI)。"
+                          "矢高向下时自由端下挠，不是简支梁那种上拱。")
+            else:
+                camber = "两段离散时，跨中上拱对得上 −Pe·s·L²/(12EI)；再细分会趋近均布荷载挠度。"
+            lines = [
+                f"跨度 {float(p['length']):g} m，{int(p.get('n_seg') or 2)} 段，"
+                + ("悬臂" if cantilever else "简支"),
+                f"张拉力 {float(p['P_kN']):g} kN，有效系数 {float(p['loss']):g}",
+                ("曲线束，矢高 "
+                 + f"{s:g} m（负值表示跨中筋更低）"
+                 if s else
+                 f"直线束，端部偏心 {float(p.get('e') or 0):g} m"),
+                (f"钢束面积 {float(p.get('Ap_mm2') or 0):g} mm²，"
+                 f"fpk {float(p.get('fpk_MPa') or 1860):g} MPa"
+                 if float(p.get("Ap_mm2") or 0) > 0 else
+                 "未给钢束面积，不做张拉控制应力校核"),
+                camber,
+            ]
+            if p.get("lane_code") == "JTG_D60" and not cantilever:
+                factor = float(p.get("lane_impact") or 1.0)
+                shock = (f"已乘手写冲击放大 {factor:g}。"
+                         if factor != 1.0 else
+                         "未写冲击系数，按竖向基频自动计算 μ。")
+                lines.append(
+                    "车道按 JTG D60：qk=10.5 kN/m，Pk 随跨径内插。"
+                    "两段简支梁跨中 MyMin 对得上 −(qk L²/8 + Pk L/4)。" + shock)
+            elif float(p.get("lane_q_kNpm") or 0) > 0 and not cantilever:
+                lines.append(
+                    f"车道均布 {float(p['lane_q_kNpm']):g} kN/m 向下。"
+                    "两段简支梁跨中弯矩包络的 MyMin 对得上 −qL²/8。")
+            elif float(p.get("lane_q_kNpm") or 0) > 0 and cantilever:
+                lines.append(
+                    f"车道均布 {float(p['lane_q_kNpm']):g} kN/m 向下。"
+                    "两段悬臂固端 MyMax 在计入自动冲击后对得上 (1+μ)qL²/2。")
+            return {"title": "预应力悬臂梁" if cantilever else "预应力简支梁",
+                    "lines": lines}
         if self.kind == "beam":
             lines = self._model.summary().splitlines()
             return {"title": KIND_LABELS[self.kind], "lines": lines}
@@ -1371,6 +1614,18 @@ class ModelDoc:
                 + " m")
             lines.append(f"定索力方法：{info.get('tension_method', '—')}"
                          "（DECK = 按恒载竖向分配）")
+            sys_name = "塔梁固结" if info.get("system") == "fixed" else "半漂浮"
+            lines.append(f"结构体系：{sys_name}。索面：单索面。")
+            if info.get("staged"):
+                if self.params.get("nonlinear_stages"):
+                    lines.append(
+                        "施工与成桥使用同一套塔梁固结约束。"
+                        "求解走非线性施工阶段：每个阶段是全量平衡，"
+                        "索力由无应力索长命中。")
+                else:
+                    lines.append(
+                        "施工与成桥使用同一套塔梁固结约束。"
+                        "本模型走线性阶段内核，不是成桥几何非线性。")
         elif self.builder_key == "arch_3d":
             info = self.info
             lines.append(
@@ -1465,6 +1720,10 @@ class ModelDoc:
         if dim_hint in DIM_LABELS:
             dimension = dim_hint
 
+        if kind == "beam" and re.search(r"预应力|钢束|预加力", text):
+            params, notes = extract_ps_beam_params(text)
+            return cls("beam", params, dimension="3d"), "rule(预应力梁)", Diag(notes=notes)
+
         if kind == "beam":
             from nl_parser import parse_nl
 
@@ -1554,6 +1813,233 @@ def _keep_solver_opts(prev: "ModelDoc | None", kind: str,
     return out
 
 
+def creep_phi_from_age(t_days: float, t0_days: float = 7.0, phi0: float = 2.0,
+                       beta_h: float = 700.0, power: float = 0.3) -> float:
+    """与 FEM-Eigen 二维内核 creepCoefficientAt 的简化曲线相同。
+
+    φ = φ0 · [(t−t0)/(βH + t−t0)]^power。阶段求解用相邻龄期的差值，不在这里一次乘完。
+    """
+    dt = max(0.0, float(t_days) - float(t0_days))
+    return float(phi0) * (dt / (beta_h + dt)) ** power
+
+
+def extract_ps_beam_params(text: str) -> tuple[dict[str, Any], list[str]]:
+    """一跨梁上的一束预应力。只抽参数，网格由 build 展开。
+
+    矢高向下（跨中筋更低）记为负，简支梁上这是产生上拱的方向。
+    两段简支梁时跨中挠度对得上 −Pe·s·L²/(12EI)。
+    悬臂梁的直线束自由端挠度对得上 Pe·e·L²/(2EI)。
+    两段悬臂的曲线束自由端挠度对得上 Pe·s·L²/(4EI)，矢高向下时向下。
+    """
+    p: dict[str, Any] = {}
+    notes: list[str] = []
+    if re.search(r"悬臂", text) and not re.search(r"悬臂施工", text):
+        p["support"] = "cantilever"
+        notes.append("按悬臂梁建模：一端固结，另一端自由。直线束筋在下缘时自由端下挠。")
+    else:
+        p["support"] = "simple"
+    m = re.search(r"(?:跨度|梁长)\s*([0-9.]+)\s*(?:米|m)?", text)
+    if not m:
+        m = re.search(r"([0-9.]+)\s*(?:米|m)\s*(?:的)?(?:简支|悬臂)?梁", text)
+    if m:
+        length = float(m.group(1))
+        if length > 1000:
+            length /= 1000.0
+            notes.append(f"跨度疑为毫米，已按 {length:g} m 处理")
+        p["length"] = length
+    else:
+        p["length"] = 10.0
+        notes.append("未说明跨度，默认 10 m")
+    m = re.search(
+        r"(?:张拉力|预加力)\s*([0-9.]+)\s*(MN|兆牛|kN|KN|千牛|N|牛)?", text, re.I)
+    if m:
+        val = float(m.group(1))
+        unit = (m.group(2) or "").lower()
+        if unit in ("mn", "兆牛"):
+            p["P_kN"] = val * 1000.0
+        elif unit in ("n", "牛"):
+            p["P_kN"] = val / 1000.0
+        else:
+            p["P_kN"] = val
+    else:
+        p["P_kN"] = 1000.0
+        notes.append("未说明张拉力，默认 1000 kN")
+    m = re.search(r"矢高\s*([0-9.]+)\s*(?:米|m)?", text)
+    if m:
+        sag = float(m.group(1))
+        if re.search(r"向上|上缘", text):
+            p["s"] = sag
+        else:
+            p["s"] = -sag
+            if p.get("support") == "cantilever":
+                notes.append("矢高向下（跨中筋更低），记为负值。两段悬臂的自由端下挠。")
+            else:
+                notes.append("矢高向下（跨中筋更低），记为负值，产生上拱")
+    elif re.search(r"直线", text):
+        p["s"] = 0.0
+    else:
+        p["s"] = -0.3
+        notes.append("未说明矢高，按曲线束默认 0.3 m 向下")
+    m = re.search(r"偏心\s*([0-9.]+)\s*(?:米|m)?", text)
+    if m:
+        ecc = float(m.group(1))
+        p["e"] = -ecc if re.search(r"下缘", text) else ecc
+    else:
+        p["e"] = 0.0
+    p["loss"] = 1.0
+    m_ap = re.search(
+        r"(?:钢束面积|束面积|预应力面积)\s*([0-9.]+)\s*"
+        r"(mm²|mm2|平方毫米|cm²|cm2|平方厘米|m²|m2|平方米)?",
+        text, re.I)
+    if m_ap:
+        aval = float(m_ap.group(1))
+        unit = (m_ap.group(2) or "").lower().replace("²", "2")
+        if unit in ("m2", "平方米"):
+            p["Ap_mm2"] = aval * 1e6
+        elif unit in ("cm2", "平方厘米"):
+            p["Ap_mm2"] = aval * 100.0
+        elif unit in ("mm2", "平方毫米"):
+            p["Ap_mm2"] = aval
+        elif aval >= 1.0:
+            p["Ap_mm2"] = aval
+            notes.append(f"钢束面积未写单位，{aval:g} 按 mm² 计")
+        else:
+            p["Ap_mm2"] = aval * 1e6
+            notes.append(f"钢束面积 {aval:g} 小于 1，按 m² 换算成 {p['Ap_mm2']:g} mm²")
+    else:
+        p["Ap_mm2"] = 0.0
+    m_fpk = re.search(
+        r"(?:fpk|抗拉强度标准值)\s*([0-9.]+)\s*(?:MPa|兆帕)?", text, re.I)
+    if m_fpk:
+        p["fpk_MPa"] = float(m_fpk.group(1))
+    else:
+        p["fpk_MPa"] = 1860.0
+        if p["Ap_mm2"] > 0:
+            notes.append("钢绞线强度未说明，张拉控制应力上限按 1860 MPa 的 0.75 倍")
+    if re.search(r"公路桥涵车道|JTG\s*D60|规范车道", text, re.I):
+        p["lane_code"] = "JTG_D60"
+        notes.append(
+            "车道按 JTG D60-2015：qk=10.5 kN/m，Pk 在 5 m 与 50 m 之间线性内插。")
+    else:
+        p["lane_code"] = ""
+    m_lane = re.search(
+        r"车道(?:均布|荷载|活载)?\s*([0-9.]+)\s*"
+        r"(?:kN/m|kn/m|千牛每米|千牛/米)?",
+        text, re.I)
+    if m_lane:
+        p["lane_q_kNpm"] = float(m_lane.group(1))
+        notes.append(
+            f"车道均布 {p['lane_q_kNpm']:g} kN/m，向下。"
+            "活载弯矩按影响线单独包络，不加进预应力位移。")
+    else:
+        p["lane_q_kNpm"] = 0.0
+    m_mu = re.search(r"(?:汽车)?冲击系数\s*([0-9.]+)", text)
+    if m_mu:
+        raw_mu = float(m_mu.group(1))
+        if raw_mu > 1.0:
+            p["lane_impact"] = raw_mu
+            notes.append(f"冲击系数 {raw_mu:g} 大于 1，按放大倍数 1+μ 使用。")
+        else:
+            p["lane_impact"] = 1.0 + raw_mu
+            notes.append(
+                f"冲击系数 μ={raw_mu:g}，车道荷载乘 {p['lane_impact']:g}。")
+    else:
+        p["lane_impact"] = 1.0
+    if (p["lane_code"] == "JTG_D60" or p["lane_q_kNpm"]) and p["lane_impact"] == 1.0:
+        if not re.search(r"密度\s*[0-9.]+", text):
+            p["dens"] = 2500.0
+            notes.append("未写密度，按 2500 kg/m³ 计算竖向基频。")
+        notes.append("未写冲击系数，μ 按 JTG D60 由竖向基频自动计算。")
+    p["n_seg"] = 2
+    p["E"] = 2.0e11
+    p["A"] = 0.01
+    p["I"] = 0.01
+    dphis = [float(x) for x in re.findall(r"徐变增量\s*([0-9.]+)", text)]
+    p["creep_dphis"] = dphis
+    p["creep_dphi"] = dphis[0] if dphis else 0.0
+    if dphis:
+        where = "自由端挠度" if p.get("support") == "cantilever" else "上拱"
+        factor = 1.0 + sum(dphis)
+        seq = "、".join(f"{v:g}" for v in dphis)
+        notes.append(
+            f"先按弹性模量张拉，再依次施加徐变增量 Δφ={seq}。"
+            f"静定梁最终{where}约为瞬时值的 {factor:g} 倍。"
+            "后一次增量仍按张拉完成时的内力计算，不把上一次的徐变位移再当成应力。"
+            "轴力和弯矩保持张拉完成时的值，不再把整段加载乘 1+χφ。")
+    m_phi = re.search(r"徐变系数\s*([0-9.]+)", text)
+    m_t = re.search(r"(?:计算龄期|目标龄期)\s*([0-9.]+)\s*(?:天|日)?", text)
+    if not m_t:
+        m_t = re.search(r"(?<!加载)(?<!张拉)龄期\s*([0-9.]+)\s*(?:天|日)?", text)
+    m_t0 = re.search(r"(?:加载龄期|张拉龄期)\s*([0-9.]+)\s*(?:天|日)?", text)
+    if dphis:
+        p["creep_phi"] = 0.0
+    elif m_phi:
+        p["creep_phi"] = float(m_phi.group(1))
+        notes.append(
+            f"徐变按全模型一个系数 φ={p['creep_phi']:g}，老化系数 χ 默认 0.8。"
+            "刚度折成 E/(1+χφ)，位移约放大到 1+χφ 倍。"
+            "这不是按应力历史逐阶段累加的徐变。")
+    elif m_t:
+        t0 = float(m_t0.group(1)) if m_t0 else 7.0
+        p["creep_phi"] = creep_phi_from_age(float(m_t.group(1)), t0)
+        notes.append(
+            f"由计算龄期 {float(m_t.group(1)):g} 天、加载龄期 {t0:g} 天，"
+            f"按简化曲线得到 φ={p['creep_phi']:.3f}（φ0=2，βH=700，指数 0.3）。"
+            "再按 1+χφ 放大位移。这不是逐阶段应力历史徐变。")
+    else:
+        p["creep_phi"] = 0.0
+    m = re.search(r"老化系数\s*([0-9.]+)", text)
+    p["creep_chi"] = float(m.group(1)) if m else 0.8
+    m = re.search(r"收缩应变\s*([0-9.]+(?:e-?[0-9]+)?)", text, re.I)
+    if m:
+        p["shrinkage_ecs"] = float(m.group(1))
+        notes.append(
+            f"自由收缩应变 {p['shrinkage_ecs']:g}，正值表示缩短。"
+            "只在单元进入模型时施加一次，轴向缩短约 ε·L，不随徐变系数或徐变增量再乘。")
+    else:
+        p["shrinkage_ecs"] = 0.0
+    notes.append("截面暂用基准梁 E=200 GPa、I=0.01 m⁴，便于和 −Pe·s·L²/(12EI) 对拍")
+    return p, notes
+
+
+def _note_cable_planes(text: str, p: dict[str, Any], notes: list[str]) -> None:
+    """双索面不是维度开关。当前建造器只有一个索面，写了就拒绝求解。"""
+    if _DUAL_PLANE_RE.search(text):
+        p["cable_planes"] = 2
+        notes.append("描述写了双索面。当前建造器只生成单索面，不会生成第二索面和横梁。"
+                     "请改成「单索面」后再计算。")
+    else:
+        p["cable_planes"] = 1
+
+
+def _note_cable_system(text: str, p: dict[str, Any], notes: list[str],
+                       *, is_2d: bool) -> None:
+    """悬臂施工与成桥必须是同一套约束。合拢后不能改成半漂浮。"""
+    wants_float = bool(_FLOATING_RE.search(text))
+    wants_fixed = bool(_FIXED_RE.search(text))
+    if is_2d:
+        p["system"] = "fixed"
+        if p.get("staged") and wants_float:
+            p["system_conflict"] = True
+            notes.append("二维平面模型按塔梁固结建立，不能在悬臂施工之后改成半漂浮。")
+        elif wants_float:
+            notes.append("二维平面斜拉桥按塔梁固结建立，不按半漂浮。"
+                         "半漂浮成桥请使用三维模型，并且不要同时写悬臂施工。")
+        return
+    if p.get("staged") and wants_float:
+        p["system"] = "fixed"
+        p["system_conflict"] = True
+        notes.append("悬臂施工与半漂浮成桥不能写在同一次计算里。"
+                     "内核不能在合拢后解除塔梁临时固结。")
+    elif p.get("staged") or wants_fixed:
+        p["system"] = "fixed"
+        notes.append("结构体系按塔梁固结。悬臂施工与成桥使用同一套约束，合拢后不解除。")
+    else:
+        p["system"] = "semi"
+        if wants_float:
+            notes.append("结构体系按半漂浮成桥，不进入悬臂施工阶段。")
+
+
 def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
     """三维（及 2D 索承体系）的规则解析：只抽参数、不建造。
 
@@ -1589,6 +2075,7 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
         notes.append(f"未说明{label}，默认 {d[key]:g}")
 
     if base == "cable_stayed":
+        _note_cable_planes(text, p, notes)
         if not grab("Lm", "主跨", "跨径", "主孔"):
             if grab("Lm", "跨度", "总长", "全长"):
                 notes.append(f"只给了一个跨度，按主跨 {p['Lm']:g} m 处理")
@@ -1635,6 +2122,25 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
                          "→ 二期铺装" + ("" if is_2d else "+二次调索") + "」阶段序列")
         else:
             p["staged"] = d["staged"]
+        if (not is_2d) and re.search(r"非线性施工|几何非线性施工", text):
+            p["staged"] = True
+            p["nonlinear_stages"] = True
+            notes.append("识别到非线性施工：悬臂阶段改用共转全量平衡，"
+                         "索力由无应力索长命中。")
+        elif ((not is_2d) and p.get("staged")
+              and float(p.get("Lm") or 0.0) >= CABLE_STAYED_LARGE_SPAN_M):
+            if re.search(r"线性施工|线性阶段", text):
+                p["nonlinear_stages"] = False
+                notes.append(
+                    f"主跨达到 {CABLE_STAYED_LARGE_SPAN_M:g} m，但写明了线性施工，"
+                    "仍走线性阶段。")
+            else:
+                p["nonlinear_stages"] = True
+                notes.append(
+                    f"主跨达到 {CABLE_STAYED_LARGE_SPAN_M:g} m，悬臂施工改用非线性阶段。"
+                    f"短于 {CABLE_STAYED_LARGE_SPAN_M:g} m 仍走线性阶段；"
+                    "写「线性施工」可以强制保持线性。")
+        _note_cable_system(text, p, notes, is_2d=is_2d)
         # 二期恒载（铺装+护栏）：单独给出才拆分 q1=q−q2，否则二期=0 全算一期。
         m2 = re.search(r"二期(?:恒载|铺装|荷载|桥面)?\s*"
                        r"([0-9]+(?:\.[0-9]+)?)\s*(?:kN/m|kN|kn/m|KN/m)", text)
@@ -1645,6 +2151,7 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
             p["q2_deck"] = d["q2_deck"]
         p["retune"] = d.get("retune", True)
     elif base == "suspension":
+        _note_cable_planes(text, p, notes)
         # 体系：只有两个选项，关键词足够，不必等 LLM。同时接受"锚在梁上"
         # 这类说法——用户描述体系时往往不说"自锚"三个字。
         if re.search(r"自锚|锚在梁|锚于梁|锚在加劲梁", text):
