@@ -209,7 +209,8 @@ def main() -> int:
     # ---------------------------------------------------------- ⑦ ModelDoc 3D
     print("\n[⑦ ModelDoc 的三维类型]")
     for txt, want in (
-        ("双塔三跨斜拉桥，主跨200米，边塔60米", ("cable_stayed", "3d")),
+        ("双索面空间斜拉桥，主跨200米，边跨80米", ("cable_stayed", "3d")),
+        ("双塔三跨斜拉桥，主跨200米，边跨80米", ("cable_stayed", "2d")),
         ("三跨连续箱梁，边跨30米中跨50米", ("beam_bridge", "3d")),
         ("空间梁格法分析三跨连续箱梁", ("beam_bridge", "3d")),
     ):
@@ -217,7 +218,7 @@ def main() -> int:
         check(f"识别「{txt[:12]}…」", (d.kind, d.dimension) == want,
               f"{d.kind}×{d.dimension} / {src}")
 
-    doc = ModelDoc("cable_stayed")
+    doc = ModelDoc("cable_stayed", dimension="3d")
     doc.build()
     check("doc.validate() 干净", not doc.validate(), str(doc.validate())[:40])
     check("三维 capability 自述",
@@ -237,7 +238,7 @@ def main() -> int:
         ("单索面积写成 cm²", {"A": 60.0}),
     ]
     for label, patch in bad_docs:
-        dd = ModelDoc("cable_stayed", patch)
+        dd = ModelDoc("cable_stayed", patch, dimension="3d")
         errs = dd.validate()
         check(f"拦下「{label}」", bool(errs), errs[0][:40] if errs else "未拦下")
 

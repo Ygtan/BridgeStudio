@@ -44,9 +44,9 @@ Kind = Literal["beam", "arch", "truss", "beam_bridge",
 Dimension = Literal["2d", "3d"]
 
 #: (kind, dimension) -> 建造器键（DEFAULTS / FIELDS 的键）。
-#: 桥型 kind 只有 6 种；维度是正交的第二维。建造器键比 kind 多几个三维变体：
-#: grillage3d（梁桥三维梁格）、arch_3d（拱桥三维施工）。
-#: cable_stayed / suspension 的 2d 暂时回退到三维建造器，档三补 2d 简化后替换。
+#: 桥型 kind 只有 6 种；维度是正交的第二维。建造器键比 kind 多几个维度变体：
+#: grillage3d（梁桥三维梁格）、arch_3d（拱桥三维施工）、cable_stayed_2d /
+#: suspension_2d（斜拉/悬索平面索面简化，档三落地）。
 BUILDERS: dict[tuple[str, str], str] = {
     ("beam", "2d"): "beam",
     ("arch", "2d"): "arch",
@@ -54,9 +54,9 @@ BUILDERS: dict[tuple[str, str], str] = {
     ("truss", "2d"): "truss",
     ("beam_bridge", "2d"): "beam_bridge",
     ("beam_bridge", "3d"): "grillage3d",
-    ("cable_stayed", "2d"): "cable_stayed",
+    ("cable_stayed", "2d"): "cable_stayed_2d",
     ("cable_stayed", "3d"): "cable_stayed",
-    ("suspension", "2d"): "suspension",
+    ("suspension", "2d"): "suspension_2d",
     ("suspension", "3d"): "suspension",
 }
 
@@ -192,6 +192,23 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "staged": False,                    # 生成悬臂施工 + 张拉阶段序列
         "retune": True,                     # 合拢后二次调索到成桥目标
     },
+    # 2D 平面斜拉桥：与三维共用同一套工程参数（Lm/Ls/Ht/n/q/A），主梁降成一条
+    # 平面梁线、扇形索面压进 x-y 平面。塔梁固结体系，无 method/fpu/retune（三维
+    # 定索力/破断强度/二次调索在 2D 简化里不单列）。
+    "cable_stayed_2d": {
+        "Lm": 200.0, "Ls": 80.0, "Ht": 60.0,
+        "n": 12,                            # 每塔每侧索数
+        "h": 2.5, "B": 12.0,                # 主梁钢箱
+        "tf": 0.28, "tw": 0.45,             # 翼缘/腹板厚 (m)
+        "q": 100.0,                         # 桥面恒载 (kN/m，= 一期 + 二期)
+        "q2_deck": 0.0,                     # 二期恒载 (kN/m)；0 = 二期为 0
+        "A": 6000.0,                        # 单索面积 (mm²)
+        "tower_b": 3.0, "tower_h": 4.5,
+        "tower_below": 8.0,                 # 塔基在桥面以下 (m)
+        "anchor_low": 0.55,                 # 最低索锚点高度系数（塔高 × 此值）
+        "staged": False,                    # 悬臂施工 + 张拉阶段序列
+        "lane": False,                      # JTG D60 车道活载（2D 索承活载待验）
+    },
     # 悬索桥的默认值刻意让边跨自动：Ls=0 时由建造器按体系定
     # 边跨（自锚式取"锚点主缆水平"的平衡边跨，地锚式取 1/3 主跨）。这不是
     # 偷懒——自锚式的边跨被 V=0 约束死，随手填一个数就会把梁端拔起来。
@@ -214,6 +231,25 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "erection_panels": 2,               # 每次对称吊装的吊点对数
         "lane_count": 3,                    # 横向设计车道数
         "lane_reduction": 0.78,             # 多车道横向折减系数（JTG D60 表 4.3.1-5）
+    },
+    # 2D 平面悬索桥：与三维共用工程参数（system/Lm/Ls/sag/clear/q/A/Ah），主缆按
+    # 抛物线初值、恒载水平力 H=qL²/8f 以 ISTRN 预张。2D 只做成桥态一次静力，无
+    # 施工阶段（erection）/车道数（lane_count）/二期拆分（q2_deck）。
+    "suspension_2d": {
+        "system": "EARTH",                  # EARTH 地锚式 | SELF 自锚式
+        "Lm": 300.0, "Ls": 0.0,             # 0 = 自动（自锚取平衡边跨，地锚取 1/3 主跨）
+        "sag": 10.0,                        # 矢跨比分母（1/10）
+        "clear": 5.0,                       # 跨中主缆至桥面净空 (m)
+        "panel": 10.0,                      # 吊索间距 (m)
+        "sh": True,                         # 边跨是否挂吊索
+        "h": 3.0, "B": 12.0,                # 加劲梁钢箱
+        "tf": 0.028, "tw": 0.020,           # 翼缘/腹板厚 (m)
+        "tower_b": 3.0, "tower_h": 4.0,
+        "tp": 6,                            # 每塔分段数
+        "q": 100.0,                         # 桥面恒载 (kN/m)
+        "A": 60000.0,                       # 单根主缆面积 (mm²)
+        "Ah": 3000.0,                       # 单根吊索面积 (mm²)
+        "lane": False,                      # JTG D60 车道活载（2D 索承活载待验）
     },
     # 大跨钢箱拱桥（拱肋分段吊装 + 斜拉扣索辅助 + 合拢 + 吊杆主梁 + 铺装）。
     # 走 3D 线性阶段内核（cable_bridge=None），与 grillage3d 同一求解链。
@@ -407,6 +443,45 @@ FIELDS: dict[str, list[list[Field]]] = {
              "when": lambda p: p.get("staged")},
         ],
     ],
+    "cable_stayed_2d": [
+        [
+            {"key": "Lm", "label": "主跨 (m)", "type": "float",
+             "min": 100.0, "max": 600.0, "step": 10.0},
+            {"key": "Ls", "label": "边跨 (m)", "type": "float",
+             "min": 30.0, "max": 300.0, "step": 5.0},
+            {"key": "Ht", "label": "塔高 (m)", "type": "float",
+             "min": 20.0, "max": 200.0, "step": 5.0},
+            {"key": "n", "label": "每塔每侧索数", "type": "int",
+             "min": 3, "max": 30, "step": 1},
+        ],
+        [
+            {"key": "h", "label": "主梁高 (m)", "type": "float",
+             "min": 1.2, "max": 6.0, "step": 0.1},
+            {"key": "B", "label": "主梁宽 (m)", "type": "float",
+             "min": 6.0, "max": 30.0, "step": 0.5},
+            {"key": "tf", "label": "顶/底板厚 (m)", "type": "float",
+             "min": 0.01, "max": 1.0, "step": 0.01},
+            {"key": "tw", "label": "腹板厚 (m)", "type": "float",
+             "min": 0.01, "max": 1.0, "step": 0.01},
+        ],
+        [
+            {"key": "q", "label": "桥面恒载 (kN/m)", "type": "float",
+             "min": 20.0, "max": 500.0, "step": 10.0},
+            {"key": "A", "label": "单索面积 (mm²)", "type": "float",
+             "min": 1000.0, "max": 20000.0, "step": 500.0},
+            {"key": "tower_b", "label": "塔柱宽 (m)", "type": "float",
+             "min": 1.5, "max": 10.0, "step": 0.5},
+            {"key": "tower_h", "label": "塔柱深 (m)", "type": "float",
+             "min": 2.0, "max": 12.0, "step": 0.5},
+        ],
+        [
+            {"key": "staged", "label": "悬臂施工 + 张拉", "type": "bool"},
+            {"key": "lane", "label": "JTG D60 车道活载", "type": "bool"},
+            {"key": "q2_deck", "label": "二期恒载 (kN/m)", "type": "float",
+             "min": 0.0, "max": 200.0, "step": 5.0,
+             "when": lambda p: p.get("staged")},
+        ],
+    ],
     "suspension": [
         [
             {"key": "system", "label": "体系", "type": "choice",
@@ -458,6 +533,54 @@ FIELDS: dict[str, list[list[Field]]] = {
             {"key": "erection_panels", "label": "每次对称吊装对数", "type": "int",
              "min": 1, "max": 10, "step": 1,
              "when": lambda p: p.get("erection")},
+        ],
+    ],
+    "suspension_2d": [
+        [
+            {"key": "system", "label": "体系", "type": "choice",
+             "choices": ["EARTH", "SELF"],
+             "fmt": {"EARTH": "地锚式（主缆锚在锚碇）",
+                     "SELF": "自锚式（主缆锚在梁端）"}},
+            {"key": "Lm", "label": "主跨 (m)", "type": "float",
+             "min": 100.0, "max": 1500.0, "step": 10.0},
+            {"key": "Ls", "label": "边跨 (m，0=自动)", "type": "float",
+             "min": 0.0, "max": 500.0, "step": 5.0},
+            {"key": "sag", "label": "矢跨比 1/n", "type": "float",
+             "min": 7.0, "max": 14.0, "step": 0.5},
+        ],
+        [
+            {"key": "h", "label": "加劲梁高 (m)", "type": "float",
+             "min": 1.5, "max": 6.0, "step": 0.1},
+            {"key": "B", "label": "加劲梁宽 (m)", "type": "float",
+             "min": 6.0, "max": 30.0, "step": 0.5},
+            {"key": "tf", "label": "顶/底板厚 (m)", "type": "float",
+             "min": 0.01, "max": 0.1, "step": 0.005},
+            {"key": "tw", "label": "腹板厚 (m)", "type": "float",
+             "min": 0.01, "max": 0.1, "step": 0.005},
+        ],
+        [
+            {"key": "q", "label": "桥面恒载 (kN/m)", "type": "float",
+             "min": 20.0, "max": 500.0, "step": 10.0},
+            {"key": "A", "label": "单根主缆面积 (mm²)", "type": "float",
+             "min": 10000.0, "max": 300000.0, "step": 5000.0},
+            {"key": "Ah", "label": "单根吊索面积 (mm²)", "type": "float",
+             "min": 500.0, "max": 10000.0, "step": 250.0},
+            {"key": "clear", "label": "跨中净空 (m)", "type": "float",
+             "min": 2.0, "max": 30.0, "step": 1.0},
+        ],
+        [
+            {"key": "panel", "label": "吊索间距 (m)", "type": "float",
+             "min": 5.0, "max": 20.0, "step": 1.0},
+            {"key": "tower_b", "label": "塔柱宽 (m)", "type": "float",
+             "min": 1.5, "max": 10.0, "step": 0.5},
+            {"key": "tower_h", "label": "塔柱深 (m)", "type": "float",
+             "min": 2.0, "max": 12.0, "step": 0.5},
+            {"key": "tp", "label": "每塔分段", "type": "int",
+             "min": 3, "max": 12, "step": 1},
+            {"key": "sh", "label": "边跨挂吊索", "type": "bool"},
+        ],
+        [
+            {"key": "lane", "label": "JTG D60 车道活载", "type": "bool"},
         ],
     ],
     "arch_3d": [
@@ -580,9 +703,8 @@ def classify_dimension(text: str, kind: str) -> str:
     # 梁格、大跨拱施工本质是空间问题（其建造器只做三维）。
     if kind in ("grillage3d", "arch_3d"):
         return "3d"
-    # 斜拉桥/悬索桥：档三补 2d 简化建造器后改默认 2d；此前只有三维实现。
-    if kind in ("cable_stayed", "suspension"):
-        return "3d"
+    # 斜拉桥/悬索桥：档三已补 2D 平面索面建造器，默认 2d；只有显式三维词
+    # （空间/双索面/偏载/扭转/横向分布…）才转 3d。
     return "2d"
 
 
@@ -622,8 +744,8 @@ class ModelDoc:
         if kind not in KIND_LABELS:
             raise ValueError(f"未知结构类型：{kind}")
         if dimension is None:
-            # 斜拉/悬索桥档三前只有三维建造器，默认 3d；其余默认 2d。
-            dimension = "3d" if kind in ("cable_stayed", "suspension") else "2d"
+            # 档三后斜拉/悬索桥默认 2d（平面索面简化），其余同样默认 2d。
+            dimension = "2d"
         if dimension not in DIM_LABELS:
             raise ValueError(f"未知维度：{dimension}")
         self.kind: str = kind
@@ -660,6 +782,10 @@ class ModelDoc:
             self._model = self._build_suspension()
         elif bk == "arch_3d":
             self._model = self._build_arch_3d()
+        elif bk == "cable_stayed_2d":
+            self._model = self._build_cable_stayed_2d()
+        elif bk == "suspension_2d":
+            self._model = self._build_suspension_2d()
         else:
             self._model = self._build_beam_bridge()
         return self
@@ -844,6 +970,58 @@ class ModelDoc:
         self._info["fpu"] = float(p.get("fpu", 1770.0)) * 1e6
         return model
 
+    def _build_cable_stayed_2d(self):
+        """2D 平面斜拉桥：主梁降成一条梁线、扇形索面压进 x-y 平面。
+
+        与三维共用工程参数（Lm/Ls/Ht/n/q/A），但走 2D 内核（NONLINEAR，
+        CABLE 以 ISTRN 预张）。塔梁固结体系，悬臂施工 + 逐段张拉可选。
+        """
+        from bridge_spec import build_cable_stayed_2d
+
+        p = self.params
+        return build_cable_stayed_2d(
+            main_span=float(p["Lm"]), side_span=float(p["Ls"]),
+            tower_height=float(p["Ht"]), n_cable=int(p["n"]),
+            h=float(p["h"]), B=float(p["B"]),
+            tf=float(p.get("tf", 0.28)), tw=float(p.get("tw", 0.45)),
+            tower_b=float(p.get("tower_b", 3.0)),
+            tower_h=float(p.get("tower_h", 4.5)),
+            tower_below=float(p.get("tower_below", 8.0)),
+            anchor_low=float(p.get("anchor_low", 0.55)),
+            q_kN=float(p["q"]),
+            q2_kN=float(p.get("q2_deck", 0.0) or 0.0),
+            cable_area_mm2=float(p["A"]),
+            staged=bool(p.get("staged", False)),
+            lane=bool(p.get("lane", False)),
+        )
+
+    def _build_suspension_2d(self):
+        """2D 平面悬索桥：单跨双塔，主缆按抛物线初值、恒载水平力 H=qL²/8f 以
+        ISTRN 预张。只做成桥态一次静力（无施工阶段/车道数，见 DEFAULTS 说明）。
+        """
+        from bridge_spec import build_suspension_2d
+
+        p = self.params
+        n_sag = float(p.get("sag", 10.0))
+        return build_suspension_2d(
+            system=str(p.get("system", "EARTH")).upper(),
+            main_span=float(p["Lm"]),
+            side_span=float(p.get("Ls", 0.0) or 0.0),
+            sag_ratio=(1.0 / n_sag) if n_sag > 0 else 0.10,
+            clearance=float(p.get("clear", 5.0)),
+            panel=float(p.get("panel", 10.0)),
+            side_hangers=bool(p.get("sh", True)),
+            h=float(p["h"]), B=float(p["B"]),
+            tf=float(p.get("tf", 0.028)), tw=float(p.get("tw", 0.020)),
+            tower_b=float(p.get("tower_b", 3.0)),
+            tower_h=float(p.get("tower_h", 4.0)),
+            n_tower_seg=int(p.get("tp", 6)),
+            q_kN=float(p["q"]),
+            main_area_mm2=float(p.get("A", 60000.0)),
+            hanger_area_mm2=float(p.get("Ah", 3000.0)),
+            lane=bool(p.get("lane", False)),
+        )
+
     def _build_arch_3d(self):
         """大跨钢箱拱桥（拱肋分段吊装 + 斜拉扣索辅助 + 合拢 + 吊杆主梁 + 铺装）。
 
@@ -900,6 +1078,10 @@ class ModelDoc:
                 errs.append("没有支座（结构会是机构）")
         elif self.is_3d:
             errs = self._param_checks_3d() + self.warnings_3d()
+        elif self.kind in ("cable_stayed", "suspension"):
+            # 2D 索承体系：参数量级检查沿用三维的 Lm/sag/A 分支，但模型自洽校验
+            # 走 2D 的 validate_model（三维的 warnings_3d 引用完整性不适用）。
+            errs = self._param_checks_3d() + self._model.validate_model()
         else:
             errs = self._bridge_param_checks() + self._model.validate_model()
         return errs
@@ -985,9 +1167,10 @@ class ModelDoc:
             if isinstance(q2, (int, float)) and q2 > 0 and p.get("q") and q2 > float(p["q"]):
                 e.append(f"二期恒载 {q2:g} kN/m 超过总恒载 {float(p['q']):g} kN/m，"
                          "一期恒载会变负")
-            lc = p.get("lane_count")
-            if not isinstance(lc, int) or not 1 <= lc <= 8:
-                e.append(f"车道数 {lc} 超出范围（1~8）")
+            if "lane_count" in p:
+                lc = p.get("lane_count")
+                if not isinstance(lc, int) or not 1 <= lc <= 8:
+                    e.append(f"车道数 {lc} 超出范围（1~8）")
         elif self.builder_key == "arch_3d":
             span = pos("span", "主跨")
             rise = pos("rise", "矢高")
@@ -1305,6 +1488,15 @@ class ModelDoc:
             params = _keep_solver_opts(prev, kind, params)
             return cls(kind, params, dimension=dimension), "rule(三维)", Diag(notes=notes)
 
+        if kind in ("cable_stayed", "suspension"):
+            # 2D 索承体系：参数名与三维同一套（Lm/Ls/Ht/sag/A…），复用三维规则
+            # 解析，但用 2D 建造器键取默认值（少了 method/fpu/erection/lane_count
+            # 等三维项）。几何仍由 build() 展开，参数是唯一真源。
+            bk = BUILDERS.get((kind, dimension), kind)
+            params, notes = extract_3d_params(text, bk)
+            params = _keep_solver_opts(prev, kind, params)
+            return cls(kind, params, dimension=dimension), "rule(索承2d)", Diag(notes=notes)
+
         from bridge_spec import extract_bridge_params
 
         # 桥梁侧也走 LLM 了，但**只出参数**（bridge_llm），几何仍由 build() 算。
@@ -1363,11 +1555,15 @@ def _keep_solver_opts(prev: "ModelDoc | None", kind: str,
 
 
 def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
-    """三维结构的规则解析：只抽参数、不建造。
+    """三维（及 2D 索承体系）的规则解析：只抽参数、不建造。
 
     与 `bridge_spec.extract_bridge_params` 同一套做法：抓不到的用工程默认值，
     并在 `notes` 里逐条列出"替你默认了什么"。三维参数名与二维不同
     （sp1/Lm/Ht 而不是 span/rise），所以不能复用那张正则表。
+
+    档三起也承接 `cable_stayed_2d` / `suspension_2d`：它们与三维共用同一套
+    工程参数（Lm/Ls/Ht/sag/A…），只少了 method/fpu/erection/lane_count 等
+    三维项。用 `base`（去掉 `_2d` 后缀）做分支分发，默认值读 `d = DEFAULTS[kind]`。
 
     一个刻意的取舍：**不做"两者择一"的猜测**。斜拉桥说"跨度 200 米"，
     按主跨理解是对的；说"边跨 80、中跨 200" 也能对上。但如果一句话同时
@@ -1376,6 +1572,8 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
     from bridge_spec import _grab
     from units_guard import guard_bridge_span, guard_units
 
+    base = kind.replace("_2d", "")          # cable_stayed_2d→cable_stayed 等
+    is_2d = kind.endswith("_2d")
     d = DEFAULTS[kind]
     p: dict[str, Any] = {}
     notes: list[str] = []
@@ -1390,7 +1588,7 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
     def default(key: str, label: str) -> None:
         notes.append(f"未说明{label}，默认 {d[key]:g}")
 
-    if kind == "cable_stayed":
+    if base == "cable_stayed":
         if not grab("Lm", "主跨", "跨径", "主孔"):
             if grab("Lm", "跨度", "总长", "全长"):
                 notes.append(f"只给了一个跨度，按主跨 {p['Lm']:g} m 处理")
@@ -1434,7 +1632,7 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
                      r"|平衡悬臂|悬浇|从塔|向两侧", text):
             p["staged"] = True
             notes.append("识别到悬臂施工，生成「桥塔+0号块 → 悬臂逐段张拉 → 合拢 "
-                         "→ 二期铺装+二次调索」阶段序列")
+                         "→ 二期铺装" + ("" if is_2d else "+二次调索") + "」阶段序列")
         else:
             p["staged"] = d["staged"]
         # 二期恒载（铺装+护栏）：单独给出才拆分 q1=q−q2，否则二期=0 全算一期。
@@ -1445,8 +1643,8 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
             notes.append(f"二期恒载 {p['q2_deck']:g} kN/m（一期 = 桥面恒载 − 二期）")
         else:
             p["q2_deck"] = d["q2_deck"]
-        p["retune"] = d["retune"]
-    elif kind == "suspension":
+        p["retune"] = d.get("retune", True)
+    elif base == "suspension":
         # 体系：只有两个选项，关键词足够，不必等 LLM。同时接受"锚在梁上"
         # 这类说法——用户描述体系时往往不说"自锚"三个字。
         if re.search(r"自锚|锚在梁|锚于梁|锚在加劲梁", text):
@@ -1523,39 +1721,49 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
                 default(key, label)
             else:
                 p[key] = v
-        # 二期铺装：与一期拆分（一期 = q - q2），供施工阶段分级施加。
-        m = re.search(r"二期(?:恒载|铺装|荷载|自重)?[\s:：为约]*"
-                      r"([0-9]+(?:\.[0-9]+)?)\s*(?:kN/m|kn/m|kN·m-1|千牛/米)",
-                      text, re.I)
-        if m:
-            p["q2_deck"] = float(m.group(1))
-        else:
-            p["q2_deck"] = d["q2_deck"]
-        # 车道数：多车道横向折减系数按 JTG D60 表 4.3.1-5。
-        m = re.search(r"(?:双向|单向)?[\s]*([一二三四五六七八1-8])\s*车道", text)
-        if m:
-            cn = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6,
-                  "七": 7, "八": 8}.get(m.group(1))
-            n_lane = cn if cn is not None else int(m.group(1))
-            p["lane_count"] = n_lane
-            p["lane_reduction"] = _LANE_REDUCTION.get(n_lane, 0.78)
-        else:
-            p["lane_count"] = d["lane_count"]
-            p["lane_reduction"] = d["lane_reduction"]
-            default("lane_count", "车道数")
-        # 施工阶段：出现吊装/合拢/施工等过程描述才生成
-        # （空缆 → 从跨中对称吊装 → 合拢 → 铺装）。
-        if re.search(r"施工阶段|施工过程|吊装|合拢|对称吊装|从跨中|从中间", text):
-            p["erection"] = True
-            m = re.search(r"每次(?:对称)?吊装\s*(\d+)\s*(?:对|段|个)?", text)
+        if not is_2d:
+            # 二期铺装：与一期拆分（一期 = q - q2），供施工阶段分级施加。
+            m = re.search(r"二期(?:恒载|铺装|荷载|自重)?[\s:：为约]*"
+                          r"([0-9]+(?:\.[0-9]+)?)\s*(?:kN/m|kn/m|kN·m-1|千牛/米)",
+                          text, re.I)
             if m:
-                p["erection_panels"] = int(m.group(1))
+                p["q2_deck"] = float(m.group(1))
             else:
+                p["q2_deck"] = d["q2_deck"]
+            # 车道数：多车道横向折减系数按 JTG D60 表 4.3.1-5。
+            m = re.search(r"(?:双向|单向)?[\s]*([一二三四五六七八1-8])\s*车道", text)
+            if m:
+                cn = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6,
+                      "七": 7, "八": 8}.get(m.group(1))
+                n_lane = cn if cn is not None else int(m.group(1))
+                p["lane_count"] = n_lane
+                p["lane_reduction"] = _LANE_REDUCTION.get(n_lane, 0.78)
+            else:
+                p["lane_count"] = d["lane_count"]
+                p["lane_reduction"] = d["lane_reduction"]
+                default("lane_count", "车道数")
+            # 施工阶段：出现吊装/合拢/施工等过程描述才生成
+            # （空缆 → 从跨中对称吊装 → 合拢 → 铺装）。
+            if re.search(r"施工阶段|施工过程|吊装|合拢|对称吊装|从跨中|从中间", text):
+                p["erection"] = True
+                m = re.search(r"每次(?:对称)?吊装\s*(\d+)\s*(?:对|段|个)?", text)
+                if m:
+                    p["erection_panels"] = int(m.group(1))
+                else:
+                    p["erection_panels"] = d["erection_panels"]
+            else:
+                p["erection"] = d["erection"]
                 p["erection_panels"] = d["erection_panels"]
         else:
-            p["erection"] = d["erection"]
-            p["erection_panels"] = d["erection_panels"]
-    elif kind == "arch_3d":
+            # 2D 平面悬索只做成桥态一次静力：无二期拆分 / 车道数 / 施工阶段。
+            # 描述里若提了这些，如实提示"2D 简化暂不承载"，不静默忽略。
+            if re.search(r"二期|铺装", text):
+                notes.append("2D 悬索桥只做成桥态一次静力，二期铺装已并入桥面恒载 q")
+            if re.search(r"车道", text):
+                notes.append("2D 悬索桥暂不接入车道活载（影响线活载待验）")
+            if re.search(r"施工|吊装|合拢", text):
+                notes.append("2D 悬索桥暂不做施工阶段模拟（分级找形走三维 erection）")
+    elif base == "arch_3d":
         # 主跨：与斜拉/悬索同一套「先主跨后跨度」的优先级。
         if not grab("span", "主跨", "跨径", "主孔"):
             if not grab("span", "跨度", "总长", "全长"):
@@ -1636,7 +1844,7 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
                 p[key] = d[key]
                 default(key, label)
 
-    guard_units(p, kind, notes)     # 单位误写在这一层就纠正
+    guard_units(p, base, notes)     # 单位哨兵用归一化键（2D 复用 3D 阈值表）
     return p, notes
 
 
