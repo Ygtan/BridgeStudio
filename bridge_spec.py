@@ -21,6 +21,7 @@ FEM-Eigen 求解内核已经支持 BEAM / TRUSS / CABLE / STRUT 四类单元，�
 
 from __future__ import annotations
 
+import math
 import re
 from enum import Enum
 
@@ -47,7 +48,11 @@ class MaterialDef(BaseModel):
 
 
 class ElemTypeDef(BaseModel):
-    """实常数（`*R`）。BEAM 必须有 I；TRUSS/CABLE/STRUT 必须有 A。"""
+    """实常数（`*R`）。BEAM 必须有 I；TRUSS/CABLE/STRUT 必须有 A。
+
+    `mat` 是本类型引用的材料 id（`*MAT,<mat>`），默认 1。斜拉/悬索桥等
+    混合材料模型（混凝土主梁/塔 + 钢索）需要为不同类型指定不同材料。
+    """
 
     id: int
     kind: ElemKind = ElemKind.BEAM
@@ -58,6 +63,7 @@ class ElemTypeDef(BaseModel):
     H: float | None = None      # 截面高度 m（温度梯度用）
     addmass: float | None = None  # 附加线质量 kg/m
     istrn: float | None = None  # 初应变，正值预拉（索/杆用）
+    mat: int = 1                # 材料 id（*MP 表里的编号）
 
 
 class NodeDef(BaseModel):
@@ -165,15 +171,19 @@ def _int_ranges(vals: list[int]) -> str:
 
 
 def _dof_set(dofs: str) -> set[int]:
-    """解析自由度写法："1-2"→{1,2}，"1-3"→{1,2,3}，"2"→{2}，"1,3"→{1,3}。"""
+    """解析自由度写法："1-2"→{1,2}，"1-3"→{1,2,3}，"2"→{2}，"1,3"→{1,3}。
+
+    用连字符表示**连续区间**，因此 "1-3" 与 "1-2-3" 等价（都取 1..3）。
+    """
     out: set[int] = set()
     for part in re.split(r"[,\s]+", dofs.strip()):
         if not part:
             continue
         if "-" in part:
-            a, _, b = part.partition("-")
+            nums = part.split("-")
             try:
-                out.update(range(int(a), int(b) + 1))
+                a, b = int(nums[0]), int(nums[-1])
+                out.update(range(a, b + 1))
             except ValueError:
                 pass
         else:
@@ -196,6 +206,7 @@ class BridgeSpec(BaseModel):
     stages: list[Stage2D] = Field(default_factory=list)
     lanes: list[Lane2D] = Field(default_factory=list)
     gravity: float = -9.81       # 0.0 表示不计自重
+    analysis: str = "LINEAR"     # LINEAR | NONLINEAR（轴向单元几何非线性 + 索开关）
     note: str = ""
 
     # ------------------------------------------------------------ 校验
@@ -307,6 +318,11 @@ class BridgeSpec(BaseModel):
         out.append(self.title)
         out.append("")
 
+        if self.analysis != "LINEAR":
+            out.append("! 分析类型（NONLINEAR = 轴向单元几何非线性 + 索/杆开关）")
+            out.append(f"*ANALYSIS TYPE={self.analysis}")
+            out.append("")
+
         out.append("! 单元类型")
         out.append("*ET")
         for t in self.elem_types:
@@ -350,7 +366,7 @@ class BridgeSpec(BaseModel):
             if not group:
                 continue
             out.append(f"*TYPE,{t.id}")
-            out.append("*MAT,1")
+            out.append(f"*MAT,{t.mat}")
             out.append(f"*REAL,{t.id}")
             for e in group:
                 out.append(f"*EN,{e.id},{e.n1},{e.n2}")
@@ -729,6 +745,461 @@ def build_truss_bridge(
         gravity=gravity,
         note=f"跨度{span}m {n_panel}节间 桁高{depth}m 弦杆A={A_chord} 腹杆A={A_diag} "
              f"节点荷载={node_load_kN}kN",
+    )
+
+
+# ---------------------------------------------------------------- 建造器 4：2D 斜拉桥
+
+
+def build_cable_stayed_2d(
+    main_span: float = 200.0,
+    side_span: float = 80.0,
+    tower_height: float = 60.0,
+    n_cable: int = 12,
+    h: float = 2.5,
+    B: float = 12.0,
+    tf: float = 0.28,
+    tw: float = 0.45,
+    tower_b: float = 3.0,
+    tower_h: float = 4.5,
+    tower_below: float = 8.0,
+    q_kN: float = 100.0,
+    q2_kN: float = 0.0,
+    cable_area_mm2: float = 6000.0,
+    anchor_low: float = 0.55,
+    cable_E: float = 195e9,
+    deck_E: float = 34.5e9,
+    deck_dens: float = 2500.0,
+    tower_E: float = 34.5e9,
+    tower_dens: float = 2500.0,
+    lane: bool = False,
+    staged: bool = False,
+) -> BridgeSpec:
+    """双塔三跨平面斜拉桥（2D 简化，成桥态一次静力 / 可选悬臂施工）。
+
+    与三维 `build_cable_stayed_3d` 共用同一套工程参数（Lm/Ls/Ht/n/q/A…），
+    只是把主梁降成一条平面梁线、桥塔降成竖直悬臂、扇形索面压进 x-y 平面。
+    索力用「按锚点受荷宽度竖向分配」初定（与 3D 的 tensions_by_deck_load 同源），
+    以 ISTRN 预应变写进 CABLE 单元：N = EA·ΔL/L + EA·ISTRN。
+
+    与 3D 的差别（刻意）：
+    - 不做几何非线性找形：2D 内核走 LINEAR（线弹性 + 索单向开关迭代）。
+    - 体系用**塔梁固结**（塔基在桥面以下 tower_below，桥面处塔梁共节点）——
+      这是悬臂施工稳定性的前提，也是钢斜拉桥常用成桥体系；3D 成桥态默认的
+      半漂浮体系在 2D 简化里不单列，避免两套拓扑。
+    - 主跨每侧索覆盖半跨（跨中为合拢点），不留无索区。
+    """
+    if n_cable < 2:
+        raise ValueError("每塔每侧索数 n_cable 至少 2")
+    q = abs(q_kN) * 1000.0
+    q2 = abs(q2_kN) * 1000.0
+    if q2 > q:
+        raise ValueError(f"二期恒载 {q2_kN:g} kN/m 超过桥面恒载 {q_kN:g} kN/m")
+    q1 = q - q2
+    Ltot = 2.0 * side_span + main_span
+    xT1, xT2 = side_span, side_span + main_span
+    x_mid = xT1 + main_span / 2.0
+    Ht = float(tower_height)
+
+    # ---- 主梁锚点 x（每塔两侧各 n_cable 根，共 4 组；j=0 最靠塔） ----
+    side1 = [round(xT1 - side_span * (j + 1) / (n_cable + 1), 9) for j in range(n_cable)]
+    main1 = [round(xT1 + (x_mid - xT1) * (j + 1) / (n_cable + 1), 9) for j in range(n_cable)]
+    main2 = [round(xT2 - (x_mid - xT1) * (j + 1) / (n_cable + 1), 9) for j in range(n_cable)]
+    side2 = [round(xT2 + side_span * (j + 1) / (n_cable + 1), 9) for j in range(n_cable)]
+    zones = [side1, main1, main2, side2]          # t1s, t1m, t2m, t2s
+    zone_tower = [xT1, xT1, xT2, xT2]
+
+    # ---- 主梁节点 x：支座/塔位/合拢点/锚点并集 ----
+    xs = sorted({0.0, xT1, xT2, Ltot, x_mid} | {x for g in zones for x in g})
+    xs = [round(x, 9) for x in xs]
+    m = len(xs)
+    iT1 = xs.index(round(xT1, 9))
+    iT2 = xs.index(round(xT2, 9))
+
+    # ---- 塔（竖直悬臂，塔基在桥面以下；桥面处塔梁共节点） ----
+    f_j = [anchor_low + (1.0 - anchor_low) * j / (n_cable - 1) for j in range(n_cable)]
+    th = [-tower_below, 0.0] + [f_j[k] * Ht for k in range(n_cable)]  # n+2 个塔节点高度
+    cable_A = cable_area_mm2 * 1e-6
+
+    nodes: list[NodeDef] = []
+    for ti, (xT, base) in enumerate(((xT1, 2000), (xT2, 3000))):
+        for k, yv in enumerate(th):
+            nodes.append(NodeDef(id=base + k, x=xT, y=yv))
+
+    # 主梁节点：塔位复用塔节点（y=0），其余新建
+    node_at: dict[float, int] = {}
+    di = 0
+    for x in xs:
+        if abs(x - xT1) < 1e-9:
+            node_at[x] = 2001
+        elif abs(x - xT2) < 1e-9:
+            node_at[x] = 3001
+        else:
+            nid = 1000 + di
+            nodes.append(NodeDef(id=nid, x=x, y=0.0))
+            node_at[x] = nid
+            di += 1
+
+    # ---- 材料 / 截面 ----
+    mat_conc = MaterialDef(id=1, name="混凝土 C50", E=deck_E, alpx=1.0e-5, dens=deck_dens)
+    mat_cable = MaterialDef(id=2, name="高强钢丝", E=cable_E, alpx=1.2e-5, dens=7850.0)
+    deck_type = _elem_type_from_section(1, ElemKind.BEAM, "box", h, B, tw, tf)
+    deck_type.mat = 1
+    tower_A = tower_b * tower_h
+    tower_I = tower_b * tower_h ** 3 / 12.0
+    tower_type = ElemTypeDef(id=2, kind=ElemKind.BEAM, A=tower_A, I=tower_I,
+                             WT=tower_b * tower_h ** 2 / 6.0,
+                             WB=tower_b * tower_h ** 2 / 6.0,
+                             H=tower_h, mat=1)
+
+    # ---- 单元：主梁 + 塔 ----
+    elements = [ElemDef(id=101 + i, type_id=1, n1=node_at[xs[i]], n2=node_at[xs[i + 1]])
+                for i in range(m - 1)]
+    tower_elem_ids: dict[int, list[int]] = {}
+    for ti, base in ((0, 2000), (1, 3000)):
+        eids = [200 + ti * 100 + k + 1 for k in range(n_cable + 1)]
+        tower_elem_ids[ti] = eids
+        for k, eid in enumerate(eids):
+            elements.append(ElemDef(id=eid, type_id=2, n1=base + k, n2=base + k + 1))
+
+    # ---- 拉索（CABLE，ISTRN = 锚点受荷宽度竖向力 / 竖向余弦 / EA） ----
+    cable_types: list[ElemTypeDef] = []
+    cables_by_zone: list[list[int]] = []
+    cidx = 0
+    for zi, (xT, anchors) in enumerate(zip(zone_tower, zones)):
+        base = 2000 if zi < 2 else 3000
+        zcables: list[int] = []
+        for j, xa in enumerate(anchors):
+            i = xs.index(xa)
+            left = (xs[i] - xs[i - 1]) / 2 if i > 0 else 0.0
+            right = (xs[i + 1] - xs[i]) / 2 if i < m - 1 else 0.0
+            trib = left + right
+            yt = f_j[j] * Ht
+            dx = xa - xT
+            L = math.hypot(dx, yt)
+            sin_theta = yt / L
+            T = q * trib / sin_theta
+            istrn = T / (cable_E * cable_A)
+            eid = 9000 + cidx + 1
+            elements.append(ElemDef(id=eid, type_id=3 + cidx,
+                                    n1=base + 2 + j, n2=node_at[xa]))
+            cable_types.append(ElemTypeDef(id=3 + cidx, kind=ElemKind.CABLE,
+                                           A=cable_A, istrn=istrn, mat=2))
+            zcables.append(eid)
+            cidx += 1
+        cables_by_zone.append(zcables)
+
+    # ---- 支座 ----
+    boundaries = [
+        BoundaryDef(node=node_at[0.0], dofs="1-2"),
+        BoundaryDef(node=node_at[round(Ltot, 9)], dofs="2"),
+        BoundaryDef(node=2000, dofs="1-3"),
+        BoundaryDef(node=3000, dofs="1-3"),
+    ]
+
+    # ---- 荷载：桥面恒载 + 塔自重（自重已含在 q 里，塔自重量手动施加） ----
+    elem_loads: list[ElemLoadDef] = [] if staged else \
+        [ElemLoadDef(e_from=101, e_to=100 + m - 1, q=-q)]
+    nodal_loads: list[NodalLoadDef] = []
+    if tower_dens:
+        w_tower = tower_A * tower_dens * 9.81
+        for ti, base in ((0, 2000), (1, 3000)):
+            for k in range(n_cable + 1):
+                seg = th[k + 1] - th[k]
+                nodal_loads.append(NodalLoadDef(node=base + k, dof=2, value=-w_tower * seg / 2))
+                nodal_loads.append(NodalLoadDef(node=base + k + 1, dof=2, value=-w_tower * seg / 2))
+
+    # ---- 施工阶段（悬臂施工 + 张拉） ----
+    stages: list[Stage2D] = []
+    if staged:
+        tower_elems = [e for ti in (0, 1) for e in tower_elem_ids[ti]]
+        active: set[int] = set()
+        zero = {iT1 - 1, iT1, iT2 - 1, iT2}
+        stages.append(Stage2D(
+            id=1, activate=tower_elems + [101 + i for i in sorted(zero)],
+            elem_loads=[StageElemLoadDef(elems=[101 + i for i in sorted(zero)],
+                                         q1=-q1, q2=-q1)]))
+        active |= zero
+        for j in range(n_cable):
+            new_elems: set[int] = set()
+            new_cables: list[int] = []
+            for zi, xT in enumerate(zone_tower):
+                xa = zones[zi][j]
+                lo, hi = sorted((xT, xa))
+                for i in range(m - 1):
+                    mid = (xs[i] + xs[i + 1]) / 2
+                    if lo < mid < hi and i not in active:
+                        new_elems.add(i)
+                new_cables.append(cables_by_zone[zi][j])
+            active |= new_elems
+            stages.append(Stage2D(
+                id=2 + j,
+                activate=[101 + i for i in sorted(new_elems)] + new_cables,
+                elem_loads=[StageElemLoadDef(elems=[101 + i for i in sorted(new_elems)],
+                                             q1=-q1, q2=-q1)]))
+        rest = [i for i in range(m - 1) if i not in active]
+        if rest:
+            stages.append(Stage2D(
+                id=2 + n_cable, activate=[101 + i for i in rest],
+                elem_loads=[StageElemLoadDef(elems=[101 + i for i in rest],
+                                             q1=-q1, q2=-q1)]))
+        if q2 > 0:
+            stages.append(Stage2D(
+                id=3 + n_cable,
+                elem_loads=[StageElemLoadDef(elems=list(range(101, 100 + m)),
+                                             q1=-q2, q2=-q2)]))
+
+    lanes: list[Lane2D] = [Lane2D(nodes=[node_at[x] for x in xs])] if lane else []
+
+    return BridgeSpec(
+        title=f"{main_span:.0f}m 双塔三跨斜拉桥（2D，{n_cable} 对索/塔）",
+        nodes=nodes,
+        elements=elements,
+        elem_types=[deck_type, tower_type] + cable_types,
+        materials=[mat_conc, mat_cable],
+        boundaries=boundaries,
+        nodal_loads=nodal_loads,
+        elem_loads=elem_loads,
+        stages=stages,
+        lanes=lanes,
+        gravity=0.0,
+        analysis="NONLINEAR",
+        note=(f"主跨{main_span}m 边跨{side_span}m 塔高{Ht}m 每塔每侧{n_cable}索 "
+              f"桥面恒载{q_kN}kN/m 单索{cable_area_mm2}mm² "
+              f"{'悬臂施工' if staged else '成桥态'}"),
+    )
+
+
+# ---------------------------------------------------------------- 建造器 5：2D 悬索桥
+
+
+def build_suspension_2d(
+    system: str = "EARTH",
+    main_span: float = 300.0,
+    side_span: float = 0.0,
+    sag_ratio: float = 0.10,
+    clearance: float = 5.0,
+    tower_below: float = 8.0,
+    panel: float = 10.0,
+    side_hangers: bool = True,
+    h: float = 3.0,
+    B: float = 12.0,
+    tf: float = 0.028,
+    tw: float = 0.020,
+    tower_b: float = 3.0,
+    tower_h: float = 4.0,
+    n_tower_seg: int = 6,
+    q_kN: float = 100.0,
+    main_area_mm2: float = 60000.0,
+    hanger_area_mm2: float = 3000.0,
+    cable_E: float = 195e9,
+    deck_E: float = 206e9,
+    deck_dens: float = 7850.0,
+    tower_E: float = 34.5e9,
+    tower_dens: float = 2500.0,
+    lane: bool = False,
+) -> BridgeSpec:
+    """单跨双塔平面悬索桥（2D 简化，成桥态一次静力）。
+
+    与三维 `build_suspension_3d` 共用同一套工程参数（system/Lm/Ls/sag/clear/
+    q/A/Ah…），主缆按抛物线初值、恒载水平力 H=qL²/8f 以 ISTRN 预张写进 CABLE
+    单元。2D 内核 LINEAR：线弹性 + 索单向开关迭代，不做几何非线性找形。
+
+    与 3D 的差别（刻意）：主缆用常数水平力 H 的 ISTRN 预张（各段张力 T=H/cosθ
+    差异 <5% 略去），不做逐段找形；锚碇/锚点、塔顶共节点、塔处加劲梁竖向支座
+    等拓扑与 3D 保持一致，避免"坐标重合而节点不共用"那类隐蔽错。
+    """
+    system = (system or "EARTH").upper()
+    if system not in ("EARTH", "SELF"):
+        raise ValueError("system 只能是 EARTH / SELF")
+    Lm = float(main_span)
+    f_sag = sag_ratio * Lm
+    q = abs(q_kN) * 1000.0
+    cable_A = main_area_mm2 * 1e-6
+    hanger_A = hanger_area_mm2 * 1e-6
+    z_top = f_sag + clearance
+    H0 = q * Lm ** 2 / (8.0 * f_sag)
+
+    # ---- 边跨：自锚式取平衡边跨 √(2HΔz/q)，地锚式取 1/3 主跨 ----
+    if side_span and side_span > 0:
+        Ls = float(side_span)
+    else:
+        Ls = math.sqrt(2.0 * H0 * z_top / q) if (system == "SELF" and q > 0) else Lm / 3.0
+    Ltot = 2.0 * Ls + Lm
+    xT1, xT2 = Ls, Ls + Lm
+
+    # ---- 加劲梁节点：panel 均匀，塔位/跨中为节点 ----
+    n_main = max(4, int(round(Lm / panel)))
+    n_side = max(2, int(round(Ls / panel)))
+    xs: list[float] = []
+    if n_side:
+        xs += [Ls * i / n_side for i in range(n_side + 1)]
+    else:
+        xs.append(0.0)
+    xs += [Ls + Lm * j / n_main for j in range(1, n_main + 1)]
+    if n_side:
+        xs += [Ls + Lm + Ls * k / n_side for k in range(1, n_side + 1)]
+    xs = [round(x, 9) for x in xs]
+    m = len(xs)
+    iT1, iT2 = n_side, n_side + n_main
+    deck_ids = [1000 + i for i in range(m)]
+
+    nodes: list[NodeDef] = [NodeDef(id=deck_ids[i], x=xs[i], y=0.0) for i in range(m)]
+
+    # ---- 材料 / 截面 ----
+    mat_deck = MaterialDef(id=1, name="钢材 Q345qD", E=deck_E, alpx=1.2e-5, dens=deck_dens)
+    mat_tower = MaterialDef(id=2, name="混凝土 C50", E=tower_E, alpx=1.0e-5, dens=tower_dens)
+    mat_cable = MaterialDef(id=3, name="高强钢丝", E=cable_E, alpx=1.2e-5, dens=7850.0)
+    deck_type = _elem_type_from_section(1, ElemKind.BEAM, "box", h, B, tw, tf)
+    deck_type.mat = 1
+    tower_A = tower_b * tower_h
+    tower_I = tower_b * tower_h ** 3 / 12.0
+    tower_type = ElemTypeDef(id=2, kind=ElemKind.BEAM, A=tower_A, I=tower_I,
+                             WT=tower_b * tower_h ** 2 / 6.0,
+                             WB=tower_b * tower_h ** 2 / 6.0,
+                             H=tower_h, mat=2)
+    main_type = ElemTypeDef(id=3, kind=ElemKind.CABLE, A=cable_A,
+                            istrn=H0 / (cable_E * cable_A), mat=3)
+    hanger_type = ElemTypeDef(id=4, kind=ElemKind.CABLE, A=hanger_A, mat=3)
+
+    # ---- 加劲梁单元 + 荷载 ----
+    elements = [ElemDef(id=101 + i, type_id=1, n1=deck_ids[i], n2=deck_ids[i + 1])
+                for i in range(m - 1)]
+    elem_loads = [ElemLoadDef(e_from=101, e_to=100 + m - 1, q=-q)]
+
+    # ---- 桥塔（竖直悬臂，塔基在桥面以下；塔顶与主缆共节点） ----
+    tower_tops: dict[int, int] = {}
+    for ti, (xT, base) in enumerate(((xT1, 3000), (xT2, 4000))):
+        yb = -tower_below
+        for k in range(n_tower_seg + 1):
+            nodes.append(NodeDef(id=base + k, x=xT,
+                                 y=yb + (z_top - yb) * k / n_tower_seg))
+        for k in range(n_tower_seg):
+            elements.append(ElemDef(id=800 + ti * 100 + k + 1, type_id=2,
+                                    n1=base + k, n2=base + k + 1))
+        tower_tops[ti] = base + n_tower_seg
+
+    # ---- 主缆链（锚 → 塔顶 → 跨中 → 塔顶 → 锚，抛物线/直线） ----
+    anchor_offset = 12.0      # 地锚式锚碇在桥台外侧的距离
+
+    def cable_z(x: float) -> float:
+        if Ls - 1e-9 <= x <= Ls + Lm + 1e-9:
+            t = (x - Ls) / Lm
+            return z_top - f_sag * 4.0 * t * (1.0 - t)
+        if x < Ls:
+            x0 = 0.0 if system == "SELF" else -anchor_offset
+            return 0.0 + (z_top - 0.0) * (x - x0) / max(Ls - x0, 1e-9)
+        x1 = Ltot if system == "SELF" else Ltot + anchor_offset
+        return z_top + (0.0 - z_top) * (x - (Ls + Lm)) / max(x1 - (Ls + Lm), 1e-9)
+
+    anchor_offset = 12.0      # 地锚式锚碇在桥台外侧的距离
+
+    chain_x: list[float] = []
+    if system == "EARTH":
+        chain_x.append(-anchor_offset)
+    else:
+        chain_x.append(0.0)
+    # 中间节点**含塔位**（塔位在下面的循环里映射到塔顶节点，主缆必须过塔顶）
+    chain_x += [x for x in xs if 1e-9 < x < Ltot - 1e-9]
+    if system == "EARTH":
+        chain_x.append(Ltot + anchor_offset)
+    else:
+        chain_x.append(Ltot)
+    # 塔位插入塔顶节点，其余节点新建
+    chain_node_ids: list[int] = []
+    cable_own: list[int] = []
+    cidx = 0
+    for x in chain_x:
+        if abs(x - xT1) < 1e-9:
+            chain_node_ids.append(tower_tops[0]); continue
+        if abs(x - xT2) < 1e-9:
+            chain_node_ids.append(tower_tops[1]); continue
+        if system == "SELF" and abs(x - 0.0) < 1e-9:
+            chain_node_ids.append(deck_ids[0]); continue
+        if system == "SELF" and abs(x - Ltot) < 1e-9:
+            chain_node_ids.append(deck_ids[m - 1]); continue
+        nid = 5000 + cidx
+        cidx += 1
+        nodes.append(NodeDef(id=nid, x=x, y=cable_z(x)))
+        chain_node_ids.append(nid)
+        # 地锚式锚碇节点会单独全约束（1-2-3），不再进 cable_own 补转角约束
+        is_anchor = system == "EARTH" and (
+            abs(x - chain_x[0]) < 1e-9 or abs(x - chain_x[-1]) < 1e-9)
+        if not is_anchor:
+            cable_own.append(nid)
+
+    main_cable_elems: list[int] = []
+    for k in range(len(chain_node_ids) - 1):
+        eid = 6000 + k + 1
+        elements.append(ElemDef(id=eid, type_id=3,
+                                n1=chain_node_ids[k], n2=chain_node_ids[k + 1]))
+        main_cable_elems.append(eid)
+
+    # ---- 吊索（竖直，主缆节点 → 加劲梁节点；塔顶/锚点不挂） ----
+    hangers: list[int] = []
+    x_to_deck = {xs[i]: deck_ids[i] for i in range(m)}
+    eid_h = 7000
+    for x, nid in zip(chain_x, chain_node_ids):
+        if abs(x - xT1) < 1e-9 or abs(x - xT2) < 1e-9:
+            continue
+        if x <= 1e-9 or x >= Ltot - 1e-9:
+            continue
+        key = round(x, 9)
+        if key not in x_to_deck:
+            continue
+        eid_h += 1
+        elements.append(ElemDef(id=eid_h, type_id=4, n1=nid, n2=x_to_deck[key]))
+        hangers.append(eid_h)
+
+    # ---- 支座 ----
+    boundaries: list[BoundaryDef] = []
+    if system == "EARTH":
+        boundaries.append(BoundaryDef(node=deck_ids[0], dofs="1-2"))
+        boundaries.append(BoundaryDef(node=deck_ids[m - 1], dofs="2"))
+        for nid in (chain_node_ids[0], chain_node_ids[-1]):
+            boundaries.append(BoundaryDef(node=nid, dofs="1-3"))   # 锚碇全约束
+    else:
+        boundaries.append(BoundaryDef(node=deck_ids[0], dofs="2"))
+        boundaries.append(BoundaryDef(node=deck_ids[m - 1], dofs="2"))
+        i_mid = min(range(m), key=lambda i: abs(xs[i] - Ltot / 2))
+        boundaries.append(BoundaryDef(node=deck_ids[i_mid], dofs="1"))
+    boundaries.append(BoundaryDef(node=deck_ids[iT1], dofs="2"))
+    boundaries.append(BoundaryDef(node=deck_ids[iT2], dofs="2"))
+    for ti, base in ((0, 3000), (1, 4000)):
+        boundaries.append(BoundaryDef(node=base, dofs="1-3"))     # 塔底固结
+    # 主缆内部节点只连索/吊杆（2 自由度），转角自由度无刚度，须约束
+    for nid in cable_own:
+        boundaries.append(BoundaryDef(node=nid, dofs="3"))
+
+    # ---- 塔自重 ----
+    nodal_loads: list[NodalLoadDef] = []
+    if tower_dens:
+        w_tower = tower_A * tower_dens * 9.81
+        for ti, base in ((0, 3000), (1, 4000)):
+            seg = (z_top + tower_below) / n_tower_seg
+            for k in range(n_tower_seg):
+                nodal_loads.append(NodalLoadDef(node=base + k, dof=2, value=-w_tower * seg / 2))
+                nodal_loads.append(NodalLoadDef(node=base + k + 1, dof=2, value=-w_tower * seg / 2))
+
+    lanes: list[Lane2D] = [Lane2D(nodes=deck_ids)] if lane else []
+
+    title = f"{main_span:.0f}m {'地锚式' if system == 'EARTH' else '自锚式'}悬索桥（2D）"
+    return BridgeSpec(
+        title=title,
+        nodes=nodes,
+        elements=elements,
+        elem_types=[deck_type, tower_type, main_type, hanger_type],
+        materials=[mat_deck, mat_tower, mat_cable],
+        boundaries=boundaries,
+        nodal_loads=nodal_loads,
+        elem_loads=elem_loads,
+        stages=[],
+        lanes=lanes,
+        gravity=0.0,
+        analysis="NONLINEAR",
+        note=(f"主跨{Lm}m 边跨{Ls:.1f}m 矢跨比1/{1.0 / sag_ratio:.1f} "
+              f"主缆{main_area_mm2}mm² 吊索{hanger_area_mm2}mm² "
+              f"桥面恒载{q_kN}kN/m H≈{H0 / 1e6:.1f}MN"),
     )
 
 
