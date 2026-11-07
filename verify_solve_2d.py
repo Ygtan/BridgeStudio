@@ -332,6 +332,34 @@ def main() -> int:
         "混凝土C40，计算龄期10000天")
     doc.build()
     ages = [s.time for s in doc.model.stages]
+    from model_doc import closed_contour_perimeter_m, theoretical_thickness_mm
+    from bridge_spec import build_cable_stayed_2d
+    bauto = build_beam_bridge(
+        span=10.0, n_spans=1, n_elem=2, udl_kN=10.0, gravity=0.0,
+        creep_rh=55.0, creep_fcm=40.0, creep_t0=7.0, creep_t_end=10000.0)
+    h_auto = theoretical_thickness_mm(
+        bauto.elem_types[0].A, closed_contour_perimeter_m(8.0, 2.0))
+    rauto = solve_2d(bauto, out_dir=OUT / "beam10_hauto", dat_name="beam10_hauto.dat")
+    phi_auto = creep_phi_jtg3362(10000.0, 7.0, 55.0, h_auto, 40.0)
+    v_auto = rauto.final_disp.get((len(bauto.elements) // 2 + 1, 2), 0.0)
+    v0_auto = -5.0 * 10000.0 * 10.0 ** 4 / (384.0 * bauto.materials[0].E * bauto.elem_types[0].I)
+    want_auto = v0_auto * (1.0 + 0.8 * phi_auto)
+    d_auto = abs(v_auto - want_auto) / abs(want_auto)
+    dat_auto = bauto.to_dat()
+    print(f"    未写厚度 h=2A/u={h_auto:.1f} mm  挠度误差 {d_auto*100:.2f}%")
+    verdicts.append(("未写理论厚度时按截面外轮廓 h=2A/u",
+                     PASS if abs(bauto.elem_types[0].h_th_mm - h_auto) < 1e-6
+                     and "HTH=" in dat_auto and d_auto < 0.01 else FAIL,
+                     f"{h_auto:.1f} mm"))
+    stayed = build_cable_stayed_2d(
+        main_span=40.0, side_span=16.0, tower_height=12.0, n_cable=2,
+        staged=True, creep_rh=55.0, creep_fcm=48.0, creep_h=0.0, creep_t_end=10000.0)
+    hd, ht = stayed.elem_types[0].h_th_mm, stayed.elem_types[1].h_th_mm
+    verdicts.append(("斜拉主梁和桥塔理论厚度分开算",
+                     PASS if hd > 0.0 and ht > 0.0 and abs(hd - ht) > 1.0
+                     and stayed.stages[-1].time == 10000.0
+                     and stayed.elem_types[2].h_th_mm == 0.0 else FAIL,
+                     f"梁 {hd:.1f} mm  塔 {ht:.1f} mm"))
     verdicts.append(("句子里的湿度让二维梁桥分出加载和计算龄期",
                      PASS if ages[:1] == [7.0] and ages[-1:] == [10000.0]
                      and doc.model.creep_fcm == 40.0

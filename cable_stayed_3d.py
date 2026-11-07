@@ -152,13 +152,19 @@ def build_cable_stayed_3d(
         # 斜拉索按安全系数判，不标牌号（见 result_3d.cable_table）
         Material3D(id=2, E=cable_E, dens=cable_dens),
     ]
+    deck_hth = tower_hth = 0.0
+    if creep_rh > 0.0 and creep_fcm > 0.0 and creep_h <= 0.0:
+        from model_doc import closed_contour_perimeter_m, theoretical_thickness_mm
+        deck_hth = theoretical_thickness_mm(box["A"], closed_contour_perimeter_m(B, h))
+        tower_hth = theoretical_thickness_mm(
+            tower_A, closed_contour_perimeter_m(tower_b, tower_h))
     reals = [
         RealConst3D(id=1, A=box["A"], IY=box["IY"], IZ=box["IY"] * 0.5,
                     J=box["J"], G=G_shear, WT=box["WT"], WB=box["WB"],
-                    AW=box["AW"]),
+                    AW=box["AW"], HTH=deck_hth),
         # 塔是实心矩形：最大剪应力 1.5V/A，等效腹板面积取 A/1.5
         RealConst3D(id=2, A=tower_A, IY=tower_I, IZ=tower_I,
-                    J=tower_I * 1.6, G=G_shear, AW=tower_A / 1.5),
+                    J=tower_I * 1.6, G=G_shear, AW=tower_A / 1.5, HTH=tower_hth),
         RealConst3D(id=3, A=cable_A, W=cable_w),
     ]
     etypes = [
@@ -441,7 +447,8 @@ def build_cable_stayed_3d(
         boundaries=boundaries,
         loads=[] if staged else loads,
         stages=stages,
-        creep_phi0=(0.0 if staged and creep_rh > 0.0 and creep_h > 0.0 and creep_fcm > 0.0
+        creep_phi0=(0.0 if staged and creep_rh > 0.0 and creep_fcm > 0.0
+                    and (creep_h > 0.0 or deck_hth > 0.0)
                     else (CANTILEVER_CREEP_PHI0 if staged else 0.0)),
         creep_t0=load_age_days if staged else CANTILEVER_LOAD_AGE_DAYS,
         creep_beta_h=CANTILEVER_CREEP_BETA_H,

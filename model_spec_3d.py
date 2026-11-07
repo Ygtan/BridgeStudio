@@ -256,6 +256,7 @@ class RealConst3D(BaseModel):
     ISTRN: float = 0.0              # 初应变（可作初拉力：F=E·A·ISTRN）
     W: float = 0.0                  # 索单位长度重量 N/m（CABLE 垂度/Ernst 用）
     L0: float = 0.0                 # 无应力索长 m（0 = 取几何长度）
+    HTH: float = 0.0                # 理论厚度 mm。0 表示没有。模型上的统一厚度优先。
     #: 腹板总面积 m²（所有腹板之和）。剪应力 τ=V/AW 用。0 = 未提供，跳过剪应力验算。
     AW: float = 0.0
     #: 控制板厚 mm（腹板/翼缘中较厚者）。查 JTG D64 表 3.2.1 的厚度档用。
@@ -625,14 +626,17 @@ class ModelSpec3D(BaseModel):
         nonlinear = self.cable_bridge is not None
         L.append(f"# {self.title}")
         L.append("# 由 BridgeStudio 导出（FEM-Eigen 3D new format，单位 m/N/Pa）")
-        code_creep = self.creep_rh > 0.0 and self.creep_h > 0.0 and self.creep_fcm > 0.0
+        has_member_h = any(r.HTH > 0.0 for r in self.reals)
+        code_creep = (self.creep_rh > 0.0 and self.creep_fcm > 0.0
+                      and (self.creep_h > 0.0 or has_member_h))
         if self.creep_phi or self.creep_phi0 or code_creep:
             bits = ["*CREEP"]
             if self.creep_phi:
                 bits.append(f"PHI={fmt(self.creep_phi)}")
             if code_creep:
                 bits.append(f"RH={fmt(self.creep_rh)}")
-                bits.append(f"H={fmt(self.creep_h)}")
+                if self.creep_h > 0.0:
+                    bits.append(f"H={fmt(self.creep_h)}")
                 bits.append(f"FCM={fmt(self.creep_fcm)}")
                 bits.append(f"T0={fmt(self.creep_t0)}")
                 if self.shrinkage_ts > 0.0:
@@ -674,7 +678,7 @@ class ModelSpec3D(BaseModel):
         for r in sorted(self.reals, key=lambda r: r.id):
             kv = [f"{r.id}", f"A={fmt(r.A)}"]
             for key in ("IY", "IZ", "J", "G", "WT", "WB", "WY", "WTORS",
-                        "IW", "ADDMASS", "ISTRN", "W", "L0"):
+                        "IW", "ADDMASS", "ISTRN", "W", "L0", "HTH"):
                 v = getattr(r, key)
                 if v:
                     kv.append(f"{key}={fmt(v)}")

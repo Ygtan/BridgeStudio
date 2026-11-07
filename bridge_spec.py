@@ -64,6 +64,7 @@ class ElemTypeDef(BaseModel):
     addmass: float | None = None  # 附加线质量 kg/m
     istrn: float | None = None  # 初应变，正值预拉（索/杆用）
     mat: int = 1                # 材料 id（*MP 表里的编号）
+    h_th_mm: float = 0.0        # 理论厚度 mm。0 表示没有。统一厚度优先。
 
 
 class NodeDef(BaseModel):
@@ -357,6 +358,8 @@ class BridgeSpec(BaseModel):
                 f.append(f"ADDMASS={t.addmass:.6g}")
             if t.istrn is not None:
                 f.append(f"ISTRN={t.istrn:.6g}")
+            if t.h_th_mm > 0.0:
+                f.append(f"HTH={t.h_th_mm:.6g}")
             out.append(f"{t.id} " + " ".join(f))
         out.append("")
 
@@ -400,11 +403,13 @@ class BridgeSpec(BaseModel):
                 out.append(f"{rng} GY {ld.q:.6g} {ld.q:.6g}")
             out.append("")
 
-        if self.creep_rh > 0.0 and self.creep_h > 0.0 and self.creep_fcm > 0.0:
-            out.append("! 徐变：JTG 3362 附录 C.2.1。没写这三项时二维阶段不徐变。")
+        member_h = any(t.h_th_mm > 0.0 for t in self.elem_types)
+        if self.creep_rh > 0.0 and self.creep_fcm > 0.0 and (self.creep_h > 0.0 or member_h):
+            out.append("! 徐变：JTG 3362 附录 C.2.1。没写湿度时二维阶段不徐变。")
+            h_bit = f" H={self.creep_h:.6g}" if self.creep_h > 0.0 else ""
             out.append(
                 "*CREEP_MODEL MODEL=JTG3362 "
-                f"RH={self.creep_rh:.6g} H={self.creep_h:.6g} "
+                f"RH={self.creep_rh:.6g}{h_bit} "
                 f"FCM={self.creep_fcm:.6g} T0={self.creep_t0:.6g}"
                 + (f" TS={self.shrinkage_ts:.6g}" if self.shrinkage_ts > 0.0 else ""))
             out.append("")
@@ -584,10 +589,9 @@ def build_beam_bridge(
         # 一期恒载已折进阶段荷载，不再全局施加
         loads = []
 
-    # 写了湿度、理论厚度和计算龄期才把加载与读数拆成两个阶段。
-    # 静定梁上，内核把位移放大到约 1+χφ（χ=0.8），弯矩保持加载完成时的值。
-    if (creep_rh > 0.0 and creep_h > 0.0 and creep_fcm > 0.0
-            and creep_t_end > creep_t0):
+    # 写了湿度和计算龄期才把加载与读数拆成两个阶段。理论厚度可以手写，
+    # 没写就用截面外轮廓的 h=2A/u。静定梁位移约放大到 1+χφ（χ=0.8）。
+    if (creep_rh > 0.0 and creep_fcm > 0.0 and creep_t_end > creep_t0):
         if not stages:
             seg = list(range(1, n_elem + 1))
             first = Stage2D(id=1, activate=seg, time=creep_t0)
@@ -611,10 +615,15 @@ def build_beam_bridge(
     if lane:
         lanes.append(Lane2D(nodes=[n.id for n in nodes]))
 
+    beam_type = _elem_type_from_section(1, ElemKind.BEAM, shape, h, b, tw, tf)
+    if creep_rh > 0.0 and creep_fcm > 0.0 and creep_h <= 0.0:
+        from model_doc import closed_contour_perimeter_m, theoretical_thickness_mm
+        beam_type.h_th_mm = theoretical_thickness_mm(
+            beam_type.A, closed_contour_perimeter_m(b, h))
     return BridgeSpec(
         title=title,
         nodes=nodes, elements=elements,
-        elem_types=[_elem_type_from_section(1, ElemKind.BEAM, shape, h, b, tw, tf)],
+        elem_types=[beam_type],
         materials=[_mat(material)],
         boundaries=boundaries,
         nodal_loads=nloads, elem_loads=loads,
@@ -905,6 +914,12 @@ def build_cable_stayed_2d(
                              WT=tower_b * tower_h ** 2 / 6.0,
                              WB=tower_b * tower_h ** 2 / 6.0,
                              H=tower_h, mat=1)
+    if creep_rh > 0.0 and creep_fcm > 0.0 and creep_h <= 0.0:
+        from model_doc import closed_contour_perimeter_m, theoretical_thickness_mm
+        deck_type.h_th_mm = theoretical_thickness_mm(
+            deck_type.A, closed_contour_perimeter_m(B, h))
+        tower_type.h_th_mm = theoretical_thickness_mm(
+            tower_A, closed_contour_perimeter_m(tower_b, tower_h))
 
     # ---- 单元：主梁 + 塔 ----
     elements = [ElemDef(id=101 + i, type_id=1, n1=node_at[xs[i]], n2=node_at[xs[i + 1]])
@@ -1002,7 +1017,7 @@ def build_cable_stayed_2d(
                 id=3 + n_cable,
                 elem_loads=[StageElemLoadDef(elems=list(range(101, 100 + m)),
                                              q1=-q2, q2=-q2)]))
-        if creep_rh > 0.0 and creep_h > 0.0 and creep_fcm > 0.0:
+        if creep_rh > 0.0 and creep_fcm > 0.0 and (creep_h > 0.0 or deck_type.h_th_mm > 0.0):
             for i, s in enumerate(stages):
                 s.time = load_age_days + i * cycle_days
             if creep_t_end > stages[-1].time + 1e-9:
@@ -1408,11 +1423,19 @@ def extract_bridge_params(text: str) -> tuple[str, dict, list[str]]:
     m_rh = re.search(r"相对湿度\s*([0-9.]+)\s*%?", t)
     m_th = re.search(r"理论厚度\s*([0-9.]+)\s*(毫米|mm|米|m)?", t, re.I)
     m_age = re.search(r"(?:计算龄期|目标龄期)\s*([0-9.]+)\s*(?:天|日)?", t)
-    if m_rh and m_th:
+    if m_rh:
         if not is_concrete:
-            notes.append("写了湿度和理论厚度，但这根梁不是混凝土，不按 JTG 3362 徐变。")
+            notes.append("写了湿度，但这根梁不是混凝土，不按 JTG 3362 徐变。")
         elif not m_age:
-            notes.append("写了湿度和理论厚度，但没有计算龄期，二维梁桥不按龄期徐变。")
+            notes.append("写了湿度，但没有计算龄期，二维梁桥不按龄期徐变。")
+        elif not m_th:
+            m_grade = re.search(r"混凝土\s*C\s*([0-9.]+)", t, re.I)
+            fcm = 0.8 * float(m_grade.group(1)) + 8.0 if m_grade else 48.0
+            creep = {
+                "creep_rh": float(m_rh.group(1)), "creep_h": 0.0, "creep_fcm": fcm,
+                "creep_t0": 7.0, "creep_t_end": float(m_age.group(1)),
+            }
+            notes.append("未写理论厚度，按截面外轮廓取 h=2A/u。")
         else:
             rh = float(m_rh.group(1))
             h_mm = float(m_th.group(1))

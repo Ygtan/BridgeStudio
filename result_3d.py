@@ -141,8 +141,15 @@ def stage_time_effect_note(model: Any, solver: str) -> str:
     phi0_in = float(getattr(model, "creep_phi0", 0.0) or 0.0)
     beta_in = float(getattr(model, "creep_beta_h", 700.0) or 700.0)
     t0 = float(getattr(model, "creep_t0", 7.0) or 7.0)
-    code = rh > 0.0 and h > 0.0 and fcm > 0.0
-    if code:
+    member_h = [float(getattr(r, "HTH", 0.0) or 0.0)
+                for r in getattr(model, "reals", []) or []]
+    member_h = [x for x in member_h if x > 0.0]
+    code = rh > 0.0 and fcm > 0.0 and (h > 0.0 or bool(member_h))
+    if code and h <= 0.0:
+        note += ("未写统一理论厚度。各混凝土截面按外轮廓 h=2A/u："
+                 + "、".join(f"{x:.1f} mm" for x in member_h)
+                 + "。拉索不取。")
+    elif code:
         from model_doc import jtg3362_nominal_creep, jtg3362_shrinkage_nominal
         phi0, beta = jtg3362_nominal_creep(rh, h, fcm, t0)
         eps = jtg3362_shrinkage_nominal(rh, fcm)

@@ -1855,6 +1855,18 @@ def creep_phi_from_age(t_days: float, t0_days: float = 7.0, phi0: float = 2.0,
     return float(phi0) * (dt / (beta_h + dt)) ** power
 
 
+def theoretical_thickness_mm(area_m2: float, exposed_perimeter_m: float) -> float:
+    """JTG 3362 的理论厚度 h=2A/u，返回 mm。u 是与大气接触的周长。"""
+    if exposed_perimeter_m <= 0.0 or area_m2 <= 0.0:
+        return 0.0
+    return 2000.0 * float(area_m2) / float(exposed_perimeter_m)
+
+
+def closed_contour_perimeter_m(width_m: float, depth_m: float) -> float:
+    """闭合箱或实心矩形的外轮廓周长。箱内空腔不计入。"""
+    return 2.0 * (float(width_m) + float(depth_m))
+
+
 def jtg3362_nominal_creep(rh_percent: float, h_mm: float, fcm_mpa: float,
                           t0_days: float) -> tuple[float, float]:
     """JTG 3362-2018 附录 C.2.1 的名义徐变系数和 βH。与内核 jtg3362NominalCreep 相同。
@@ -2192,16 +2204,18 @@ def _note_cantilever_creep(text: str, p: dict[str, Any], notes: list[str]) -> No
         if m_rh and m_h:
             notes.append("写了徐变系数，悬臂施工仍用 φ0=2、βH=700，不改用湿度曲线。")
         return
-    if not (m_rh and m_h):
+    if not m_rh:
         if _drying_start_days(text) is not None:
-            notes.append("写了收缩开始龄期，但没有湿度和理论厚度，不按规范收缩曲线计算。")
+            notes.append("写了收缩开始龄期，但没有湿度，不按规范收缩曲线计算。")
         return
     rh = float(m_rh.group(1))
-    h = float(m_h.group(1))
-    unit = (m_h.group(2) or "").lower()
-    if unit in ("米", "m") or (not unit and h < 5.0):
-        h *= 1000.0
-        notes.append(f"理论厚度按米换算为 {h:g} mm。")
+    h = 0.0
+    if m_h:
+        h = float(m_h.group(1))
+        unit = (m_h.group(2) or "").lower()
+        if unit in ("米", "m") or (not unit and h < 5.0):
+            h *= 1000.0
+            notes.append(f"理论厚度按米换算为 {h:g} mm。")
     m_grade = re.search(r"混凝土\s*C\s*([0-9.]+)", text, re.I)
     m_fcm = re.search(r"(?:圆柱体强度|fcm)\s*([0-9.]+)", text, re.I)
     if m_fcm:
@@ -2214,16 +2228,21 @@ def _note_cantilever_creep(text: str, p: dict[str, Any], notes: list[str]) -> No
         fcm = 0.8 * 50.0 + 8.0
         notes.append("未写混凝土强度，主梁按 C50，圆柱体平均强度 fcm=48 MPa。")
     t0 = float(p.get("load_age_days") or 7.0)
-    phi0, beta_h = jtg3362_nominal_creep(rh, h, fcm, t0)
     p["creep_rh"] = rh
     p["creep_h"] = h
     p["creep_fcm"] = fcm
     ts = _drying_start_days(text)
     if ts is not None:
         p["shrinkage_ts"] = ts
+    if h > 0.0:
+        phi0, beta_h = jtg3362_nominal_creep(rh, h, fcm, t0)
+        thick = (f"理论厚度 {h:g} mm，名义系数 φ0={phi0:.3f}，βH={beta_h:.1f}。")
+    else:
+        thick = ("未写统一理论厚度。主梁按闭合外轮廓、桥塔按实心周长，分别取 h=2A/u。"
+                 "拉索不取。")
     notes.append(
-        f"悬臂徐变按 JTG 3362 附录 C.2.1：相对湿度 {rh:g}%、理论厚度 {h:g} mm、"
-        f"fcm={fcm:g} MPa、加载龄期 {t0:g} 天，名义系数 φ0={phi0:.3f}，βH={beta_h:.1f}。"
+        f"悬臂徐变按 JTG 3362 附录 C.2.1：相对湿度 {rh:g}%，{thick}"
+        f"fcm={fcm:g} MPa、加载龄期 {t0:g} 天。"
         "这不是 φ0=2、βH=700。合拢后的塔梁固结不因这条曲线而解除。"
         + (f"干燥从第 {ts:g} 天起，参与受力之前的收缩不进入平衡。"
            if ts is not None else ""))

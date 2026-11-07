@@ -147,16 +147,24 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
         rh = float(getattr(spec, "creep_rh", 0.0) or 0.0)
         if rh > 0.0:
             from model_doc import jtg3362_nominal_creep, jtg3362_shrinkage_nominal
-            h = float(spec.creep_h)
+            h = float(getattr(spec, "creep_h", 0.0) or 0.0)
             fcm = float(spec.creep_fcm)
             t0 = float(getattr(spec, "creep_t0", 7.0) or 7.0)
-            phi0, beta = jtg3362_nominal_creep(rh, h, fcm, t0)
-            eps = jtg3362_shrinkage_nominal(rh, fcm)
+            if h > 0.0:
+                phi0, beta = jtg3362_nominal_creep(rh, h, fcm, t0)
+                eps = jtg3362_shrinkage_nominal(rh, fcm)
+                thick = (f"名义徐变系数 φ0={phi0:.3f}，βH={beta:.1f}，"
+                         f"名义收缩系数 {eps:.3e}。")
+            else:
+                hs = [float(getattr(t, "h_th_mm", 0.0) or 0.0)
+                      for t in getattr(spec, "elem_types", []) or []]
+                hs = [x for x in hs if x > 0.0]
+                thick = ("未写统一理论厚度，各混凝土截面按外轮廓 h=2A/u："
+                         + "、".join(f"{x:.1f} mm" for x in hs) + "。")
             age_note = (
-                f"混凝土梁和桥塔按 JTG 3362 从这些龄期徐变、收缩："
-                f"名义徐变系数 φ0={phi0:.3f}，βH={beta:.1f}，"
-                f"名义收缩系数 {eps:.3e}。"
-                "拉索保持原弹性模量。上面的成桥挠度已经含这段徐变。"
+                "混凝土梁和桥塔按 JTG 3362 从这些龄期徐变、收缩。"
+                + thick
+                + "拉索保持原弹性模量。上面的成桥挠度已经含这段徐变。"
             )
             if getattr(spec, "lanes", None):
                 age_note += "车道活载仍按未徐变的弹性模量，不乘 1+χφ。"
