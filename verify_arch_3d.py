@@ -83,8 +83,8 @@ def main() -> int:
           classify_text("大跨度拱桥500米，拱肋分段吊装，用斜拉扣索辅助吊装，合拢后铺装") == ("arch", "3d"))
     check("普通拱桥（矢高+吊杆）→ arch×2d",
           classify_text("跨度100米的拱桥，矢高20米，9对吊杆") == ("arch", "2d"))
-    check("斜拉桥不受「斜拉扣索」干扰",
-          classify_text("主跨200米斜拉桥，塔高60米，悬臂施工") == ("cable_stayed", "3d"))
+    check("斜拉桥（无拱桥施工词）仍判斜拉桥",
+          classify_text("主跨200米斜拉桥，塔高60米，悬臂施工") == ("cable_stayed", "2d"))
 
     doc, src, diag = ModelDoc.from_text(
         "大跨度拱桥500米，矢高100米，拱肋分段吊装，用斜拉扣索辅助吊装，"

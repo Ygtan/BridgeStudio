@@ -134,12 +134,14 @@ def main() -> int:
         check("阶段2/3活载 min 为负（向下）",
               mins[1] < 0 and mins[2] < 0,
               f"阶段2={mins[1]*1000:.2f}mm  阶段3={mins[2]*1000:.2f}mm")
-        # 阶段 3（成桥）：vs anastruct 三跨连续梁活载最不利近似
-        oracle = _live_oracle()
+        # 阶段 3（成桥）：vs anastruct 三跨连续梁活载最不利近似。
+        # 内核的活载位移包络按 JTG D60 计入汽车冲击 1+μ，oracle 乘同一系数才可比。
+        impact_factor = float((res.get("lane_impact") or {}).get("impact_factor") or 1.0)
+        oracle = _live_oracle() * impact_factor
         err_l = abs(mins[2] - oracle) / abs(oracle) * 100
         check("阶段3活载 vs 连续梁理论", err_l < 20.0,
-              f"FEM={mins[2]*1000:.2f}mm  oracle={oracle*1000:.2f}mm  "
-              f"误差={err_l:.1f}%")
+              f"FEM={mins[2]*1000:.2f}mm  oracle={oracle*1000:.2f}mm "
+              f"(1+μ={impact_factor:.3f})  误差={err_l:.1f}%")
 
     n_pass = sum(1 for r in RESULTS if r[0])
     print("=" * 60)
