@@ -154,6 +154,61 @@ def main() -> int:
                      else FAIL,
                      " ".join(f"{a:g}" for a in creep_ages[:4]) + " … "
                      + f"{creep_ages[-1]:g}"))
+    r_on = solve_2d(creep_doc.model, out_dir=OUT / "cs2d_creep",
+                    dat_name="cs2d_creep.dat")
+    off = creep_doc.model.model_copy(deep=True)
+    off.creep_rh = off.creep_h = off.creep_fcm = 0.0
+    r_off = solve_2d(off, out_dir=OUT / "cs2d_creep_off", dat_name="cs2d_creep_off.dat")
+    nodes = {n.id: n for n in creep_doc.model.nodes}
+    xmid = float(creep_doc.params["Ls"]) + float(creep_doc.params["Lm"]) / 2.0
+    deck = min((n for n in nodes.values() if abs(n.y) < 1.0),
+               key=lambda n: abs(n.x - xmid))
+    v_on = r_on.final_disp.get((deck.id, 2), 0.0)
+    v_off = r_off.final_disp.get((deck.id, 2), 0.0)
+    types = {t.id: t for t in creep_doc.model.elem_types}
+    mats = {m.id: m for m in creep_doc.model.materials}
+    cab = next(e for e in creep_doc.model.elements
+               if getattr(types[e.type_id].kind, "value", types[e.type_id].kind) == "CABLE")
+    t = types[cab.type_id]
+    n1, n2 = nodes[cab.n1], nodes[cab.n2]
+    L0 = ((n2.x - n1.x) ** 2 + (n2.y - n1.y) ** 2) ** 0.5
+
+    def _xy(res, n):
+        return (n.x + res.final_disp.get((n.id, 1), 0.0),
+                n.y + res.final_disp.get((n.id, 2), 0.0))
+
+    a, b = _xy(r_on, n1), _xy(r_on, n2)
+    L1 = ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5
+    strain = (L1 - L0) / L0 + float(t.istrn or 0.0)
+    Nexp = mats[t.mat].E * t.A * strain
+    Nfem = max(abs(r_on.final_beam.get((cab.id, end), {}).get("N", 0.0))
+               for end in ("i", "j"))
+    ratio = Nfem / Nexp if abs(Nexp) > 1.0 else 0.0
+    print(f"    徐变后主梁节点 {deck.id} 竖向 {v_off*1000:.2f} → {v_on*1000:.2f} mm，"
+          f"索 {cab.id} 力/原弹性模量 {ratio:.3f}")
+    verdicts.append(("二维斜拉徐变只让混凝土变柔，拉索仍按原弹性模量",
+                     PASS if abs(v_on) > abs(v_off) * 1.02 and abs(ratio - 1.0) < 0.08
+                     else FAIL,
+                     f"挠度比 {abs(v_on)/max(abs(v_off),1e-9):.3f} 索力比 {ratio:.3f}"))
+    from export_html import write_2d_html
+    creep_html = write_2d_html(r_on, creep_doc.model, OUT / "cs2d_creep.html")
+    creep_page = creep_html.read_text(encoding="utf-8")
+    from model_doc import jtg3362_nominal_creep, jtg3362_shrinkage_nominal
+    phi0, _beta = jtg3362_nominal_creep(55.0, 200.0, 48.0, 7.0)
+    eps0 = jtg3362_shrinkage_nominal(55.0, 48.0)
+    verdicts.append(("HTML 写出斜拉徐变龄期",
+                     PASS if "施工阶段龄期" in creep_page and "10000" in creep_page
+                     and "拉索保持原弹性模量" in creep_page
+                     and f"φ0={phi0:.3f}" in creep_page
+                     and f"{eps0:.3e}" in creep_page else FAIL,
+                     creep_html.name))
+    from bridge_spec import Lane2D
+    laned = creep_doc.model.model_copy(deep=True)
+    laned.lanes = [Lane2D(nodes=[1])]
+    lane_page = write_2d_html(r_on, laned, OUT / "cs2d_creep_lane_note.html").read_text(
+        encoding="utf-8")
+    verdicts.append(("有车道时写明活载不乘徐变",
+                     PASS if "不乘 1+χφ" in lane_page else FAIL, ""))
 
     # ---------------- 6. 规范组合 ----------------
     combos = r_cs.combinations()

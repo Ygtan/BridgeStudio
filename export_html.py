@@ -137,6 +137,37 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
             f"{html.escape(extra)}</p>"
         )
     diags = "".join(f"<li>{html.escape(str(d))}</li>" for d in res.diagnostics)
+    age_rows = []
+    for s in getattr(spec, "stages", []) or []:
+        t = float(getattr(s, "time", 0.0) or 0.0)
+        if t > 0.0:
+            age_rows.append(f"<tr><td>{s.id}</td><td>{t:g}</td></tr>")
+    age_html = ""
+    if age_rows:
+        rh = float(getattr(spec, "creep_rh", 0.0) or 0.0)
+        if rh > 0.0:
+            from model_doc import jtg3362_nominal_creep, jtg3362_shrinkage_nominal
+            h = float(spec.creep_h)
+            fcm = float(spec.creep_fcm)
+            t0 = float(getattr(spec, "creep_t0", 7.0) or 7.0)
+            phi0, beta = jtg3362_nominal_creep(rh, h, fcm, t0)
+            eps = jtg3362_shrinkage_nominal(rh, fcm)
+            age_note = (
+                f"混凝土梁和桥塔按 JTG 3362 从这些龄期徐变、收缩："
+                f"名义徐变系数 φ0={phi0:.3f}，βH={beta:.1f}，"
+                f"名义收缩系数 {eps:.3e}。"
+                "拉索保持原弹性模量。上面的成桥挠度已经含这段徐变。"
+            )
+            if getattr(spec, "lanes", None):
+                age_note += "车道活载仍按未徐变的弹性模量，不乘 1+χφ。"
+        else:
+            age_note = "这些龄期写在阶段上，但本次没有按规范曲线计算徐变和收缩。"
+        age_html = (
+            "<h2>施工阶段龄期</h2>"
+            f"<div class=\"note\">{html.escape(age_note)}</div>"
+            "<table><tr><th>阶段</th><th>末龄期 (天)</th></tr>"
+            + "".join(age_rows) + "</table>"
+        )
     env_rows = []
     for eid, f in sorted(getattr(res, "beam", {}).items()):
         env_rows.append(
@@ -211,6 +242,7 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
 <div class="sub">二维桥梁 · {html.escape(res.solver or "FEM-Eigen")} · 指纹 {html.escape(res.fingerprint)}</div>
 <h2>最大竖向位移</h2>
 <p>{html.escape(defl_txt)}</p>
+{age_html}
 {live_v}
 <h2>成桥态梁端内力</h2>
 <table>
