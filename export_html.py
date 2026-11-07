@@ -117,13 +117,10 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
     disp = getattr(res, "live_disp", None) or {}
     if disp:
         node, pair = min(disp.items(), key=lambda kv: kv[1][1])
-        factor = float(getattr(res, "impact_factor", 1.0) or 1.0)
-        if factor <= 0.0:
-            factor = 1.0
-        bare = pair[1] / factor
+        bare = pair[1]  # 位移包络已不计冲击（冲击只放大内力）
         from solve_2d import _max_vertical_span
         span = _max_vertical_span(spec)
-        extra = f"不计冲击 {bare * 1000:.2f} mm。"
+        extra = ""
         if span > 0.0:
             lim = span / 600.0
             extra += (
@@ -132,8 +129,8 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
                 + ("满足。" if abs(bare) <= lim else "超出。")
             )
         live_v = (
-            "<h2>车道活载竖向位移</h2>"
-            f"<p>向下最大：节点 {node}　{pair[1] * 1000:.2f} mm（含冲击）。"
+            "<h2>车道活载竖向位移（不计冲击）</h2>"
+            f"<p>向下最大：节点 {node}　{bare * 1000:.2f} mm。"
             f"{html.escape(extra)}</p>"
         )
     diags = "".join(f"<li>{html.escape(str(d))}</li>" for d in res.diagnostics)

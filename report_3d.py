@@ -570,7 +570,7 @@ def figure_girder_live(res: SolveResult, model: Any,
 
 
 def figure_live(res: SolveResult, model: Any, path: Path) -> Path:
-    """活载包络：各施工阶段影响点处车道荷载产生的竖向位移。
+    """活载包络：各施工阶段影响点处车道荷载产生的竖向位移（不计冲击）。
 
 
     内核只给标量（每个阶段一对 max/min），没有沿桥分布——所以是成对柱状图，

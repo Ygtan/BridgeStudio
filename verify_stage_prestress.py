@@ -668,8 +668,9 @@ def online() -> None:
           "basis=tangent" in stay_txt
           and abs(stay_my - want_stay) / abs(want_stay) < 5e-3,
           f"stay={stay_my:.6e} want={want_stay:.6e}")
-    # 跨中等效集中力 = q·(L/2)·(1+μ)，挠度 = 该力 / (k梁 + EA/L0)。
-    f_mid = 10000.0 * 5.0 * 1.45
+    # 跨中等效集中力 = q·(L/2)。挠度不计冲击（表 4.3.2），故不乘 1+μ；
+    # 弯矩包络仍乘 1+μ（见 want_stay 上方的 my_mid）。挠度 = 该力 / (k梁 + EA/L0)。
+    f_mid = 10000.0 * 5.0
     want_uz = -f_mid / (k_beam + k_cable)
     got = stay_nl.live.get(1)
     got_uz = got[1] if got else 0.0
@@ -711,7 +712,7 @@ def online() -> None:
     stay_code_my = stay_code_nl.live_beam.get((1, "j"), {}).get("MyMin", 0.0)
     want_code_my = m_code_bare * k_beam / (k_beam + k_cable)
     code_uz = (stay_code_nl.live.get(1) or (0.0, 0.0))[1]
-    want_code_uz = -(qk_s * 5.0 + pk_s) * 1.45 / (k_beam + k_cable)
+    want_code_uz = -(qk_s * 5.0 + pk_s) / (k_beam + k_cable)  # 挠度不计冲击
     check("有索公路车道的弯矩和挠度按切线刚度折减",
           abs(stay_code_my - want_code_my) / abs(want_code_my) < 5e-3
           and abs(code_uz - want_code_uz) / abs(want_code_uz) < 5e-3,
@@ -828,7 +829,7 @@ def online() -> None:
     sag_nl = solve_staged_result(sag_model, "out/verify_prestress",
                                  dat_name="sag_lane_nl.dat")
     sag_uz = (sag_nl.live.get(1) or (0.0, 0.0))[1]
-    f_sag = 10000.0 * 5.0 * 1.2
+    f_sag = 10000.0 * 5.0  # 挠度不计冲击（impact=1.2 只放大弯矩包络）
     want_sag = -f_sag / (k_soft + k_zz)
     want_bar = -f_sag / (k_soft + k_zz_bar)
     check("垂度索活载挠度用 Ernst 切线，不是 EA/L0",
@@ -884,7 +885,6 @@ def online() -> None:
             return 0.1767 * math.log(freq) - 0.0157
         return 0.45
 
-    factor_f = 1.0 + mu_of(f_ernst)
     freq_model = ModelSpec3D(
         title="垂度索切线基频",
         nodes=[Node3D(id=1, x=0, y=0, z=0), Node3D(id=2, x=10, y=0, z=0),
@@ -914,7 +914,7 @@ def online() -> None:
     mu_got = float(freq_nl.meta.get("impact_mu") or 0.0)
     uz_dead = freq_nl.final_disp.get((2, 3), 0.0)
     uz_live = (freq_nl.live.get(1) or (0.0, 0.0))[1]
-    want_live = -10000.0 * (L_f / 2.0) * factor_f / k_f
+    want_live = -10000.0 * (L_f / 2.0) / k_f  # 挠度不计冲击，μ 只在弯矩包络放大
     # 弹性支承必须进基频。两端转角固定时梁的竖向刚度是 12EI/L³，再并联弹簧。
     # 若把弹簧当成固结，基频只剩梁，大约低一半。
     k_b = 1.0e5
@@ -925,13 +925,6 @@ def online() -> None:
     m_s = 156.0 / 420.0 * rho_s * A_s * L_s
     f_with = math.sqrt((k_b + k_s) / m_s) / (2.0 * math.pi)
     f_beam_only = math.sqrt(k_b / m_s) / (2.0 * math.pi)
-
-    def mu_s(freq: float) -> float:
-        if freq < 1.5:
-            return 0.05
-        if freq <= 14.0:
-            return 0.1767 * math.log(freq) - 0.0157
-        return 0.45
 
     spring = ModelSpec3D(
         title="弹性支承上的梁",
@@ -953,7 +946,7 @@ def online() -> None:
     spring_res = solve_3d(spring, out_dir="out/verify_prestress", dat_name="spring_lane.dat")
     f_spring = float(spring_res.get("lane_impact", {}).get("f1_vertical") or 0.0)
     uz_spring = (spring_res.get("live", {}).get(1) or (0.0, 0.0))[1]
-    want_uz_s = -10000.0 * (L_s / 2.0) * (1.0 + mu_s(f_with)) / (k_b + k_s)
+    want_uz_s = -10000.0 * (L_s / 2.0) / (k_b + k_s)  # 挠度不计冲击
     check("弹性支承进入冲击基频，不当成固结",
           abs(f_spring - f_with) / f_with < 1.0e-2
           and abs(f_with - f_beam_only) / f_beam_only > 0.05

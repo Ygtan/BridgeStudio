@@ -305,7 +305,7 @@ class SolveResult:
 
         内核给的是**影响点**（中跨跨中）处各施工阶段的活载位移包络，一个
         阶段一对 (max, min)；包络的 min 才是向下挠的控制值，但上拱同样要
-        看得见，所以按绝对值挑。
+        看得见，所以按绝对值挑。位移已不计冲击（冲击只放大内力包络）。
         """
         best: tuple[int, float] | None = None
         for stage, (hi, lo) in self.live.items():
@@ -535,7 +535,7 @@ class SolveResult:
             if lw is not None:
                 out.append(Metric(
                     "活载包络（影响点）", f"{lw[1] * 1000:.2f}", "mm",
-                    hint=f"阶段 {lw[0]}，JTG D60 车道荷载"))
+                    hint=f"阶段 {lw[0]}，JTG D60 车道荷载（不计冲击）"))
             out.append(Metric("施工阶段", f"{st.get('stages', 0)}",
                               hint=f"活载包络 {len(self.live)} 阶段"))
             if self.stage_cables:
@@ -1496,7 +1496,8 @@ class SolveResult:
         # 活载挠度单独校核：规范限值针对的是**车道荷载产生的挠度**，
         # 不是恒载 + 活载的总量。上面那条拿全量对 L/600，只能当量级判据；
         # 这条才是条文对应的量，分母用最大跨径（不是总长）。
-        # 表 4.3.2 的挠度不计冲击。包络里的位移已经乘了 1+μ，比对限值时除掉。
+        # 表 4.3.2 的挠度不计冲击：内核位移包络已不乘 1+μ（冲击只放大内力），
+        # 这里直接用包络值比对，无需再除。
         lw = self.live_worst()
         if lw is not None:
             sup = support_x(model)
@@ -1504,15 +1505,11 @@ class SolveResult:
                     if len(sup) >= 2 else 0.0)
             if span > 0:
                 lim = span / 600.0
-                factor = float(self.meta.get("impact_factor") or 1.0)
-                if factor <= 0.0:
-                    factor = 1.0
-                bare = lw[1] / factor
+                bare = lw[1]
                 out.append(Check(
                     "活载挠度 ≤ L₁/600（JTG D60 4.3.2）", abs(bare) <= lim,
-                    f"阶段 {lw[0]} 影响点含冲击 |{lw[1] * 1000:.2f}| mm，"
-                    f"不计冲击 |{bare * 1000:.2f}| mm ≤ "
-                    f"{lim * 1000:.1f} mm（最大跨径 {span:.0f} m，1+μ={factor:.3f}）",
+                    f"阶段 {lw[0]} 影响点不计冲击 |{lw[1] * 1000:.2f}| mm ≤ "
+                    f"{lim * 1000:.1f} mm（最大跨径 {span:.0f} m）",
                     value=abs(bare), limit=lim, unit="m"))
         if self.beam:
             mmax = self.max_bending()
@@ -1677,7 +1674,8 @@ class SolveResult:
             out["live_envelope"] = {
                 "title": "活载包络（JTG D60，影响点 = 中跨跨中）",
                 "note": "取自内核 compute3DStageLiveEnvelope：对各施工阶段的"
-                        "激活体系逐车道求影响面后取包络，max 为向上、min 为向下。",
+                        "激活体系逐车道求影响面后取包络，max 为向上、min 为向下。"
+                        "位移不计冲击（表 4.3.2 挠度限值；冲击只放大内力包络）。",
                 "headers": ["施工阶段", "竖向 max (mm)", "竖向 min (mm)"],
                 "rows": [[k, _r(hi * 1000, 2), _r(lo * 1000, 2)]
                          for k, (hi, lo) in sorted(self.live.items())],

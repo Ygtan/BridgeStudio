@@ -122,9 +122,9 @@ def main() -> int:
     m_g = Q * L * L / 8                                # 恒载跨中弯矩
     m_q = (qk * L * L / 8 + pk * L / 4) * (1.0 + mu)  # 活载，含自动冲击
     defl = 5 * Q * L ** 4 / (384 * E * IY)             # 恒载跨中挠度
-    defl_q = ((5 * qk * L ** 4 / (384 * E * IY)        # 活载跨中挠度：
+    defl_q = (5 * qk * L ** 4 / (384 * E * IY)         # 活载跨中挠度（不计冲击）：
               + pk * L ** 3 / (48 * E * IY))           # 均布 + 跨中集中力
-             * (1.0 + mu))                             # 与弯矩同一套 1+μ
+    # 表 4.3.2 挠度限值针对汽车荷载本身，位移包络不计冲击（冲击只放大内力）。
 
     # ---------------------------------------------------------- 恒载与活载
     print("\n[单工况：内核 vs 解析]")
@@ -179,15 +179,15 @@ def main() -> int:
     check("控制截面在跨中", by["ultimate"].worst("My")[0][0] == N // 2,
           str(by["ultimate"].worst("My")[0]))
 
-    # 活载位移：5qk·L⁴/(384EI) + Pk·L³/(48EI)。这条同时守住"影响点取的是
-    # 最后一个阶段"——施工中间态的模型残缺，那里活载位移恒为 0。
+    # 活载位移：5qk·L⁴/(384EI) + Pk·L³/(48EI)，不计冲击。这条同时守住
+    # "影响点取的是最后一个阶段"——施工中间态的模型残缺，那里活载位移恒为 0。
     u_q = abs(res.live[max(res.live)][1]) if res.live else 0.0
-    check("活载跨中挠度 = (5qk·L⁴/(384EI) + Pk·L³/(48EI))·(1+μ)",
+    check("活载跨中挠度 = (5qk·L⁴/(384EI) + Pk·L³/(48EI))（不计冲击）",
           near(u_q, defl_q, 5e-3),
           f"FEM {u_q * 1000:.2f} / 解析 {defl_q * 1000:.2f} mm")
     live_chk = next((c for c in res.checks(simple_beam())
                      if c.name.startswith("活载挠度")), None)
-    bare = u_q / float(res.meta.get("impact_factor") or 1.0)
+    bare = u_q
     check("活载挠度限值按不计冲击",
           live_chk is not None and near(float(live_chk.value or 0.0), bare, 1e-6)
           and "不计冲击" in live_chk.detail,

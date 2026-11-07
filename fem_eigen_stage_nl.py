@@ -232,7 +232,7 @@ def as_solve_result(model, rows: list[dict], *, dat_path: Path) -> SolveResult:
     if live_beam and tangent_live:
         note += "末阶段活载弯矩在收敛构形的切线刚度上计算。有索时不用参考几何上的线弹性影响线。"
     elif live_beam:
-        note += "无索单元的活载包络与线性阶段内核相同，弯矩和挠度乘同一套 1+μ。"
+        note += "无索单元的活载内力包络与线性阶段内核相同，弯矩乘 1+μ、挠度不计冲击。"
     elif live or meta:
         note += "末阶段活载在收敛构形的切线刚度上计算，冲击系数用同一套切线的竖向基频。"
     elif has_cable:

@@ -101,12 +101,12 @@ def main() -> int:
                      f"1+μ={fac:.3f} 误差{dm_imp*100:.2f}%"))
     qk = 10500.0
     want_v = -(5.0 * qk * Lspan ** 4 / (384.0 * EI)
-               + pk * Lspan ** 3 / (48.0 * EI)) * fac
+               + pk * Lspan ** 3 / (48.0 * EI))  # 不计冲击（表 4.3.2 挠度限值）
     got_v = rL.live_disp.get(mid_node, (0.0, 0.0))[1]
     dv_imp = abs(got_v - want_v) / abs(want_v)
-    print(f"    车道跨中挠度 {got_v*1000:.3f} mm（理论含冲击 {want_v*1000:.3f}）"
+    print(f"    车道跨中挠度 {got_v*1000:.3f} mm（理论不计冲击 {want_v*1000:.3f}）"
           f"误差 {dv_imp*100:.2f}%")
-    verdicts.append(("简支梁车道活载挠度含自动冲击",
+    verdicts.append(("简支梁车道活载挠度不计冲击",
                      PASS if mid_node in rL.live_disp and dv_imp < 0.02 else FAIL,
                      f"{got_v*1000:.2f} mm 误差{dv_imp*100:.2f}%"))
     note = " ".join(rL.diagnostics)

@@ -116,9 +116,10 @@ class Solve2DResult:
     beam: dict[int, dict[str, float]] = field(default_factory=dict)
     # 车道活载内力包络：{(单元, "i"/"j"): {NMin,NMax,MyMin,MyMax,VzMin,VzMax}}
     live_beam: dict[tuple[int, str], dict[str, float]] = field(default_factory=dict)
-    # 车道节点活载位移包络：{节点: (max, min)}，竖向，单位 m。已含 1+μ。
+    # 车道节点活载位移包络：{节点: (max, min)}，竖向，单位 m。不计冲击
+    # （表 4.3.2 挠度限值针对汽车荷载本身，冲击只放大内力包络）。
     live_disp: dict[int, tuple[float, float]] = field(default_factory=dict)
-    # 自动冲击的放大系数。未自动计算时为 1。
+    # 自动冲击的放大系数（只作用于内力包络）。未自动计算时为 1。
     impact_factor: float = 1.0
 
     @property
@@ -440,19 +441,17 @@ def solve_2d(
             "荷载组合只出恒载项（has_live=False）。")
     if res.live_disp:
         node, (_hi, lo) = min(res.live_disp.items(), key=lambda kv: kv[1][1])
-        factor = res.impact_factor if res.impact_factor > 0.0 else 1.0
-        bare = lo / factor
         span = _max_vertical_span(spec)
         line = (
-            f"车道活载竖向位移：节点 {node} 含冲击 {lo * 1000:.2f} mm，"
-            f"不计冲击 {bare * 1000:.2f} mm。"
+            f"车道活载竖向位移（不计冲击）：节点 {node} "
+            f"{lo * 1000:.2f} mm。"
         )
         if span > 0.0:
             lim = span / 600.0
             line += (
                 f"JTG D60 表 4.3.2 限值 L/600 = {lim * 1000:.1f} mm"
                 f"（最大跨径 {span:.0f} m），"
-                + ("满足。" if abs(bare) <= lim else "超出。")
+                + ("满足。" if abs(lo) <= lim else "超出。")
             )
         res.diagnostics.append(line)
     else:
