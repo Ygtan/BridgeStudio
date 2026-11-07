@@ -137,6 +137,23 @@ def main() -> int:
     verdicts.append(("斜拉桥 2D：施工成桥态可解",
                      PASS if r_cst.stats.get("stages_solved", 0) > 3 else FAIL,
                      f"{r_cst.stats.get('stages_solved')} 阶段"))
+    creep_doc, _, creep_notes = ModelDoc.from_text(
+        "斜拉桥，主跨40米，边跨16米，塔高12米，每塔每侧2根索，悬臂施工，"
+        "相对湿度55%，理论厚度200毫米，混凝土C50，计算龄期10000天")
+    creep_doc.build()
+    creep_dat = creep_doc.model.to_dat()
+    creep_ages = [s.time for s in creep_doc.model.stages]
+    has_cable = any(getattr(t.kind, "value", t.kind) == "CABLE"
+                    for t in creep_doc.model.elem_types)
+    verdicts.append(("二维斜拉悬臂写上龄期，拉索仍是拉索",
+                     PASS if has_cable and creep_ages[0] == 7.0
+                     and creep_ages[-1] == 10000.0
+                     and creep_ages == sorted(creep_ages)
+                     and "CREEP_MODEL" in creep_dat and "RH=55" in creep_dat
+                     and any("拉索保持弹性" in n for n in creep_notes.notes)
+                     else FAIL,
+                     " ".join(f"{a:g}" for a in creep_ages[:4]) + " … "
+                     + f"{creep_ages[-1]:g}"))
 
     # ---------------- 6. 规范组合 ----------------
     combos = r_cs.combinations()

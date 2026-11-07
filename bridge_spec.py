@@ -205,6 +205,12 @@ class BridgeSpec(BaseModel):
     elem_loads: list[ElemLoadDef] = Field(default_factory=list)
     stages: list[Stage2D] = Field(default_factory=list)
     lanes: list[Lane2D] = Field(default_factory=list)
+    # 三者都大于 0 且阶段写了 TIME 时，二维施工阶段按 JTG 3362 附录 C.2.1 徐变。
+    creep_rh: float = 0.0
+    creep_h: float = 0.0
+    creep_fcm: float = 0.0
+    creep_t0: float = 7.0
+    shrinkage_ts: float = 0.0    # 干燥开始龄期；0 表示与加载龄期相同
     gravity: float = -9.81       # 0.0 表示不计自重
     analysis: str = "LINEAR"     # LINEAR | NONLINEAR（轴向单元几何非线性 + 索开关）
     note: str = ""
@@ -394,6 +400,15 @@ class BridgeSpec(BaseModel):
                 out.append(f"{rng} GY {ld.q:.6g} {ld.q:.6g}")
             out.append("")
 
+        if self.creep_rh > 0.0 and self.creep_h > 0.0 and self.creep_fcm > 0.0:
+            out.append("! 徐变：JTG 3362 附录 C.2.1。没写这三项时二维阶段不徐变。")
+            out.append(
+                "*CREEP_MODEL MODEL=JTG3362 "
+                f"RH={self.creep_rh:.6g} H={self.creep_h:.6g} "
+                f"FCM={self.creep_fcm:.6g} T0={self.creep_t0:.6g}"
+                + (f" TS={self.shrinkage_ts:.6g}" if self.shrinkage_ts > 0.0 else ""))
+            out.append("")
+
         out.append("! 自重开关（必须显式给出：求解器 gy 默认 -9.81）")
         out.append("*GRAVITY")
         out.append(f"0 {self.gravity:.6g}")
@@ -505,6 +520,12 @@ def build_beam_bridge(
     staged: bool = False,
     q2_kN: float = 0.0,
     lane: bool = False,
+    creep_rh: float = 0.0,
+    creep_h: float = 0.0,
+    creep_fcm: float = 0.0,
+    creep_t0: float = 7.0,
+    creep_t_end: float = 0.0,
+    shrinkage_ts: float = 0.0,
 ) -> BridgeSpec:
     """简支 / 连续梁桥。用于与拱桥、桁架桥在同一内核上做对比。
 
@@ -563,6 +584,29 @@ def build_beam_bridge(
         # 一期恒载已折进阶段荷载，不再全局施加
         loads = []
 
+    # 写了湿度、理论厚度和计算龄期才把加载与读数拆成两个阶段。
+    # 静定梁上，内核把位移放大到约 1+χφ（χ=0.8），弯矩保持加载完成时的值。
+    if (creep_rh > 0.0 and creep_h > 0.0 and creep_fcm > 0.0
+            and creep_t_end > creep_t0):
+        if not stages:
+            seg = list(range(1, n_elem + 1))
+            first = Stage2D(id=1, activate=seg, time=creep_t0)
+            if udl_kN:
+                first.elem_loads.append(StageElemLoadDef(
+                    elems=seg, q1=-abs(udl_kN) * 1000.0, q2=-abs(udl_kN) * 1000.0))
+            for ld in nloads:
+                first.loads.append(StageLoadDef(
+                    node=ld.node, dof=ld.dof, value=ld.value))
+            stages = [first, Stage2D(id=2, time=creep_t_end)]
+            loads = []
+            nloads = []
+        else:
+            for i, s in enumerate(stages):
+                if not s.time:
+                    s.time = creep_t0 + i * 7.0
+            if stages[-1].time + 1e-9 < creep_t_end:
+                stages.append(Stage2D(id=stages[-1].id + 1, time=creep_t_end))
+
     lanes: list[Lane2D] = []
     if lane:
         lanes.append(Lane2D(nodes=[n.id for n in nodes]))
@@ -575,6 +619,8 @@ def build_beam_bridge(
         boundaries=boundaries,
         nodal_loads=nloads, elem_loads=loads,
         stages=stages, lanes=lanes,
+        creep_rh=creep_rh, creep_h=creep_h, creep_fcm=creep_fcm, creep_t0=creep_t0,
+        shrinkage_ts=shrinkage_ts,
         gravity=gravity,
         note=f"跨度{span}m 跨数{n_spans} {shape} 截面 h={h}m b={b}m UDL={udl_kN}kN/m",
     )
@@ -774,6 +820,14 @@ def build_cable_stayed_2d(
     tower_dens: float = 2500.0,
     lane: bool = False,
     staged: bool = False,
+    creep_rh: float = 0.0,
+    creep_h: float = 0.0,
+    creep_fcm: float = 0.0,
+    creep_t0: float = 7.0,
+    creep_t_end: float = 0.0,
+    shrinkage_ts: float = 0.0,
+    load_age_days: float = 7.0,
+    cycle_days: float = 7.0,
 ) -> BridgeSpec:
     """双塔三跨平面斜拉桥（2D 简化，成桥态一次静力 / 可选悬臂施工）。
 
@@ -948,6 +1002,11 @@ def build_cable_stayed_2d(
                 id=3 + n_cable,
                 elem_loads=[StageElemLoadDef(elems=list(range(101, 100 + m)),
                                              q1=-q2, q2=-q2)]))
+        if creep_rh > 0.0 and creep_h > 0.0 and creep_fcm > 0.0:
+            for i, s in enumerate(stages):
+                s.time = load_age_days + i * cycle_days
+            if creep_t_end > stages[-1].time + 1e-9:
+                stages.append(Stage2D(id=stages[-1].id + 1, time=creep_t_end))
 
     lanes: list[Lane2D] = [Lane2D(nodes=[node_at[x] for x in xs])] if lane else []
 
@@ -962,6 +1021,8 @@ def build_cable_stayed_2d(
         elem_loads=elem_loads,
         stages=stages,
         lanes=lanes,
+        creep_rh=creep_rh, creep_h=creep_h, creep_fcm=creep_fcm,
+        creep_t0=creep_t0, shrinkage_ts=shrinkage_ts,
         gravity=0.0,
         analysis="NONLINEAR",
         note=(f"主跨{main_span}m 边跨{side_span}m 塔高{Ht}m 每塔每侧{n_cable}索 "
@@ -1343,10 +1404,39 @@ def extract_bridge_params(text: str) -> tuple[str, dict, list[str]]:
         if not staged:
             staged = True
             notes.append("识别到二期铺装，自动开启逐跨施工（二期在合拢后全桥施加）")
+    creep: dict = {}
+    m_rh = re.search(r"相对湿度\s*([0-9.]+)\s*%?", t)
+    m_th = re.search(r"理论厚度\s*([0-9.]+)\s*(毫米|mm|米|m)?", t, re.I)
+    m_age = re.search(r"(?:计算龄期|目标龄期)\s*([0-9.]+)\s*(?:天|日)?", t)
+    if m_rh and m_th:
+        if not is_concrete:
+            notes.append("写了湿度和理论厚度，但这根梁不是混凝土，不按 JTG 3362 徐变。")
+        elif not m_age:
+            notes.append("写了湿度和理论厚度，但没有计算龄期，二维梁桥不按龄期徐变。")
+        else:
+            rh = float(m_rh.group(1))
+            h_mm = float(m_th.group(1))
+            unit = (m_th.group(2) or "").lower()
+            if unit in ("米", "m") or (not unit and h_mm < 5.0):
+                h_mm *= 1000.0
+                notes.append(f"理论厚度按米换算为 {h_mm:g} mm。")
+            m_grade = re.search(r"混凝土\s*C\s*([0-9.]+)", t, re.I)
+            fcm = 0.8 * float(m_grade.group(1)) + 8.0 if m_grade else 48.0
+            m_ts = re.search(r"(?:收缩开始龄期|干燥开始龄期|养护结束)\s*([0-9.]+)", t)
+            creep = {
+                "creep_rh": rh, "creep_h": h_mm, "creep_fcm": fcm,
+                "creep_t0": 7.0, "creep_t_end": float(m_age.group(1)),
+                "shrinkage_ts": float(m_ts.group(1)) if m_ts else 0.0,
+            }
+            notes.append(
+                f"二维梁桥按 JTG 3362 徐变到 {float(m_age.group(1)):g} 天："
+                f"相对湿度 {rh:g}%、理论厚度 {h_mm:g} mm、fcm={fcm:g} MPa。"
+                "静定梁位移约放大到 1+χφ，χ=0.8，弯矩不随徐变放大。")
     return _finish("beam_bridge", dict(
         span=span, n_spans=ns, h=h, b=b, material=mat,
         udl=udl or 0.0, point=point or 0.0,
         staged=staged, q2_kN=q2, lane=lane,
+        **creep,
     ), notes)
 
 

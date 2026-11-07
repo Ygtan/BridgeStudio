@@ -361,12 +361,23 @@ def solve_2d(
             raise SolverUnavailable2D("施工阶段结果为空，无法解析。")
         res.beam = _stage_envelope(stages)
         last = stages[-1]
-        res.final_disp = {(int(n), 2): float(d["v"]) for n, d in last["disp"].items()}
+        res.final_disp = {}
+        for n, d in last["disp"].items():
+            res.final_disp[(int(n), 1)] = float(d["u"])
+            res.final_disp[(int(n), 2)] = float(d["v"])
         res.final_beam = _forces_to_final(last["forces"])
         res.stats["stages_solved"] = len(stages)
+        creep_note = (
+            "二维施工阶段按加载龄期之后的徐变折减模量，老化系数 χ=0.8。"
+            "静定梁的位移约放大到 1+χφ，弯矩不随徐变放大。"
+            "混凝土收缩按同一组湿度从加载龄期起算，正值缩短，只缩短梁轴。"
+            "拉索和钢杆不按这条混凝土曲线徐变或收缩。"
+            if float(getattr(spec, "creep_rh", 0.0) or 0.0) > 0.0
+            else "这条二维正装不按龄期计算徐变和收缩。")
         res.diagnostics.append(
             f"施工阶段正装（{len(stages)} 个阶段，增量法）：成桥态取最后一个阶段的"
-            "累计内力，与三维 final_beam 语义一致，可和活载包络配对组合。")
+            "累计内力，与三维 final_beam 语义一致，可和活载包络配对组合。"
+            + creep_note)
     else:
         exe = _find_exe("example_mixed.exe")
         if exe is None:

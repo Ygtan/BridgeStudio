@@ -1054,6 +1054,12 @@ class ModelDoc:
             staged=bool(p.get("staged", False)),
             q2_kN=float(p.get("q2_kN", 0.0) or 0.0),
             lane=bool(p.get("lane", False)),
+            creep_rh=float(p.get("creep_rh") or 0.0),
+            creep_h=float(p.get("creep_h") or 0.0),
+            creep_fcm=float(p.get("creep_fcm") or 0.0),
+            creep_t0=float(p.get("creep_t0") or 7.0),
+            creep_t_end=float(p.get("creep_t_end") or 0.0),
+            shrinkage_ts=float(p.get("shrinkage_ts") or 0.0),
         )
 
     def _build_grillage3d(self):
@@ -1169,6 +1175,14 @@ class ModelDoc:
             cable_area_mm2=float(p["A"]),
             staged=bool(p.get("staged", False)),
             lane=bool(p.get("lane", False)),
+            creep_rh=float(p.get("creep_rh") or 0.0),
+            creep_h=float(p.get("creep_h") or 0.0),
+            creep_fcm=float(p.get("creep_fcm") or 0.0),
+            creep_t0=float(p.get("load_age_days") or p.get("creep_t0") or 7.0),
+            creep_t_end=float(p.get("creep_t_end") or 0.0),
+            shrinkage_ts=float(p.get("shrinkage_ts") or 0.0),
+            load_age_days=float(p.get("load_age_days") or 7.0),
+            cycle_days=float(p.get("cycle_days") or 7.0),
         )
 
     def _build_suspension_2d(self):
@@ -2316,9 +2330,15 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
                     f"短于 {CABLE_STAYED_LARGE_SPAN_M:g} m 仍走线性阶段；"
                     "写「线性施工」可以强制保持线性。")
         _note_cable_system(text, p, notes, is_2d=is_2d)
-        if p.get("staged") and not is_2d:
+        if p.get("staged"):
             _note_cantilever_schedule(text, p, notes)
             _note_cantilever_creep(text, p, notes)
+            m_end = re.search(r"(?:计算龄期|目标龄期)\s*([0-9.]+)\s*(?:天|日)?", text)
+            if is_2d and m_end and float(p.get("creep_rh") or 0.0) > 0.0:
+                p["creep_t_end"] = float(m_end.group(1))
+                notes.append(
+                    f"二维斜拉在施工阶段之后加一段到 {p['creep_t_end']:g} 天。"
+                    "混凝土梁和桥塔按这条曲线徐变、收缩，拉索保持弹性。")
         # 二期恒载（铺装+护栏）：单独给出才拆分 q1=q−q2，否则二期=0 全算一期。
         m2 = re.search(r"二期(?:恒载|铺装|荷载|桥面)?\s*"
                        r"([0-9]+(?:\.[0-9]+)?)\s*(?:kN/m|kN|kn/m|KN/m)", text)
