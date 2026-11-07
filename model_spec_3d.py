@@ -454,6 +454,13 @@ class ModelSpec3D(BaseModel):
     creep_t0: float = 7.0
     creep_beta_h: float = 700.0
     creep_power: float = 0.3
+    # 三者都大于 0 时，名义徐变系数和 βH 由内核按 JTG 3362 附录 C.2.1 计算。
+    # 不写 PHI0。相对湿度为百分数，理论厚度为 mm，fcm 为圆柱体平均强度 MPa。
+    creep_rh: float = 0.0
+    creep_h: float = 0.0
+    creep_fcm: float = 0.0
+    # 干燥开始龄期（天）。0 表示与加载龄期相同。只在规范收缩里使用。
+    shrinkage_ts: float = 0.0
     # 自由收缩应变，正值为缩短。0 表示不计。全模型一个值，不按龄期。
     shrinkage_ecs: float = 0.0
 
@@ -618,11 +625,19 @@ class ModelSpec3D(BaseModel):
         nonlinear = self.cable_bridge is not None
         L.append(f"# {self.title}")
         L.append("# 由 BridgeStudio 导出（FEM-Eigen 3D new format，单位 m/N/Pa）")
-        if self.creep_phi or self.creep_phi0:
+        code_creep = self.creep_rh > 0.0 and self.creep_h > 0.0 and self.creep_fcm > 0.0
+        if self.creep_phi or self.creep_phi0 or code_creep:
             bits = ["*CREEP"]
             if self.creep_phi:
                 bits.append(f"PHI={fmt(self.creep_phi)}")
-            if self.creep_phi0:
+            if code_creep:
+                bits.append(f"RH={fmt(self.creep_rh)}")
+                bits.append(f"H={fmt(self.creep_h)}")
+                bits.append(f"FCM={fmt(self.creep_fcm)}")
+                bits.append(f"T0={fmt(self.creep_t0)}")
+                if self.shrinkage_ts > 0.0:
+                    bits.append(f"TS={fmt(self.shrinkage_ts)}")
+            elif self.creep_phi0:
                 bits.append(f"PHI0={fmt(self.creep_phi0)}")
                 bits.append(f"T0={fmt(self.creep_t0)}")
                 bits.append(f"BETAH={fmt(self.creep_beta_h)}")

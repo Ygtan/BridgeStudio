@@ -1284,6 +1284,8 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     if stage_chapter:
         blocks.append({"type": "h1", "text": "施工阶段索力"})
         blocks.append({"type": "p", "text": _stage_paragraph(res)})
+        if "stage_schedule" in tabs:
+            blocks.append({"type": "table", "key": "stage_schedule"})
         if STAGE_FIGURE_KEY in figs:
             blocks.append({"type": "figure", "key": STAGE_FIGURE_KEY})
         blocks.append({"type": "table", "key": STAGE_TABLE_KEY})

@@ -121,6 +121,51 @@ class Metric:
                 "unit": self.unit, "hint": self.hint}
 
 
+def stage_time_effect_note(model: Any, solver: str) -> str:
+    """施工阶段龄期在这次求解里到底有没有进入徐变和收缩。"""
+    times = [float(getattr(s, "time", 0.0) or 0.0)
+             for s in getattr(model, "stages", []) or []]
+    times = [t for t in times if t > 0.0]
+    uniform = (len(times) >= 2 and all(
+        abs((b - a) - (times[1] - times[0])) < 1e-6
+        for a, b in zip(times, times[1:])))
+    if uniform:
+        note = (f"第一段末龄期 {times[0]:g} 天，之后每段加 {times[1] - times[0]:g} 天，"
+                "含合拢和二期。这不是现场进度，也不是规范规定的工期。")
+    else:
+        note = ("龄期是程序拟定的施工周期：第一段为加载龄期，之后每段加一个周期。"
+                "这不是现场进度，也不是规范规定的工期。")
+    rh = float(getattr(model, "creep_rh", 0.0) or 0.0)
+    h = float(getattr(model, "creep_h", 0.0) or 0.0)
+    fcm = float(getattr(model, "creep_fcm", 0.0) or 0.0)
+    phi0_in = float(getattr(model, "creep_phi0", 0.0) or 0.0)
+    beta_in = float(getattr(model, "creep_beta_h", 700.0) or 700.0)
+    t0 = float(getattr(model, "creep_t0", 7.0) or 7.0)
+    code = rh > 0.0 and h > 0.0 and fcm > 0.0
+    if code:
+        from model_doc import jtg3362_nominal_creep, jtg3362_shrinkage_nominal
+        phi0, beta = jtg3362_nominal_creep(rh, h, fcm, t0)
+        eps = jtg3362_shrinkage_nominal(rh, fcm)
+        note += (f"按 JTG 3362 附录 C，相对湿度 {rh:g}%、理论厚度 {h:g} mm、"
+                 f"fcm={fcm:g} MPa，名义徐变系数 φ0={phi0:.3f}，βH={beta:.1f}，"
+                 f"名义收缩系数 {eps:.3e}。")
+        ts = float(getattr(model, "shrinkage_ts", 0.0) or 0.0)
+        if ts > 0.0 and abs(ts - t0) > 1e-6:
+            note += f"干燥从第 {ts:g} 天起，参与受力之前的收缩不进入平衡。"
+    elif phi0_in > 0.0:
+        note += (f"徐变曲线是 φ0={phi0_in:g}、βH={beta_in:g} 的简化曲线，"
+                 "不是按湿度、理论厚度取值。")
+    nonlinear = "stage_nl" in (solver or "")
+    if nonlinear and (code or phi0_in > 0.0):
+        note += ("本次是非线性阶段：徐变取相邻龄期的系数差，作用在已有混凝土应力上；"
+                 "收缩只计构件参与受力之后新发展的部分，索不收缩。")
+    elif code or phi0_in > 0.0:
+        note += "本次是线性阶段，不读龄期，没有按这条曲线计算徐变和收缩。"
+    else:
+        note += "非线性阶段才按相邻龄期计算徐变。线性阶段不读龄期。"
+    return note
+
+
 # ---------------------------------------------------------------- 结果
 
 
@@ -1567,6 +1612,26 @@ class SolveResult:
                                 "τ (MPa)", "折算应力 (MPa)", "利用率", "控制项"],
                     "rows": rows,
                 }
+
+        # ---- 施工阶段龄期 ------------------------------------------------
+        # 悬臂序列把每段末龄期写在 Stage3D.time。计算书要列出来，否则
+        # 徐变只发生在内核里，读报告的人不知道各段是第几天。
+        if model is not None and any(float(getattr(s, "time", 0.0) or 0.0) > 0.0
+                                     for s in getattr(model, "stages", []) or []):
+            rows = []
+            for s in model.stages:
+                rows.append([
+                    s.id,
+                    _r(float(s.time), 1) if s.time else "—",
+                    len(s.activate),
+                    len(s.tensions),
+                ])
+            out["stage_schedule"] = {
+                "title": "施工阶段龄期",
+                "note": stage_time_effect_note(model, self.solver),
+                "headers": ["阶段", "末龄期 (天)", "新激活单元", "本段张拉索"],
+                "rows": rows,
+            }
 
         # ---- 施工阶段：索力全过程 ----------------------------------------
         # 行 = 索，列 = 各阶段末索力。这个形状是刻意的：施工控制问的是

@@ -48,6 +48,14 @@ from model_spec_3d import (
 from grillage_3d import box_section
 
 G = 9.81
+# 悬臂每一段的工期。程序拟定，不是规范规定的施工周期。
+# 阶段末龄期 = 加载龄期 + 段序 × 周期。第一段龄期等于加载龄期，本段新加的
+# 梁和索要到下一段才开始徐变。
+CANTILEVER_CYCLE_DAYS = 7.0
+CANTILEVER_LOAD_AGE_DAYS = 7.0
+CANTILEVER_CREEP_PHI0 = 2.0
+CANTILEVER_CREEP_BETA_H = 700.0
+CANTILEVER_CREEP_POWER = 0.3
 
 
 def build_cable_stayed_3d(
@@ -79,7 +87,13 @@ def build_cable_stayed_3d(
     method: str = "DECK",                 # DECK | MINENERGY | RIGID
     cable_tensions: dict[int, float] | None = None,   # 指定索力（N），缺省按 method 定
     min_tension_fraction: float = 0.02,
-    staged: bool = False,               # 生成悬臂施工 + 张拉阶段序列（走线性阶段内核）
+    staged: bool = False,               # 生成悬臂施工 + 张拉阶段序列
+    creep_rh: float = 0.0,              # 相对湿度 %。与 h、fcm 同时给出才改用规范曲线
+    creep_h: float = 0.0,               # 理论厚度 mm
+    creep_fcm: float = 0.0,             # 圆柱体平均强度 MPa
+    shrinkage_ts: float = 0.0,          # 干燥开始龄期；0 表示与加载龄期相同
+    cycle_days: float = CANTILEVER_CYCLE_DAYS,  # 每一悬臂段的工期（天）
+    load_age_days: float = CANTILEVER_LOAD_AGE_DAYS,  # 第一段末龄期，也是徐变加载龄期
     system: str = "semi",               # semi 半漂浮 | fixed 塔梁固结；staged 时强制 fixed
     q2_deck: float = 0.0,               # 二期恒载 N/m（铺装+护栏）；0 = 二期为 0
     retune: bool = True,                # 合拢后二次调索到成桥目标（施工闭环）
@@ -299,7 +313,9 @@ def build_cable_stayed_3d(
         tensions = tensions_by_deck_load(model_tmp, q_deck, trib_map, x_sup)
         method_out = "GIVEN"
     # ---------------------------------------------------------- 施工阶段（悬臂施工 + 张拉）
-    # staged=True 时走线性阶段内核（solveModel3DStages），不挂 cable_bridge：
+    # staged=True 时不挂 cable_bridge。主跨短于 400 m 走线性阶段，达到 400 m
+    # 或写明非线性施工时走共转全量平衡。阶段都写 TIME，徐变曲线写 PHI0，
+    # 线性内核忽略龄期，非线性内核才按 φ(t)−φ(上一阶段) 徐变。
     # 成桥态的几何非线性找形与"逐阶段激活单元 + 张拉索力"是两条不同的力学
     # 路线，混在一个 .dat 里会同时出现 *CABLE_BRIDGE 与 *STAGE 两套工况
     # （见 verify_stage_cable 的说明）。成桥目标索力 tensions 仍按同一口径
@@ -402,6 +418,9 @@ def build_cable_stayed_3d(
             loads=q2_loads,
             tensions={cid: tensions[cid] for cid in cable_ids} if retune else {},
         ))
+        # 加载龄期在第一段。之后每段加一个周期，含合拢和二期。
+        for i, st in enumerate(stages):
+            st.time = load_age_days + i * cycle_days
 
     cables = [CableSpec3D(elem=eid, anchor=0, tension=float(tensions.get(eid, 0.0)))
               for eid in cable_ids]
@@ -422,6 +441,15 @@ def build_cable_stayed_3d(
         boundaries=boundaries,
         loads=[] if staged else loads,
         stages=stages,
+        creep_phi0=(0.0 if staged and creep_rh > 0.0 and creep_h > 0.0 and creep_fcm > 0.0
+                    else (CANTILEVER_CREEP_PHI0 if staged else 0.0)),
+        creep_t0=load_age_days if staged else CANTILEVER_LOAD_AGE_DAYS,
+        creep_beta_h=CANTILEVER_CREEP_BETA_H,
+        creep_power=CANTILEVER_CREEP_POWER,
+        creep_rh=creep_rh if staged else 0.0,
+        creep_h=creep_h if staged else 0.0,
+        creep_fcm=creep_fcm if staged else 0.0,
+        shrinkage_ts=shrinkage_ts if staged else 0.0,
         cable_bridge=cable_bridge,
         # 车道：主梁纵向节点序列，按 JTG D60 自动生成 qk/Pk。
         # 索承体系内核在成桥态切线刚度上算活载梁内力包络（见 cable_solver）。

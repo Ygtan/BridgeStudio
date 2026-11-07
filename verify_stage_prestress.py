@@ -479,6 +479,94 @@ def online() -> None:
           f"uz={uz_age_nl:.6e} hist={want_hist:.6e} same={want_same:.6e} "
           f"φ100={phi100:.4f} φ10000={phi10000:.4f} My={my_age:.6e} N={n_age:.6e}")
 
+    from model_doc import jtg3362_nominal_creep, creep_phi_jtg3362
+    phi0_tab, _bh = jtg3362_nominal_creep(55.0, 100.0, 40.0, 7.0)
+    phi0_wet, _bh = jtg3362_nominal_creep(80.0, 100.0, 40.0, 7.0)
+    phi0_28, _bh = jtg3362_nominal_creep(55.0, 100.0, 40.0, 28.0)
+    _phi, beta_cap = jtg3362_nominal_creep(99.0, 600.0, 40.0, 7.0)
+    check("JTG 3362 名义徐变系数对上表 C.2.2",
+          abs(phi0_tab - 3.33) < 0.02
+          and abs(phi0_wet - 2.41) < 0.02
+          and abs(phi0_28 - 2.56) < 0.02
+          and abs(beta_cap - 1500.0) < 1e-6,
+          f"φ0(55%,h100,t0=7)={phi0_tab:.3f} φ0(80%)={phi0_wet:.3f} "
+          f"φ0(t0=28)={phi0_28:.3f} βHcap={beta_cap:.1f}")
+    code_doc, _, code_diag = ModelDoc.from_text(
+        "跨度10米简支梁，曲线预应力，张拉力1000千牛，矢高0.3米向下，"
+        "相对湿度55%，理论厚度100毫米，混凝土C40，加载龄期7天，计算龄期10000天")
+    code_doc.build()
+    phi_code = creep_phi_jtg3362(10000.0, 7.0, 55.0, 100.0, 40.0)
+    phi_old = creep_phi_from_age(10000.0, 7.0)
+    dat = code_doc.model.to_dat()
+    nl_code = solve_staged_result(code_doc.model, "out/verify_prestress",
+                                  dat_name="creep_jtg3362.dat")
+    uz_code = nl_code.final_disp.get((2, 3), 0.0)
+    want_code = want * (1.0 + phi_code)
+    want_old = want * (1.0 + phi_old)
+    check("规范徐变曲线按湿度和理论厚度，不是 φ0=2",
+          code_doc.model.creep_phi == 0.0
+          and code_doc.model.creep_rh == 55.0
+          and code_doc.model.creep_h == 100.0
+          and code_doc.model.creep_fcm == 40.0
+          and "PHI0=" not in dat
+          and "RH=" in dat
+          and abs(code_doc.model.stages[0].time - 7.0) < 1e-9
+          and abs(code_doc.model.stages[-1].time - 10000.0) < 1e-9
+          and any("JTG 3362" in n for n in code_diag.notes)
+          and abs(uz_code - want_code) / abs(want_code) < 2.0e-2
+          and abs(want_code - want_old) / abs(want_old) > 0.1,
+          f"uz={uz_code:.6e} code={want_code:.6e} old={want_old:.6e} φ={phi_code:.3f}")
+    keep, _, keep_diag = ModelDoc.from_text(
+        "跨度10米简支梁，曲线预应力，张拉力1000千牛，矢高0.3米向下，"
+        "徐变系数2，相对湿度55%，理论厚度100毫米")
+    check("写了徐变系数就不用规范湿度曲线",
+          keep.params.get("creep_phi") == 2.0
+          and not keep.params.get("creep_rh")
+          and any("不再改用" in n for n in keep_diag.notes),
+          str(keep.params.get("creep_phi")))
+    from model_doc import jtg3362_shrinkage_nominal, jtg3362_shrinkage
+    eps55 = jtg3362_shrinkage_nominal(55.0, 40.0)
+    eps80 = jtg3362_shrinkage_nominal(80.0, 40.0)
+    check("JTG 3362 名义收缩系数对上表 C.1.2",
+          abs(eps55 - 0.529e-3) < 2.0e-6 and abs(eps80 - 0.310e-3) < 2.0e-6,
+          f"55%={eps55:.6e} 80%={eps80:.6e}")
+    eps = jtg3362_shrinkage(10000.0, 7.0, 7.0, 55.0, 100.0, 40.0)
+    bare = code_doc.model.model_copy(deep=True)
+    for st in bare.stages:
+        st.prestress.clear()
+    nl_sh = solve_staged_result(bare, "out/verify_prestress",
+                                dat_name="shrink_jtg.dat")
+    ux_sh = nl_sh.final_disp.get((3, 1), 0.0)
+    n_sh = nl_sh.final_beam.get((1, "i"), {}).get("N", 0.0)
+    want_sh = -eps * 10.0
+    check("规范收缩从参与受力起缩短，自由缩短不留轴力",
+          abs(ux_sh - want_sh) / abs(want_sh) < 2.0e-2
+          and abs(n_sh) < 1.0e4
+          and abs(ux_sh) > 1.0e-3,
+          f"ux={ux_sh:.6e} want={want_sh:.6e} N={n_sh:.6e} ε={eps:.6e}")
+    over = bare.model_copy(deep=True)
+    over.shrinkage_ecs = 2.0e-4
+    nl_over = solve_staged_result(over, "out/verify_prestress",
+                                  dat_name="shrink_explicit.dat")
+    ux_over = nl_over.final_disp.get((3, 1), 0.0)
+    want_over = -2.0e-4 * 10.0
+    early = bare.model_copy(deep=True)
+    early.shrinkage_ts = 3.0
+    eps_early = jtg3362_shrinkage(10000.0, 7.0, 3.0, 55.0, 100.0, 40.0)
+    nl_early = solve_staged_result(early, "out/verify_prestress",
+                                   dat_name="shrink_jtg_ts3.dat")
+    ux_early = nl_early.final_disp.get((3, 1), 0.0)
+    want_early = -eps_early * 10.0
+    check("干燥早于加载时，参与受力前的收缩不进入平衡",
+          "TS=3" in early.to_dat()
+          and abs(ux_early - want_early) / abs(want_early) < 2.0e-2
+          and abs(want_early) < abs(want_sh) * 0.95,
+          f"ux={ux_early:.6e} want={want_early:.6e} from_load={want_sh:.6e}")
+    check("手写收缩应变优先，不与规范收缩相加",
+          abs(ux_over - want_over) / abs(want_over) < 2.0e-2
+          and abs(ux_over - (want_over + want_sh)) / abs(want_sh) > 0.2,
+          f"ux={ux_over:.6e} explicit={want_over:.6e} code={want_sh:.6e}")
+
     check("非线性阶段徐变系数把上拱放大为 (1+χφ) 倍",
           abs(uz_phi - want * factor) / abs(want * factor) < 1.5e-2
           and abs(my_phi - 3.0e5) / 3.0e5 < 2.0e-2,

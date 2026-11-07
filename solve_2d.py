@@ -116,6 +116,10 @@ class Solve2DResult:
     beam: dict[int, dict[str, float]] = field(default_factory=dict)
     # 车道活载内力包络：{(单元, "i"/"j"): {NMin,NMax,MyMin,MyMax,VzMin,VzMax}}
     live_beam: dict[tuple[int, str], dict[str, float]] = field(default_factory=dict)
+    # 车道节点活载位移包络：{节点: (max, min)}，竖向，单位 m。已含 1+μ。
+    live_disp: dict[int, tuple[float, float]] = field(default_factory=dict)
+    # 自动冲击的放大系数。未自动计算时为 1。
+    impact_factor: float = 1.0
 
     @property
     def fingerprint(self) -> str:
@@ -215,6 +219,46 @@ def _parse_lane_envelope(txt: str) -> dict[tuple[int, str], dict[str, float]]:
         elif comp == "M":
             slot["MyMin"], slot["MyMax"] = lo, hi
     return out
+
+
+def _parse_lane_disp(txt: str) -> dict[int, tuple[float, float]]:
+    """车道节点竖向位移包络。标签 D<节点>_2，值为 (max, min)，单位 m。"""
+    out: dict[int, tuple[float, float]] = {}
+    for raw in txt.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("label"):
+            continue
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        m = re.match(r"^D(\d+)_2$", parts[0])
+        if not m:
+            continue
+        out[int(m.group(1))] = (float(parts[1]), float(parts[2]))
+    return out
+
+
+def _max_vertical_span(spec: Any) -> float:
+    """相邻竖向支座的最大间距（m）。JTG D60 表 4.3.2 的分母用这一跨，不用总长。"""
+    from bridge_spec import _dof_set
+
+    xy = {n.id: float(n.x) for n in getattr(spec, "nodes", []) or []}
+    xs = sorted({
+        xy[b.node] for b in getattr(spec, "boundaries", []) or []
+        if b.node in xy and 2 in _dof_set(b.dofs)
+    })
+    if len(xs) < 2:
+        return 0.0
+    return max(b - a for a, b in zip(xs, xs[1:]))
+
+
+def _spec_has_cable(spec: Any) -> bool:
+    for t in getattr(spec, "elem_types", []) or []:
+        kind = getattr(t, "kind", "")
+        name = getattr(kind, "value", kind)
+        if str(name).upper() == "CABLE":
+            return True
+    return False
 
 
 def _forces_to_final(forces: dict[int, dict[str, float]]) -> dict[tuple[int, str], dict[str, float]]:
@@ -357,10 +401,25 @@ def solve_2d(
             stdout = _run(exe, dat_name, out, timeout)
             env_path = out / (dat_path.stem + "_envelope_lane1.txt")
             if env_path.is_file():
-                res.live_beam = _parse_lane_envelope(
-                    env_path.read_text(encoding="utf-8", errors="replace"))
+                env_text = env_path.read_text(encoding="utf-8", errors="replace")
+                res.live_beam = _parse_lane_envelope(env_text)
+                res.live_disp = _parse_lane_disp(env_text)
                 res.diagnostics.append(
                     "车道活载按 JTG D60 影响线最不利布载取包络（成桥构型上线性叠加）。")
+                hit = re.search(
+                    r"f1_vertical=(\S+)\s+impact_mu=(\S+)\s+impact_factor=(\S+)",
+                    env_text)
+                if hit:
+                    res.impact_factor = float(hit.group(3))
+                    res.diagnostics.append(
+                        "汽车冲击按竖向基频计入："
+                        f"f1={float(hit.group(1)):.2f} Hz，"
+                        f"μ={float(hit.group(2)):.3f}，"
+                        f"活载放大 {res.impact_factor:.3f}。")
+                if _spec_has_cable(spec):
+                    res.diagnostics.append(
+                        "索承活载走线性影响线：索按线弹性杆一次装配，逐点回代。"
+                        "这不是成桥切线刚度，不含 Ernst 与几何刚度。")
             else:
                 res.diagnostics.append(
                     f"example_influence.exe 未写出活载包络，组合只出恒载项。\n{stdout}")
@@ -368,9 +427,26 @@ def solve_2d(
         res.diagnostics.append(
             "模型未定义车道荷载或内核未产出活载包络，无活载内力，"
             "荷载组合只出恒载项（has_live=False）。")
-    res.diagnostics.append(
-        "2D 车道荷载包络只出内力/应力，不出位移包络；挠度限值（JTG D60 4.3.2）"
-        "判的是汽车荷载本身产生的挠度，本链未接入（需 *INFLUENCE DISP 请求）。")
+    if res.live_disp:
+        node, (_hi, lo) = min(res.live_disp.items(), key=lambda kv: kv[1][1])
+        factor = res.impact_factor if res.impact_factor > 0.0 else 1.0
+        bare = lo / factor
+        span = _max_vertical_span(spec)
+        line = (
+            f"车道活载竖向位移：节点 {node} 含冲击 {lo * 1000:.2f} mm，"
+            f"不计冲击 {bare * 1000:.2f} mm。"
+        )
+        if span > 0.0:
+            lim = span / 600.0
+            line += (
+                f"JTG D60 表 4.3.2 限值 L/600 = {lim * 1000:.1f} mm"
+                f"（最大跨径 {span:.0f} m），"
+                + ("满足。" if abs(bare) <= lim else "超出。")
+            )
+        res.diagnostics.append(line)
+    else:
+        res.diagnostics.append(
+            "没有车道位移包络，不能做 JTG D60 表 4.3.2 的活载挠度限值。")
     return res
 
 

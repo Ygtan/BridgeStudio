@@ -225,6 +225,80 @@ def t_scope():
 
     check("只写悬臂施工仍走线性阶段",
           plain.params.get("staged") and not plain.params.get("nonlinear_stages"))
+    plain.build()
+    ages = [s.time for s in plain.model.stages]
+    dat = plain.model.to_dat(compact=False)
+    check("悬臂每段都写了递增龄期",
+          len(ages) >= 4 and ages[0] == 7.0
+          and all(b > a for a, b in zip(ages, ages[1:]))
+          and plain.model.creep_phi0 == 2.0
+          and dat.count("TIME=") == len(ages)
+          and "PHI0=2" in dat,
+          " ".join(f"{t:g}" for t in ages[:4]) + "…")
+    paced, _, pace_notes = ModelDoc.from_text(
+        "空间单索面斜拉桥，主跨80米，悬臂施工，加载龄期14天，每段10天")
+    paced.build()
+    pace_ages = [s.time for s in paced.model.stages]
+    check("悬臂工期按句子里的加载龄期和每段天数",
+          pace_ages[0] == 14.0
+          and all(abs((b - a) - 10.0) < 1e-9 for a, b in zip(pace_ages, pace_ages[1:]))
+          and paced.model.creep_t0 == 14.0
+          and paced.model.creep_phi0 == 2.0
+          and any("14" in n and "10" in n for n in pace_notes.notes),
+          " ".join(f"{t:g}" for t in pace_ages[:3]))
+    from model_doc import jtg3362_nominal_creep
+    aged, _, aged_notes = ModelDoc.from_text(
+        "空间单索面斜拉桥，主跨80米，悬臂施工，加载龄期14天，"
+        "相对湿度55%，理论厚度200毫米，混凝土C50")
+    aged.build()
+    phi14, _ = jtg3362_nominal_creep(55.0, 200.0, 48.0, 14.0)
+    phi7, _ = jtg3362_nominal_creep(55.0, 200.0, 48.0, 7.0)
+    check("规范徐变的加载龄期跟句子走",
+          aged.model.creep_t0 == 14.0
+          and aged.model.stages[0].time == 14.0
+          and abs(phi14 - phi7) / phi7 > 0.05
+          and f"{phi14:.3f}" in " ".join(aged_notes.notes),
+          f"φ0(14)={phi14:.3f} φ0(7)={phi7:.3f}")
+    dry, _, dry_notes = ModelDoc.from_text(
+        "空间单索面斜拉桥，主跨80米，悬臂施工，相对湿度55%，理论厚度200毫米，"
+        "混凝土C50，收缩开始龄期3天")
+    dry.build()
+    check("悬臂收缩开始龄期写进模型",
+          dry.model.shrinkage_ts == 3.0
+          and "TS=3" in dry.model.to_dat(compact=False)
+          and any("干燥从第 3" in n for n in dry_notes.notes),
+          "")
+    humid, _, hnotes = ModelDoc.from_text(
+        "空间单索面斜拉桥，主跨80米，悬臂施工，相对湿度55%，理论厚度200毫米，混凝土C50")
+    humid.build()
+    hdat = humid.model.to_dat(compact=False)
+    phi0_h, beta_h = jtg3362_nominal_creep(55.0, 200.0, 48.0, 7.0)
+    check("悬臂写了湿度就改用规范徐变曲线",
+          humid.model.creep_phi0 == 0.0
+          and humid.model.creep_rh == 55.0
+          and humid.model.creep_h == 200.0
+          and abs(humid.model.creep_fcm - 48.0) < 1e-9
+          and "PHI0=" not in hdat
+          and "RH=55" in hdat and "H=200" in hdat and "FCM=48" in hdat
+          and any("JTG 3362" in n for n in hnotes.notes)
+          and phi0_h > 2.2,
+          f"φ0={phi0_h:.3f} βH={beta_h:.1f}")
+    from result_3d import SolveResult
+    lin_note = SolveResult(kind="grillage3d", solver="example_3d_grillage.exe").tables(
+        humid.model)["stage_schedule"]["note"]
+    check("线性阶段写明未按规范曲线计算徐变和收缩",
+          "φ0=2.727" in lin_note and "4.781e-04" in lin_note
+          and "没有按这条曲线" in lin_note,
+          lin_note[-40:])
+    keep_phi, _, keep_notes = ModelDoc.from_text(
+        "空间单索面斜拉桥，主跨80米，悬臂施工，徐变系数2，相对湿度55%，理论厚度200毫米")
+    keep_phi.build()
+    check("悬臂写了徐变系数仍用 φ0=2",
+          keep_phi.model.creep_phi0 == 2.0
+          and keep_phi.model.creep_rh == 0.0
+          and "PHI0=2" in keep_phi.model.to_dat(compact=False)
+          and any("不改用" in n for n in keep_notes.notes),
+          "")
     long_span, _, long_notes = ModelDoc.from_text(
         "空间单索面斜拉桥，主跨400米，悬臂施工")
     check("主跨达到400米的悬臂施工走非线性",

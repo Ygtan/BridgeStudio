@@ -76,6 +76,56 @@ def main() -> int:
     print(f"    vmax {v_num*1000:.4f} mm（理论 {v_th*1000:.4f}）误差 {dv:.4f}%")
     ok = dm < 0.5 and dv < 0.5
     verdicts.append(("简支梁 vs 理论解", PASS if ok else FAIL, f"弯矩{dm:.3f}% 挠度{dv:.3f}%"))
+    import re
+    bL = build_beam_bridge(span=Lspan, n_spans=1, udl_kN=0.0, gravity=0.0, lane=True)
+    rL = solve_2d(bL, out_dir=OUT / "beam30_lane", dat_name="beam30_lane.dat")
+    env = (OUT / "beam30_lane" / "beam30_lane_envelope_lane1.txt").read_text(encoding="utf-8")
+    fac_m = re.search(r"impact_factor=(\S+)", env)
+    fac = float(fac_m.group(1)) if fac_m else 1.0
+    pk = 270000.0 + 2000.0 * (Lspan - 5.0)
+    bare_m = 10500.0 * Lspan * Lspan / 8.0 + pk * Lspan / 4.0
+    mid_node = len(bL.elements) // 2 + 1
+    got_m = 0.0
+    for eid, end, n_end in (
+        (mid_node - 1, "j", mid_node),
+        (mid_node, "i", mid_node),
+    ):
+        slot = rL.live_beam.get((eid, end), {})
+        got_m = max(got_m, abs(slot.get("MyMin", 0.0)), abs(slot.get("MyMax", 0.0)))
+    want_m = bare_m * fac
+    dm_imp = abs(got_m - want_m) / want_m
+    print(f"    车道跨中 |My| {got_m/1e3:.1f} kN·m（不计冲击 {bare_m/1e3:.1f} × {fac:.3f}）"
+          f"误差 {dm_imp*100:.2f}%")
+    verdicts.append(("简支梁车道活载含自动冲击",
+                     PASS if fac > 1.0 and dm_imp < 0.03 else FAIL,
+                     f"1+μ={fac:.3f} 误差{dm_imp*100:.2f}%"))
+    qk = 10500.0
+    want_v = -(5.0 * qk * Lspan ** 4 / (384.0 * EI)
+               + pk * Lspan ** 3 / (48.0 * EI)) * fac
+    got_v = rL.live_disp.get(mid_node, (0.0, 0.0))[1]
+    dv_imp = abs(got_v - want_v) / abs(want_v)
+    print(f"    车道跨中挠度 {got_v*1000:.3f} mm（理论含冲击 {want_v*1000:.3f}）"
+          f"误差 {dv_imp*100:.2f}%")
+    verdicts.append(("简支梁车道活载挠度含自动冲击",
+                     PASS if mid_node in rL.live_disp and dv_imp < 0.02 else FAIL,
+                     f"{got_v*1000:.2f} mm 误差{dv_imp*100:.2f}%"))
+    note = " ".join(rL.diagnostics)
+    limit_ok = "不计冲击" in note and "L/600" in note and "满足" in note
+    verdicts.append(("活载挠度按不计冲击对 L/600",
+                     PASS if limit_ok else FAIL, "表 4.3.2"))
+    from export_html import write_2d_html
+    html_path = write_2d_html(r1, b1, OUT / "beam30.html")
+    html = html_path.read_text(encoding="utf-8")
+    html_ok = "2250.0" in html and "成桥态梁端内力" in html
+    verdicts.append(("二维梁桥 HTML 写出跨中弯矩",
+                     PASS if html_ok else FAIL, html_path.name))
+    html_lane = write_2d_html(rL, bL, OUT / "beam30_lane.html")
+    lane_html = html_lane.read_text(encoding="utf-8")
+    lane_html_ok = ("车道活载内力包络" in lane_html
+                    and f"{got_m / 1e3:.1f}" in lane_html
+                    and "不要再加一次" in lane_html)
+    verdicts.append(("HTML 写出车道活载弯矩包络",
+                     PASS if lane_html_ok else FAIL, html_lane.name))
 
     # ---------------- 2. 三跨连续梁（一次性）中间支座弯矩 ----------------
     total2 = Lspan * 3
@@ -134,6 +184,12 @@ def main() -> int:
                      f"差{diff/1e3:.3f}kN·m"))
     verdicts.append(("阶段包络捕获临时简支态", PASS if env_ok else FAIL,
                      f"Mmax={env_mmax/1e3:.1f}kN·m"))
+    html_staged = write_2d_html(r3, b3, OUT / "beam3x30_staged.html")
+    staged_html = html_staged.read_text(encoding="utf-8")
+    staged_ok = ("施工阶段内力包络" in staged_html and "2250.0" in staged_html
+                 and "不能把这份极值与运营期活载相加" in staged_html)
+    verdicts.append(("HTML 写出临时简支弯矩",
+                     PASS if staged_ok else FAIL, html_staged.name))
 
     # ---------------- 4. 规范组合 ----------------
     combos = r3.combinations()

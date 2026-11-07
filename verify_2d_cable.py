@@ -14,8 +14,8 @@
 5. **悬臂施工**：斜拉桥 staged 生成阶段序列（> 3 阶段），成桥态与一次性恒载
    总量一致（增量法 = 叠加）。
 6. **规范组合**：三种组合齐全。
-7. **不静默兜底**：2D 悬索描述里带「车道/施工/二期」要如实提示"2D 简化暂不
-   承载"，而不是假装听懂；主跨 mm 误写要被单位哨兵纠正。
+7. **车道**：2D 斜拉、悬索写了车道就走线性影响线，并写明不是成桥切线。
+   施工阶段仍只提示悬索不做；主跨 mm 误写要被单位哨兵纠正。
 """
 
 from __future__ import annotations
@@ -144,15 +144,71 @@ def main() -> int:
                      PASS if len(combos) == 3 else FAIL, f"{len(combos)} 种"))
 
     # ---------------- 7. 不静默兜底 ----------------
-    _, _, dg_lane = ModelDoc.from_text(
+    lane_doc, _, dg_lane = ModelDoc.from_text(
         "自锚式悬索桥，主跨300米，矢跨比1/10，6车道")
-    note_lane = "暂不接入车道活载" in "；".join(dg_lane.notes)
+    note_lane = "线性影响线" in "；".join(dg_lane.notes) and bool(lane_doc.params.get("lane"))
     _, _, dg_er = ModelDoc.from_text(
         "地锚式悬索桥，主跨300米，矢跨比1/10，从跨中对称吊装施工")
     note_er = "暂不做施工阶段" in "；".join(dg_er.notes)
-    verdicts.append(("2D 悬索：车道/施工如实提示（不静默）",
+    verdicts.append(("2D 悬索：车道走线性影响线，施工仍提示不做",
                      PASS if (note_lane and note_er) else FAIL,
                      f"车道提示={note_lane} 施工提示={note_er}"))
+    stay_lane, _, stay_notes = ModelDoc.from_text(
+        "双塔三跨斜拉桥，主跨40米，边跨16米，塔高12米，每塔每侧2根索，车道活载")
+    stay_lane.build()
+    r_lane = solve_2d(stay_lane.model, out_dir=OUT / "cs2d_lane",
+                      dat_name="cs2d_lane.dat")
+    live_my = [abs(v.get("MyMax", 0.0)) for v in r_lane.live_beam.values()]
+    live_my += [abs(v.get("MyMin", 0.0)) for v in r_lane.live_beam.values()]
+    note = "；".join(r_lane.diagnostics)
+    verdicts.append(("2D 斜拉车道活载走线性影响线",
+                     PASS if (stay_lane.model.lanes and live_my
+                              and max(live_my) > 1.0
+                              and "线性影响线" in note
+                              and "不是成桥切线" in note
+                              and "线性影响线" in "；".join(stay_notes.notes))
+                     else FAIL,
+                     f"活载截面 {len(r_lane.live_beam)} 最大|My|={max(live_my or [0])/1e3:.1f} kN·m"))
+    bare = stay_lane.model.model_copy(deep=True)
+    cable_types = {
+        t.id for t in bare.elem_types
+        if str(getattr(getattr(t, "kind", ""), "value", t.kind)).upper() == "CABLE"
+    }
+    bare.elements = [e for e in bare.elements if e.type_id not in cable_types]
+    bare.elem_types = [t for t in bare.elem_types if t.id not in cable_types]
+    r_bare = solve_2d(bare, out_dir=OUT / "cs2d_lane_nocable",
+                      dat_name="cs2d_lane_nocable.dat")
+    bare_my = [abs(v.get("MyMax", 0.0)) for v in r_bare.live_beam.values()]
+    bare_my += [abs(v.get("MyMin", 0.0)) for v in r_bare.live_beam.values()]
+    def _mid_live(model, res) -> float:
+        nodes = {n.id: n for n in model.nodes}
+        xmid = float(stay_lane.params["Ls"]) + float(stay_lane.params["Lm"]) / 2.0
+        best_e, best_dx = None, 1e300
+        for e in model.elements:
+            if e.id < 101 or e.id >= 200:
+                continue
+            x = 0.5 * (nodes[e.n1].x + nodes[e.n2].x)
+            if abs(x - xmid) < best_dx:
+                best_e, best_dx = e.id, abs(x - xmid)
+        vals = []
+        for end in ("i", "j"):
+            slot = res.live_beam.get((best_e, end), {})
+            vals.append(abs(slot.get("MyMax", 0.0)))
+            vals.append(abs(slot.get("MyMin", 0.0)))
+        return max(vals or [0.0])
+
+    with_mid = _mid_live(stay_lane.model, r_lane)
+    without_mid = _mid_live(bare, r_bare)
+    verdicts.append(("线性影响线计入拉索，跨中活载弯矩更小",
+                     PASS if without_mid > 1.0 and with_mid < 0.85 * without_mid else FAIL,
+                     f"有索 {with_mid/1e3:.1f}  无索 {without_mid/1e3:.1f} kN·m"))
+    from export_html import write_2d_html
+    html_lane = write_2d_html(r_lane, stay_lane.model, OUT / "cs2d_lane.html")
+    lane_html = html_lane.read_text(encoding="utf-8")
+    verdicts.append(("HTML 写出斜拉车道弯矩包络",
+                     PASS if ("车道活载内力包络" in lane_html
+                              and f"{with_mid / 1e3:.1f}" in lane_html) else FAIL,
+                     html_lane.name))
 
     bad, _, _ = ModelDoc.from_text("地锚式悬索桥，主跨300000米")
     verdicts.append(("2D 悬索：主跨 mm 误写被纠正",

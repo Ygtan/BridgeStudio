@@ -100,6 +100,10 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
     res.diagnostics.append(
         "线性阶段分析：不考虑几何非线性、索垂度与只受拉。"
         "本内核输出阶段位移/内力包络与活载包络。")
+    if any(float(getattr(s, "time", 0.0) or 0.0) > 0.0
+           for s in getattr(model, "stages", []) or []):
+        from result_3d import stage_time_effect_note
+        res.diagnostics.append(stage_time_effect_note(model, res.solver))
     if res.final_beam:
         res.diagnostics.append(
             "荷载组合取「成桥态」单值（各施工阶段内力累加），不取阶段包络："

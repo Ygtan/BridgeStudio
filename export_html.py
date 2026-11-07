@@ -88,6 +88,159 @@ pre{background:#f6f8fa;border:1px solid var(--bd);border-radius:8px;
 """
 
 
+def write_calculation_html(res, model, out_path: str | Path, *,
+                           project: str = "") -> Path:
+    """三维计算书的 HTML。内容就是 report_3d 那份 Report，不另写一套结论。"""
+    from report_3d import build_document, write_html
+
+    out = Path(out_path)
+    rep = build_document(res, model, project=project, out_dir=out.parent)
+    return write_html(rep, out)
+
+
+def write_2d_html(res, spec, out_path: str | Path) -> Path:
+    """二维桥梁 HTML。只列求解结果里已有的成桥内力、挠度和规范组合。"""
+    title = str(getattr(spec, "title", "") or getattr(res, "title", "") or "二维桥梁")
+    rows = []
+    for (eid, end), f in sorted(res.final_beam.items()):
+        rows.append(
+            "<tr>"
+            f"<td>{eid}</td><td>{html.escape(str(end))}</td>"
+            f"<td>{f.get('N', 0.0) / 1e3:.1f}</td>"
+            f"<td>{f.get('My', 0.0) / 1e3:.1f}</td>"
+            f"<td>{f.get('Vz', 0.0) / 1e3:.1f}</td>"
+            "</tr>"
+        )
+    defl = res.max_vertical_deflection()
+    defl_txt = "—" if defl is None else f"节点 {defl[0]}　{defl[1] * 1000:.2f} mm"
+    live_v = ""
+    disp = getattr(res, "live_disp", None) or {}
+    if disp:
+        node, pair = min(disp.items(), key=lambda kv: kv[1][1])
+        factor = float(getattr(res, "impact_factor", 1.0) or 1.0)
+        if factor <= 0.0:
+            factor = 1.0
+        bare = pair[1] / factor
+        from solve_2d import _max_vertical_span
+        span = _max_vertical_span(spec)
+        extra = f"不计冲击 {bare * 1000:.2f} mm。"
+        if span > 0.0:
+            lim = span / 600.0
+            extra += (
+                f"表 4.3.2 限值 L/600 = {lim * 1000:.1f} mm"
+                f"（最大跨径 {span:.0f} m），"
+                + ("满足。" if abs(bare) <= lim else "超出。")
+            )
+        live_v = (
+            "<h2>车道活载竖向位移</h2>"
+            f"<p>向下最大：节点 {node}　{pair[1] * 1000:.2f} mm（含冲击）。"
+            f"{html.escape(extra)}</p>"
+        )
+    diags = "".join(f"<li>{html.escape(str(d))}</li>" for d in res.diagnostics)
+    env_rows = []
+    for eid, f in sorted(getattr(res, "beam", {}).items()):
+        env_rows.append(
+            "<tr>"
+            f"<td>{eid}</td>"
+            f"<td>{f.get('Mmin', 0.0) / 1e3:.1f}</td>"
+            f"<td>{f.get('Mmax', 0.0) / 1e3:.1f}</td>"
+            f"<td>{f.get('Vmin', 0.0) / 1e3:.1f}</td>"
+            f"<td>{f.get('Vmax', 0.0) / 1e3:.1f}</td>"
+            "</tr>"
+        )
+    live_rows = []
+    for (eid, end), f in sorted(
+            (getattr(res, "live_beam", None) or {}).items(),
+            key=lambda kv: (kv[0][0], kv[0][1])):
+        live_rows.append(
+            "<tr>"
+            f"<td>{eid}</td><td>{html.escape(str(end))}</td>"
+            f"<td>{f.get('NMin', 0.0) / 1e3:.1f}</td>"
+            f"<td>{f.get('NMax', 0.0) / 1e3:.1f}</td>"
+            f"<td>{f.get('MyMin', 0.0) / 1e3:.1f}</td>"
+            f"<td>{f.get('MyMax', 0.0) / 1e3:.1f}</td>"
+            f"<td>{f.get('VzMin', 0.0) / 1e3:.1f}</td>"
+            f"<td>{f.get('VzMax', 0.0) / 1e3:.1f}</td>"
+            "</tr>"
+        )
+    live_html = ""
+    if live_rows:
+        live_html = (
+            "<h2>车道活载内力包络</h2>"
+            "<div class=\"note\">这是车道影响线最不利布载的内力，已含 1+μ。"
+            "下面的规范组合已经用过这份包络，不要再加一次。</div>"
+            "<table><tr><th>单元</th><th>端</th>"
+            "<th>N min (kN)</th><th>N max (kN)</th>"
+            "<th>My min (kN·m)</th><th>My max (kN·m)</th>"
+            "<th>Vz min (kN)</th><th>Vz max (kN)</th></tr>"
+            + "".join(live_rows) + "</table>"
+        )
+    env_html = ""
+    if env_rows:
+        env_html = (
+            "<h2>施工阶段内力包络</h2>"
+            "<div class=\"note\">包络含未成桥的临时构型，例如边跨还是简支时的跨中弯矩。"
+            "不能把这份极值与运营期活载相加。</div>"
+            "<table><tr><th>单元</th><th>My min (kN·m)</th><th>My max (kN·m)</th>"
+            "<th>Vz min (kN)</th><th>Vz max (kN)</th></tr>"
+            + "".join(env_rows) + "</table>"
+        )
+    combo_rows = []
+    live_note = ""
+    for c in res.combinations():
+        worst = c.worst("My")
+        if worst is None:
+            continue
+        (eid, end), val = worst
+        combo_rows.append(
+            "<tr>"
+            f"<td>{html.escape(c.spec.name)}</td>"
+            f"<td>{html.escape(c.spec.expr)}</td>"
+            f"<td>{eid}·{html.escape(end)}</td>"
+            f"<td>{val / 1e3:.1f}</td>"
+            "</tr>"
+        )
+        if not c.has_live:
+            live_note = ("<div class=\"note\">没有车道活载包络，组合里只有恒载项。"
+                         "这不是完整的正常使用验算。</div>")
+    body = f"""<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"/>
+<title>{html.escape(title)}</title>
+<style>{CSS}</style></head><body>
+<h1>{html.escape(title)}</h1>
+<div class="sub">二维桥梁 · {html.escape(res.solver or "FEM-Eigen")} · 指纹 {html.escape(res.fingerprint)}</div>
+<h2>最大竖向位移</h2>
+<p>{html.escape(defl_txt)}</p>
+{live_v}
+<h2>成桥态梁端内力</h2>
+<table>
+<tr><th>单元</th><th>端</th><th>N (kN)</th><th>My (kN·m)</th><th>Vz (kN)</th></tr>
+{''.join(rows)}
+</table>
+{env_html}
+{live_html}
+<h2>规范组合（控制弯矩）</h2>
+{live_note}
+<table>
+<tr><th>组合</th><th>表达式</th><th>截面</th><th>My (kN·m)</th></tr>
+{''.join(combo_rows)}
+</table>
+{"<h2>诊断</h2><ul>" + diags + "</ul>" if diags else ""}
+</body></html>"""
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(body, encoding="utf-8")
+    return out
+
+
+def export_calculation_book(doc, out_path: str | Path) -> Path:
+    """ModelDoc 三维模型：求解后导出与计算书相同的 HTML。"""
+    doc.build()
+    res = doc.solve(out_dir=Path(out_path).parent / "solve")
+    title = str(getattr(doc.model, "title", "") or "")
+    return write_calculation_html(res, doc.model, out_path, project=title)
+
+
 def build_report(
     spec,
     use_fem: bool = True,
@@ -214,21 +367,28 @@ def build_report(
 def main() -> int:
     import argparse
 
-    from nl_parser import parse_nl
+    from model_doc import ModelDoc
 
     ap = argparse.ArgumentParser(description="导出自包含 HTML 模型报告")
     ap.add_argument("--text", default=DEMO_TEXT, help="自然语言描述")
     ap.add_argument("-o", "--output", default="nl_fe_report.html")
-    ap.add_argument("--no-fem", action="store_true", help="不调用 FEM-Eigen")
-    ap.add_argument("--self-weight", action="store_true", help="计入自重")
+    ap.add_argument("--no-fem", action="store_true", help="不调用 FEM-Eigen（仅单梁）")
+    ap.add_argument("--self-weight", action="store_true", help="计入自重（仅单梁）")
     args = ap.parse_args()
 
-    spec, source, _diag = parse_nl(args.text)
+    doc, source, _diag = ModelDoc.from_text(args.text)
     print(f"解析来源：{source}")
-    print(spec.summary())
-
-    out = build_report(spec, use_fem=not args.no_fem,
-                       out_path=args.output, self_weight=args.self_weight)
+    if doc.is_3d:
+        print(doc.model.title if hasattr(doc.model, "title") else doc.kind)
+        out = export_calculation_book(doc, args.output)
+    elif doc.kind == "beam":
+        print(doc.model.summary())
+        out = build_report(doc.model, use_fem=not args.no_fem,
+                           out_path=args.output, self_weight=args.self_weight)
+    else:
+        print(getattr(doc.model, "title", doc.kind))
+        res = doc.solve(out_dir=Path(args.output).parent / "solve2d")
+        out = write_2d_html(res, doc.model, args.output)
     print(f"\n已生成：{out.resolve()}")
     print(f"大小：{out.stat().st_size/1024:.1f} KB（双击即可用浏览器打开）")
     return 0

@@ -947,6 +947,12 @@ class ModelDoc:
         for i, dphi in enumerate(dphis, start=2):
             if dphi:
                 stages.append(Stage3D(id=i, creep_dphi=dphi))
+        if float(p.get("creep_rh") or 0.0) > 0.0:
+            t0 = float(p.get("creep_t0") or 7.0)
+            stages[0].time = t0
+            t_end = p.get("creep_t_end")
+            if t_end:
+                stages.append(Stage3D(id=len(stages) + 1, time=float(t_end)))
         lane_q = float(p.get("lane_q_kNpm") or 0.0)
         impact = float(p.get("lane_impact") or 1.0)
         lanes = []
@@ -971,6 +977,11 @@ class ModelDoc:
             stages=stages,
             creep_phi=float(p.get("creep_phi") or 0.0),
             creep_chi=float(p.get("creep_chi") or 0.8),
+            creep_t0=float(p.get("creep_t0") or 7.0),
+            creep_rh=float(p.get("creep_rh") or 0.0),
+            creep_h=float(p.get("creep_h") or 0.0),
+            creep_fcm=float(p.get("creep_fcm") or 0.0),
+            shrinkage_ts=float(p.get("shrinkage_ts") or 0.0),
             shrinkage_ecs=float(p.get("shrinkage_ecs") or 0.0),
             lanes=lanes,
         )
@@ -1078,6 +1089,12 @@ class ModelDoc:
             staged=bool(p.get("staged", False)),
             retune=bool(p.get("retune", True)),
             system=str(p.get("system") or "semi"),
+            creep_rh=float(p.get("creep_rh") or 0.0),
+            creep_h=float(p.get("creep_h") or 0.0),
+            creep_fcm=float(p.get("creep_fcm") or 0.0),
+            shrinkage_ts=float(p.get("shrinkage_ts") or 0.0),
+            cycle_days=float(p.get("cycle_days") or 7.0),
+            load_age_days=float(p.get("load_age_days") or 7.0),
         )
         # 派生量挂在外壳上：界面要支座 x 才能画红虚线，而 pydantic 契约里
         # 不该出现这种"只给界面用"的字段。
@@ -1621,7 +1638,8 @@ class ModelDoc:
                     lines.append(
                         "施工与成桥使用同一套塔梁固结约束。"
                         "求解走非线性施工阶段：每个阶段是全量平衡，"
-                        "索力由无应力索长命中。")
+                        "索力由无应力索长命中。"
+                        "每段末写了龄期，混凝土按 φ(t)−φ(上一阶段) 徐变。")
                 else:
                     lines.append(
                         "施工与成桥使用同一套塔梁固结约束。"
@@ -1823,6 +1841,54 @@ def creep_phi_from_age(t_days: float, t0_days: float = 7.0, phi0: float = 2.0,
     return float(phi0) * (dt / (beta_h + dt)) ** power
 
 
+def jtg3362_nominal_creep(rh_percent: float, h_mm: float, fcm_mpa: float,
+                          t0_days: float) -> tuple[float, float]:
+    """JTG 3362-2018 附录 C.2.1 的名义徐变系数和 βH。与内核 jtg3362NominalCreep 相同。
+
+    返回 (φ0, βH)。发展项仍用 creep_phi_from_age 的 0.3 次方。
+    表 C.2.2 对 C50 及以上的折减是查表用的，这里不重复乘。
+    """
+    rh = min(99.0, max(40.0, float(rh_percent)))
+    h = max(float(h_mm), 1.0)
+    fcm = max(float(fcm_mpa), 1.0)
+    t0 = max(float(t0_days), 0.1)
+    phi_rh = 1.0 + (1.0 - rh / 100.0) / (0.46 * (h / 100.0) ** (1.0 / 3.0))
+    beta_f = 5.3 / (fcm / 10.0) ** 0.5
+    beta_t0 = 1.0 / (0.1 + t0 ** 0.2)
+    beta_h = 150.0 * (1.0 + (1.2 * rh / 100.0) ** 18.0) * (h / 100.0) + 250.0
+    if beta_h > 1500.0:
+        beta_h = 1500.0
+    return phi_rh * beta_f * beta_t0, beta_h
+
+
+def jtg3362_shrinkage_nominal(rh_percent: float, fcm_mpa: float) -> float:
+    """JTG 3362 附录 C.1 的名义收缩系数，正值缩短。与内核 jtg3362ShrinkageNominal 相同。"""
+    rh = min(99.0, max(40.0, float(rh_percent)))
+    fcm = max(float(fcm_mpa), 1.0)
+    eps_s = (160.0 + 50.0 * (9.0 - fcm / 10.0)) * 1e-6
+    beta_rh = 1.55 * (1.0 - (rh / 100.0) ** 3.0)
+    return eps_s * beta_rh
+
+
+def jtg3362_shrinkage(t_days: float, t_ref_days: float, ts_days: float,
+                      rh_percent: float, h_mm: float, fcm_mpa: float) -> float:
+    """从 t_ref 到 t 新发展的收缩应变。干燥从 ts 起算。正值缩短。"""
+    def beta(t: float) -> float:
+        dt = max(0.0, float(t) - float(ts_days))
+        h = max(float(h_mm), 1.0)
+        return (dt / (350.0 * (h / 100.0) ** 2.0 + dt)) ** 0.5
+
+    return jtg3362_shrinkage_nominal(rh_percent, fcm_mpa) * (
+        beta(t_days) - beta(t_ref_days))
+
+
+def creep_phi_jtg3362(t_days: float, t0_days: float, rh_percent: float,
+                      h_mm: float, fcm_mpa: float) -> float:
+    """按附录 C.2.1 计算 φ(t, t0)。阶段求解仍取相邻龄期的差。"""
+    phi0, beta_h = jtg3362_nominal_creep(rh_percent, h_mm, fcm_mpa, t0_days)
+    return creep_phi_from_age(t_days, t0_days, phi0, beta_h, 0.3)
+
+
 def extract_ps_beam_params(text: str) -> tuple[dict[str, Any], list[str]]:
     """一跨梁上的一束预应力。只抽参数，网格由 build 展开。
 
@@ -1967,6 +2033,10 @@ def extract_ps_beam_params(text: str) -> tuple[dict[str, Any], list[str]]:
             "后一次增量仍按张拉完成时的内力计算，不把上一次的徐变位移再当成应力。"
             "轴力和弯矩保持张拉完成时的值，不再把整段加载乘 1+χφ。")
     m_phi = re.search(r"徐变系数\s*([0-9.]+)", text)
+    m_rh = re.search(r"相对湿度\s*([0-9.]+)\s*%?", text)
+    m_h = re.search(r"理论厚度\s*([0-9.]+)\s*(毫米|mm|米|m)?", text, re.I)
+    m_grade = re.search(r"混凝土\s*C\s*([0-9.]+)", text, re.I)
+    m_fcm = re.search(r"(?:圆柱体强度|fcm)\s*([0-9.]+)", text, re.I)
     m_t = re.search(r"(?:计算龄期|目标龄期)\s*([0-9.]+)\s*(?:天|日)?", text)
     if not m_t:
         m_t = re.search(r"(?<!加载)(?<!张拉)龄期\s*([0-9.]+)\s*(?:天|日)?", text)
@@ -1979,6 +2049,42 @@ def extract_ps_beam_params(text: str) -> tuple[dict[str, Any], list[str]]:
             f"徐变按全模型一个系数 φ={p['creep_phi']:g}，老化系数 χ 默认 0.8。"
             "刚度折成 E/(1+χφ)，位移约放大到 1+χφ 倍。"
             "这不是按应力历史逐阶段累加的徐变。")
+        if m_rh and m_h:
+            notes.append("写了徐变系数，不再改用湿度、理论厚度的规范曲线。")
+    elif m_rh and m_h:
+        rh = float(m_rh.group(1))
+        h = float(m_h.group(1))
+        unit = (m_h.group(2) or "").lower()
+        if unit in ("米", "m") or (not unit and h < 5.0):
+            h *= 1000.0
+            notes.append(f"理论厚度按米换算为 {h:g} mm。")
+        if m_fcm:
+            fcm = float(m_fcm.group(1))
+        elif m_grade:
+            fcu = float(m_grade.group(1))
+            fcm = 0.8 * fcu + 8.0
+            notes.append(f"混凝土 C{fcu:g} 的圆柱体平均强度取 fcm=0.8fcu,k+8={fcm:g} MPa。")
+        else:
+            fcm = 40.0
+            notes.append("未写混凝土强度，圆柱体平均强度按 C40 的 fcm=40 MPa。")
+        t0 = float(m_t0.group(1)) if m_t0 else 7.0
+        phi0, beta_h = jtg3362_nominal_creep(rh, h, fcm, t0)
+        p["creep_phi"] = 0.0
+        p["creep_rh"] = rh
+        p["creep_h"] = h
+        p["creep_fcm"] = fcm
+        p["creep_t0"] = t0
+        if m_t:
+            p["creep_t_end"] = float(m_t.group(1))
+        ts = _drying_start_days(text)
+        if ts is not None:
+            p["shrinkage_ts"] = ts
+        notes.append(
+            f"徐变按 JTG 3362 附录 C.2.1：相对湿度 {rh:g}%、理论厚度 {h:g} mm、"
+            f"fcm={fcm:g} MPa、加载龄期 {t0:g} 天，名义系数 φ0={phi0:.3f}，βH={beta_h:.1f}。"
+            "这不是 φ0=2、βH=700 的简化曲线。阶段求解用相邻龄期的差值。"
+            + (f"干燥从第 {ts:g} 天起，参与受力之前的收缩不进入平衡。"
+               if ts is not None else "没写收缩开始龄期，干燥从加载龄期起算。"))
     elif m_t:
         t0 = float(m_t0.group(1)) if m_t0 else 7.0
         p["creep_phi"] = creep_phi_from_age(float(m_t.group(1)), t0)
@@ -2038,6 +2144,75 @@ def _note_cable_system(text: str, p: dict[str, Any], notes: list[str],
         p["system"] = "semi"
         if wants_float:
             notes.append("结构体系按半漂浮成桥，不进入悬臂施工阶段。")
+
+
+def _drying_start_days(text: str) -> float | None:
+    """收缩开始龄期。没写就返回 None，干燥从加载龄期起算。"""
+    m = re.search(r"(?:收缩开始龄期|干燥开始龄期|养护结束)\s*([0-9.]+)\s*(?:天|日)?", text)
+    return float(m.group(1)) if m else None
+
+
+def _note_cantilever_schedule(text: str, p: dict[str, Any], notes: list[str]) -> None:
+    """句子里的加载龄期和每段工期。没写就保持 7 天，不在这里再声明一遍默认值。"""
+    m_age = re.search(r"(?:加载龄期|张拉龄期)\s*([0-9.]+)\s*(?:天|日)?", text)
+    m_cycle = re.search(
+        r"(?:每段工期|节段周期|施工周期|悬臂周期|每段)\s*([0-9.]+)\s*(?:天|日)", text)
+    if not m_age and not m_cycle:
+        return
+    age = float(m_age.group(1)) if m_age else 7.0
+    cycle = float(m_cycle.group(1)) if m_cycle else 7.0
+    if m_age:
+        p["load_age_days"] = age
+    if m_cycle:
+        p["cycle_days"] = cycle
+    notes.append(
+        f"悬臂第一段末龄期 {age:g} 天，之后每段加 {cycle:g} 天，含合拢和二期。"
+        "这是句子里的工期，不是现场进度。合拢后不解除塔梁固结。")
+
+
+def _note_cantilever_creep(text: str, p: dict[str, Any], notes: list[str]) -> None:
+    """悬臂斜拉没写湿度和理论厚度时保持 φ0=2。写齐了、又没写徐变系数，才改规范曲线。"""
+    m_rh = re.search(r"相对湿度\s*([0-9.]+)\s*%?", text)
+    m_h = re.search(r"理论厚度\s*([0-9.]+)\s*(毫米|mm|米|m)?", text, re.I)
+    if re.search(r"徐变系数", text):
+        if m_rh and m_h:
+            notes.append("写了徐变系数，悬臂施工仍用 φ0=2、βH=700，不改用湿度曲线。")
+        return
+    if not (m_rh and m_h):
+        if _drying_start_days(text) is not None:
+            notes.append("写了收缩开始龄期，但没有湿度和理论厚度，不按规范收缩曲线计算。")
+        return
+    rh = float(m_rh.group(1))
+    h = float(m_h.group(1))
+    unit = (m_h.group(2) or "").lower()
+    if unit in ("米", "m") or (not unit and h < 5.0):
+        h *= 1000.0
+        notes.append(f"理论厚度按米换算为 {h:g} mm。")
+    m_grade = re.search(r"混凝土\s*C\s*([0-9.]+)", text, re.I)
+    m_fcm = re.search(r"(?:圆柱体强度|fcm)\s*([0-9.]+)", text, re.I)
+    if m_fcm:
+        fcm = float(m_fcm.group(1))
+    elif m_grade:
+        fcu = float(m_grade.group(1))
+        fcm = 0.8 * fcu + 8.0
+        notes.append(f"混凝土 C{fcu:g} 的圆柱体平均强度取 fcm=0.8fcu,k+8={fcm:g} MPa。")
+    else:
+        fcm = 0.8 * 50.0 + 8.0
+        notes.append("未写混凝土强度，主梁按 C50，圆柱体平均强度 fcm=48 MPa。")
+    t0 = float(p.get("load_age_days") or 7.0)
+    phi0, beta_h = jtg3362_nominal_creep(rh, h, fcm, t0)
+    p["creep_rh"] = rh
+    p["creep_h"] = h
+    p["creep_fcm"] = fcm
+    ts = _drying_start_days(text)
+    if ts is not None:
+        p["shrinkage_ts"] = ts
+    notes.append(
+        f"悬臂徐变按 JTG 3362 附录 C.2.1：相对湿度 {rh:g}%、理论厚度 {h:g} mm、"
+        f"fcm={fcm:g} MPa、加载龄期 {t0:g} 天，名义系数 φ0={phi0:.3f}，βH={beta_h:.1f}。"
+        "这不是 φ0=2、βH=700。合拢后的塔梁固结不因这条曲线而解除。"
+        + (f"干燥从第 {ts:g} 天起，参与受力之前的收缩不进入平衡。"
+           if ts is not None else ""))
 
 
 def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
@@ -2141,6 +2316,9 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
                     f"短于 {CABLE_STAYED_LARGE_SPAN_M:g} m 仍走线性阶段；"
                     "写「线性施工」可以强制保持线性。")
         _note_cable_system(text, p, notes, is_2d=is_2d)
+        if p.get("staged") and not is_2d:
+            _note_cantilever_schedule(text, p, notes)
+            _note_cantilever_creep(text, p, notes)
         # 二期恒载（铺装+护栏）：单独给出才拆分 q1=q−q2，否则二期=0 全算一期。
         m2 = re.search(r"二期(?:恒载|铺装|荷载|桥面)?\s*"
                        r"([0-9]+(?:\.[0-9]+)?)\s*(?:kN/m|kN|kn/m|KN/m)", text)
@@ -2150,6 +2328,13 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
         else:
             p["q2_deck"] = d["q2_deck"]
         p["retune"] = d.get("retune", True)
+        if is_2d and re.search(r"车道|活载|影响线|汽车荷载|JTG\s*D60", text, re.I):
+            p["lane"] = True
+            notes.append(
+                "2D 斜拉活载按线性影响线最不利布载。索按线弹性杆，"
+                "不是成桥切线刚度，不含 Ernst 与几何刚度。")
+        elif is_2d:
+            p["lane"] = bool(d.get("lane", False))
     elif base == "suspension":
         _note_cable_planes(text, p, notes)
         # 体系：只有两个选项，关键词足够，不必等 LLM。同时接受"锚在梁上"
@@ -2266,8 +2451,11 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
             # 描述里若提了这些，如实提示"2D 简化暂不承载"，不静默忽略。
             if re.search(r"二期|铺装", text):
                 notes.append("2D 悬索桥只做成桥态一次静力，二期铺装已并入桥面恒载 q")
-            if re.search(r"车道", text):
-                notes.append("2D 悬索桥暂不接入车道活载（影响线活载待验）")
+            if re.search(r"车道|活载|影响线|汽车荷载|JTG\s*D60", text, re.I):
+                p["lane"] = True
+                notes.append(
+                    "2D 悬索活载按线性影响线最不利布载。主缆和吊索按线弹性杆，"
+                    "不是成桥切线刚度，不含 Ernst 与几何刚度。")
             if re.search(r"施工|吊装|合拢", text):
                 notes.append("2D 悬索桥暂不做施工阶段模拟（分级找形走三维 erection）")
     elif base == "arch_3d":

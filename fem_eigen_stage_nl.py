@@ -240,6 +240,10 @@ def as_solve_result(model, rows: list[dict], *, dat_path: Path) -> SolveResult:
     else:
         note += "本模型没有车道，没有活载包络。"
     res.diagnostics.append(note)
+    if any(float(getattr(s, "time", 0.0) or 0.0) > 0.0
+           for s in getattr(model, "stages", []) or []):
+        from result_3d import stage_time_effect_note
+        res.diagnostics.append(stage_time_effect_note(model, res.solver))
     return res
 
 

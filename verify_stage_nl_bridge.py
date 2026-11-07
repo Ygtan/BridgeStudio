@@ -78,8 +78,74 @@ def main() -> int:
         print(f"  末态竖向位移差：最大 {max(uz) * 1e3:.2f} mm，"
               f"平均 {sum(uz) / len(uz) * 1e3:.2f} mm（两种列式，预期不必相同）")
 
+    # 同一座桥关掉徐变曲线。第二段是第一次龄期增量，先浇的梁应该已经变位。
+    bare = model.model_copy(deep=True)
+    bare.creep_phi0 = 0.0
+    nl_bare = solve_stages_nonlinear(
+        bare, out, dat_name="bridge_nl_nocreep.dat", timeout=600)
+    u_c = nl[1]["u"]
+    u_b = nl_bare[1]["u"]
+    node = max((n for (n, d) in u_b if d == 3),
+               key=lambda n: abs(u_b.get((n, 3), 0.0)))
+    uc, ub = u_c.get((node, 3), 0.0), u_b.get((node, 3), 0.0)
+    rel = abs(uc - ub) / max(abs(ub), 1e-9)
+    check("先浇梁在下一段发生徐变",
+          nl_bare[1]["converged"] and abs(ub) > 1e-6 and rel > 0.02,
+          f"节点 {node}  uz 有徐变 {uc:.6e}  无徐变 {ub:.6e}  相对差 {rel:.3f}")
+
+    code = build_cable_stayed_3d(
+        main_span=40.0, side_span=16.0, tower_height=12.0,
+        n_cable=2, panel=8.0, q_deck=20e3, q2_deck=0.0,
+        staged=True, retune=True, title="规范徐变悬臂斜拉桥",
+        creep_rh=55.0, creep_h=200.0, creep_fcm=48.0)[0]
+    code_dat = code.to_dat(compact=False)
+    nl_code = solve_stages_nonlinear(
+        code, out, dat_name="bridge_nl_jtg.dat", timeout=600)
+    u_j = nl_code[1]["u"]
+    uj = u_j.get((node, 3), 0.0)
+    rel_j = abs(uj - uc) / max(abs(uc), 1e-9)
+    worst_j = 0.0
+    for stage, row in zip(code.stages, nl_code):
+        for eid, target in stage.tensions.items():
+            got = row["cables"].get(eid, {}).get("T")
+            if got is None or target <= 0:
+                worst_j = 1.0
+                continue
+            worst_j = max(worst_j, abs(got / target - 1.0))
+    check("规范湿度曲线改变先浇梁位移，索力仍命中",
+          nl_code[1]["converged"]
+          and code.creep_phi0 == 0.0
+          and "PHI0=" not in code_dat and "RH=55" in code_dat
+          and rel_j > 0.005 and worst_j < 0.01,
+          f"节点 {node}  规范 {uj:.6e}  φ0=2 {uc:.6e}  相对差 {rel_j:.3f}"
+          f"  索力差 {worst_j:.3e}")
+
     from fem_eigen_stage_nl import as_solve_result
     res = as_solve_result(model, nl, dat_path=out / "bridge_nl.dat")
+    sched = res.tables(model).get("stage_schedule")
+    got_ages = [row[1] for row in sched["rows"]] if sched else []
+    want_ages = [s.time for s in model.stages]
+    from export_html import write_calculation_html
+    html_path = write_calculation_html(
+        res, model, out / "bridge.html", project=model.title)
+    html = html_path.read_text(encoding="utf-8")
+    check("HTML 计算书含龄期表",
+          "施工阶段龄期" in html and "7.0" in html and "35.0" in html
+          and "简化曲线" in html,
+          html_path.name)
+    code_res = as_solve_result(code, nl_code, dat_path=out / "bridge_nl_jtg.dat")
+    code_note = code_res.tables(code).get("stage_schedule", {}).get("note", "")
+    check("计算书写明本次用了规范徐变和收缩",
+          "φ0=2.727" in code_note and "附录 C" in code_note
+          and "非线性阶段" in code_note,
+          code_note[-48:])
+
+    check("计算书列出每段龄期",
+          sched is not None
+          and got_ages == [7.0, 14.0, 21.0, 28.0, 35.0]
+          and got_ages == want_ages,
+          " ".join(str(a) for a in got_ages))
+
     check("结果可送进界面",
           res.kind == "grillage3d" and res.converged
           and len(res.stage_cables) >= info["n_cable_actual"],
