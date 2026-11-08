@@ -469,3 +469,294 @@ def capacity_table(rows: list[tuple[str, CapacityResult]]) -> dict:
                     "利用率 M", "利用率 V", "利用率", "控制项"],
         "rows": [[name] + r.to_row() for name, r in rows],
     }
+
+
+# ---------------------------------------------------------------- 偏心受压（压弯）承载力
+#
+# 受弯承载力（Mu/Vu）回答"配筋够不够扛弯矩/剪力"，但桥塔、拱肋这类构件
+# 承受的是**轴压 + 弯矩**（压弯）。轴力较大时用纯弯公式会偏不安全——受压
+# 区高度 x 被轴力抬高、甚至进入小偏心，受拉钢筋应力 σs 不再等于 fsd。故
+# 按 JTG 3362-2018 §5.3.4（矩形截面偏心受压）单独验算：
+#
+#   力平衡     N ≤ fcd·b·x + f'sd·A's − σs·As            （5.3.4-1）
+#   力矩平衡   N·e ≤ fcd·b·x·(h0−x/2) + f'sd·A's·(h0−a's) （5.3.4-2）
+#
+# 其中 e = η·e0 + h/2 − as、e0 = M/N。大偏心（ξ≤ξb）取 σs = fsd；小偏心
+# （ξ>ξb）σs 按 §5.1.5 平截面公式 σs = εcu·Es·(β·h0/x − 1)，受拉为正、
+# 受压为负，且 −f'sd ≤ σs ≤ fsd。长细比较大时按 §5.3.9 用偏心距增大系数
+# η 计入二阶效应。
+#
+# 只做矩形截面、对称配筋（A's=As，桥塔/拱肋的标准做法）；工形/T 形压弯、
+# 非对称配筋留待下一步，接口按矩形对称设计。
+
+
+def _beta(concrete_grade: str) -> float:
+    """§5.1.4 受压区矩形应力图高度与实际受压区高度之比 β。
+
+    C50 及以下 0.80，C80 0.74，中间每 5 MPa 降 0.01（线性）。
+    """
+    fcu = cm.concrete(concrete_grade).fcu_k
+    return 0.80 - max(0.0, fcu - 50.0) * 0.002
+
+
+def _eps_cu(concrete_grade: str) -> float:
+    """§5.1.5 截面非均匀受压时混凝土极限压应变 εcu。
+
+    C50 及以下 0.0033，C80 0.003，中间线性插入。
+    """
+    fcu = cm.concrete(concrete_grade).fcu_k
+    return 0.0033 - max(0.0, fcu - 50.0) * 0.00001
+
+
+def _sigma_s(sec: CapacitySection, x: float, beta: float, eps_cu: float,
+             Es: float, fsd: float, fsd_c: float) -> float:
+    """§5.1.5 受拉（或受压较小）边纵向钢筋应力，受拉为正，限 −f'sd≤σs≤fsd。"""
+    if x <= 1e-6:
+        return fsd
+    sig = eps_cu * Es * (beta * sec.h0 / x - 1.0)
+    return min(fsd, max(-fsd_c, sig))
+
+
+def eta_second_order(sec: CapacitySection, N: float, M: float,
+                     l0: float | None) -> float:
+    """§5.3.9 偏心距增大系数 η（二阶效应）。l0 计算长度 mm；N 受压为正（N）。
+
+    仅当长细比 l0/i > 17.5（矩形回转半径 i=h/√12）时二阶效应才不可忽略，
+    否则 η=1。ζ1=min(0.2+2.7e0/h0, 0.5fcdA/N, 1.0)、ζ2=min(1.15−0.01l0/h,1)。
+    """
+    if l0 is None or l0 <= 0.0 or N <= 0.0 or abs(M) <= 0.0:
+        return 1.0
+    h, h0 = sec.h, sec.h0
+    if l0 / (h / math.sqrt(12.0)) <= 17.5:
+        return 1.0
+    e0 = abs(M) / N * 1000.0          # M 为 N·m、N 为 N → e0 是 m，转 mm 与 h0 对齐
+    zeta1 = min(0.2 + 2.7 * e0 / h0, 1.0)
+    zeta1 = min(zeta1, 0.5 * cm.concrete(sec.concrete_grade).fcd
+                * (sec.b * sec.h) / N)
+    zeta1 = max(zeta1, 0.0)
+    zeta2 = min(1.15 - 0.01 * l0 / h, 1.0)
+    return 1.0 + zeta1 * zeta2 * (l0 / h) ** 2 / (1300.0 * e0 / h0)
+
+
+def _solve_x_small(sec: CapacitySection, N: float, fcd: float, fsd: float,
+                   fsd_c: float, Es: float, beta: float, eps_cu: float,
+                   b: float, As: float, Asp: float, xi_b: float,
+                   h0: float, h: float) -> float:
+    """小偏心受压求受压区高度 x（二分法解力平衡 §5.3.4-1）。
+
+    力平衡 N = fcd·b·x + f'sd·A's − σs(x)·As，σs(x) 随 x 单调降，左式随 x
+    单调升，故在 [ξb·h0, h] 上二分。若 f(h)<0（N 超全截面受压承载力）返回
+    h，由调用方判"轴压不足"。
+    """
+    def f(x: float) -> float:
+        sig = _sigma_s(sec, x, beta, eps_cu, Es, fsd, fsd_c)
+        return fcd * b * x + fsd_c * Asp - sig * As - N
+
+    lo, hi = xi_b * h0, h
+    if f(hi) < 0.0:
+        return hi
+    for _ in range(120):
+        mid = 0.5 * (lo + hi)
+        if f(mid) < 0.0:
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < 1e-3:
+            break
+    return 0.5 * (lo + hi)
+
+
+def eccentric_capacity(sec: CapacitySection, N: float) -> dict:
+    """偏心受压正截面抗压承载力（§5.3.4 矩形、对称配筋）。
+
+    `N` 轴力设计值（受压为正，N，应已含结构重要性系数 γ0）。返回该轴力
+    水平下截面能承受的**一阶**极限弯矩 ``Mu``（N·m，不含 η）；效应侧乘 η
+    后再比较。只支持矩形（bf≤b 或 hf=0），工形/T 形压弯暂不支持。
+
+    返回 dict：``Mu``(N·m)、``x``(mm)、``xi``、``xi_b``、``mode``、
+    ``sigma_s``(MPa)、``N``、``over_reinforced``。
+    """
+    co = cm.concrete(sec.concrete_grade)
+    rb = cm.rebar(sec.grade_rebar)
+    fcd, fsd, fsd_c = co.fcd, rb.fsd, rb.fsd_c
+    Es = rb.Es * 1e5
+    beta = _beta(sec.concrete_grade)
+    eps_cu = _eps_cu(sec.concrete_grade)
+    h, h0, b = sec.h, sec.h0, sec.b
+    As = sec.As
+    Asp = sec.Asp if sec.Asp > 0.0 else sec.As   # 默认对称配筋 A's=As
+    a_sp = sec.asp
+    xi_b = _xi_b(sec.grade_rebar, sec.concrete_grade)
+
+    base = {"x": 0.0, "xi": 0.0, "xi_b": xi_b, "N": N,
+            "over_reinforced": False}
+
+    if sec.bf > b and sec.hf > 0.0:
+        return {**base, "Mu": 0.0, "mode": "工形截面压弯暂不支持",
+                "sigma_s": 0.0}
+    if As <= 0.0 or N <= 0.0:
+        return {**base, "Mu": 0.0,
+                "mode": "未配筋" if As <= 0.0 else "非受压",
+                "sigma_s": 0.0}
+
+    # 大偏心假设：σs=fsd，力平衡求 x
+    #   N = fcd·b·x + fsd_c·Asp − fsd·As  →  x = (N − fsd_c·Asp + fsd·As)/(fcd·b)
+    x_big = (N - fsd_c * Asp + fsd * As) / (fcd * b)
+
+    if x_big <= xi_b * h0:
+        mode = "大偏心受压"
+        x = max(x_big, 2.0 * a_sp)   # x ≥ 2a's（受压钢筋屈服的构造下限）
+        sigma_s = fsd
+    else:
+        mode = "小偏心受压"
+        x = _solve_x_small(sec, N, fcd, fsd, fsd_c, Es, beta, eps_cu,
+                           b, As, Asp, xi_b, h0, h)
+        sigma_s = _sigma_s(sec, x, beta, eps_cu, Es, fsd, fsd_c)
+
+    # 力矩平衡（对 As 合力点取矩）求一阶极限弯矩：
+    #   N·(η·e0 + h/2 − as) ≤ fcd·b·x·(h0−x/2) + fsd_c·Asp·(h0−a_sp)
+    #   → M_lim = RHS − N·(h/2 − as)   （η 由调用方处理，此处 η=1）
+    rhs = fcd * b * x * (h0 - x / 2.0) + fsd_c * Asp * (h0 - a_sp)
+    m_lim = rhs - N * (h / 2.0 - sec.as_)
+    if x_big < 2.0 * a_sp and x_big <= xi_b * h0:
+        # 受压钢筋应力达不到 f'sd，保守忽略受压钢筋贡献
+        m_lim = min(m_lim, fcd * b * x * (h0 - x / 2.0)
+                    - N * (h / 2.0 - sec.as_))
+
+    return {**base, "Mu": m_lim / 1e3, "x": x, "xi": x / h0,
+            "mode": mode, "sigma_s": sigma_s,
+            "over_reinforced": x > xi_b * h0}
+
+
+@dataclass
+class EccentricResult:
+    """压弯构件（偏心受压）正截面承载力验算结果。"""
+
+    N: float = 0.0            # 轴力设计值 γ0·N（受压为正，N）
+    M: float = 0.0            # 弯矩设计值 γ0·|M|（N·m）
+    Mu: float = 0.0           # 该轴力下的一阶极限弯矩（N·m，不含 η）
+    eta: float = 1.0          # 偏心距增大系数
+    util: float = 0.0         # η·M / Mu（轴压不足时 = inf）
+    mode: str = ""            # 大偏心受压 / 小偏心受压 / 轴压不足 / 非受压 / 未配筋
+    x: float = 0.0            # 受压区高度 mm
+    xi: float = 0.0
+    xi_b: float = 0.0
+    sigma_s: float = 0.0      # 受拉钢筋应力 MPa（受压为负）
+    note: str = ""
+
+    def to_row(self) -> list[str]:
+        mu = f"{self.Mu / 1e3:.0f}" if self.Mu > 0 else "—"
+        util = "∞" if math.isinf(self.util) else f"{self.util:.3f}"
+        return [f"{self.N / 1e3:.0f}", f"{self.M / 1e3:.0f}",
+                f"{self.eta:.3f}", mu, util, self.mode]
+
+
+def check_eccentric(sec: CapacitySection, N: float, M: float,
+                    gamma0: float = 1.0, l0: float | None = None) -> EccentricResult:
+    """压弯构件（偏心受压）验算。N 受压为正（N）、M 为弯矩（N·m），不含 γ0。
+
+    `gamma0` 结构重要性系数乘在效应侧（JTG D60 §4.1.5）；`l0` 构件计算长度
+    （mm），提供时按 §5.3.9 计入二阶效应，None 时 η=1。只覆盖矩形对称配筋。
+    """
+    r = EccentricResult()
+    Nd = gamma0 * N
+    Md = gamma0 * abs(M)
+    r.N, r.M = Nd, Md
+
+    if sec.As <= 0.0:
+        r.mode = "未配筋"
+        r.note = "未配纵向钢筋，无法验算偏心受压正截面承载力。"
+        return r
+    if Nd <= 0.0:
+        r.mode = "非受压"
+        r.note = "截面轴力为拉（N≤0），偏心受压公式不适用，应按受弯/偏心受拉验算。"
+        return r
+
+    r.eta = eta_second_order(sec, N, M, l0) if l0 else 1.0
+    cap = eccentric_capacity(sec, Nd)
+    r.Mu = cap["Mu"]
+    r.x, r.xi, r.xi_b = cap["x"], cap["xi"], cap["xi_b"]
+    r.mode = cap["mode"]
+    r.sigma_s = cap["sigma_s"]
+
+    if r.Mu > 0.0:
+        r.util = r.eta * Md / r.Mu
+    else:
+        # 轴压承载力不足（N 超全截面受压承载力）：效应必不满足
+        r.util = float("inf")
+        r.note = ("轴力 γ0·N 已超过截面全截面受压承载力，"
+                  "即使弯矩为零也不满足。")
+    return r
+
+
+def eccentric_table(rows: list[tuple[str, EccentricResult]]) -> dict:
+    """计算书用的偏心受压（压弯）承载力验算表。"""
+    return {
+        "title": "偏心受压（压弯）正截面承载力验算",
+        "note": "按 JTG 3362-2018 §5.3.4 矩形截面对称配筋公式；"
+                "N 受压为正，Mu 为该轴力下的一阶极限弯矩（不含 η），"
+                "利用率为 η·γ0·|M|/Mu，>1.0 即不满足。",
+        "headers": ["部位", "N (kN)", "M (kN·m)", "η", "Mu (kN·m)",
+                    "利用率", "破坏形态"],
+        "rows": [[name] + r.to_row() for name, r in rows],
+    }
+
+
+# ---------------------------------------------------------------- 轴心受压
+#
+# 桥塔、立柱等以轴压为主的构件，弯矩很小（偏心距 e0→0）时偏心受压公式退化，
+# 应按 §5.3.1 轴心受压构件正截面抗压承载力验算：
+#
+#   γ0·Nd ≤ 0.9·φ·(fcd·A + f'sd·A's)            （5.3.1-1）
+#
+# φ 为稳定系数（表 5.3.1，随长细比 l0/b 减小）。本程序默认 φ=1（短柱），
+# 长柱需计算长度 l0 查表——未提供时不静默降级，由调用方在口径里说明。
+
+
+@dataclass
+class AxialResult:
+    """轴心受压构件正截面承载力验算结果。"""
+
+    N: float = 0.0            # 轴力设计值 γ0·N（受压为正，N）
+    Nu: float = 0.0           # 抗压承载力 0.9·φ·(fcd·A + f'sd·A's)（N）
+    phi: float = 1.0          # 稳定系数
+    util: float = 0.0         # N / Nu
+
+    def to_row(self) -> list[str]:
+        nu = f"{self.Nu / 1e3:.0f}" if self.Nu > 0 else "—"
+        return [f"{self.N / 1e3:.0f}", nu, f"{self.phi:.3f}",
+                f"{self.util:.3f}"]
+
+
+def axial_capacity(sec: CapacitySection, phi: float = 1.0) -> float:
+    """§5.3.1 轴心受压抗压承载力 Nu = 0.9·φ·(fcd·A + f'sd·A's)（N）。
+
+    ``phi`` 稳定系数（长细比 l0/b 相关，短柱=1）；A=b·h（矩形），A's 为
+    全部纵向钢筋面积（对称配筋取 As+Asp，Asp=0 时取 2·As）。
+    """
+    co = cm.concrete(sec.concrete_grade)
+    rb = cm.rebar(sec.grade_rebar)
+    A = sec.b * sec.h
+    As_total = sec.As + (sec.Asp if sec.Asp > 0.0 else sec.As)
+    return 0.9 * phi * (co.fcd * A + rb.fsd_c * As_total)
+
+
+def check_axial(sec: CapacitySection, N: float, gamma0: float = 1.0,
+                phi: float = 1.0) -> AxialResult:
+    """轴心受压验算。N 受压为正（N），不含 γ0。"""
+    r = AxialResult(N=gamma0 * N, phi=phi)
+    r.Nu = axial_capacity(sec, phi)
+    r.util = r.N / r.Nu if r.Nu > 0 else 0.0
+    return r
+
+
+def axial_table(rows: list[tuple[str, AxialResult]]) -> dict:
+    """计算书用的轴心受压承载力验算表。"""
+    return {
+        "title": "轴心受压正截面承载力验算",
+        "note": "按 JTG 3362-2018 §5.3.1，Nu = 0.9·φ·(fcd·A + f'sd·A's)；"
+                "N 受压为正，利用率为 γ0·N/Nu，>1.0 即不满足。"
+                "稳定系数 φ 默认 1（短柱），长柱需按 l0/b 查表。",
+        "headers": ["部位", "N (kN)", "Nu (kN)", "φ", "利用率"],
+        "rows": [[name] + r.to_row() for name, r in rows],
+    }

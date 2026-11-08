@@ -1043,71 +1043,136 @@ class SolveResult:
         return out
 
     def _checks_capacity(self, model: Any, ult: Any) -> list[Check]:
-        """承载力验算（混凝土配筋截面）：正截面抗弯 Mu + 斜截面抗剪 Vu。
+        """承载力验算（混凝土配筋截面）：按受力状态分派三条链。
 
-        用基本组合的设计内力（My / Vz 包络，取绝对值大者），按
-        JTG 3362-2018 §5.2.2 / §5.2.3 / §5.2.9 算承载力与利用率。只覆盖
-        填了配筋的混凝土截面；钢截面走应力验算，未配筋的混凝土截面不判定。
+        用基本组合的设计内力（N / My / Vz 包络，取绝对值大者）。受压轴力
+        显著（>5% 截面轴压承载力，如桥塔）时按偏心距再分：偏心距 <1% 截面
+        高走轴心受压 §5.3.1，否则走偏心受压 §5.3.4；轴力≈0（如主梁）走
+        正截面抗弯 §5.2.2/5.2.3 + 斜截面 §5.2.9。只覆盖填了配筋的混凝土
+        截面；钢截面走应力验算，未配筋的混凝土截面不判定。
+
+        兼容两种组合行结构：梁格 ``beam_combinations`` 的轴力是单值 ``N``，
+        索承体系 ``cable_combinations`` 的轴力是包络 ``NMin/NMax``。
         """
         cap_secs = _capacity_sections(model)
         if not cap_secs:
             return []
 
-        ranked: list[tuple[float, str, Any, Any]] = []
+        ranked_axial: list[tuple[float, str, Any, Any]] = []  # 轴心受压
+        ranked_ecc: list[tuple[float, str, Any, Any]] = []    # 偏心受压（压弯）
+        ranked_flex: list[tuple[float, str, Any, Any]] = []   # 受弯（轴力≈0）
         for label, sec, eids in cap_secs:
+            worst_N: tuple[float, int, str] | None = None   # 受压轴力（正值）
             worst_M: tuple[float, int, str] | None = None
             worst_V: tuple[float, int, str] | None = None
             for (eid, end), v in ult.rows.items():
                 if eid not in eids:
                     continue
+                if "NMin" in v or "NMax" in v:
+                    nc = max(-v.get("NMin", 0.0), -v.get("NMax", 0.0), 0.0)
+                else:
+                    nc = max(-v.get("N", 0.0), 0.0)
+                if worst_N is None or nc > worst_N[0]:
+                    worst_N = (nc, eid, end)
                 for my in (v.get("MyMin", 0.0), v.get("MyMax", 0.0)):
                     if worst_M is None or abs(my) > worst_M[0]:
                         worst_M = (abs(my), eid, end)
                 for vz in (v.get("VzMin", 0.0), v.get("VzMax", 0.0)):
                     if worst_V is None or abs(vz) > worst_V[0]:
                         worst_V = (abs(vz), eid, end)
-            if worst_M is None and worst_V is None:
+            if worst_N is None and worst_M is None and worst_V is None:
                 continue
+            Nc = worst_N[0] if worst_N else 0.0
             Md = worst_M[0] if worst_M else 0.0
             Vd = worst_V[0] if worst_V else 0.0
-            r = section_strength.check_capacity(
-                sec, Md, Vd, gamma0=1.0, alpha1=1.0, alpha3=1.1)
-            ranked.append((r.util, label, (worst_M, worst_V), r))
-
-        if not ranked:
-            return []
-        ranked.sort(key=lambda t: -t[0])
+            # 轴力显著性：受压轴力 > 5% 截面轴压承载力 → 压弯/轴压，否则受弯。
+            try:
+                fcd = code_material.concrete(sec.concrete_grade).fcd
+                n_axial = fcd * sec.b * sec.h
+            except Exception:
+                n_axial = 0.0
+            if Nc > 0.05 * n_axial:
+                e0 = Md / Nc if Nc > 0 else float("inf")
+                if e0 < 0.01 * (sec.h / 1000.0):     # 偏心距 <1% 截面高 → 轴心
+                    r = section_strength.check_axial(sec, Nc, gamma0=1.0)
+                    ranked_axial.append((r.util, label, (worst_N,), r))
+                else:
+                    r = section_strength.check_eccentric(sec, Nc, Md, gamma0=1.0)
+                    ranked_ecc.append((r.util, label, (worst_N, worst_M), r))
+            else:
+                r = section_strength.check_capacity(
+                    sec, Md, Vd, gamma0=1.0, alpha1=1.0, alpha3=1.1)
+                ranked_flex.append((r.util, label, (worst_M, worst_V), r))
 
         out: list[Check] = []
-        for _, label, (wm, wv), r in ranked[:3]:
-            if r.Mu > 0:
-                src = f"单元 {wm[1]}·{wm[2]} 端" if wm else "—"
+
+        # ---- 受弯验算（主梁等轴力≈0 的构件）----
+        if ranked_flex:
+            ranked_flex.sort(key=lambda t: -t[0])
+            for _, label, (wm, wv), r in ranked_flex[:3]:
+                if r.Mu > 0:
+                    src = f"单元 {wm[1]}·{wm[2]} 端" if wm else "—"
+                    out.append(Check(
+                        f"{label} 正截面抗弯 Mu",
+                        r.util_M <= 1.0,
+                        f"{src} γ0·|Md| = {abs(wm[0]) / 1e3:,.0f} kN·m ≤ "
+                        f"Mu = {r.Mu / 1e3:,.0f} kN·m，利用率 {r.util_M:.3f}"
+                        f"{'（超筋）' if r.over_reinforced else ''}；"
+                        f"JTG 3362-2018 §5.2.2/5.2.3",
+                        value=r.util_M, limit=1.0, level="error"))
+                if r.Vu > 0:
+                    src = f"单元 {wv[1]}·{wv[2]} 端" if wv else "—"
+                    out.append(Check(
+                        f"{label} 斜截面抗剪 Vu",
+                        r.util_V <= 1.0,
+                        f"{src} γ0·|Vd| = {abs(wv[0]) / 1e3:,.0f} kN ≤ "
+                        f"Vu = {r.Vu / 1e3:,.0f} kN，利用率 {r.util_V:.3f}；"
+                        f"JTG 3362-2018 §5.2.9（仅配箍筋，α1=1.0、α3=1.1）",
+                        value=r.util_V, limit=1.0, level="error"))
+                if r.note:
+                    out.append(Check(
+                        f"{label} 承载力验算说明", True, r.note, level="info"))
+
+        # ---- 轴心受压验算（桥塔等弯矩≈0 的构件）----
+        if ranked_axial:
+            ranked_axial.sort(key=lambda t: -t[0])
+            for _, label, (wn,), r in ranked_axial[:3]:
                 out.append(Check(
-                    f"{label} 正截面抗弯 Mu",
-                    r.util_M <= 1.0,
-                    f"{src} γ0·|Md| = {abs(wm[0]) / 1e3:,.0f} kN·m ≤ "
-                    f"Mu = {r.Mu / 1e3:,.0f} kN·m，利用率 {r.util_M:.3f}"
-                    f"{'（超筋）' if r.over_reinforced else ''}；"
-                    f"JTG 3362-2018 §5.2.2/5.2.3",
-                    value=r.util_M, limit=1.0, level="error"))
-            if r.Vu > 0:
-                src = f"单元 {wv[1]}·{wv[2]} 端" if wv else "—"
-                out.append(Check(
-                    f"{label} 斜截面抗剪 Vu",
-                    r.util_V <= 1.0,
-                    f"{src} γ0·|Vd| = {abs(wv[0]) / 1e3:,.0f} kN ≤ "
-                    f"Vu = {r.Vu / 1e3:,.0f} kN，利用率 {r.util_V:.3f}；"
-                    f"JTG 3362-2018 §5.2.9（仅配箍筋，α1=1.0、α3=1.1）",
-                    value=r.util_V, limit=1.0, level="error"))
-            if r.note:
-                out.append(Check(
-                    f"{label} 承载力验算说明", True, r.note, level="info"))
+                    f"{label} 轴心受压正截面",
+                    r.util <= 1.0,
+                    f"单元 {wn[1]}·{wn[2]} 端 N = {r.N / 1e3:,.0f} kN ≤ "
+                    f"Nu = {r.Nu / 1e3:,.0f} kN（0.9·φ·(fcd·A+f'sd·A's)，"
+                    f"φ={r.phi:g}），利用率 {r.util:.3f}；"
+                    f"JTG 3362-2018 §5.3.1",
+                    value=r.util, limit=1.0, level="error"))
+
+        # ---- 偏心受压验算（压弯构件，弯矩显著）----
+        if ranked_ecc:
+            ranked_ecc.sort(key=lambda t: -t[0])
+            for _, label, (wn, wm), r in ranked_ecc[:3]:
+                if r.Mu > 0 or math.isinf(r.util):
+                    util_s = "∞" if math.isinf(r.util) else f"{r.util:.3f}"
+                    src = f"单元 {wn[1]}·{wn[2]} 端" if wn else "—"
+                    out.append(Check(
+                        f"{label} 偏心受压（压弯）正截面",
+                        r.util <= 1.0 and not math.isinf(r.util),
+                        f"{src} N = {r.N / 1e3:,.0f} kN、M = {r.M / 1e3:,.0f} "
+                        f"kN·m，{r.mode}，x = {r.x:.0f} mm，σs = "
+                        f"{r.sigma_s:+.0f} MPa；该轴力下 Mu = "
+                        f"{r.Mu / 1e3:,.0f} kN·m，利用率 {util_s}；"
+                        f"JTG 3362-2018 §5.3.4（矩形对称配筋）",
+                        value=r.util, limit=1.0, level="error"))
+                if r.note:
+                    out.append(Check(
+                        f"{label} 压弯验算说明", True, r.note, level="info"))
 
         out.append(Check(
             "承载力验算适用范围", True,
-            "正截面按矩形/工形（受压翼缘在受压区）单筋公式，斜截面按仅配箍筋"
-            "公式，均为普通钢筋混凝土（无预应力、无弯起钢筋）；负弯矩区与"
-            "轴力较大的压弯构件需按偏心受压公式另行验算。",
+            "受弯按矩形/工形（受压翼缘在受压区）单筋 §5.2.2/5.2.3、斜截面"
+            "按仅配箍筋 §5.2.9；轴力显著（>5% 轴压承载力）时按偏心距自动分派"
+            "轴心受压 §5.3.1（偏心距 <1% 截面高）或偏心受压 §5.3.4。均为普通"
+            "钢筋混凝土（无预应力、无弯起钢筋），二阶效应与稳定系数未计"
+            "（需计算长度 l0，程序未给，η、φ 取 1）。",
             level="info"))
         return out
 
@@ -1124,8 +1189,9 @@ class SolveResult:
         JTG D64 §5.3.1），混凝土超限标 warn（0.5fck 是量级判据）。频遇 /
         准永久组合属正常使用，只给控制截面的利用率，不做逐项判定。
 
-        塔柱也在验算范围内：它同样是 BEAM、同样被压弯，但实常数里没有截面
-        模量（W=0），只算轴应力——这一点写在条目说明里，不静默。
+        塔柱也在验算范围内：它同样是 BEAM、同样被压弯，实常数里没有截面
+        模量（W=0），应力验算只算轴应力；其承载力另按 §5.3.1 轴心受压 /
+        §5.3.4 偏心受压验算（见 `_checks_capacity`），不静默。
         """
         if not self.girder_ends:
             return [Check(
@@ -1188,8 +1254,9 @@ class SolveResult:
                 f"单元 {eid}·{end} 端 σ = {r.sigma_top:+.1f} / "
                 f"{r.sigma_bot:+.1f} MPa（上/下缘，拉正压负），"
                 f"利用率 {r.util_normal:.3f}；{r.limit_desc}。"
-                + ("**该截面未给截面模量（WT/WB=0），只算了轴应力，"
-                   "弯曲应力未计。**" if no_w else ""),
+                + ("**该截面未给截面模量（WT/WB=0），应力验算只算轴应力、"
+                   "弯曲应力未计；承载力按轴心/偏心受压另验（见下方条目）。**"
+                   if no_w else ""),
                 value=r.util_normal, limit=1.0,
                 level="error" if steel else "warn"))
 
@@ -1254,6 +1321,10 @@ class SolveResult:
                 f"模型含 {len(ult)} 个梁截面，上列只给利用率最高的 "
                 f"{len(shown)} 个；其余 {len(ult) - len(shown)} 个更低。",
                 level="info"))
+        # 承载力验算（混凝土配筋截面：桥塔轴心受压 / 偏心受压，加劲梁受弯）。
+        # 塔柱是混凝土 C50、已配筋，这里按 §5.3.1/§5.3.4 补上承载力结论，
+        # 替代此前"塔柱只算轴应力、无承载力判定"的空缺。
+        out.extend(self._checks_capacity(model, combos[0]))
         return out
 
     def _checks_girder_live(self, model: Any = None) -> list[Check]:

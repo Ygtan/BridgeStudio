@@ -50,6 +50,7 @@ from model_spec_3d import (
     Node3D,
     NodalLoad3D,
     RealConst3D,
+    RebarSpec3D,
 )
 
 G = 9.81
@@ -75,6 +76,7 @@ def build_suspension_3d(
     tw: float = 0.020,
     tower_b: float = 3.0,
     tower_h: float = 4.0,
+    tower_rebar_ratio: float = 0.01,       # 塔柱全截面纵向配筋率（对称配筋，验算用）
     n_tower_seg: int = 6,
     main_area_mm2: float = 60000.0,       # 单根主缆截面积（全桥两根之一）
     hanger_area_mm2: float = 3000.0,
@@ -197,7 +199,15 @@ def build_suspension_3d(
                     AW=box["AW"], T_PLATE=box["T_MAX"] * 1000.0),
         # 塔是实心矩形：最大剪应力 1.5V/A，故等效腹板面积取 A/1.5
         RealConst3D(id=2, A=tower_A, IY=tower_I, IZ=tower_I,
-                    J=tower_I * 1.6, G=G_conc, AW=tower_A / 1.5),
+                    J=tower_I * 1.6, G=G_conc, AW=tower_A / 1.5,
+                    rebar=(
+                        RebarSpec3D(h=tower_h * 1e3, b=tower_b * 1e3,
+                                    As=0.5 * tower_rebar_ratio * tower_A * 1e6,
+                                    Asp=0.5 * tower_rebar_ratio * tower_A * 1e6,
+                                    as_=70.0,
+                                    Asv=2 * math.pi * 16 ** 2 / 4, sv=150.0)
+                        if tower_rebar_ratio > 0.0 else None
+                    )),
         RealConst3D(id=3, A=cable_A, W=cable_w),
         RealConst3D(id=4, A=hanger_A, W=hanger_w),
     ]

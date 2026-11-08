@@ -112,8 +112,100 @@ def main() -> int:
     r1 = ss.check_capacity(nosv, Md=200e3, Vd=100e3)
     check("未配箍 → Vu=0 且标注", r1.no_stirrup and r1.Vu == 0.0)
 
+    # ============================================================ 偏心受压（压弯）
+    print("\n[5] 矩形偏心受压（对称配筋）手算对拍")
+    # b=400 h=600 as=a's=40 → h0=560；C30 fcd=13.8；HRB400 fsd=f'sd=330、
+    # Es=2.0e5；As=A's=4Φ25=1963.5；ξb=0.53
+    sec_e = ss.CapacitySection(h=600, b=400, As=4 * math.pi * 25 ** 2 / 4,
+                               as_=40, asp=40, concrete_grade="C30")
+    As_e = 4 * math.pi * 25 ** 2 / 4
+    # 大偏心：N=800kN，对称配筋（fsd=fsd_c）力平衡 → x=N/(fcd·b)
+    cap_e1 = ss.eccentric_capacity(sec_e, 800e3)
+    x1 = 800e3 / (13.8 * 400)
+    rhs1 = 13.8 * 400 * x1 * (560 - x1 / 2) + 330 * As_e * (560 - 40)
+    Mu1 = (rhs1 - 800e3 * (300 - 40)) / 1e3              # N·m
+    check("大偏心受压区高度 x 与手算一致", near(cap_e1["x"], x1, 1e-3),
+          f"x={cap_e1['x']:.1f}mm vs {x1:.1f}")
+    check("大偏心 σs=fsd=330", near(cap_e1["sigma_s"], 330.0, 1e-9),
+          f"σs={cap_e1['sigma_s']:.0f}")
+    check("大偏心 Mu 与手算一致", near(cap_e1["Mu"], Mu1, 1e-3),
+          f"Mu={cap_e1['Mu']/1e3:.1f}kN·m vs {Mu1/1e3:.1f}")
+    check("判为大偏心受压", cap_e1["mode"] == "大偏心受压"
+          and not cap_e1["over_reinforced"], cap_e1["mode"])
+
+    # 小偏心：N=2500kN，力平衡 5520x − 660·As·448/x = 556139.95（二次方程闭式解）
+    cap_e2 = ss.eccentric_capacity(sec_e, 2500e3)
+    a2, b2, c2 = 5520.0, -(2500e3 - 330 * As_e - 660 * As_e), -660 * As_e * 448
+    x2 = (-b2 + math.sqrt(b2 * b2 - 4 * a2 * c2)) / (2 * a2)
+    sig2 = 0.0033 * 2.0e5 * (0.8 * 560 / x2 - 1)
+    rhs2 = 13.8 * 400 * x2 * (560 - x2 / 2) + 330 * As_e * (560 - 40)
+    Mu2 = (rhs2 - 2500e3 * (300 - 40)) / 1e3
+    check("小偏心受压区高度 x（二分迭代）", near(cap_e2["x"], x2, 1e-3),
+          f"x={cap_e2['x']:.1f}mm vs {x2:.1f}")
+    check("小偏心 σs 按 §5.1.5 平截面", near(cap_e2["sigma_s"], sig2, 1e-3),
+          f"σs={cap_e2['sigma_s']:.1f} vs {sig2:.1f}")
+    check("小偏心 Mu 与手算一致", near(cap_e2["Mu"], Mu2, 1e-3),
+          f"Mu={cap_e2['Mu']/1e3:.1f}kN·m vs {Mu2/1e3:.1f}")
+    check("判为小偏心受压", cap_e2["mode"] == "小偏心受压"
+          and cap_e2["over_reinforced"], cap_e2["mode"])
+
+    # ============================================================ 二阶效应 η
+    print("\n[6] 偏心距增大系数 η（§5.3.9）")
+    # 墩柱算例：l0=19.6m、h=2.2m、e0=274mm、C40 → η≈1.26
+    sec_eta = ss.CapacitySection(h=2200, b=2200, As=91608.8, as_=70, asp=70,
+                                 concrete_grade="C40")
+    eta = ss.eta_second_order(sec_eta, 20400e3, 20400e3 * 0.274, 19600)
+    check("η 与墩柱算例一致（≈1.26）", near(eta, 1.26, 0.02), f"η={eta:.3f}")
+    check("短柱（l0/i≤17.5）η=1",
+          ss.eta_second_order(sec_eta, 20400e3, 20400e3 * 0.274, 5000) == 1.0, "")
+    check("未给 l0 时 η=1",
+          ss.eta_second_order(sec_eta, 20400e3, 20400e3 * 0.274, None) == 1.0, "")
+
+    # ============================================================ 压弯边界
+    print("\n[7] 压弯边界：集成验算 / 轴压不足 / 未配筋 / 轴拉 / 工形")
+    r_ec = ss.check_eccentric(sec_e, 800e3, 400e3, gamma0=1.1)
+    # check_eccentric 用 γ0·N=880kN 求 Mu，再算 util=η·γ0·|M|/Mu（η=1）
+    Nd_ec = 1.1 * 800e3
+    x_ec = Nd_ec / (13.8 * 400)
+    rhs_ec = 13.8 * 400 * x_ec * (560 - x_ec / 2) + 330 * As_e * (560 - 40)
+    Mu_ec = (rhs_ec - Nd_ec * (300 - 40)) / 1e3
+    check("check_eccentric 大偏心利用率", near(r_ec.util, 1.1 * 400e3 / Mu_ec, 1e-3),
+          f"util={r_ec.util:.3f}")
+    r_ov = ss.check_eccentric(sec_e, 8000e3, 100e3)
+    check("轴压超载 → util=∞ 且标注", math.isinf(r_ov.util), r_ov.note)
+    r_nr = ss.check_eccentric(
+        ss.CapacitySection(h=600, b=400, As=0, concrete_grade="C30"), 1000e3, 100e3)
+    check("未配筋 → 不可判定", r_nr.mode == "未配筋", r_nr.note)
+    r_nt = ss.check_eccentric(sec_e, -500e3, 100e3)
+    check("轴拉 → 非受压不适用", r_nt.mode == "非受压", r_nt.note)
+    sec_i = ss.CapacitySection(h=2500, b=900, bf=12000, hf=280, As=40000,
+                               as_=100, concrete_grade="C50")
+    cap_i = ss.eccentric_capacity(sec_i, 1000e3)
+    check("工形截面压弯明确标注不支持", "不支持" in cap_i["mode"], cap_i["mode"])
+
+    # ============================================================ 轴心受压
+    print("\n[8] 轴心受压（§5.3.1）+ 桥塔端到端")
+    # Nu = 0.9·φ·(fcd·A + f'sd·A's)，A=b·h，对称配筋 A's = As + Asp = 2·As
+    nu_hand = 0.9 * 1.0 * (13.8 * 400 * 600 + 330 * (As_e * 2))
+    r_ax = ss.check_axial(sec_e, 2000e3, gamma0=1.0)
+    check("轴心受压 Nu 与手算一致", near(r_ax.Nu, nu_hand, 1e-3),
+          f"Nu={r_ax.Nu/1e3:.0f}kN vs {nu_hand/1e3:.0f}")
+    check("轴心受压利用率正确", near(r_ax.util, 2000e3 / nu_hand, 1e-3),
+          f"util={r_ax.util:.3f}")
+    # 端到端：斜拉桥塔柱（混凝土 C50 对称配筋）→ 自动走轴心受压
+    import cable_stayed_3d
+    from solver_3d import solve
+    m_cb, _ = cable_stayed_3d.build_cable_stayed_3d(
+        main_span=100.0, side_span=40.0, tower_height=40.0, n_cable=6)
+    res_cb = solve(m_cb, out_dir=tempfile.mkdtemp(), dat_name="cable.dat")
+    chk_cb = res_cb.checks(m_cb)
+    ax_cb = next((c for c in chk_cb if "轴心受压" in c.name), None)
+    check("斜拉桥塔柱轴心受压条目出现", ax_cb is not None, "")
+    check("塔柱轴心受压通过（截面富余大）", ax_cb is not None and ax_cb.ok,
+          ax_cb.detail[:60] if ax_cb else "—")
+
     # ============================================================ 端到端
-    print("\n[5] 端到端：梁格建造器 → 求解 → 承载力校核")
+    print("\n[9] 端到端：梁格建造器 → 求解 → 承载力校核")
     import model_doc
     t = "三跨连续箱梁，边跨30米中跨50米，梁高2.5米，箱宽12米，逐跨施工"
     doc, _src, _diag = model_doc.ModelDoc.from_text(t)

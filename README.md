@@ -83,8 +83,18 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        `_checks_capacity` 把基本组合设计内力换成 Mu/Vu 利用率，出校核条目 +
        `capacity_table` 明细表。`verify_capacity.py` 22/22（矩形/工形/斜截面
        手算对拍 + 超筋/未配筋负例 + 梁格端到端）。
-       **边界**：只做普通钢筋混凝土（无预应力、无弯起），压弯构件与负弯矩区
-       需按偏心受压公式另行验算 —— 2026-11-08
+       **边界**：只做普通钢筋混凝土（无预应力、无弯起），负弯矩区、工形/T 形
+       压弯、非对称配筋未覆盖 —— 2026-11-08
+- [x] **P3** 桥塔压弯 / 轴心受压承载力：`section_strength` 加
+       `eccentric_capacity`（§5.3.4 矩形对称配筋，大偏心 σs=fsd / 小偏心按
+       §5.1.5 平截面二分迭代）、`eta_second_order`（§5.3.9 二阶效应）、
+       `check_axial`（§5.3.1 轴心受压 0.9·φ·(fcd·A+f'sd·A's)）；`cable_stayed_3d`
+       /`suspension_3d` 塔柱对称配筋接 `RebarSpec3D`；`result_3d._checks_capacity`
+       按轴力+偏心距三分派（轴心受压 / 偏心受压 / 受弯），索承体系也接上承载力
+       验算。`verify_capacity.py` 42/42（含大/小偏心、η、轴心受压手算对拍 +
+       斜拉桥塔柱端到端）。
+       **边界**：二阶效应 η、稳定系数 φ 未计（需计算长度 l0）；工形/T 形压弯、
+       非对称配筋未覆盖 —— 2026-11-08
 - [x] **P3** 索承体系梁应力：`cable_solver` 新增 `[GIRDEREND]`（每端一行，两种桥型
        都输出），斜拉桥第一次有主梁内力；`result_3d._checks_strength_cable` 用
        `_strength_sections + section_strength` 做正应力/剪应力/折算应力，报告增
