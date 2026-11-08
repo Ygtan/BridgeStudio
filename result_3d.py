@@ -42,6 +42,7 @@ from typing import Any
 
 import combination
 import code_material
+import modal_3d
 import section_strength
 
 #: 内核键 → 中文名。界面标题、计算书章节名都取这里，不各写一份。
@@ -264,6 +265,17 @@ class SolveResult:
     erection: list[dict[str, Any]] = field(default_factory=list)
     # 每阶段主跨主缆高程序列 {stage: [z…]}，画"主缆随吊装下沉"曲线用。
     erection_shape: dict[int, list[float]] = field(default_factory=dict)
+
+    # ---- 模态与自振特性 ------------------------------------------------
+    # K/M 装配与广义特征求解都在 FEM-Eigen 内核里完成（线性内核用成桥态
+    # 构型 + 线弹性刚度，索承体系用成桥态一致切线刚度）。这里只存内核
+    # 输出的解析结果，形状见 modal_3d.parse_modal_section：
+    #   {"nmodes", "ndof", "mass": {X,Y,Z}, "modes": [{order,f,T,mx,my,mz,
+    #    mnorm,shape}], "error"}。
+    # 空 dict = 本次结果根本没有模态数据（手工构造/旧序列化结果），
+    # 此时不产生模态校核，也不假装"验过了"；真实求解总有这一段，
+    # 内核算不出时会带 error 并给出 warn。
+    modal: dict[str, Any] = field(default_factory=dict)
 
     diagnostics: list[str] = field(default_factory=list)
 
@@ -558,6 +570,23 @@ class SolveResult:
                 out.append(Metric(
                     "基本组合控制弯矩", f"{w[1] / 1e3:,.0f}", "kN·m",
                     hint=f"1.2G+1.4Q，单元 {w[0][0]}·{w[0][1]} 端"))
+        # 模态卡片对三种内核都给：频率来自内核的 Kφ=λMφ，不是这里估的。
+        md = self.modal or {}
+        modes = md.get("modes") or []
+        if modes:
+            f1 = float(modes[0]["f"])
+            vf = modal_3d.vertical_fundamental(md)
+            ratios = modal_3d.cumulative_ratio(md, "Z")
+            hint = f"T = {modes[0]['T']:.3f} s；共 {len(modes)} 阶"
+            if vf:
+                hint += f"；竖向基频 {vf:.3f} Hz"
+            if ratios:
+                hint += f"；前 {len(modes)} 阶累计竖向参与质量 {ratios[-1] * 100:.0f}%"
+            out.append(Metric("一阶自振频率", f"{f1:.3f}", "Hz", hint=hint))
+        elif md.get("error"):
+            out.append(Metric(
+                "一阶自振频率", "未产出",
+                hint=modal_3d.ERROR_TEXT.get(md["error"], md["error"])))
         return out
 
     def max_bending(self) -> tuple[int, float] | None:
@@ -666,6 +695,48 @@ class SolveResult:
         out += self._checks_girder_live(model)
         out += self._checks_stage_cable(model)
         out += self._checks_stage_prestress(model)
+        out += self._checks_modal()
+        return out
+
+    def _checks_modal(self) -> list[Check]:
+        """模态结果的自检与工程提示。
+
+        这里判的是"数据对不对、和冲击系数是不是同一次算的、截断够不够"，
+        不是"频率合不合格"——规范没给自振频率的通过限值，硬编一个就是
+        假校核。所以三条都是 info 级陈述；只有内核报错/频率非正/与
+        f1_vertical 不同源才算问题，给 warn。
+        """
+        md = self.modal or {}
+        if not md:
+            return []                     # 手工构造/旧结果：没有就不假装验过
+        try:
+            ref = float(self.meta.get("f1_vertical") or 0.0) or None
+        except (TypeError, ValueError):
+            ref = None
+        issues = modal_3d.validate(md, ref)
+        if issues:
+            return [Check("模态与自振特性", False,
+                          "；".join(issues), level="warn")]
+        modes = md["modes"]
+        out = [Check(
+            "一阶自振频率", modes[0]["f"] > 0,
+            f"f₁ = {modes[0]['f']:.4f} Hz（T = {modes[0]['T']:.4f} s），"
+            f"共 {len(modes)} 阶；Kφ = λMφ 由 FEM-Eigen 内核求解",
+            level="info")]
+        if ref:
+            fs = [float(m["f"]) for m in modes]
+            hit = min(fs, key=lambda f: abs(f - ref))
+            out.append(Check(
+                "模态与冲击系数同源", True,
+                f"f1_vertical = {ref:.5f} Hz 对应第 {fs.index(hit) + 1} 阶 "
+                f"{hit:.5f} Hz；JTG D60 冲击系数 μ 与各阶频率出自同一次特征求解",
+                level="info"))
+        ratios = modal_3d.cumulative_ratio(md, "Z")
+        if ratios:
+            out.append(Check(
+                "竖向参与质量覆盖率", True,
+                modal_3d.participation_note(md),
+                value=ratios[-1], unit="1", level="info"))
         return out
 
     def _checks_stage_cable(self, model: Any) -> list[Check]:
@@ -1707,6 +1778,13 @@ class SolveResult:
         out: dict[str, dict[str, Any]] = {}
         x_of = {n.id: n.x for n in model.nodes} if model is not None else {}
 
+        # 模态表与桥型无关：只要内核产出了模态就给。缺数据（旧内核 /
+        # 未收敛 / 无质量）不给表，由 checks() 的 warn 写明原因，不摆一张
+        # 空表或一行"—"冒充"验过了"。
+        md = self.modal or {}
+        if md.get("modes") and not md.get("error"):
+            out["modal_table"] = modal_3d.modal_table(md)
+
         if self.cables:
             rows = []
             for c in sorted(self.cables, key=lambda c: x_of.get(c["anchor"], 0.0)):
@@ -2049,6 +2127,8 @@ class SolveResult:
             "n_hangers": len(self.hangers),
             "n_girder": len(self.girder),
             "n_reaction": len(self.reaction),
+            "n_modes": len(self.modal.get("modes") or []),
+            "modal_error": self.modal.get("error", ""),
             "diagnostics": list(self.diagnostics),
             "metrics": [m.to_dict() for m in self.metrics()],
             "checks": [c.to_dict() for c in self.checks()],

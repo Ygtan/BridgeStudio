@@ -33,6 +33,8 @@
     res["camber"]  = {node: (dx, dy, dz)}     制造线形相对设计线形的偏移 m
     res["erected"] = {node: (x, y, z)}        制造线形绝对坐标
     res["u"]       = {(node, dof): 值}        成桥位移（dof 1..6）
+    res["modal"]   = modal_3d 的统一结构      成桥态切线刚度上的各阶频率/周期/
+                                              参与质量/节点振型（[MODAL] 段）
     res["dat"], res["result"], res["stdout"]
 
 用法
@@ -50,6 +52,7 @@ import subprocess
 from pathlib import Path
 
 from fem_eigen_export import FEM_EIGEN_DIR
+from modal_3d import parse_modal_section
 
 EXE_CABLE_CANDIDATES = [
     (FEM_EIGEN_DIR / "build" / "cable_solver.exe") if FEM_EIGEN_DIR else None,
@@ -100,6 +103,8 @@ def parse_cable_result(path: str | Path) -> dict:
     shape: dict[int, tuple[float, float]] = {}
     erection: list[dict] = []
     erection_shape: dict[int, list[float]] = {}
+    modal_lines: list[str] = []
+    has_modal_section = False
     sec = ""
     for raw in txt:
         line = raw.strip()
@@ -107,6 +112,8 @@ def parse_cable_result(path: str | Path) -> dict:
             continue
         if line.startswith("["):
             sec = line.strip("[]").upper()
+            if sec == "MODAL":
+                has_modal_section = True
             continue
         if sec in ("", "CABLE_SOLVER"):
             if line.startswith("cable_solver"):
@@ -196,7 +203,15 @@ def parse_cable_result(path: str | Path) -> dict:
         elif sec == "ERECTION_SHAPE" and len(parts) >= 2:
             # 每阶段一行：<stage> <主跨主缆节点高程序列>
             erection_shape[int(parts[0])] = [float(v) for v in parts[1:]]
+        elif sec == "MODAL":
+            # 成桥态切线刚度上的模态段，与 fem_eigen_3d 共用同一个解析器。
+            modal_lines.append(line)
+
+    modal = parse_modal_section(modal_lines)
+    if not has_modal_section:
+        modal["error"] = "no_modal_section"
     return {"meta": meta, "cables": cables, "camber": camber,
+            "modal": modal,
             "erected": erected, "u": u, "main_cable": main_cable,
             "hangers": hangers, "girder": girder, "girder_ends": girder_ends,
             "girder_live": girder_live, "reaction": reaction,

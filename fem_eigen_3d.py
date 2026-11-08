@@ -23,6 +23,7 @@ import subprocess
 from pathlib import Path
 
 from fem_eigen_export import FEM_EIGEN_DIR
+from modal_3d import parse_modal_section
 
 EXE_3D_CANDIDATES = [
     (FEM_EIGEN_DIR / "build" / "example_3d_grillage.exe") if FEM_EIGEN_DIR else None,
@@ -52,6 +53,7 @@ def parse_summary(path: Path) -> dict:
           "final_beam": {elem: {...}}   # 成桥态恒载内力（单一状态）
           "final_disp": {(node,dof): u} # 成桥态位移
           "live_beam": {elem: {MyMin,MyMax,VzMin,VzMax}}}  # 成桥态活载内力包络
+          "modal": {...}                  # 各阶频率/周期/参与质量/节点振型
 
     梁内力**逐分量**解析（键名不写死）。旧版 summary 只输出 N/Mz，新版输出
     六个分量——竖向受弯的弯矩落在 My 上（纵向梁沿 X，绕局部 y 水平轴），
@@ -71,6 +73,7 @@ def parse_summary(path: Path) -> dict:
     lane_impact: dict = {}
     stage_cables: dict = {}
     stage_prestress: dict = {}
+    modal_lines: list[str] | None = None   # None = 内核根本没写 modal 段
 
     # 段名按**完整前缀**分派，不做子串匹配："beam force envelope" 与
     # "final stage beam force" 都含 "beam force"，用子串会串段。
@@ -84,6 +87,7 @@ def parse_summary(path: Path) -> dict:
         "live beam envelope",
         "stage cable tension",
         "stage prestress force",
+        "modal",
     )
     section = ""
     re_disp = re.compile(r"^N(\d+) dof(\d+) min=(\S+) max=(\S+)$")
@@ -114,6 +118,8 @@ def parse_summary(path: Path) -> dict:
         hit = next((s for s in sections if line.startswith(s)), None)
         if hit:
             section = hit
+            if hit == "modal":
+                modal_lines = []
             continue
         if section == "stage displacement envelope":
             m = re_disp.match(line)
@@ -165,11 +171,20 @@ def parse_summary(path: Path) -> dict:
                 vals = _beam_row(m.group(3))
                 if vals:
                     stage_prestress[(int(m.group(1)), int(m.group(2)))] = vals
+        elif section == "modal" and modal_lines is not None:
+            # 模态段的行格式由 modal_3d.py 统一解析（与 cable_solver 共用），
+            # 这里只负责收行——两个求解器不各写一套正则。
+            modal_lines.append(line)
+
+    modal = parse_modal_section(modal_lines or [])
+    if modal_lines is None:
+        modal["error"] = "no_modal_section"
     return {"disp": disp, "beam": beam, "live": live,
             "final_beam": final_beam, "final_disp": final_disp,
             "live_beam": live_beam, "lane_impact": lane_impact,
             "stage_cables": stage_cables,
-            "stage_prestress": stage_prestress}
+            "stage_prestress": stage_prestress,
+            "modal": modal}
 
 
 def solve_3d(model, out_dir: str | Path, dat_name: str = "model_3d.dat") -> dict:

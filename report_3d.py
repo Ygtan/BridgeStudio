@@ -55,6 +55,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+import modal_3d
 import view_3d
 from result_3d import (CABLE_FPU_DEFAULT, CABLE_SAFETY_MIN,
                        CABLE_SAFETY_MIN_STAGE, Check, Metric,
@@ -204,6 +205,38 @@ def _bucketed(pairs: Iterable[tuple[float, float, float]]) -> list[tuple[float, 
         else:
             bucket[k] = (lo, hi)
     return [(k, v[0], v[1]) for k, v in sorted(bucket.items())]
+
+
+def figure_mode_shape(res: SolveResult, model: Any, path: Path,
+                      order: int) -> Path:
+    """第 ``order`` 阶振型的竖向分量 φw 沿顺桥向分布。
+
+    振型本身按 φᵀMφ=1 归一，量级约 1e-5（无量纲 1/√kg），直接标纵轴
+    读不出形状；这里按该阶主梁节点的峰值再归一到 ±1。**只改变显示比例，
+    不改变节点间的相对关系**，节点位置（振型零点）才是有物理意义的量。
+    横向/扭转为主、竖向分量只有数值噪声的阶由 `figures()` 跳过，不画空图。
+    """
+    plt = _plt()
+    x_of = _deck_x(model)
+    nodes = {nid: (x, 0.0, 0.0) for nid, x in x_of.items()}
+    xs, ws = modal_3d.mode_shape_series(res.modal, order, nodes, "x", 2)
+    peak = max((abs(v) for v in ws), default=0.0)
+    fig, ax = plt.subplots(figsize=(7.4, 2.9))
+    if xs and peak > 0.0:
+        ys = [v / peak for v in ws]
+        ax.plot(xs, ys, "-", lw=1.5, color=C_BLUE, label="竖向振型 φw")
+        ax.fill_between(xs, 0.0, ys, color=C_BLUE, alpha=0.10)
+        ax.axhline(0.0, color=C_GRAY, lw=0.8)
+    for sx in support_x(model):
+        ax.axvline(x=sx, color=C_RED, ls="--", lw=0.7, alpha=0.55)
+    ax.set_ylim(-1.15, 1.15)
+    ax.set_xlabel("顺桥向 x (m)　（红虚线 = 支承断面）")
+    ax.set_ylabel("归一化竖向振型 φw")
+    ax.grid(alpha=0.25, lw=0.5)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    return _save(fig, path)
 
 
 def figure_deflection(res: SolveResult, model: Any, path: Path) -> Path:
@@ -859,6 +892,11 @@ CAPACITY_TABLE_KEYS = (
     "eccentric_table", "axial_table", "capacity_calculation_sheet",
 )
 
+#: 模态章：结论表跟着章节走，振型图也从「计算结果」章的通用图循环里
+#: 排除（否则同一张图会在两个章节各出现一次）。
+MODAL_TABLE_KEY = "modal_table"
+MODAL_FIGURE_PREFIX = "mode_shape_"
+
 
 @dataclass
 class Figure:
@@ -1001,6 +1039,35 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
             note="H 随荷载单调增加（空缆最小、成桥最大）；矢高先升后降再升——"
                  "吊装初期荷载集中在跨中使矢高出现峰值，随加劲梁向塔侧推进、"
                  "荷载摊开而回落，合拢后加二期铺装再回升至成桥值。")
+
+    # 振型图：画前 3 个**确实有竖向分量**的阶。按阶次硬取 1/2/3 会在
+    # 斜拉桥上翻车——第 1 阶常是横向侧弯，竖向分量只有 1e-19 的数值噪声，
+    # 画出来是一条贴着零轴的直线，比不画更误导。
+    md = res.modal or {}
+    if md.get("modes") and not md.get("error") and model is not None:
+        x_of = _deck_x(model)
+        nodes = {nid: (x, 0.0, 0.0) for nid, x in x_of.items()}
+        total = max(float(v) for v in md["mass"].values()) if md["mass"] else 0.0
+        picks: list[int] = []
+        for m in md["modes"]:
+            if len(picks) >= 3:
+                break
+            _xs, ws = modal_3d.mode_shape_series(
+                md, m["order"], nodes, "x", 2)
+            if ws and max(abs(v) for v in ws) > 1e-12:
+                picks.append(m["order"])
+        for order in picks:
+            m = next(x for x in md["modes"] if x["order"] == order)
+            key = f"mode_shape_{order}"
+            out[key] = Figure(
+                key,
+                f"第 {order} 阶振型：f = {m['f']:.3f} Hz，"
+                f"T = {m['T']:.3f} s，主导方向 "
+                f"{modal_3d.mode_direction(m, total)}",
+                figure_mode_shape(res, model, d / f"{key}.png", order),
+                note="主梁节点竖向分量 φw，按本阶峰值归一到 ±1；纵轴数值无量纲，"
+                     "形状与零点位置才有物理意义。振型由内核 Kφ=λMφ 给出，"
+                     "未叠加到结构几何上，故不是变形图。")
     return out
 
 
@@ -1085,6 +1152,40 @@ def _combo_paragraph(res: SolveResult) -> str:
     if not has_live:
         txt += ("**本模型未定义车道荷载（*LANE_3D），表中组合值只有恒载项乘"
                 "系数，不是组合值**——在补齐车道定义之前不得用于设计。")
+    return txt
+
+
+def _modal_paragraph(res: SolveResult) -> str:
+    """模态章节引言：把"频率是哪个构型、哪套刚度算的"写死在纸上。
+
+    同一座桥用线弹性刚度和用成桥态切线刚度能差出几倍基频；索承体系若
+    拿线弹性频率去对冲击系数，报告里就会同时出现两个互不承认的 f1。
+    """
+    md = res.modal or {}
+    modes = md.get("modes") or []
+    if not modes:
+        return ("本次求解未产出模态结果（原因见「工程校核」）。"
+                "内核算不出模态时不补一个估计频率。")
+    tangent = res.kind in ("cable_stayed", "suspension")
+    basis = ("成桥态一致切线刚度（共转列式 + 索垂度 + Ernst 效应，"
+             "张紧索的切线刚度远大于弹性刚度）" if tangent
+             else "成桥态构型（各施工阶段 activate/deactivate 后仍在的单元）"
+                  " + 线弹性刚度")
+    f1 = float(modes[0]["f"])
+    vf = modal_3d.vertical_fundamental(md)
+    txt = (f"按 Kφ = λMφ 求前 {len(modes)} 阶自振特性，刚度与质量矩阵、"
+           f"特征对均由 FEM-Eigen 内核给出：{basis}；质量取 DENS×A + "
+           f"ADDMASS 的一致质量矩阵。一阶频率 f₁ = {f1:.4f} Hz"
+           f"（T = {modes[0]['T']:.4f} s）。"
+           "**最低阶不一定是竖向基频**：索承体系常先出现横向侧弯，"
+           "JTG D60 汽车冲击系数取的是竖向弯曲主导的那一阶。")
+    ref = res.meta.get("f1_vertical")
+    if ref:
+        txt += (f"本模型冲击系数依据 f1_vertical = {float(ref):.5f} Hz，"
+                "与上表出自同一次特征求解，不是另算的一套频率。")
+    if vf:
+        txt += f" 竖向主导的最低阶约 {vf:.4f} Hz。"
+    txt += " " + modal_3d.participation_note(md)
     return txt
 
 
@@ -1283,6 +1384,10 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     # 根本不是一回事（那里是桥纵向位置，这里是施工阶段）。
     stage_chapter = bool(res.stage_cables) and STAGE_TABLE_KEY in tabs
     skip_fig = set()
+    modal_chapter = MODAL_TABLE_KEY in tabs
+    modal_fig_keys = [k for k in figs if k.startswith(MODAL_FIGURE_PREFIX)]
+    if modal_chapter:
+        skip_fig.update(modal_fig_keys)   # 振型图只在模态章出现一次
     if stage_chapter:
         skip_fig.add(STAGE_FIGURE_KEY)
     if erection_chapter:
@@ -1296,6 +1401,18 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     for key in figs:                     # 清单外的新图兜底，排在最后
         if key not in _FIGURE_ORDER and key not in skip_fig:
             blocks.append({"type": "figure", "key": key})
+
+    if modal_chapter:
+        blocks.append({"type": "h1", "text": "模态与自振特性"})
+        blocks.append({"type": "p", "text": _modal_paragraph(res)})
+        blocks.append({"type": "table", "key": MODAL_TABLE_KEY})
+        for key in modal_fig_keys:
+            blocks.append({"type": "figure", "key": key})
+        blocks.append({"type": "note", "text": (
+            "φᵀMφ ≈ 1 表示振型按质量归一；有效参与质量 Γ_d²/(φᵀMφ) 的"
+            "逐阶累计越接近该方向平动总质量，截断阶数越充分。本程序只给"
+            "自振频率、周期与振型，不做反应谱、模态叠加、时程或风致振动"
+            "分析；累计占比不足时不得把前几阶当作全模态使用。")})
 
     if stage_chapter:
         blocks.append({"type": "h1", "text": "施工阶段索力"})
@@ -1396,6 +1513,7 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
         rest.pop("erection_table", None)
     rest.pop("monitor_plan", None)
     rest.pop("opt_round", None)
+    rest.pop(MODAL_TABLE_KEY, None)      # 已跟着「模态与自振特性」章走
     for key in CAPACITY_TABLE_KEYS:      # 已跟着「承载力计算书」章走
         rest.pop(key, None)
     if rest:

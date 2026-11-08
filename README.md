@@ -63,7 +63,8 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        3D .dat 导出；基准 = 三跨连续箱梁 3D 梁格（对照 FEM-Eigen 黄金基线
        `bridge_3d_grillage`）
 - [ ] **P2** 高级能力全量暴露：施工阶段（STAGE）、预应力（PRESTRESS_LOSS）、
-       车道荷载/影响面（LANE_3D/INFLUENCE_3D）、模态/屈曲；JTG D60 荷载组合引擎
+       车道荷载/影响面（LANE_3D/INFLUENCE_3D）、**屈曲因子**（内核已算但尚未
+       全量暴露）；模态已于 2026-11-08 全量暴露（见下）；JTG D60 荷载组合引擎
 - [x] **P3** 内核攻坚：共转列式非线性 + 索长迭代 → 斜拉桥成桥态 —— 2026-10-30
 - [x] **P3** 悬索桥成桥态（自锚式 / 地锚式）：主缆索多边形找形（对 H 二分命中
        矢高）→ 平衡态弦长反算 L₀ → 索长迭代；两体系共用同一套内核，只差边界。
@@ -116,6 +117,19 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        分派结果，`report_3d` 新增独立「承载力计算书」章（汇总表 + 逐项复核表，
        不落进文末明细表章）；梁格与索承体系（塔柱 φ/λ）都出表，HTML / DOCX /
        CSV 三种出口同源（PDF 出口见下一条）。`verify_capacity.py` 130/130。—— 2026-11-08
+- [x] **P3** 模态 / 自振特性全量暴露：内核 `computeNaturalFrequencies3D` 与
+       `cable_solver` 的 `modalFromTangent` 本来就在算模态（只为冲击系数留下
+       一个 `f1_vertical`）。新增 `FEM-Eigen/modal_output_3d.hpp` 把同一份
+       `ModalResult3D` 写成 `modal` / `[MODAL]` 段（前 8 / 12 阶频率、周期、
+       X/Y/Z 有效参与质量、φᵀMφ、节点三平动振型）；Python 侧 `modal_3d.py`
+       统一解析，`fem_eigen_3d.py` / `fem_eigen_cable.py` 共用一份正则，
+       `SolveResult.modal` → 指标卡 / 三条 info 校核 / `modal_table` → 报告独立
+       「模态与自振特性」章与振型图 → HTML / DOCX / CSV / PDF 四出口。
+       线性内核用成桥态构型 + 线弹性刚度，索承体系用**成桥态一致切线刚度**，
+       与 `f1_vertical` 出自同一次特征求解，不另造一套频率。
+       `verify_modal_3d.py` 54/54（含 10 m 简支梁 Euler-Bernoulli 闭式解
+       f₁=119.9534 Hz 对拍误差 0.0007%、黄金基线前 6 阶、无质量负例、
+       斜拉桥切线刚度端到端）；全套 27 个 verify 脚本 rc=0。—— 2026-11-08
 - [x] **P3** PDF 计算书出口：`report_3d.write_pdf` 把 `render_html()` 的**同一份
        自包含 HTML** 交给本机无头 Edge / Chrome 按 A4 打印，不另写一套排版，
        也不引 reportlab 之类第三方 PDF 库——中文、ξ/φ/η/σs、200+ 行明细表的

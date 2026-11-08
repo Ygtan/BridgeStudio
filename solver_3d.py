@@ -72,6 +72,9 @@ def _dofs(model: Any) -> int:
 
 
 def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
+    # 模态：内核在成桥态构型 + 线弹性刚度上求的 Kφ=λMφ，与下面
+    # lane_impact 的 f1_vertical 是同一次特征求解，不是 Python 另算的。
+    res.modal = dict(raw.get("modal") or {})
     res.disp = dict(raw.get("disp") or {})
     res.beam = {int(k): dict(v) for k, v in (raw.get("beam") or {}).items()}
     res.live = {int(k): tuple(v) for k, v in (raw.get("live") or {}).items()}
@@ -100,6 +103,10 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
     res.diagnostics.append(
         "线性阶段分析：不考虑几何非线性、索垂度与只受拉。"
         "本内核输出阶段位移/内力包络与活载包络。")
+    res.diagnostics.append(
+        "模态取成桥态构型（各阶段 activate/deactivate 后的单元）+ 线弹性刚度"
+        "的一致质量矩阵，求前 8 阶 Kφ=λMφ；与汽车冲击系数的 f1_vertical "
+        "出自同一次特征求解。参与质量未覆盖全部竖向质量时不宜做反应谱分析。")
     if any(float(getattr(s, "time", 0.0) or 0.0) > 0.0
            for s in getattr(model, "stages", []) or []):
         from result_3d import stage_time_effect_note
@@ -121,6 +128,9 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
 
 
 def _adapt_cable(model: Any, raw: dict, res: SolveResult) -> None:
+    # 索承体系模态必须用成桥态一致切线刚度（张紧索的切线刚度 >> 弹性刚度），
+    # 由内核 modalFromTangent 给出，与 f1_vertical / μ 同源。
+    res.modal = dict(raw.get("modal") or {})
     meta = dict(raw.get("meta") or {})
     res.meta = meta
     res.converged = bool(raw.get("converged"))
@@ -157,6 +167,9 @@ def _adapt_cable(model: Any, raw: dict, res: SolveResult) -> None:
     res.stdout = str(raw.get("stdout") or "")
     res.diagnostics.append(
         "几何非线性成桥态：共转列式 + 索垂度 + 索长反算，输出下料索长与制造线形。")
+    res.diagnostics.append(
+        "模态在成桥态一致切线刚度上求 Kφ=λMφ（含索的 Ernst 效应与几何刚度），"
+        "线弹性装配刚度会把索算软、基频算低；与 f1_vertical / 冲击系数 μ 同源。")
     res.diagnostics.append(
         "梁端内力（[GIRDEREND]）是成桥态恒载标准值；活载内力包络（[GIRDER_LIVE]）"
         "在成桥态切线刚度上线性化求得（索的切线刚度远大于弹性刚度，不能用线弹性"

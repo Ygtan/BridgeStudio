@@ -436,8 +436,9 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
 
     got = st.session_state.get(SS_REPORT)
     if not got:
-        c2.caption("报告含：计算概要、工程校核、承载力计算书、结果图、结论、"
-                   "明细表。数值与界面逐项同源（同一个 SolveResult）。")
+        c2.caption("报告含：计算概要、工程校核、模态与自振特性、结果图、"
+                   "荷载组合、承载力计算书、结论、明细表。数值与界面逐项同源"
+                   "（同一个 SolveResult）。")
         return
     if got["fingerprint"] != res.fingerprint:
         c2.warning("报告是上一次求解的结果，模型已变，请重新生成。")
