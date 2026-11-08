@@ -1137,7 +1137,7 @@ class SolveResult:
         if ranked_axial:
             ranked_axial.sort(key=lambda t: -t[0])
             for _, label, (wn,), r in ranked_axial[:3]:
-                lam_s = (f"λ=l0/b={r.lam:.0f}" if r.lam > 0
+                lam_s = (f"λ={r.lam_kind}={r.lam:.0f}" if r.lam > 0
                          else "λ 未计（未给计算长度，按短柱 φ=1）")
                 out.append(Check(
                     f"{label} 轴心受压正截面",
@@ -1162,7 +1162,7 @@ class SolveResult:
                         f"kN·m，{r.mode}，x = {r.x:.0f} mm，σs = "
                         f"{r.sigma_s:+.0f} MPa；该轴力下 Mu = "
                         f"{r.Mu / 1e3:,.0f} kN·m，利用率 {util_s}；"
-                        f"JTG 3362-2018 §5.3.4（矩形对称配筋）",
+                        f"JTG 3362-2018 §5.3.4/5.3.5（对称配筋）",
                         value=r.util, limit=1.0, level="error"))
                 if r.note:
                     out.append(Check(
@@ -1172,10 +1172,10 @@ class SolveResult:
             "承载力验算适用范围", True,
             "受弯按矩形/工形（受压翼缘在受压区）单筋 §5.2.2/5.2.3、斜截面"
             "按仅配箍筋 §5.2.9；轴力显著（>5% 轴压承载力）时按偏心距自动分派"
-            "轴心受压 §5.3.1（偏心距 <1% 截面高）或偏心受压 §5.3.4。均为普通"
-            "钢筋混凝土（无预应力、无弯起钢筋）。稳定系数 φ 按长细比 l0/b"
-            "查表 5.3.1、二阶效应 η 按 §5.3.9；未提供计算长度 l0 时按短柱"
-            "φ=1、η=1（不静默，λ 标注为「未计」）。",
+            "轴心受压 §5.3.1（偏心距 <1% 截面高）或偏心受压 §5.3.4/5.3.5。均为"
+            "普通钢筋混凝土（无预应力、无弯起钢筋）。稳定系数 φ 按长细比"
+            "查表 5.3.1（矩形用 l0/b、箱形用 l0/i）、二阶效应 η 按 §5.3.9；"
+            "未提供计算长度 l0 时按短柱 φ=1、η=1（不静默，λ 标注为「未计」）。",
             level="info"))
         return out
 
@@ -2150,6 +2150,7 @@ def _capacity_sections(model: Any) -> list[tuple[str, Any, set[int]]]:
             grade_stirrup=rb.grade_stirrup,
             concrete_grade=grade,
             l0=float(getattr(rb, "l0", 0.0) or 0.0),
+            hollow=bool(getattr(rb, "hollow", False)),
         )
         eids = {e.id for e in model.elements if e.etype == t.id}
         head = "主梁" if t.id == main_et else f"截面#{t.real}"

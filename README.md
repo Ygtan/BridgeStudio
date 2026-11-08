@@ -93,14 +93,19 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        按轴力+偏心距三分派（轴心受压 / 偏心受压 / 受弯），索承体系也接上承载力
        验算。`verify_capacity.py` 42/42（含大/小偏心、η、轴心受压手算对拍 +
        斜拉桥塔柱端到端）。
-       **边界**：工形/T 形压弯、非对称配筋未覆盖 —— 2026-11-08
-- [x] **P3** 桥塔稳定系数 φ：`section_strength.stability_factor` 按长细比 l0/b
-       查 JTG 3362-2018 表 5.3.1（线性插值），`check_axial`/`check_eccentric`
-       从 `sec.l0` 取计算长度；`cable_stayed_3d`/`suspension_3d` 塔柱默认
-       l0=2×塔高（附录 E，一端固定一端自由，最保守，可调 `tower_k`）。
-       `verify_capacity.py` 51/51（含 φ 表值对拍）。
-       **边界**：仅矩形实心塔柱按 l0/b 精确查表，箱形塔柱需按回转半径 l0/i
-       另查 —— 2026-11-08
+       **边界**：非对称配筋未覆盖（工形/T 形/箱形压弯见下一条） —— 2026-11-08
+- [x] **P3** 桥塔稳定系数 φ：`section_strength.stability_factor` 按长细比
+       查 JTG 3362-2018 表 5.3.1（线性插值）——矩形用 l0/b、箱形用 l0/i
+       （最小回转半径）；`check_axial`/`check_eccentric` 从 `sec.l0` 取计算
+       长度；`cable_stayed_3d`/`suspension_3d` 塔柱默认 l0=2×塔高（附录 E，
+       一端固定一端自由，最保守，可调 `tower_k`）。`verify_capacity.py` 63/63
+       （含 φ 表值对拍 + 箱形对拍）。—— 2026-11-08
+- [x] **P3** 箱形塔柱截面（§5.3.5 工形压弯 + l0/i 回转半径）：`CapacitySection`
+       加 `hollow` 标志 + 毛面积/最小回转半径（空心矩形外减内）；`eccentric_capacity`
+       扩到工形/箱形（第一类 x≤hf 按 bf 宽矩形、第二类 x>hf 按工形，受压区面积
+       在 x=hf 处连续）；`cable_stayed_3d`/`suspension_3d` 加 `tower_wall`（>0
+       用空心箱形塔柱，等效工形 bf=外宽、hf=壁厚、b=两片腹板厚之和）。箱形
+       回转半径大于实心，故 φ 更大、更抗屈曲。—— 2026-11-08
 - [x] **P3** 索承体系梁应力：`cable_solver` 新增 `[GIRDEREND]`（每端一行，两种桥型
        都输出），斜拉桥第一次有主梁内力；`result_3d._checks_strength_cable` 用
        `_strength_sections + section_strength` 做正应力/剪应力/折算应力，报告增

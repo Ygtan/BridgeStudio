@@ -271,6 +271,7 @@ class CapacitySection:
     grade_stirrup: str = "HRB400"     # 箍筋牌号
     concrete_grade: str = "C50"
     l0: float = 0.0                  # 构件计算长度 mm（表5.3.1/§5.3.9 用；0=未提供，按短柱 φ=1/η=1）
+    hollow: bool = False             # True=空心箱形截面（外 bf×h、腹板 2×b/2、翼缘 hf）
 
     @property
     def h0(self) -> float:
@@ -281,6 +282,41 @@ class CapacitySection:
     def b_eff(self) -> float:
         """受压区有效宽度：工形/T 形取翼缘宽，矩形取 b。"""
         return self.bf if self.bf > self.b else self.b
+
+    @property
+    def gross_area(self) -> float:
+        """毛截面面积 mm²（§5.3.1 的 A）。
+
+        矩形/实心 = b·h；箱形 = 外矩形 − 空心矩形（外 bf×h、空心
+        (bf−b)×(h−2hf)，其中 b 为两片腹板厚之和）。
+        """
+        if not self.hollow:
+            return self.b * self.h
+        B, H = self.bf if self.bf > self.b else self.b, self.h
+        tw, tf = self.b / 2.0, self.hf
+        b_in, h_in = B - 2.0 * tw, H - 2.0 * tf
+        if b_in <= 0.0 or h_in <= 0.0:
+            return B * H                     # 壁太厚退化为实心
+        return B * H - b_in * h_in
+
+    @property
+    def min_radius_of_gyration(self) -> float:
+        """截面最小回转半径 i（mm），表 5.3.1 的 l0/i 坐标用。
+
+        矩形实心 = 短边/√12；箱形 = √(min(I_B, I_H)/A)，其中 I_B、I_H 为
+        绕两个主轴的空心矩形惯性矩（B 为外宽、H 为外高）。
+        """
+        if not self.hollow:
+            return min(self.b, self.h) / math.sqrt(12.0)
+        B, H = self.bf if self.bf > self.b else self.b, self.h
+        tw, tf = self.b / 2.0, self.hf
+        b_in, h_in = B - 2.0 * tw, H - 2.0 * tf
+        if b_in <= 0.0 or h_in <= 0.0:
+            return min(B, H) / math.sqrt(12.0)  # 壁太厚退化为实心
+        A = B * H - b_in * h_in
+        I_B = (H * B ** 3 - h_in * b_in ** 3) / 12.0   # 绕 B 方向主轴
+        I_H = (B * H ** 3 - b_in * h_in ** 3) / 12.0   # 绕 H 方向主轴
+        return math.sqrt(min(I_B, I_H) / A)
 
 
 #: JTG 3362-2018 表 5.2.1 相对界限受压区高度 ξb。
@@ -522,18 +558,20 @@ def eta_second_order(sec: CapacitySection, N: float, M: float,
                      l0: float | None) -> float:
     """§5.3.9 偏心距增大系数 η（二阶效应）。l0 计算长度 mm；N 受压为正（N）。
 
-    仅当长细比 l0/i > 17.5（矩形回转半径 i=h/√12）时二阶效应才不可忽略，
+    仅当长细比 l0/i > 17.5（i 为截面最小回转半径）时二阶效应才不可忽略，
     否则 η=1。ζ1=min(0.2+2.7e0/h0, 0.5fcdA/N, 1.0)、ζ2=min(1.15−0.01l0/h,1)。
+    用最小回转半径偏保守（弱轴最易发生二阶屈曲）。
     """
     if l0 is None or l0 <= 0.0 or N <= 0.0 or abs(M) <= 0.0:
         return 1.0
     h, h0 = sec.h, sec.h0
-    if l0 / (h / math.sqrt(12.0)) <= 17.5:
+    i = sec.min_radius_of_gyration
+    if i <= 0.0 or l0 / i <= 17.5:
         return 1.0
     e0 = abs(M) / N * 1000.0          # M 为 N·m、N 为 N → e0 是 m，转 mm 与 h0 对齐
     zeta1 = min(0.2 + 2.7 * e0 / h0, 1.0)
     zeta1 = min(zeta1, 0.5 * cm.concrete(sec.concrete_grade).fcd
-                * (sec.b * sec.h) / N)
+                * sec.gross_area / N)
     zeta1 = max(zeta1, 0.0)
     zeta2 = min(1.15 - 0.01 * l0 / h, 1.0)
     return 1.0 + zeta1 * zeta2 * (l0 / h) ** 2 / (1300.0 * e0 / h0)
@@ -541,17 +579,24 @@ def eta_second_order(sec: CapacitySection, N: float, M: float,
 
 def _solve_x_small(sec: CapacitySection, N: float, fcd: float, fsd: float,
                    fsd_c: float, Es: float, beta: float, eps_cu: float,
-                   b: float, As: float, Asp: float, xi_b: float,
+                   b: float, bf: float, hf: float, flange: bool,
+                   As: float, Asp: float, xi_b: float,
                    h0: float, h: float) -> float:
     """小偏心受压求受压区高度 x（二分法解力平衡 §5.3.4-1）。
 
-    力平衡 N = fcd·b·x + f'sd·A's − σs(x)·As，σs(x) 随 x 单调降，左式随 x
-    单调升，故在 [ξb·h0, h] 上二分。若 f(h)<0（N 超全截面受压承载力）返回
-    h，由调用方判"轴压不足"。
+    力平衡 N = fcd·Ac(x) + f'sd·A's − σs(x)·As，Ac(x) 为受压区混凝土面积：
+    矩形 = b·x；工形/箱形 = x≤hf 时 bf·x、x>hf 时 b·x+(bf−b)·hf（两段在
+    x=hf 处连续）。σs(x) 随 x 单调降，故左式随 x 单调升，在 [ξb·h0, h] 上
+    二分。若 f(h)<0（N 超全截面受压承载力）返回 h，由调用方判"轴压不足"。
     """
+    def ac(x: float) -> float:
+        if flange and x > hf:
+            return b * x + (bf - b) * hf
+        return bf * x if flange else b * x
+
     def f(x: float) -> float:
         sig = _sigma_s(sec, x, beta, eps_cu, Es, fsd, fsd_c)
-        return fcd * b * x + fsd_c * Asp - sig * As - N
+        return fcd * ac(x) + fsd_c * Asp - sig * As - N
 
     lo, hi = xi_b * h0, h
     if f(hi) < 0.0:
@@ -568,11 +613,12 @@ def _solve_x_small(sec: CapacitySection, N: float, fcd: float, fsd: float,
 
 
 def eccentric_capacity(sec: CapacitySection, N: float) -> dict:
-    """偏心受压正截面抗压承载力（§5.3.4 矩形、对称配筋）。
+    """偏心受压正截面抗压承载力（§5.3.4 矩形 / §5.3.5 工形·箱形，对称配筋）。
 
     `N` 轴力设计值（受压为正，N，应已含结构重要性系数 γ0）。返回该轴力
     水平下截面能承受的**一阶**极限弯矩 ``Mu``（N·m，不含 η）；效应侧乘 η
-    后再比较。只支持矩形（bf≤b 或 hf=0），工形/T 形压弯暂不支持。
+    后再比较。矩形（bf≤b 或 hf=0）与工形/箱形（bf>b 且 hf>0，箱形为空心、
+    受压区按等效工形截面：bf=外宽、hf=翼缘厚、b=两片腹板厚之和）都支持。
 
     返回 dict：``Mu``(N·m)、``x``(mm)、``xi``、``xi_b``、``mode``、
     ``sigma_s``(MPa)、``N``、``over_reinforced``。
@@ -592,17 +638,29 @@ def eccentric_capacity(sec: CapacitySection, N: float) -> dict:
     base = {"x": 0.0, "xi": 0.0, "xi_b": xi_b, "N": N,
             "over_reinforced": False}
 
-    if sec.bf > b and sec.hf > 0.0:
-        return {**base, "Mu": 0.0, "mode": "工形截面压弯暂不支持",
-                "sigma_s": 0.0}
     if As <= 0.0 or N <= 0.0:
         return {**base, "Mu": 0.0,
                 "mode": "未配筋" if As <= 0.0 else "非受压",
                 "sigma_s": 0.0}
 
-    # 大偏心假设：σs=fsd，力平衡求 x
-    #   N = fcd·b·x + fsd_c·Asp − fsd·As  →  x = (N − fsd_c·Asp + fsd·As)/(fcd·b)
-    x_big = (N - fsd_c * Asp + fsd * As) / (fcd * b)
+    # 受压翼缘（工形 / 箱形）：bf > b 且 hf > 0
+    flange = sec.bf > b and sec.hf > 0.0
+    bf = sec.bf if flange else b
+    hf = sec.hf if flange else 0.0
+
+    # 大偏心假设（σs=fsd）求受压区高度 x：
+    #   矩形          N = fcd·b·x + f'sd·A's − fsd·As
+    #   工形 x≤hf     N = fcd·bf·x + f'sd·A's − fsd·As
+    #   工形 x>hf     N = fcd·[b·x+(bf−b)·hf] + f'sd·A's − fsd·As
+    if flange:
+        x1 = (N - fsd_c * Asp + fsd * As) / (fcd * bf)
+        if x1 <= hf:
+            x_big = x1                       # 第一类：中和轴在翼缘内
+        else:
+            x_big = (N - fsd_c * Asp + fsd * As
+                     - fcd * (bf - b) * hf) / (fcd * b)   # 第二类：深入腹板
+    else:
+        x_big = (N - fsd_c * Asp + fsd * As) / (fcd * b)
 
     if x_big <= xi_b * h0:
         mode = "大偏心受压"
@@ -611,18 +669,26 @@ def eccentric_capacity(sec: CapacitySection, N: float) -> dict:
     else:
         mode = "小偏心受压"
         x = _solve_x_small(sec, N, fcd, fsd, fsd_c, Es, beta, eps_cu,
-                           b, As, Asp, xi_b, h0, h)
+                           b, bf, hf, flange, As, Asp, xi_b, h0, h)
         sigma_s = _sigma_s(sec, x, beta, eps_cu, Es, fsd, fsd_c)
 
     # 力矩平衡（对 As 合力点取矩）求一阶极限弯矩：
-    #   N·(η·e0 + h/2 − as) ≤ fcd·b·x·(h0−x/2) + fsd_c·Asp·(h0−a_sp)
-    #   → M_lim = RHS − N·(h/2 − as)   （η 由调用方处理，此处 η=1）
-    rhs = fcd * b * x * (h0 - x / 2.0) + fsd_c * Asp * (h0 - a_sp)
+    #   M_lim = fcd·Ac(x)·杠杆臂 + f'sd·A's·(h0−a's) − N·(h/2 − as)
+    if flange and x > hf:
+        rhs = (fcd * (b * x * (h0 - x / 2.0)
+                      + (bf - b) * hf * (h0 - hf / 2.0))
+               + fsd_c * Asp * (h0 - a_sp))
+    else:
+        rhs = fcd * bf * x * (h0 - x / 2.0) + fsd_c * Asp * (h0 - a_sp)
     m_lim = rhs - N * (h / 2.0 - sec.as_)
     if x_big < 2.0 * a_sp and x_big <= xi_b * h0:
         # 受压钢筋应力达不到 f'sd，保守忽略受压钢筋贡献
-        m_lim = min(m_lim, fcd * b * x * (h0 - x / 2.0)
-                    - N * (h / 2.0 - sec.as_))
+        if flange and x > hf:
+            rhs2 = fcd * (b * x * (h0 - x / 2.0)
+                          + (bf - b) * hf * (h0 - hf / 2.0))
+        else:
+            rhs2 = fcd * bf * x * (h0 - x / 2.0)
+        m_lim = min(m_lim, rhs2 - N * (h / 2.0 - sec.as_))
 
     return {**base, "Mu": m_lim / 1e3, "x": x, "xi": x / h0,
             "mode": mode, "sigma_s": sigma_s,
@@ -717,12 +783,17 @@ def eccentric_table(rows: list[tuple[str, EccentricResult]]) -> dict:
 
 
 #: JTG 3362-2018 表 5.3.1 钢筋混凝土轴心受压构件稳定系数 φ。
-#: 坐标用「l0/b」（b 为矩形截面短边，表注明）；线性插值，两端截断。
-#: 塔柱为矩形实心截面，按 l0/b 精确查表（表的 l0/i 行是任意截面取整近似，
-#: 用回转半径去插反而引入取整误差，故统一用短边）。
+#: 表里并列三套坐标：l0/b（矩形短边）、l0/2r（圆形半径）、l0/i（最小回转
+#: 半径）。矩形实心用 l0/b 精确查（l0/i 行是任意截面的取整近似，用回转半径
+#: 去插会引入取整误差）；箱形等非矩形截面无短边可查，必须用 l0/i。φ 值同一
+#: 套，线性插值，两端截断。
 _STABILITY_L0_B: list[float] = [
     8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28,
     30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50,
+]
+_STABILITY_L0_I: list[float] = [
+    28, 35, 42, 48, 55, 62, 69, 76, 83, 90, 97,
+    104, 111, 118, 125, 132, 139, 145, 153, 160, 167, 174,
 ]
 _STABILITY_PHI: list[float] = [
     1.00, 0.98, 0.95, 0.92, 0.87, 0.81, 0.75, 0.70, 0.65, 0.60, 0.56,
@@ -730,30 +801,41 @@ _STABILITY_PHI: list[float] = [
 ]
 
 
+def _interp_stability(xs: list[float], val: float) -> float:
+    """在 φ 表的横坐标 ``xs`` 上对 ``val`` 线性插值（两端截断）。"""
+    ys = _STABILITY_PHI
+    if val <= xs[0]:
+        return ys[0]
+    if val >= xs[-1]:
+        return ys[-1]
+    for j in range(len(xs) - 1):
+        if xs[j] <= val <= xs[j + 1]:
+            t = (val - xs[j]) / (xs[j + 1] - xs[j])
+            return ys[j] + t * (ys[j + 1] - ys[j])
+    return ys[-1]               # 不可达，仅作兜底
+
+
 def stability_factor(sec: CapacitySection,
                      l0: float | None) -> tuple[float, float]:
     """JTG 3362-2018 表 5.3.1 稳定系数 φ。
 
-    返回 ``(φ, l0/b)``，l0/b 为长细比（b 取矩形短边 min(b, h)）。``l0`` 为
-    None/≤0 时按短柱 φ=1（l0/b 记 0，表示未计）。l0/b > 表尾 50 时取表末值
-    0.19，靠调用方提示超范围。
+    返回 ``(φ, λ)``。λ 为长细比：矩形实心取 l0/b（b=短边）、箱形取 l0/i
+    （i=最小回转半径）。``l0`` 为 None/≤0 时按短柱 φ=1（λ 记 0，表示未计）。
+    超出表尾时取表末值 0.19，靠调用方提示超范围。
     """
     if l0 is None or l0 <= 0.0:
         return 1.0, 0.0
+    if sec.hollow:
+        i = sec.min_radius_of_gyration
+        if i <= 0.0:
+            return 1.0, 0.0
+        lam = l0 / i
+        return _interp_stability(_STABILITY_L0_I, lam), lam
     b = min(sec.b, sec.h)
     if b <= 0.0:
         return 1.0, 0.0
-    l0b = l0 / b
-    xs, ys = _STABILITY_L0_B, _STABILITY_PHI
-    if l0b <= xs[0]:
-        return ys[0], l0b
-    if l0b >= xs[-1]:
-        return ys[-1], l0b
-    for j in range(len(xs) - 1):
-        if xs[j] <= l0b <= xs[j + 1]:
-            t = (l0b - xs[j]) / (xs[j + 1] - xs[j])
-            return ys[j] + t * (ys[j + 1] - ys[j]), l0b
-    return ys[-1], l0b          # 不可达，仅作兜底
+    lam = l0 / b
+    return _interp_stability(_STABILITY_L0_B, lam), lam
 
 
 @dataclass
@@ -763,7 +845,8 @@ class AxialResult:
     N: float = 0.0            # 轴力设计值 γ0·N（受压为正，N）
     Nu: float = 0.0           # 抗压承载力 0.9·φ·(fcd·A + f'sd·A's)（N）
     phi: float = 1.0          # 稳定系数
-    lam: float = 0.0          # 长细比 l0/b（b 矩形短边；0=未提供 l0，按短柱）
+    lam: float = 0.0          # 长细比 λ（0=未提供 l0，按短柱）
+    lam_kind: str = "l0/b"    # λ 的坐标：矩形=l0/b、箱形=l0/i
     util: float = 0.0         # N / Nu
 
     def to_row(self) -> list[str]:
@@ -776,12 +859,13 @@ class AxialResult:
 def axial_capacity(sec: CapacitySection, phi: float = 1.0) -> float:
     """§5.3.1 轴心受压抗压承载力 Nu = 0.9·φ·(fcd·A + f'sd·A's)（N）。
 
-    ``phi`` 稳定系数（长细比 l0/b 相关，短柱=1）；A=b·h（矩形），A's 为
-    全部纵向钢筋面积（对称配筋取 As+Asp，Asp=0 时取 2·As）。
+    ``phi`` 稳定系数（长细比相关，短柱=1）；A 为毛截面面积（矩形=b·h，
+    箱形=空心毛面积），A's 为全部纵向钢筋面积（对称配筋取 As+Asp，Asp=0
+    时取 2·As）。
     """
     co = cm.concrete(sec.concrete_grade)
     rb = cm.rebar(sec.grade_rebar)
-    A = sec.b * sec.h
+    A = sec.gross_area
     As_total = sec.As + (sec.Asp if sec.Asp > 0.0 else sec.As)
     return 0.9 * phi * (co.fcd * A + rb.fsd_c * As_total)
 
@@ -795,7 +879,8 @@ def check_axial(sec: CapacitySection, N: float, gamma0: float = 1.0,
     """
     l0 = l0 if l0 is not None else sec.l0
     phi, lam = stability_factor(sec, l0)
-    r = AxialResult(N=gamma0 * N, phi=phi, lam=lam)
+    r = AxialResult(N=gamma0 * N, phi=phi, lam=lam,
+                    lam_kind="l0/i" if sec.hollow else "l0/b")
     r.Nu = axial_capacity(sec, phi)
     r.util = r.N / r.Nu if r.Nu > 0 else 0.0
     return r
@@ -807,8 +892,9 @@ def axial_table(rows: list[tuple[str, AxialResult]]) -> dict:
         "title": "轴心受压正截面承载力验算",
         "note": "按 JTG 3362-2018 §5.3.1，Nu = 0.9·φ·(fcd·A + f'sd·A's)；"
                 "N 受压为正，利用率为 γ0·N/Nu，>1.0 即不满足。"
-                "稳定系数 φ 按长细比 l0/b 查表 5.3.1（线性插值），"
-                "λ 为 — 表示未提供计算长度 l0、按短柱 φ=1。",
+                "稳定系数 φ 按长细比查表 5.3.1（线性插值）：矩形用 l0/b、"
+                "箱形用 l0/i（最小回转半径）；λ 为 — 表示未提供计算长度 l0、"
+                "按短柱 φ=1。",
         "headers": ["部位", "N (kN)", "Nu (kN)", "φ", "λ", "利用率"],
         "rows": [[name] + r.to_row() for name, r in rows],
     }

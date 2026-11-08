@@ -73,6 +73,7 @@ def build_cable_stayed_3d(
     tower_h: float = 4.5,
     tower_rebar_ratio: float = 0.01,       # 塔柱全截面纵向配筋率（对称配筋，验算用）
     tower_k: float = 2.0,                  # 塔柱计算长度系数（附录 E；2.0=一端固定一端自由，最保守）
+    tower_wall: float = 0.0,               # 塔柱壁厚 m；>0 用空心箱形截面，0=实心矩形
     n_tower_seg: int = 8,
     anchor_low: float = 0.55,             # 最低索的塔上锚固高度（占塔高）
     main_cover: float = 0.46,             # 单侧索在主跨上的覆盖比例（留中部无索区）
@@ -145,8 +146,17 @@ def build_cable_stayed_3d(
 
     # ---------------------------------------------------------- 截面
     box = box_section(B, h, tf, tw)
-    tower_A = tower_b * tower_h
-    tower_I = tower_b * tower_h ** 3 / 12.0
+    # 塔柱截面：实心矩形（tower_wall=0）或空心箱形（tower_wall>0，外 b×h 等壁厚）
+    if tower_wall > 0.0:
+        b_in = tower_b - 2.0 * tower_wall
+        h_in = tower_h - 2.0 * tower_wall
+        if b_in <= 0.0 or h_in <= 0.0:
+            raise ValueError("塔柱壁厚 tower_wall 过大（≥ 短边一半），空心部分为负")
+        tower_A = tower_b * tower_h - b_in * h_in
+        tower_I = (tower_b * tower_h ** 3 - b_in * h_in ** 3) / 12.0
+    else:
+        tower_A = tower_b * tower_h
+        tower_I = tower_b * tower_h ** 3 / 12.0
     cable_A = cable_area_mm2 * 1e-6
     cable_w = cable_A * cable_dens * G          # 单位长度重量 N/m
 
@@ -161,24 +171,34 @@ def build_cable_stayed_3d(
         deck_hth = theoretical_thickness_mm(box["A"], closed_contour_perimeter_m(B, h))
         tower_hth = theoretical_thickness_mm(
             tower_A, closed_contour_perimeter_m(tower_b, tower_h))
+    # 塔柱配筋（对称配筋 A's=As，压弯 §5.3.4 / 轴压稳定 §5.3.1）；全截面
+    # 配筋率 tower_rebar_ratio、每侧取一半；保护层 50 + 主筋半径 ≈ as=70mm。
+    if tower_rebar_ratio > 0.0:
+        if tower_wall > 0.0:
+            tower_rebar = RebarSpec3D(
+                h=tower_h * 1e3, b=2.0 * tower_wall * 1e3,
+                As=0.5 * tower_rebar_ratio * tower_A * 1e6,
+                Asp=0.5 * tower_rebar_ratio * tower_A * 1e6,
+                bf=tower_b * 1e3, hf=tower_wall * 1e3,
+                as_=70.0, Asv=2 * math.pi * 16 ** 2 / 4, sv=150.0,
+                l0=tower_k * tower_height * 1e3, hollow=True)
+        else:
+            tower_rebar = RebarSpec3D(
+                h=tower_h * 1e3, b=tower_b * 1e3,
+                As=0.5 * tower_rebar_ratio * tower_A * 1e6,
+                Asp=0.5 * tower_rebar_ratio * tower_A * 1e6,
+                as_=70.0, Asv=2 * math.pi * 16 ** 2 / 4, sv=150.0,
+                l0=tower_k * tower_height * 1e3)
+    else:
+        tower_rebar = None
     reals = [
         RealConst3D(id=1, A=box["A"], IY=box["IY"], IZ=box["IY"] * 0.5,
                     J=box["J"], G=G_shear, WT=box["WT"], WB=box["WB"],
                     AW=box["AW"], HTH=deck_hth),
-        # 塔是实心矩形：最大剪应力 1.5V/A，等效腹板面积取 A/1.5
-        # 配筋：对称配筋（A's=As，压弯验算 §5.3.4），全截面配筋率
-        # tower_rebar_ratio、每侧取一半；保护层 50 + 主筋半径 ≈ as=70mm。
+        # 塔为实心矩形或空心箱形：最大剪应力 1.5V/A，等效腹板面积取 A/1.5
         RealConst3D(id=2, A=tower_A, IY=tower_I, IZ=tower_I,
                     J=tower_I * 1.6, G=G_shear, AW=tower_A / 1.5, HTH=tower_hth,
-                    rebar=(
-                        RebarSpec3D(h=tower_h * 1e3, b=tower_b * 1e3,
-                                    As=0.5 * tower_rebar_ratio * tower_A * 1e6,
-                                    Asp=0.5 * tower_rebar_ratio * tower_A * 1e6,
-                                    as_=70.0,
-                                    Asv=2 * math.pi * 16 ** 2 / 4, sv=150.0,
-                                    l0=tower_k * tower_height * 1e3)
-                        if tower_rebar_ratio > 0.0 else None
-                    )),
+                    rebar=tower_rebar),
         RealConst3D(id=3, A=cable_A, W=cable_w),
     ]
     etypes = [

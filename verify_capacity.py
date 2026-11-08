@@ -181,7 +181,28 @@ def main() -> int:
     sec_i = ss.CapacitySection(h=2500, b=900, bf=12000, hf=280, As=40000,
                                as_=100, concrete_grade="C50")
     cap_i = ss.eccentric_capacity(sec_i, 1000e3)
-    check("工形截面压弯明确标注不支持", "不支持" in cap_i["mode"], cap_i["mode"])
+    # 第一类 T 形（中和轴在翼缘内）：x1=1e6/(22.4×12000)=3.72mm<hf=280，
+    # x=max(3.72,2×40)=80mm；x_big<2a's 受压钢筋不屈服，保守忽略 Asp。
+    mu_i_nm = (22.4 * 12000 * 80 * (2400 - 40) - 1e6 * (1250 - 100)) / 1e3
+    check("工形压弯（第一类 T 形）大偏心", cap_i["mode"] == "大偏心受压",
+          cap_i["mode"])
+    check("工形压弯 x 与手算一致", near(cap_i["x"], 80.0, 1e-3),
+          f"x={cap_i['x']:.1f}")
+    check("工形压弯 Mu 与手算一致", near(cap_i["Mu"], mu_i_nm, 1e-3),
+          f"Mu={cap_i['Mu']/1e3:.0f} vs {mu_i_nm/1e3:.0f}")
+    # 第二类 T 形（中和轴深入腹板）：bf=3000,hf=100,b=800,h=4500,N=15000kN
+    sec_f2 = ss.CapacitySection(h=4500, b=800, As=26800, Asp=26800,
+                                bf=3000, hf=100, as_=70, asp=70,
+                                concrete_grade="C50")
+    cap_f2 = ss.eccentric_capacity(sec_f2, 15e6)
+    x_f2 = (15e6 - 22.4 * (3000 - 800) * 100) / (22.4 * 800)
+    mu_f2_nm = (22.4 * (800 * x_f2 * (4430 - x_f2 / 2)
+                        + 2200 * 100 * (4430 - 50))
+                + 330 * 26800 * 4360 - 15e6 * 2180) / 1e3
+    check("工形压弯第二类 x 与手算一致", near(cap_f2["x"], x_f2, 1e-3),
+          f"x={cap_f2['x']:.1f}")
+    check("工形压弯第二类 Mu 与手算一致", near(cap_f2["Mu"], mu_f2_nm, 1e-3),
+          f"Mu={cap_f2['Mu']/1e3:.0f}")
 
     # ============================================================ 轴心受压
     print("\n[8] 轴心受压（§5.3.1）+ 桥塔端到端")
@@ -205,6 +226,28 @@ def main() -> int:
     check("长柱轴压 φ<1", r_ax_long.phi < 1.0, f"φ={r_ax_long.phi:.3f}")
     check("长柱轴压 λ=l0/b 正确", near(r_ax_long.lam, 20.0, 1e-3),
           f"λ={r_ax_long.lam:.0f}")
+    # ---- 箱形截面：毛面积 / 回转半径 / 稳定系数 l0/i ----
+    sec_box = ss.CapacitySection(h=4500, b=800, As=26800, Asp=26800,
+                                 bf=3000, hf=400, as_=70, asp=70,
+                                 concrete_grade="C50", l0=120000, hollow=True)
+    A_box = 3000 * 4500 - 2200 * 3700
+    check("箱形毛面积 = 外减空心", near(sec_box.gross_area, A_box, 1e-6),
+          f"A={sec_box.gross_area:.0f}")
+    I_B = (4500 * 3000 ** 3 - 3700 * 2200 ** 3) / 12
+    i_box = math.sqrt(I_B / A_box)
+    check("箱形最小回转半径", near(sec_box.min_radius_of_gyration, i_box, 1e-3),
+          f"i={sec_box.min_radius_of_gyration:.1f}")
+    phi_box, lam_box = ss.stability_factor(sec_box, 120000)
+    check("箱形稳定系数坐标 l0/i", near(lam_box, 120000 / i_box, 1e-3),
+          f"λ={lam_box:.1f}")
+    check("箱形 φ 与表值一致", near(phi_box, 0.507, 5e-3), f"φ={phi_box:.4f}")
+    check("箱形比实心更抗屈曲（φ 更大）",
+          phi_box > ss.stability_factor(
+              ss.CapacitySection(h=4500, b=3000, As=26800, Asp=26800, as_=70,
+                                 concrete_grade="C50", l0=120000), 120000)[0],
+          f"{phi_box:.3f}")
+    r_ax_box = ss.check_axial(sec_box, 16000e3)
+    check("箱形轴压 λ 标注 l0/i", r_ax_box.lam_kind == "l0/i", r_ax_box.lam_kind)
     # 端到端：斜拉桥塔柱（混凝土 C50 对称配筋）→ 自动走轴心受压
     import cable_stayed_3d
     from solver_3d import solve
@@ -220,6 +263,17 @@ def main() -> int:
           ax_cb is not None and "λ=l0/b=" in ax_cb.detail
           and "φ=0." in ax_cb.detail,
           ax_cb.detail[:70] if ax_cb else "—")
+    # 箱形塔柱：稳定系数走 l0/i，λ 标注 l0/i
+    m_box, _ = cable_stayed_3d.build_cable_stayed_3d(
+        main_span=100.0, side_span=40.0, tower_height=40.0, n_cable=6,
+        tower_wall=0.4)
+    res_box = solve(m_box, out_dir=tempfile.mkdtemp(), dat_name="cable_box.dat")
+    chk_box = res_box.checks(m_box)
+    ax_box = next((c for c in chk_box if "轴心受压" in c.name), None)
+    check("箱形塔柱轴心受压条目出现", ax_box is not None, "")
+    check("箱形塔柱 λ 标注 l0/i",
+          ax_box is not None and "λ=l0/i=" in ax_box.detail,
+          ax_box.detail[:70] if ax_box else "—")
 
     # ============================================================ 端到端
     print("\n[9] 端到端：梁格建造器 → 求解 → 承载力校核")

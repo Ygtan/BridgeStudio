@@ -291,6 +291,7 @@ class RebarSpec3D(BaseModel):
     grade_rebar: str = "HRB400"     # 纵向钢筋牌号
     grade_stirrup: str = "HRB400"   # 箍筋牌号
     l0: float = 0.0                 # 构件计算长度 mm（表5.3.1稳定/§5.3.9二阶效应用；0=未提供）
+    hollow: bool = False            # True=空心箱形截面（外 bf×h、腹板 2×(b/2)、翼缘 hf）
 
 
 class ElemTypeDef3D(BaseModel):
