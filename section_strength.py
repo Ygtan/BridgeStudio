@@ -51,7 +51,9 @@
 ----------------
 承载力验算（正截面抗弯 Mu / 斜截面抗剪 Vu / 偏心受压 / 轴心受压 / 稳定
 系数 φ）在下面单列一节，输入是 `RebarSpec3D` 提供的截面几何与配筋，模型里
-没有配筋信息时明确跳过并说明，不编一个配筋出来。
+没有配筋信息时明确跳过并说明，不编一个配筋出来。文件末尾另有一节把 x、ξ、
+ξb、σs、η、φ、λ 等中间量连同条文号整理成「承载力计算书」明细表；所有数值
+直接取自这些纯函数的返回值，不另写一套公式，保证结论与计算书不会漂移。
 
 不做：预应力（含弯起钢筋）、受扭、抗冲切、腹板局部屈曲。这几条不是疏漏，
 在适用范围条目里写明。
@@ -457,31 +459,43 @@ def flexural_capacity(sec: CapacitySection, moment: float = 0.0) -> dict:
     h0, b = sec.h0, sec.b
     xi_b = _xi_b(sec.grade_rebar, sec.concrete_grade)
 
+    # 计算书要逐项复核，故把参与公式的每个量一并返回（只留痕，不改数值）。
+    common = {"h0": h0, "b": b, "bf": sec.bf, "hf": sec.hf,
+              "As": sec.As, "Asp": sec.Asp_eff,
+              "as_": sec.as_, "asp": sec.asp,
+              "fcd": fcd, "fsd": fsd, "fsd_c": rb.fsd_c,
+              "xi_b": xi_b, "face": face}
     if sec.As <= 0.0:
-        return {"Mu": 0.0, "x": 0.0, "xi": 0.0, "xi_b": xi_b,
-                "over_reinforced": False, "fcd": fcd, "fsd": fsd,
-                "face": face}
+        return {**common, "Mu": 0.0, "x": 0.0, "xi": 0.0, "Ac": 0.0,
+                "kind": "未配筋", "over_reinforced": False}
 
     if sec.bf > b and sec.hf > 0.0:
         # 工形 / T 形（受压翼缘在受压区）
         if fsd * sec.As <= fcd * sec.bf * sec.hf:
             # 第一类 T 形：中和轴在翼缘内，按 bf 宽矩形
+            kind = "第一类 T 形（中和轴在翼缘内）"
             x = fsd * sec.As / (fcd * sec.bf)
             Mu = fcd * sec.bf * x * (h0 - x / 2)
+            Ac = sec.bf * x
+            clause = "JTG 3362-2018 §5.2.3（第一类，按 bf 宽矩形）"
         else:
             # 第二类 T 形：中和轴在腹板内
+            kind = "第二类 T 形（中和轴深入腹板）"
             x = (fsd * sec.As - fcd * (sec.bf - b) * sec.hf) / (fcd * b)
             Mu = (fcd * b * x * (h0 - x / 2)
                   + fcd * (sec.bf - b) * sec.hf * (h0 - sec.hf / 2))
+            Ac = b * x + (sec.bf - b) * sec.hf
+            clause = "JTG 3362-2018 §5.2.3（第二类，翼缘挑出部分单算）"
     else:
-        # 矩形
+        kind = "矩形截面"
         x = fsd * sec.As / (fcd * b)
         Mu = fcd * b * x * (h0 - x / 2)
+        Ac = b * x
+        clause = "JTG 3362-2018 §5.2.2（矩形截面）"
 
-    return {"Mu": Mu / 1e3,                 # N·mm → N·m
-            "x": x, "xi": x / h0, "xi_b": xi_b,
-            "over_reinforced": x > xi_b * h0,
-            "fcd": fcd, "fsd": fsd, "face": face}
+    return {**common, "Mu": Mu / 1e3,      # N·mm → N·m
+            "x": x, "xi": x / h0, "Ac": Ac, "kind": kind,
+            "clause": clause, "over_reinforced": x > xi_b * h0}
 
 
 def shear_capacity(sec: CapacitySection, alpha1: float = 1.0,
@@ -501,17 +515,17 @@ def shear_capacity(sec: CapacitySection, alpha1: float = 1.0,
     rho_sv = sec.Asv / (sec.sv * b) if sec.Asv > 0.0 and sec.sv > 0.0 else 0.0
     fsv = cm.rebar_fsd_tension(sec.grade_stirrup)   # 箍筋抗拉设计值（≤330）
 
+    common = {"b": b, "h0": h0, "Asv": sec.Asv, "sv": sec.sv,
+              "rho_sv": rho_sv, "rho_sv_min": _rho_sv_min(sec.grade_stirrup),
+              "P": P, "fsv": fsv, "fcu_k": fcu_k,
+              "alpha1": alpha1, "alpha2": alpha2, "alpha3": alpha3}
     if sec.Asv <= 0.0 or rho_sv <= 0.0:
-        return {"Vu": 0.0, "rho_sv": rho_sv,
-                "rho_sv_min": _rho_sv_min(sec.grade_stirrup),
-                "P": P, "fsv": fsv, "fcu_k": fcu_k, "alpha1": alpha1}
+        return {**common, "Vu": 0.0}
 
     # 半经验公式：b、h0 取 mm、强度取 MPa 时结果即为 kN，×1e3 得 N。
     Vu = (0.45e-3 * alpha1 * alpha2 * alpha3 * b * h0
           * math.sqrt((2 + 0.6 * P) * math.sqrt(fcu_k) * rho_sv * fsv))
-    return {"Vu": Vu * 1e3, "rho_sv": rho_sv,
-            "rho_sv_min": _rho_sv_min(sec.grade_stirrup),
-            "P": P, "fsv": fsv, "fcu_k": fcu_k, "alpha1": alpha1}
+    return {**common, "Vu": Vu * 1e3}
 
 
 def _fmt_util(v: float) -> str:
@@ -724,6 +738,35 @@ def _sigma_s(sec: CapacitySection, x: float, beta: float, eps_cu: float,
     return min(fsd, max(-fsd_c, sig))
 
 
+def eta_second_order_detail(sec: CapacitySection, N: float, M: float,
+                            l0: float | None) -> dict:
+    """§5.3.9 偏心距增大系数 η 的**全部中间量**（计算书逐项复核用）。
+
+    与 `eta_second_order` 共用同一份计算，避免"结论里的 η"和"计算书里的 η"
+    两套实现漂移。返回 η、e0、i、l0/i、l0/h、ζ1、ζ2、适用与否等。
+    """
+    h, h0 = sec.h, sec.h0
+    i = sec.min_radius_of_gyration
+    L = l0 if (l0 is not None and l0 > 0.0) else 0.0
+    e0 = abs(M) / N * 1000.0 if N > 0.0 else 0.0   # N·m/N → m → mm
+    d = {"eta": 1.0, "applicable": False, "e0": e0, "i": i, "l0": L,
+         "l0_over_i": L / i if i > 0.0 else 0.0,
+         "l0_over_h": L / h if h > 0.0 else 0.0,
+         "zeta1": 0.0, "zeta2": 0.0, "h": h, "h0": h0,
+         "fcdA": cm.concrete(sec.concrete_grade).fcd * sec.gross_area}
+    if L <= 0.0 or N <= 0.0 or abs(M) <= 0.0:
+        return d
+    if i <= 0.0 or L / i <= 17.5:
+        return d
+    zeta1 = min(0.2 + 2.7 * e0 / h0, 1.0)
+    zeta1 = min(zeta1, 0.5 * d["fcdA"] / N)
+    zeta1 = max(zeta1, 0.0)
+    zeta2 = min(1.15 - 0.01 * L / h, 1.0)
+    d.update(applicable=True, zeta1=zeta1, zeta2=zeta2,
+             eta=1.0 + zeta1 * zeta2 * (L / h) ** 2 / (1300.0 * e0 / h0))
+    return d
+
+
 def eta_second_order(sec: CapacitySection, N: float, M: float,
                      l0: float | None) -> float:
     """§5.3.9 偏心距增大系数 η（二阶效应）。l0 计算长度 mm；N 受压为正（N）。
@@ -732,19 +775,7 @@ def eta_second_order(sec: CapacitySection, N: float, M: float,
     否则 η=1。ζ1=min(0.2+2.7e0/h0, 0.5fcdA/N, 1.0)、ζ2=min(1.15−0.01l0/h,1)。
     用最小回转半径偏保守（弱轴最易发生二阶屈曲）。
     """
-    if l0 is None or l0 <= 0.0 or N <= 0.0 or abs(M) <= 0.0:
-        return 1.0
-    h, h0 = sec.h, sec.h0
-    i = sec.min_radius_of_gyration
-    if i <= 0.0 or l0 / i <= 17.5:
-        return 1.0
-    e0 = abs(M) / N * 1000.0          # M 为 N·m、N 为 N → e0 是 m，转 mm 与 h0 对齐
-    zeta1 = min(0.2 + 2.7 * e0 / h0, 1.0)
-    zeta1 = min(zeta1, 0.5 * cm.concrete(sec.concrete_grade).fcd
-                * sec.gross_area / N)
-    zeta1 = max(zeta1, 0.0)
-    zeta2 = min(1.15 - 0.01 * l0 / h, 1.0)
-    return 1.0 + zeta1 * zeta2 * (l0 / h) ** 2 / (1300.0 * e0 / h0)
+    return eta_second_order_detail(sec, N, M, l0)["eta"]
 
 
 def _solve_x_small(sec: CapacitySection, N: float, fcd: float, fsd: float,
@@ -808,11 +839,17 @@ def eccentric_capacity(sec: CapacitySection, N: float) -> dict:
     a_sp = sec.asp
     xi_b = _xi_b(sec.grade_rebar, sec.concrete_grade)
 
+    # 计算书要逐项复核，故把材料、几何与平截面假定的中间量一并留痕。
     base = {"x": 0.0, "xi": 0.0, "xi_b": xi_b, "N": N,
-            "over_reinforced": False}
+            "over_reinforced": False,
+            "fcd": fcd, "fsd": fsd, "fsd_c": fsd_c, "Es": Es,
+            "beta": beta, "eps_cu": eps_cu,
+            "h": h, "h0": h0, "b": b, "as_": sec.as_, "a_sp": a_sp,
+            "As": As, "Asp": Asp, "xi_b_h0": xi_b * h0}
 
     if As <= 0.0 or N <= 0.0:
-        return {**base, "Mu": 0.0,
+        return {**base, "Mu": 0.0, "Ac": 0.0, "x_big": 0.0,
+                "m_lim_rhs": 0.0, "flange": False, "bf": b, "hf": 0.0,
                 "mode": "未配筋" if As <= 0.0 else "非受压",
                 "sigma_s": 0.0}
 
@@ -863,9 +900,38 @@ def eccentric_capacity(sec: CapacitySection, N: float) -> dict:
             rhs2 = fcd * bf * x * (h0 - x / 2.0)
         m_lim = min(m_lim, rhs2 - N * (h / 2.0 - sec.as_))
 
+    if flange and x > hf:
+        Ac = b * x + (bf - b) * hf
+    else:
+        Ac = bf * x
     return {**base, "Mu": m_lim / 1e3, "x": x, "xi": x / h0,
+            "Ac": Ac, "x_big": x_big, "m_lim_rhs": rhs,
+            "flange": flange, "bf": bf, "hf": hf,
             "mode": mode, "sigma_s": sigma_s,
             "over_reinforced": x > xi_b * h0}
+
+
+def reverse_failure_detail(sec: CapacitySection, Nd: float,
+                           e0: float) -> dict | None:
+    """§5.3.4-4/5 反向破坏验算的全部中间量（计算书用）。
+
+    不适用（对称配筋、轴力不在两排钢筋合力点之间）时返回 None。
+    """
+    if not sec.asymmetric or Nd <= 0.0:
+        return None
+    e_prime = sec.h / 2.0 - e0 - sec.asp
+    if e_prime <= 0.0:                 # 轴力不在两排钢筋合力点之间
+        return None
+    h0_prime = sec.h - sec.asp
+    co = cm.concrete(sec.concrete_grade)
+    rb = cm.rebar(sec.grade_rebar)
+    R = (co.fcd * sec.b * sec.h * (h0_prime - sec.h / 2.0)
+         + rb.fsd_c * sec.As * (h0_prime - sec.as_))
+    util = Nd * e_prime / R if R > 0.0 else float("inf")
+    return {"e_prime": e_prime, "h0_prime": h0_prime, "R": R,
+            "effect": Nd * e_prime, "util": util,
+            "fcd": co.fcd, "fsd_c": rb.fsd_c, "As": sec.As,
+            "a_sp": sec.asp, "as_": sec.as_}
 
 
 def reverse_failure_util(sec: CapacitySection, Nd: float,
@@ -879,23 +945,16 @@ def reverse_failure_util(sec: CapacitySection, Nd: float,
         γ0·Nd·e' ≤ fcd·b·h·(h0'−h/2) + f'sd·As·(h0'−as)
         e' = h/2 − e0 − a'， h0' = h − a'
 
-    返回 ``(利用率, 说明)``；不适用（对称配筋、轴力不在两排钢筋之间）时
-    返回 None。仅矩形截面；工形/箱形的受压较小边翼缘项未实现，由调用方
-    判断并写明「未覆盖」。
+    返回 ``(利用率, 说明)``；公式中间量见 `reverse_failure_detail`。
+    仅矩形截面；工形/箱形的受压较小边翼缘项未实现，由调用方写明「未覆盖」。
     """
-    if not sec.asymmetric or Nd <= 0.0:
+    d = reverse_failure_detail(sec, Nd, e0)
+    if d is None:
         return None
-    e_prime = sec.h / 2.0 - e0 - sec.asp
-    if e_prime <= 0.0:                 # 轴力不在两排钢筋合力点之间
-        return None
-    h0_prime = sec.h - sec.asp
-    co = cm.concrete(sec.concrete_grade)
-    rb = cm.rebar(sec.grade_rebar)
-    R = (co.fcd * sec.b * sec.h * (h0_prime - sec.h / 2.0)
-         + rb.fsd_c * sec.As * (h0_prime - sec.as_))
-    util = Nd * e_prime / R if R > 0.0 else float("inf")
-    return util, (f"反向破坏 e'={e_prime:.0f}mm、h0'={h0_prime:.0f}mm，"
-                  f"γ0·Nd·e'/Nu'={util:.3f}（JTG 3362-2018 §5.3.4-4/5）")
+    return d["util"], (f"反向破坏 e'={d['e_prime']:.0f}mm、"
+                       f"h0'={d['h0_prime']:.0f}mm，"
+                       f"γ0·Nd·e'/Nu'={d['util']:.3f}"
+                       f"（JTG 3362-2018 §5.3.4-4/5）")
 
 
 @dataclass
@@ -1084,6 +1143,20 @@ class AxialResult:
                 f"{self.util:.3f}"]
 
 
+def axial_capacity_detail(sec: CapacitySection, phi: float = 1.0) -> dict:
+    """§5.3.1 轴心受压 Nu 的全部中间量（计算书逐项复核用）。"""
+    co = cm.concrete(sec.concrete_grade)
+    rb = cm.rebar(sec.grade_rebar)
+    A = sec.gross_area
+    As_total = sec.As + sec.Asp_eff
+    concrete = co.fcd * A
+    steel = rb.fsd_c * As_total
+    return {"Nu": 0.9 * phi * (concrete + steel),
+            "A": A, "As_total": As_total, "As": sec.As,
+            "Asp": sec.Asp_eff, "fcd": co.fcd, "fsd_c": rb.fsd_c,
+            "concrete": concrete, "steel": steel, "phi": phi}
+
+
 def axial_capacity(sec: CapacitySection, phi: float = 1.0) -> float:
     """§5.3.1 轴心受压抗压承载力 Nu = 0.9·φ·(fcd·A + f'sd·A's)（N）。
 
@@ -1091,11 +1164,7 @@ def axial_capacity(sec: CapacitySection, phi: float = 1.0) -> float:
     箱形=空心毛面积），全部纵向钢筋面积 = As + Asp_eff（未显式给受压筋时
     按对称配筋取 2·As；Asp_given=True 且 Asp=0 时为单筋 As）。
     """
-    co = cm.concrete(sec.concrete_grade)
-    rb = cm.rebar(sec.grade_rebar)
-    A = sec.gross_area
-    As_total = sec.As + sec.Asp_eff
-    return 0.9 * phi * (co.fcd * A + rb.fsd_c * As_total)
+    return axial_capacity_detail(sec, phi)["Nu"]
 
 
 def check_axial(sec: CapacitySection, N: float, gamma0: float = 1.0,
@@ -1125,4 +1194,293 @@ def axial_table(rows: list[tuple[str, AxialResult]]) -> dict:
                 "按短柱 φ=1。",
         "headers": ["部位", "N (kN)", "Nu (kN)", "φ", "λ", "利用率"],
         "rows": [[name] + r.to_row() for name, r in rows],
+    }
+
+
+# ---------------------------------------------------------------- 承载力计算书
+#
+# 前面几张表给的是「结论」（利用率多少），这一节给的是「过程」：把 x、ξ、
+# ξb、σs、η、φ、λ、Ac、e0、e' 等中间量连同条文号逐行列出，审查人不必读
+# 源码就能按规范复算。所有数值**直接取自上面那些纯函数的返回值**，不另写
+# 一套公式——结论和计算书若各算一遍，迟早会漂移。
+
+_CHAIN_LABEL = {
+    "flex": "受弯 / 抗剪",
+    "eccentric": "偏心受压（压弯）",
+    "axial": "轴心受压",
+}
+
+
+@dataclass(frozen=True)
+class CalcCase:
+    """计算书的一个条目：一条验算链 + 实际参与验算的截面 + 设计内力 + 结果。
+
+    ``sec`` 必须是**实际送进验算函数的那个截面**：压弯负弯矩控制时是镜像
+    后的截面，不是原始截面。``result`` 是对应的 `CapacityResult` /
+    `EccentricResult` / `AxialResult`，利用率直接取它，保证与工程校核一致。
+    内力均为**未乘 γ0** 的设计值（N·m / N）。
+    """
+
+    label: str
+    chain: str                       # "flex" | "eccentric" | "axial"
+    sec: CapacitySection
+    result: object
+    N: float = 0.0                  # 轴压设计值（受压为正，N）
+    M: float = 0.0                  # 压弯弯矩设计值（N·m）
+    Md: float = 0.0                 # 正弯矩设计值（N·m）
+    Md_neg: float = 0.0             # 负弯矩设计值绝对值（N·m）
+    Vd: float = 0.0                 # 剪力设计值（N）
+    gamma0: float = 1.0
+    alpha1: float = 1.0
+    alpha3: float = 1.0
+    l0: float | None = None         # 显式计算长度 mm；None 用 sec.l0
+
+
+def _cnum(v: object, nd: int = 1) -> str:
+    """计算书数值格式：不可判定写 ∞、缺失写 —、其余千分位。"""
+    if isinstance(v, str):
+        return v
+    try:
+        f = float(v)                # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return "—"
+    if math.isinf(f):
+        return "∞" if f > 0 else "−∞"
+    if math.isnan(f):
+        return "—"
+    return f"{f:,.{nd}f}"
+
+
+def _case_rows(c: CalcCase) -> list[list[str]]:
+    """把一个验算条目展开成逐项复核的计算书行。"""
+    sec = c.sec
+    co = cm.concrete(sec.concrete_grade)
+    rb = cm.rebar(sec.grade_rebar)
+    chain = _CHAIN_LABEL.get(c.chain, c.chain)
+    rows: list[list[str]] = []
+
+    def add(q: str, v: object, unit: str, clause: str, nd: int = 1) -> None:
+        rows.append([c.label, chain, q, _cnum(v, nd), unit, clause])
+
+    # ---- 材料、几何、配筋（三条链共用）----
+    add("混凝土轴心抗压强度设计值 fcd", co.fcd, "MPa",
+        "JTG 3362-2018 §3.1.4（表 3.1.4）")
+    add("钢筋抗拉强度设计值 fsd", rb.fsd, "MPa",
+        "JTG 3362-2018 §3.2.3（表 3.2.3-1）")
+    add("钢筋抗压强度设计值 f'sd", rb.fsd_c, "MPa",
+        "JTG 3362-2018 §3.2.3（表 3.2.3-1）")
+    add("结构重要性系数 γ0", c.gamma0, "—", "JTG D60-2015 §4.1.5", 2)
+    add("截面全高 h", sec.h, "mm", "模型输入 RebarSpec3D")
+    add("腹板宽 b", sec.b, "mm", "模型输入 RebarSpec3D")
+    add("受压翼缘宽 bf", sec.bf, "mm", "模型输入 RebarSpec3D")
+    add("受压翼缘厚 hf", sec.hf, "mm", "模型输入 RebarSpec3D")
+    add("有效高度 h0 = h − as", sec.h0, "mm", "§5.2.2 / §5.3.4")
+    add("受拉钢筋合力点至边缘 as", sec.as_, "mm", "模型输入 RebarSpec3D")
+    add("受压钢筋合力点至边缘 a's", sec.asp, "mm", "模型输入 RebarSpec3D")
+    add("受拉钢筋面积 As", sec.As, "mm²", "模型输入 RebarSpec3D")
+    add("受压钢筋面积 A's", sec.Asp_eff, "mm²",
+        "§5.2.2 / §5.3.4（Asp_given=" + str(sec.Asp_given) + "）")
+    add("钢筋弹性模量 Es", rb.Es * 1e5, "MPa",
+        "JTG 3362-2018 §3.2.4（表 3.2.4）；§5.1.5 平截面公式采用")
+    add("相对界限受压区高度 ξb", _xi_b(sec.grade_rebar, sec.concrete_grade),
+        "—", "JTG 3362-2018 表 5.2.1", 3)
+
+    # ---- 受弯 / 抗剪 ----
+    if c.chain == "flex":
+        r = c.result
+        assert isinstance(r, CapacityResult)
+        fm_pos = flexural_capacity(sec, +1.0)
+        sec_neg, given = mirror_section_for_negative(sec)
+        fm_neg = flexural_capacity(sec_neg, +1.0)
+        sh = shear_capacity(sec, alpha1=c.alpha1, alpha3=c.alpha3)
+        zones = (("正弯矩区（顶板受压）", fm_pos, abs(c.Md),
+                  r.util_M_pos, r.Mu_pos),
+                 ("负弯矩区（底板受压）", fm_neg, abs(c.Md_neg),
+                  r.util_M_neg, r.Mu_neg))
+        for zone, fm, Md, util_M, Mu in zones:
+            add(f"{zone} 截面判别", fm["kind"], "—",
+                fm.get("clause", "JTG 3362-2018 §5.2.2/5.2.3"))
+            add(f"{zone} 受压区高度 x", fm["x"], "mm",
+                fm.get("clause", "§5.2.2/5.2.3（力平衡 fsd·As = fcd·Ac）"))
+            add(f"{zone} 受压区混凝土面积 Ac", fm["Ac"], "mm²",
+                "§5.2.2/5.2.3（Ac = b·x 或 bf·x 或 b·x+(bf−b)·hf）")
+            add(f"{zone} 相对受压区高度 ξ = x/h0", fm["xi"], "—",
+                "§5.2.1 表 5.2.1（与 ξb 比较判别超筋）", 3)
+            add(f"{zone} 界限受压区高度 ξb·h0", fm["xi_b"] * fm["h0"], "mm",
+                "JTG 3362-2018 表 5.2.1")
+            add(f"{zone} 抗弯承载力 Mu", Mu / 1e3, "kN·m",
+                fm.get("clause", "§5.2.2/5.2.3（力矩平衡）"))
+            add(f"{zone} 弯矩效应 γ0·|Md|", c.gamma0 * Md / 1e3, "kN·m",
+                "JTG D60-2015 §4.1.5（基本组合设计值）")
+            add(f"{zone} 抗弯利用率 γ0·|Md|/Mu", util_M, "—",
+                "§5.2.2/5.2.3（>1.0 不满足）", 3)
+        if not given and abs(c.Md_neg) > 0.0:
+            add("负弯矩面登记情况", "未登记，按正弯矩面对称近似", "—",
+                "§5.2.3（底板较窄 / 顶板筋较少时偏不安全）")
+        add("控制弯矩区", r.zone, "—", "正、负弯矩两向取利用率大者")
+        add("箍筋配筋率 ρsv = Asv/(sv·b)", sh["rho_sv"], "—",
+            "JTG 3362-2018 §5.2.9", 5)
+        add("最小箍筋配筋率 ρsv,min", sh["rho_sv_min"], "—",
+            "JTG 3362-2018 §9.3.12", 5)
+        add("纵向受拉钢筋配筋百分率 P", sh["P"], "%",
+            "§5.2.9（P>2.5 取 2.5）", 3)
+        add("箍筋抗拉强度设计值 fsv", sh["fsv"], "MPa",
+            "§5.2.9（≤330 MPa）")
+        add("混凝土立方体强度 fcu,k（取值上限 50）", sh["fcu_k"], "MPa",
+            "§5.2.9")
+        add("异号弯矩影响系数 α1", sh["alpha1"], "—", "§5.2.9", 2)
+        add("预应力提高系数 α2", sh["alpha2"], "—",
+            "§5.2.9（普通钢筋混凝土取 1.0）", 2)
+        add("受压翼缘影响系数 α3", sh["alpha3"], "—",
+            "§5.2.9（T/I 形取 1.1）", 2)
+        add("斜截面抗剪承载力 Vu", sh["Vu"] / 1e3, "kN",
+            "JTG 3362-2018 §5.2.9（仅配箍筋）")
+        add("剪力效应 γ0·|Vd|", c.gamma0 * abs(c.Vd) / 1e3, "kN",
+            "JTG D60-2015 §4.1.5（基本组合设计值）")
+        add("抗剪利用率 γ0·|Vd|/Vu", r.util_V, "—", "§5.2.9", 3)
+        add("控制项", r.control, "—",
+            "正截面抗弯与斜截面抗剪取利用率大者")
+        return rows
+
+    # ---- 偏心受压（压弯）----
+    if c.chain == "eccentric":
+        r = c.result
+        assert isinstance(r, EccentricResult)
+        Nd, Md = c.gamma0 * c.N, c.gamma0 * abs(c.M)
+        l0 = c.l0 if c.l0 is not None else sec.l0
+        ed = eta_second_order_detail(sec, c.N, abs(c.M), l0)
+        cap = eccentric_capacity(sec, Nd)
+        add("轴力设计值 γ0·N", Nd / 1e3, "kN",
+            "JTG D60-2015 §4.1.5 + §5.3.4-1")
+        add("弯矩设计值 γ0·|M|", Md / 1e3, "kN·m",
+            "JTG D60-2015 §4.1.5（基本组合设计值）")
+        add("初始偏心距 e0 = M/N", ed["e0"], "mm",
+            "§5.3.4（e0 = M/N，不含 η）")
+        add("计算长度 l0", ed["l0"], "mm", "模型输入 RebarSpec3D.l0")
+        add("截面最小回转半径 i", ed["i"], "mm",
+            "JTG 3362-2018 表 5.3.1（l0/i 坐标）")
+        add("长细比 l0/i", ed["l0_over_i"], "—",
+            "§5.3.9（>17.5 才计二阶效应）", 2)
+        add("截面偏心影响系数 ζ1", ed["zeta1"], "—", "§5.3.9", 3)
+        add("长细比影响系数 ζ2", ed["zeta2"], "—", "§5.3.9", 3)
+        add("长细比 l0/h", ed["l0_over_h"], "—", "§5.3.9", 2)
+        add("偏心距增大系数 η", ed["eta"], "—",
+            "JTG 3362-2018 §5.3.9（η=1 表示未计二阶）", 3)
+        add("计算偏心距 e = η·e0 + h/2 − as",
+            ed["eta"] * ed["e0"] + sec.h / 2.0 - sec.as_, "mm",
+            "§5.3.4（对 As 合力点取矩）")
+        add("受压区矩形应力图系数 β", cap["beta"], "—", "§5.1.4", 3)
+        add("混凝土极限压应变 εcu", cap["eps_cu"], "—", "§5.1.5", 5)
+        add("大偏心假设的受压区高度 x(σs=fsd)", cap["x_big"], "mm",
+            "§5.3.4-1（力平衡，σs 取 fsd）")
+        add("受压区高度 x（力平衡解）", cap["x"], "mm",
+            "§5.3.4-1 / §5.3.5（小偏心时按 §5.1.5 迭代 σs）")
+        add("相对受压区高度 ξ = x/h0", cap["xi"], "—",
+            "§5.2.1 表 5.2.1（ξ≤ξb 为大偏心）", 3)
+        add("界限受压区高度 ξb·h0", cap["xi_b_h0"], "mm",
+            "JTG 3362-2018 表 5.2.1")
+        add("受压区混凝土面积 Ac", cap["Ac"], "mm²",
+            "§5.3.4-1 / §5.3.5（矩形 b·x；工形含翼缘挑出）")
+        add("受拉（或受压较小）边钢筋应力 σs", cap["sigma_s"], "MPa",
+            "JTG 3362-2018 §5.1.5（σs = εcu·Es·(β·h0/x − 1)）")
+        add("一阶极限弯矩 Mu", cap["Mu"] / 1e3, "kN·m",
+            "§5.3.4-2 / §5.3.5（对 As 合力点取矩，不含 η）")
+        add("二阶效应后弯矩 η·γ0·|M|", ed["eta"] * Md / 1e3, "kN·m",
+            "§5.3.9")
+        add("破坏形态", r.mode, "—", "§5.3.4 / §5.3.5")
+        add("常规利用率 η·γ0·|M|/Mu", (ed["eta"] * Md / r.Mu
+                                     if r.Mu > 0 else float("inf")),
+            "—", "§5.3.4-2 / §5.3.9", 3)
+        if cap["mode"] == "小偏心受压" and sec.asymmetric:
+            e0 = Md / Nd * 1000.0 if Nd > 0 else 0.0
+            rev = reverse_failure_detail(sec, Nd, e0)
+            if rev is not None:
+                add("反向破坏偏心距 e' = h/2 − e0 − a'", rev["e_prime"],
+                    "mm", "JTG 3362-2018 §5.3.4-5（e0 不含 η、无 ea）")
+                add("反向破坏有效高度 h0' = h − a'", rev["h0_prime"], "mm",
+                    "§5.3.4-5")
+                add("反向破坏抗力 Nu'（§5.3.4-4 右式）",
+                    rev["R"] / 1e6, "kN·m", "§5.3.4-4")
+                add("反向破坏效应 γ0·Nd·e'", rev["effect"] / 1e6, "kN·m",
+                    "§5.3.4-4")
+                add("反向破坏利用率", rev["util"], "—", "§5.3.4-4/5", 3)
+            elif not r.reverse_covered:
+                add("反向破坏", "未覆盖（工形/箱形非对称小偏心，含受压较小边翼缘项）",
+                    "—", "§5.3.4-4（需专项复核）")
+        add("压弯利用率（取常规与反向破坏大者）", r.util, "—",
+            "§5.3.4-2 / §5.3.4-4（>1.0 不满足）", 3)
+        return rows
+
+    # ---- 轴心受压 ----
+    if c.chain == "axial":
+        r = c.result
+        assert isinstance(r, AxialResult)
+        l0 = c.l0 if c.l0 is not None else sec.l0
+        phi, lam = stability_factor(sec, l0)
+        d = axial_capacity_detail(sec, phi)
+        add("轴力设计值 γ0·N", r.N / 1e3, "kN", "JTG D60-2015 §4.1.5")
+        add("毛截面面积 A", d["A"], "mm²",
+            "§5.3.1（矩形 b·h；箱形 = 外矩形 − 空心矩形）")
+        add("全部纵向钢筋面积 A's_total", d["As_total"], "mm²",
+            "§5.3.1（As + 受压筋；对称配筋 = 2·As）")
+        add("计算长度 l0", l0 if l0 else 0.0, "mm",
+            "模型输入 RebarSpec3D.l0")
+        add("截面最小回转半径 i", sec.min_radius_of_gyration, "mm",
+            "JTG 3362-2018 表 5.3.1（箱形 λ 坐标）")
+        if r.lam > 0.0:
+            add(f"长细比 λ = {r.lam_kind}", lam, "—",
+                "JTG 3362-2018 表 5.3.1", 1)
+        else:
+            add("长细比 λ", "未计（未提供 l0，按短柱 φ=1）", "—",
+                "JTG 3362-2018 表 5.3.1")
+        add("稳定系数 φ", r.phi, "—",
+            "JTG 3362-2018 表 5.3.1（按 λ 线性插值）", 3)
+        add("混凝土项 fcd·A", d["concrete"] / 1e3, "kN", "§5.3.1-1")
+        add("钢筋项 f'sd·A's", d["steel"] / 1e3, "kN", "§5.3.1-1")
+        add("抗压承载力 Nu = 0.9·φ·(fcd·A + f'sd·A's)", r.Nu / 1e3, "kN",
+            "JTG 3362-2018 §5.3.1-1")
+        add("利用率 γ0·N/Nu", r.util, "—", "§5.3.1-1（>1.0 不满足）", 3)
+        return rows
+
+    add("验算链", f"未识别：{c.chain}", "—", "—")
+    return rows
+
+
+def capacity_calculation_sheet(cases: list[CalcCase],
+                               max_per_chain: int = 3) -> dict:
+    """承载力计算书（逐项复核）明细表。
+
+    每条验算链按利用率降序取最不利的 ``max_per_chain`` 个截面展开；完整
+    截面见各链的汇总表。表内每个数值都来自与结论同一个纯函数，并标注
+    JTG 3362-2018 / JTG D60-2015 的条文或公式出处。
+    """
+    picked: list[CalcCase] = []
+    for chain in ("flex", "eccentric", "axial"):
+        group = [c for c in cases if c.chain == chain]
+
+        def rank(c: CalcCase) -> tuple[int, float]:
+            u = float(getattr(c.result, "util", 0.0))
+            # ∞（缺筋不可判定）最该被复核，不能排到 -inf 的末尾
+            return (0, 0.0) if math.isinf(u) else (1, -u)
+
+        group.sort(key=rank)
+        picked.extend(group[:max(0, max_per_chain)])
+    rows: list[list[str]] = []
+    for c in picked:
+        rows.extend(_case_rows(c))
+    return {
+        "title": "承载力计算书（逐项复核）",
+        "note": (
+            "按 JTG 3362-2018 第 5 章逐项列出中间量与条文出处，供人工按规范复算；"
+            "每条验算链按利用率取最不利的 "
+            f"{max_per_chain} 个截面展开（全部截面见各链汇总表）。"
+            "符号：x 受压区高度、ξ=x/h0、ξb 相对界限受压区高度（表 5.2.1）、"
+            "σs 受拉/受压较小边钢筋应力（§5.1.5）、η 偏心距增大系数（§5.3.9）、"
+            "φ 稳定系数（表 5.3.1）、λ 长细比、Ac 受压区混凝土面积、e0=M/N、"
+            "e' 反向破坏偏心距（§5.3.4-5）。γ0 按 JTG D60-2015 §4.1.5 乘在效应侧。"
+            "标「模型输入」的行取自 RebarSpec3D，不属规范公式。"
+            "利用率 >1.0 即不满足，∞ 表示缺筋导致不可判定。"
+        ),
+        "headers": ["部位", "验算链", "计算量", "数值", "单位", "条文 / 公式出处"],
+        "rows": rows,
     }

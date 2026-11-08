@@ -1,6 +1,6 @@
 """verify_capacity.py —— JTG 3362-2018 第 5 章承载力验算的端到端回归。
 
-覆盖六件事：
+覆盖七件事：
 1. 纯函数手算对拍：矩形/工形正截面抗弯 Mu、斜截面抗剪 Vu 与闭式解逐一
    对照（手算值硬编码在断言里，不用被验代码反算）。
 2. 边界：超筋检测、未配筋负例（不下假结论）。
@@ -12,6 +12,9 @@
    §5.3.4-4/5 反向破坏手算对拍、工形未覆盖如实标注。
 6. 端到端：梁格建造器填配筋 → 求解 → 校核含承载力条目且通过、明细表
    capacity_table / capacity_faces_table 出现；塔柱轴压与箱形塔柱端到端。
+7. 承载力计算书：纯函数中间量留痕且与结论同源、六列明细表带条文号、
+   三条验算链齐全、∞ 不可判定排最前；报告独立章节 + HTML / DOCX / CSV
+   三种出口逐行导出。
 
 JTG 3362-2018 依据：
 - §5.2.1 表 5.2.1 相对界限受压区高度 ξb（2018 修订值：HRB400=0.53）
@@ -496,6 +499,160 @@ def main() -> int:
     check("顶板纵筋减半 → 负弯矩 Mu 下降",
           fm_half["Mu"] < ss.flexural_capacity(secs2[0][1], -1.0)["Mu"],
           f"{fm_half['Mu']/1e3:.0f} kN·m")
+
+    # ============================================================ 计算书
+    print("\n[13] 承载力计算书：中间量留痕 + 条文号 + 报告三种出口")
+    # ---- 纯函数只留痕、不改数值 ----
+    fm_k = ss.flexural_capacity(sec3)
+    check("抗弯纯函数导出 Ac/kind/条文号",
+          all(k in fm_k for k in ("Ac", "kind", "clause", "h0", "fcd", "fsd"))
+          and near(fm_k["Ac"], sec3.bf * fm_k["x"], 1e-6)
+          and "§5.2.3" in fm_k["clause"], f"{fm_k['kind']} Ac={fm_k['Ac']:.0f}")
+    sh_k = ss.shear_capacity(sec2, alpha3=1.1)
+    check("抗剪纯函数导出 α1/α2/α3/ρsv,min",
+          all(k in sh_k for k in ("alpha1", "alpha2", "alpha3",
+                                  "rho_sv_min", "Asv", "sv"))
+          and near(sh_k["alpha3"], 1.1, 1e-9)
+          and near(sh_k["Vu"], ss.shear_capacity(sec2, alpha3=1.1)["Vu"], 1e-9),
+          f"α3={sh_k['alpha3']} ρsv,min={sh_k['rho_sv_min']}")
+    d_eta = ss.eta_second_order_detail(sec_eta, 2500e3, 100e3, 8000)
+    check("η 明细与 η 结论同源（不另写一套公式）",
+          near(d_eta["eta"], ss.eta_second_order(sec_eta, 2500e3, 100e3, 8000),
+               1e-12)
+          and all(k in d_eta for k in ("zeta1", "zeta2", "e0",
+                                       "l0_over_i", "applicable")),
+          f"η={d_eta['eta']:.3f} ζ1={d_eta['zeta1']:.3f}")
+    cap_k = ss.eccentric_capacity(sec_asym, 2500e3)
+    check("偏心受压纯函数导出 β/εcu/Es/Ac/x_big",
+          all(k in cap_k for k in ("beta", "eps_cu", "Es", "Ac", "x_big"))
+          and near(cap_k["beta"], 0.80, 1e-9)
+          and near(cap_k["eps_cu"], 0.0033, 1e-9)
+          and near(cap_k["Es"], 2.0e5, 1e-9),
+          f"β={cap_k['beta']} Es={cap_k['Es']:.0f}")
+    d_rev = ss.reverse_failure_detail(
+        sec_asym, 2500e3, 100e3 / 2500e3 * 1000.0)
+    check("反向破坏明细 e'/h0'/利用率与手算一致",
+          d_rev is not None
+          and near(d_rev["e_prime"], 300 - 40 - 40, 1e-9)
+          and near(d_rev["h0_prime"], 560, 1e-9)
+          and near(d_rev["util"], r_rev.reverse_util, 1e-12),
+          f"e'={d_rev['e_prime']:.0f} util={d_rev['util']:.4f}"
+          if d_rev else "—")
+    d_ax = ss.axial_capacity_detail(sec_stab, 0.75)
+    check("轴压明细 Nu 与结论同源、混凝土/钢筋分项可复核",
+          near(d_ax["Nu"], ss.axial_capacity(sec_stab, 0.75), 1e-12)
+          and near(d_ax["concrete"] + d_ax["steel"],
+                   d_ax["Nu"] / (0.9 * 0.75), 1e-6)
+          and near(d_ax["As_total"], 2 * sec_stab.As, 1e-9),
+          f"Nu={d_ax['Nu']/1e3:.0f} kN")
+
+    # ---- 三条链的计算书明细表 ----
+    cf = ss.CalcCase("主梁", "flex", sec2,
+                     ss.check_capacity(sec2, 100e3, 100e3, Md_neg=50e3),
+                     Md=100e3, Md_neg=50e3, Vd=100e3)
+    ce = ss.CalcCase("桥墩", "eccentric", sec_asym,
+                     ss.check_eccentric(sec_asym, 2500e3, 100e3),
+                     N=2500e3, M=100e3)
+    ca = ss.CalcCase("桥塔", "axial", sec_stab,
+                     ss.check_axial(sec_stab, 2000e3, l0=8000),
+                     N=2000e3)
+    sheet = ss.capacity_calculation_sheet([cf, ce, ca])
+    qs = [r[2] for r in sheet["rows"]]
+    clauses = [r[5] for r in sheet["rows"]]
+    check("计算书 6 列且每行对齐",
+          sheet["headers"] == ["部位", "验算链", "计算量", "数值", "单位",
+                               "条文 / 公式出处"]
+          and all(len(r) == 6 for r in sheet["rows"]),
+          f"{len(sheet['rows'])} 行")
+    check("三条验算链都展开",
+          {r[1] for r in sheet["rows"]}
+          == {"受弯 / 抗剪", "偏心受压（压弯）", "轴心受压"}, "")
+    for key, label in [("受压区高度 x", "x"), ("相对受压区高度 ξ", "ξ"),
+                       ("ξb", "ξb"), ("σs", "σs"),
+                       ("偏心距增大系数 η", "η"), ("稳定系数 φ", "φ"),
+                       ("长细比 λ", "λ"), ("e'", "e'")]:
+        hits = [(q, c) for q, c in zip(qs, clauses) if key in q]
+        check(f"计算书含 {label} 且标条文号",
+              bool(hits) and all(("§" in c or "表" in c) for _, c in hits),
+              hits[0][1][:36] if hits else "—")
+    check("关键中间量与纯函数一致（x 不被另算一遍）",
+          any(q.startswith("正弯矩区") and "受压区高度 x" in q
+              and v == f"{ss.flexural_capacity(sec2)['x']:,.1f}"
+              for q, v in ((r[2], r[3]) for r in sheet["rows"])),
+          f"x={ss.flexural_capacity(sec2)['x']:.1f}mm")
+    check("计算书 note 写明条文与适用范围",
+          "JTG 3362-2018" in sheet["note"]
+          and "JTG D60-2015" in sheet["note"]
+          and "逐项复核" in sheet["title"], "")
+    cases4 = [
+        ss.CalcCase(f"截面{j}", "flex", sec2,
+                    ss.check_capacity(sec2, 10e3 * (j + 1), 10e3),
+                    Md=10e3 * (j + 1), Vd=10e3)
+        for j in range(4)]
+    sheet4 = ss.capacity_calculation_sheet(cases4)
+    check("每条链只展开最不利 3 个截面",
+          len({r[0] for r in sheet4["rows"]}) == 3
+          and "截面0" not in {r[0] for r in sheet4["rows"]}, "")
+    sec_bad = ss.CapacitySection(
+        h=600, b=300, As=0, Asv=2 * math.pi * 8 ** 2 / 4, sv=150,
+        concrete_grade="C30")
+    bad = ss.CalcCase("缺筋截面", "flex", sec_bad,
+                      ss.check_capacity(sec_bad, 100e3, 100e3),
+                      Md=100e3, Vd=100e3)
+    sheet_inf = ss.capacity_calculation_sheet([cf, bad])
+    check("不可判定（∞）截面排在最前、不静默跳过",
+          sheet_inf["rows"][0][0] == "缺筋截面"
+          and any("∞" in r[3] for r in sheet_inf["rows"]), "")
+
+    # ---- 端到端：tables / HTML / DOCX / CSV ----
+    import zipfile
+    import report_3d
+    sheets = tb.get("capacity_calculation_sheet")
+    check("梁格明细表含计算书且 6 列对齐",
+          sheets is not None and len(sheets["rows"]) > 0
+          and all(len(r) == 6 for r in sheets["rows"]),
+          f"{len(sheets['rows']) if sheets else 0} 行")
+    tabs_cb = res_cb.tables(m_cb)
+    sh_cb = tabs_cb.get("capacity_calculation_sheet")
+    check("斜拉桥塔柱也出计算书（φ/λ 不再只在文字里）",
+          "axial_table" in tabs_cb and sh_cb is not None
+          and any("稳定系数 φ" in r[2] for r in sh_cb["rows"])
+          and any("表 5.3.1" in r[5] for r in sh_cb["rows"]),
+          f"{len(sh_cb['rows']) if sh_cb else 0} 行")
+    rep = report_3d.build_document(res, doc.model,
+                                   out_dir=tempfile.mkdtemp())
+    h1s = [b["text"] for b in rep.blocks if b["type"] == "h1"]
+    sheet_pos = next(i for i, b in enumerate(rep.blocks)
+                     if b.get("key") == "capacity_calculation_sheet")
+    detail_pos = next(i for i, b in enumerate(rep.blocks)
+                      if b["type"] == "h1" and b["text"] == "明细表")
+    check("报告有独立「承载力计算书」章、且不在明细表章",
+          "承载力计算书" in h1s
+          and h1s.index("承载力计算书") < h1s.index("结论与说明")
+          and sheet_pos < detail_pos, " / ".join(h1s))
+    html = report_3d.render_html(rep)
+    check("HTML 报告含计算书表名与条文号",
+          "承载力计算书（逐项复核）" in html
+          and "§5.2.2" in html and "表 5.2.1" in html, "")
+    out_dir = tempfile.mkdtemp()
+    paths = report_3d.write_all(rep, out_dir, stem="capacity_calc")
+    from docx import Document
+    docx_cells = "\n".join(
+        c.text for t in Document(str(paths["docx"])).tables
+        for row in t.rows for c in row.cells)
+    check("DOCX 报告含计算书中间量与条文号",
+          "相对受压区高度" in docx_cells and "§5.2.2" in docx_cells
+          and "ξb" in docx_cells, "")
+    with zipfile.ZipFile(str(paths["zip"])) as zf:
+        names = zf.namelist()
+        csv_name = next((n for n in names
+                         if "capacity_calculation_sheet" in n), None)
+        n_lines = (len(zf.read(csv_name).decode("utf-8-sig").splitlines())
+                   if csv_name else -1)
+    check("CSV 出口逐行导出计算书",
+          csv_name is not None
+          and n_lines == len(tb["capacity_calculation_sheet"]["rows"]) + 1,
+          f"{n_lines} 行 / 表 {len(tb['capacity_calculation_sheet']['rows'])} 行")
 
     # ============================================================ 汇总
     n_pass = sum(1 for _, ok, _ in PASS if ok)

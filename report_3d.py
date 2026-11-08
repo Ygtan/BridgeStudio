@@ -844,6 +844,14 @@ STAGE_FIGURE_KEY = "stage_tension"
 #: 逐截面表）仍归「明细表」——组合的**结论**要一页看得完，**依据**才翻表。
 COMBO_SUMMARY_KEYS = ("combo_coef", "combo_summary")
 
+#: 承载力计算书的表顺序：结论汇总在先、逐项复核在后。这几张表跟着
+#: 「承载力计算书」章走，不塞进文末明细表——审查人要按条文号逐项复核，
+#: 翻十几页明细表再找公式出处没有意义。
+CAPACITY_TABLE_KEYS = (
+    "capacity_table", "capacity_faces_table",
+    "eccentric_table", "axial_table", "capacity_calculation_sheet",
+)
+
 
 @dataclass
 class Figure:
@@ -1326,6 +1334,20 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
                 "基本组合的逐截面结果（每个单元 × i/j 两端）见文末明细表"
                 "「基本组合（承载力）：梁端弯矩与剪力」；本页不重复 222 行。")})
 
+    # 承载力计算书单列一章：结论（利用率）与过程（中间量 + 条文号）分开读。
+    cap_keys = [k for k in CAPACITY_TABLE_KEYS if k in tabs]
+    if cap_keys:
+        blocks.append({"type": "h1", "text": "承载力计算书"})
+        blocks.append({"type": "p", "text": (
+            "本章按 JTG 3362-2018 第 5 章给出混凝土配筋截面的承载力验算。"
+            "前几张表是结论汇总（正截面抗弯 / 斜截面抗剪、正 / 负弯矩区分面、"
+            "偏心受压、轴心受压），最后一张「逐项复核」表把 x、ξ、ξb、σs、"
+            "η、φ、λ、Ac、e0、e' 等中间量连同条文号逐行列出，数值与工程校核"
+            "取自同一次计算，可据此按规范复算。钢构件与未配筋截面走应力验算，"
+            "不在本章范围内；适用范围与未覆盖项见「工程校核」的说明条目。")})
+        for key in cap_keys:
+            blocks.append({"type": "table", "key": key})
+
     if opt:
         from cable_opt import opt_table
 
@@ -1366,6 +1388,8 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
         rest.pop("erection_table", None)
     rest.pop("monitor_plan", None)
     rest.pop("opt_round", None)
+    for key in CAPACITY_TABLE_KEYS:      # 已跟着「承载力计算书」章走
+        rest.pop(key, None)
     if rest:
         blocks.append({"type": "h1", "text": "明细表"})
         for key in rest:

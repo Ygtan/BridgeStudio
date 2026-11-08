@@ -1055,76 +1055,18 @@ class SolveResult:
         兼容两种组合行结构：梁格 ``beam_combinations`` 的轴力是单值 ``N``，
         索承体系 ``cable_combinations`` 的轴力是包络 ``NMin/NMax``。
         """
-        cap_secs = _capacity_sections(model)
-        if not cap_secs:
+        # 分派只做一次：工程校核（这里）与计算书明细表（tables）共用同一份
+        # `_capacity_cases`，避免两条链路各自判断"受弯还是压弯"而漂移。
+        cases = _capacity_cases(model, ult)
+        if not cases:
             return []
 
-        ranked_axial: list[tuple[float, str, Any, Any]] = []  # 轴心受压
-        ranked_ecc: list[tuple[float, str, Any, Any]] = []    # 偏心受压（压弯）
-        ranked_flex: list[tuple[float, str, Any, Any]] = []   # 受弯（轴力≈0）
-        for label, sec, eids in cap_secs:
-            worst_N: tuple[float, int, str] | None = None   # 受压轴力（正值）
-            worst_M_pos: tuple[float, int, str] | None = None  # 正弯矩（顶板受压）
-            worst_M_neg: tuple[float, int, str] | None = None  # 负弯矩（底板受压）
-            worst_V: tuple[float, int, str] | None = None
-            for (eid, end), v in ult.rows.items():
-                if eid not in eids:
-                    continue
-                if "NMin" in v or "NMax" in v:
-                    nc = max(-v.get("NMin", 0.0), -v.get("NMax", 0.0), 0.0)
-                else:
-                    nc = max(-v.get("N", 0.0), 0.0)
-                if worst_N is None or nc > worst_N[0]:
-                    worst_N = (nc, eid, end)
-                # 保留弯矩符号：正/负弯矩的受压面与配筋不同，不能只取 |M|
-                for my in (v.get("MyMin", 0.0), v.get("MyMax", 0.0)):
-                    if my >= 0.0:
-                        if worst_M_pos is None or my > worst_M_pos[0]:
-                            worst_M_pos = (my, eid, end)
-                    elif worst_M_neg is None or -my > worst_M_neg[0]:
-                        worst_M_neg = (-my, eid, end)
-                for vz in (v.get("VzMin", 0.0), v.get("VzMax", 0.0)):
-                    if worst_V is None or abs(vz) > worst_V[0]:
-                        worst_V = (abs(vz), eid, end)
-            if (worst_N is None and worst_M_pos is None
-                    and worst_M_neg is None and worst_V is None):
-                continue
-            Nc = worst_N[0] if worst_N else 0.0
-            M_pos = worst_M_pos[0] if worst_M_pos else 0.0
-            M_neg = worst_M_neg[0] if worst_M_neg else 0.0
-            Md = max(M_pos, M_neg)
-            wm_ctrl = worst_M_pos if M_pos >= M_neg else worst_M_neg
-            Vd = worst_V[0] if worst_V else 0.0
-            # 轴力显著性：受压轴力 > 5% 截面轴压承载力 → 压弯/轴压，否则受弯。
-            try:
-                fcd = code_material.concrete(sec.concrete_grade).fcd
-                n_axial = fcd * sec.b * sec.h
-            except Exception:
-                n_axial = 0.0
-            if Nc > 0.05 * n_axial:
-                e0 = Md / Nc if Nc > 0 else float("inf")
-                if e0 < 0.01 * (sec.h / 1000.0):     # 偏心距 <1% 截面高 → 轴心
-                    r = section_strength.check_axial(sec, Nc, gamma0=1.0)
-                    ranked_axial.append((r.util, label, (worst_N,), r))
-                else:
-                    r = section_strength.check_eccentric(
-                        sec, Nc, M_pos, gamma0=1.0)
-                    # 非对称配筋压弯构件在两个弯矩方向的承载力不同，取不利面
-                    sec_neg, given = \
-                        section_strength.mirror_section_for_negative(sec)
-                    if given and M_neg > 0.0:
-                        r_neg = section_strength.check_eccentric(
-                            sec_neg, Nc, M_neg, gamma0=1.0)
-                        if r_neg.util > r.util:
-                            r = r_neg
-                            r.note = ((r.note + "；") if r.note else "") + \
-                                "负弯矩面（底板受压）控制。"
-                    ranked_ecc.append((r.util, label, (worst_N, wm_ctrl), r))
-            else:
-                r = section_strength.check_capacity(
-                    sec, M_pos, Vd, gamma0=1.0, alpha1=1.0, alpha3=1.1,
-                    Md_neg=M_neg)
-                ranked_flex.append((r.util, label, (wm_ctrl, worst_V), r))
+        ranked_axial = [(c.result.util, c.label, (c.wn,), c.result)
+                        for c in cases if c.chain == "axial"]
+        ranked_ecc = [(c.result.util, c.label, (c.wn, c.wm_ctrl), c.result)
+                      for c in cases if c.chain == "eccentric"]
+        ranked_flex = [(c.result.util, c.label, (c.wm_ctrl, c.wv), c.result)
+                       for c in cases if c.chain == "flex"]
 
         out: list[Check] = []
 
@@ -1721,6 +1663,45 @@ class SolveResult:
 
     # ------------------------------------------------------------ 明细表
 
+    @staticmethod
+    def _capacity_tables(out: dict[str, dict[str, Any]], model: Any,
+                         ult: Any) -> None:
+        """承载力汇总表 + 逐项复核计算书，写进 `tables()` 的产出字典。
+
+        梁格（组合内力来自 `beam_combinations`）与索承体系（来自
+        `cable_combinations`）都调这一处；分派结果与 `_checks_capacity`
+        共用 `_capacity_cases`，不会一边判轴压、一边出抗弯表。
+        """
+        if ult is None or not getattr(ult, "rows", None) or model is None:
+            return
+        cases = _capacity_cases(model, ult)
+        if not cases:
+            return
+        cap_pairs = [(c.label, c.result) for c in cases
+                     if c.chain == "flex"]
+        if cap_pairs:
+            out["capacity_table"] = \
+                section_strength.capacity_table(cap_pairs)
+            out["capacity_faces_table"] = \
+                section_strength.capacity_faces_table(cap_pairs)
+        ecc_pairs = [(c.label, c.result) for c in cases
+                     if c.chain == "eccentric"]
+        if ecc_pairs:
+            out["eccentric_table"] = \
+                section_strength.eccentric_table(ecc_pairs)
+        ax_pairs = [(c.label, c.result) for c in cases
+                    if c.chain == "axial"]
+        if ax_pairs:
+            out["axial_table"] = section_strength.axial_table(ax_pairs)
+        calc_cases = [
+            section_strength.CalcCase(
+                label=c.label, chain=c.chain, sec=c.sec, result=c.result,
+                N=c.N, M=c.M, Md=c.Md, Md_neg=c.Md_neg, Vd=c.Vd,
+                gamma0=c.gamma0, alpha1=c.alpha1, alpha3=c.alpha3, l0=c.l0)
+            for c in cases]
+        out["capacity_calculation_sheet"] = \
+            section_strength.capacity_calculation_sheet(calc_cases)
+
     def tables(self, model: Any = None) -> dict[str, dict[str, Any]]:
         """CSV / Word / HTML 共用的明细表。键名固定，缺数据就不给这张表。"""
         out: dict[str, dict[str, Any]] = {}
@@ -1798,6 +1779,10 @@ class SolveResult:
                                 "τ (MPa)", "折算应力 (MPa)", "利用率", "控制项"],
                     "rows": rows,
                 }
+            # 承载力计算书：索承体系没有 beam_combinations，但同样有基本组合
+            # 内力；桥塔的 φ、λ、σs、η 此前只出现在校核文字里，现在也逐项
+            # 列出条文号，供复核。与 _checks_strength_cable 用同一个 ult。
+            self._capacity_tables(out, model, ult)
 
         # ---- 施工阶段龄期 ------------------------------------------------
         # 悬臂序列把每段末龄期写在 Stage3D.time。计算书要列出来，否则
@@ -2020,35 +2005,9 @@ class SolveResult:
             ult = next((c for c in combos if c.spec.key == "ultimate"), None)
             if ult is not None and ult.rows:
                 out["combo_ultimate"] = combination.beam_table(ult)
-                # 承载力验算明细表（混凝土配筋截面，仅梁格填了配筋）
-                if model is not None and self.final_beam:
-                    cap_pairs = []
-                    for label, sec, eids in _capacity_sections(model):
-                        mp = mn = wv = None
-                        for (eid, end), v in ult.rows.items():
-                            if eid not in eids:
-                                continue
-                            for my in (v.get("MyMin", 0.0), v.get("MyMax", 0.0)):
-                                if my >= 0.0:
-                                    if mp is None or my > mp[0]:
-                                        mp = (my, eid, end)
-                                elif mn is None or -my > mn[0]:
-                                    mn = (-my, eid, end)
-                            for vz in (v.get("VzMin", 0.0), v.get("VzMax", 0.0)):
-                                if wv is None or abs(vz) > wv[0]:
-                                    wv = (abs(vz), eid, end)
-                        if mp is None and mn is None and wv is None:
-                            continue
-                        r = section_strength.check_capacity(
-                            sec, mp[0] if mp else 0.0,
-                            wv[0] if wv else 0.0, alpha3=1.1,
-                            Md_neg=mn[0] if mn else 0.0)
-                        cap_pairs.append((label, r))
-                    if cap_pairs:
-                        out["capacity_table"] = \
-                            section_strength.capacity_table(cap_pairs)
-                        out["capacity_faces_table"] = \
-                            section_strength.capacity_faces_table(cap_pairs)
+                # 承载力汇总表 + 逐项复核计算书（与工程校核共用一份分派结果）
+                if self.final_beam:
+                    self._capacity_tables(out, model, ult)
         return out
 
     # ------------------------------------------------------------ 兼容旧字典
@@ -2214,6 +2173,117 @@ def _capacity_sections(model: Any) -> list[tuple[str, Any, set[int]]]:
         head = "主梁" if t.id == main_et else f"截面#{t.real}"
         out.append((f"{head}（{grade}）", sec, eids))
     return out
+
+
+@dataclass
+class _CapacityCaseRow:
+    """一个截面的承载力验算记录：工程校核与计算书共用这一份分派结果。
+
+    以前 ``_checks_capacity`` 和 ``tables()`` 各扫一遍组合内力、各自决定
+    "受弯还是压弯"，口径迟早会漂。现在只在这里算一次：``chain`` 是分派
+    结果、``sec`` 是**实际送进验算函数的截面**（压弯负弯矩控制时是镜像面）、
+    ``result`` 是对应的结果对象，利用率与明细表都从它取。
+    """
+
+    label: str
+    sec: Any
+    chain: str                    # "flex" | "eccentric" | "axial"
+    result: Any
+    N: float = 0.0               # 轴压设计值（N，受压为正，未乘 γ0）
+    M: float = 0.0               # 压弯弯矩设计值（N·m，未乘 γ0）
+    Md: float = 0.0              # 正弯矩设计值（N·m）
+    Md_neg: float = 0.0          # 负弯矩设计值绝对值（N·m）
+    Vd: float = 0.0              # 剪力设计值（N）
+    gamma0: float = 1.0
+    alpha1: float = 1.0
+    alpha3: float = 1.0
+    l0: Any = None
+    wn: Any = None               # 最不利轴力 (值, 单元, 端)
+    wm_ctrl: Any = None          # 控制弯矩 (值, 单元, 端)
+    wv: Any = None               # 最不利剪力 (值, 单元, 端)
+
+
+def _capacity_cases(model: Any, ult: Any) -> list[_CapacityCaseRow]:
+    """按受力状态分派三条承载力验算链，返回全部记录。
+
+    受压轴力显著（>5% 截面轴压承载力）时按偏心距再分：偏心距 <1% 截面高
+    走轴心受压 §5.3.1，否则走偏心受压 §5.3.4；轴力≈0 走正截面抗弯
+    §5.2.2/5.2.3 + 斜截面 §5.2.9。兼容梁格轴力单值 ``N`` 与索承体系
+    轴力包络 ``NMin/NMax``。
+    """
+    cap_secs = _capacity_sections(model)
+    rows: list[_CapacityCaseRow] = []
+    for label, sec, eids in cap_secs:
+        worst_N: tuple[float, int, str] | None = None
+        worst_M_pos: tuple[float, int, str] | None = None
+        worst_M_neg: tuple[float, int, str] | None = None
+        worst_V: tuple[float, int, str] | None = None
+        for (eid, end), v in ult.rows.items():
+            if eid not in eids:
+                continue
+            if "NMin" in v or "NMax" in v:
+                nc = max(-v.get("NMin", 0.0), -v.get("NMax", 0.0), 0.0)
+            else:
+                nc = max(-v.get("N", 0.0), 0.0)
+            if worst_N is None or nc > worst_N[0]:
+                worst_N = (nc, eid, end)
+            # 保留弯矩符号：正/负弯矩的受压面与配筋不同，不能只取 |M|
+            for my in (v.get("MyMin", 0.0), v.get("MyMax", 0.0)):
+                if my >= 0.0:
+                    if worst_M_pos is None or my > worst_M_pos[0]:
+                        worst_M_pos = (my, eid, end)
+                elif worst_M_neg is None or -my > worst_M_neg[0]:
+                    worst_M_neg = (-my, eid, end)
+            for vz in (v.get("VzMin", 0.0), v.get("VzMax", 0.0)):
+                if worst_V is None or abs(vz) > worst_V[0]:
+                    worst_V = (abs(vz), eid, end)
+        if (worst_N is None and worst_M_pos is None
+                and worst_M_neg is None and worst_V is None):
+            continue
+        Nc = worst_N[0] if worst_N else 0.0
+        M_pos = worst_M_pos[0] if worst_M_pos else 0.0
+        M_neg = worst_M_neg[0] if worst_M_neg else 0.0
+        Md = max(M_pos, M_neg)
+        wm_ctrl = worst_M_pos if M_pos >= M_neg else worst_M_neg
+        Vd = worst_V[0] if worst_V else 0.0
+        try:
+            fcd = code_material.concrete(sec.concrete_grade).fcd
+            n_axial = fcd * sec.b * sec.h
+        except Exception:
+            n_axial = 0.0
+        common = dict(label=label, wn=worst_N, wm_ctrl=wm_ctrl, wv=worst_V)
+        if Nc > 0.05 * n_axial:
+            e0 = Md / Nc if Nc > 0 else float("inf")
+            if e0 < 0.01 * (sec.h / 1000.0):     # 偏心距 <1% 截面高 → 轴心
+                r = section_strength.check_axial(sec, Nc, gamma0=1.0)
+                rows.append(_CapacityCaseRow(
+                    sec=sec, chain="axial", result=r, N=Nc, **common))
+            else:
+                r = section_strength.check_eccentric(
+                    sec, Nc, M_pos, gamma0=1.0)
+                sec_used, M_used = sec, M_pos
+                # 非对称配筋压弯构件两个弯矩方向承载力不同，取不利面
+                sec_neg, given = \
+                    section_strength.mirror_section_for_negative(sec)
+                if given and M_neg > 0.0:
+                    r_neg = section_strength.check_eccentric(
+                        sec_neg, Nc, M_neg, gamma0=1.0)
+                    if r_neg.util > r.util:
+                        r = r_neg
+                        sec_used, M_used = sec_neg, M_neg
+                        r.note = ((r.note + "；") if r.note else "") + \
+                            "负弯矩面（底板受压）控制。"
+                rows.append(_CapacityCaseRow(
+                    sec=sec_used, chain="eccentric", result=r,
+                    N=Nc, M=M_used, **common))
+        else:
+            r = section_strength.check_capacity(
+                sec, M_pos, Vd, gamma0=1.0, alpha1=1.0, alpha3=1.1,
+                Md_neg=M_neg)
+            rows.append(_CapacityCaseRow(
+                sec=sec, chain="flex", result=r,
+                Md=M_pos, Md_neg=M_neg, Vd=Vd, alpha3=1.1, **common))
+    return rows
 
 
 def _impact_note(meta: dict) -> str:
