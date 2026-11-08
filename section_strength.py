@@ -26,7 +26,8 @@
 
 注意这条的适用边界：7.1.5 属于**预应力混凝土构件**的应力验算。普通
 钢筋混凝土构件规范不要求做使用阶段应力验算，靠的是承载力 + 裂缝宽度
-控制。本程序不建钢筋，做不了那两项，所以这里把 0.5·fck 当**量级判据**
+控制。承载力那一项已在本模块后半部分按 `RebarSpec3D` 的配筋信息实现
+（Mu / Vu / 压弯 / 轴压），裂缝宽度仍未做，所以这里把 0.5·fck 当**量级判据**
 用：超了说明截面偏小或预应力不足，需要回到设计；没超也不能当成"验算
 通过"。`level` 因此标 `warn` 而不是 `error`。
 
@@ -46,17 +47,20 @@
 |σ_bot|) 不变。这是刻意的——本程序拿不到梁单元局部坐标系的朝向保证，
 不能赌符号。
 
-不做什么
---------
-不做承载力（Mu / Vu）。那需要钢筋面积、保护层、箍筋间距，模型里没有。
-不做稳定（压弯构件整体稳定、腹板局部屈曲），需要计算长度与加劲肋布置。
-这两条是路线图上的下一步，不是本模块的疏漏。
+本模块的后半部分
+----------------
+承载力验算（正截面抗弯 Mu / 斜截面抗剪 Vu / 偏心受压 / 轴心受压 / 稳定
+系数 φ）在下面单列一节，输入是 `RebarSpec3D` 提供的截面几何与配筋，模型里
+没有配筋信息时明确跳过并说明，不编一个配筋出来。
+
+不做：预应力（含弯起钢筋）、受扭、抗冲切、腹板局部屈曲。这几条不是疏漏，
+在适用范围条目里写明。
 """
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import code_material as cm
 
@@ -240,8 +244,34 @@ def result_table(rows: list[tuple[str, StressResult]]) -> dict:
 #   正截面抗弯  §5.2.2 矩形 / §5.2.3 工形（受压翼缘）
 #   斜截面抗剪  §5.2.9 仅配箍筋
 #
-# 不做：压弯构件 N-M 相关（轴力较大时需用 §5.3 偏心受压公式，纯弯公式
-# 会偏不安全）、受扭、抗冲切。这几条留待下一步，接口先按"受弯为主"设计。
+# 连续梁支点负弯矩时受压区在**底板**（顶板受拉），此时受压翼缘宽/厚、
+# 受拉钢筋面积都跟跨中正弯矩不同。若一律按"顶板受压的工形截面"算 Mu，
+# 底板较窄或顶板纵筋较少时会高估承载力 —— 偏不安全的假通过。因此
+# `CapacitySection.negative` 允许登记负弯矩面，`check_capacity` 对正、
+# 负两个弯矩方向各算一次，取控制者。两个方向都验算也顺带解决了"拿不到
+# 梁单元局部坐标朝向保证、不能赌弯矩符号"的老问题。
+#
+# 不做：压弯构件 N-M 相关（轴力较大时用 §5.3 偏心受压，另见下节）、
+# 受扭、抗冲切。
+
+
+@dataclass(frozen=True)
+class FaceSpec:
+    """负弯矩面（受压在底板、受拉在顶板）的几何与配筋。
+
+    ``None`` = 沿用正弯矩面的对应值；显式数值 = 覆盖（``As=0`` 表示该面
+    确实不配筋，不是"未提供"）。尺寸 mm、面积 mm²。
+
+    真实箱梁底板常比顶板窄（顶板带悬臂），底板厚也常与顶板不同；连续梁
+    支点负弯矩区的顶板纵筋通常另配。这三项都不能拿正弯矩面的值顶替。
+    """
+
+    bf: float | None = None           # 底板（受压翼缘）宽 mm
+    hf: float | None = None           # 底板厚 mm
+    As: float | None = None           # 顶板受拉纵筋 mm²
+    Asp: float | None = None          # 底板受压纵筋 mm²
+    as_: float | None = None          # 顶板筋合力点至顶缘 mm
+    asp: float | None = None          # 底板筋合力点至底缘 mm
 
 
 @dataclass(frozen=True)
@@ -272,6 +302,19 @@ class CapacitySection:
     concrete_grade: str = "C50"
     l0: float = 0.0                  # 构件计算长度 mm（表5.3.1/§5.3.9 用；0=未提供，按短柱 φ=1/η=1）
     hollow: bool = False             # True=空心箱形截面（外 bf×h、腹板 2×b/2、翼缘 hf）
+    negative: FaceSpec | None = None  # 负弯矩面（受压在底板）；None=未提供，按正弯矩面对称近似
+    Asp_given: bool = False          # False=Asp 未提供、按对称配筋 As；True=Asp 按字面值（可为 0=单筋）
+    outer_bf: float = 0.0            # 外轮廓宽 mm（毛面积/回转半径用）；0=按 bf 取；镜像时锁定真实外宽
+
+    @property
+    def Asp_eff(self) -> float:
+        """受压钢筋面积 mm²。未显式给定时按对称配筋取 As。"""
+        return self.Asp if self.Asp_given else self.As
+
+    @property
+    def asymmetric(self) -> bool:
+        """是否非对称配筋（显式给了 Asp 且与 As 不等）。"""
+        return self.Asp_given and abs(self.Asp - self.As) > 1e-6
 
     @property
     def h0(self) -> float:
@@ -292,7 +335,9 @@ class CapacitySection:
         """
         if not self.hollow:
             return self.b * self.h
-        B, H = self.bf if self.bf > self.b else self.b, self.h
+        B = (self.outer_bf if self.outer_bf > 0.0
+             else (self.bf if self.bf > self.b else self.b))
+        H = self.h
         tw, tf = self.b / 2.0, self.hf
         b_in, h_in = B - 2.0 * tw, H - 2.0 * tf
         if b_in <= 0.0 or h_in <= 0.0:
@@ -308,7 +353,9 @@ class CapacitySection:
         """
         if not self.hollow:
             return min(self.b, self.h) / math.sqrt(12.0)
-        B, H = self.bf if self.bf > self.b else self.b, self.h
+        B = (self.outer_bf if self.outer_bf > 0.0
+             else (self.bf if self.bf > self.b else self.b))
+        H = self.h
         tw, tf = self.b / 2.0, self.hf
         b_in, h_in = B - 2.0 * tw, H - 2.0 * tf
         if b_in <= 0.0 or h_in <= 0.0:
@@ -360,12 +407,50 @@ def _rho_sv_min(grade_stirrup: str) -> float:
     return _RHO_SV_MIN.get(key, 0.0010)
 
 
-def flexural_capacity(sec: CapacitySection) -> dict:
+def mirror_section_for_negative(
+        sec: CapacitySection) -> tuple[CapacitySection, bool]:
+    """生成「负弯矩面」（受压在底板、受拉在顶板）的等效截面。
+
+    把截面上下翻转后 §5.2.2/§5.2.3 的公式形式不变，只是 bf/hf 换成底板、
+    As/Asp 换成顶板/底板纵筋、as_/asp 换成各自到相应边缘的距离。
+    ``outer_bf`` 锁住真实外轮廓宽，使毛面积与回转半径不因翻转而改变。
+
+    返回 ``(等效截面, 是否显式登记了负弯矩面)``。未登记时返回原截面与
+    False —— 由调用方写明「按正弯矩面对称近似」，不静默。
+    """
+    f = sec.negative
+    if f is None:
+        return sec, False
+    outer = (sec.outer_bf if sec.outer_bf > 0.0
+             else (sec.bf if sec.bf > sec.b else sec.b))
+    return replace(
+        sec,
+        bf=sec.bf if f.bf is None else f.bf,
+        hf=sec.hf if f.hf is None else f.hf,
+        As=sec.As if f.As is None else f.As,
+        Asp=sec.Asp if f.Asp is None else f.Asp,
+        Asp_given=(f.Asp is not None) or sec.Asp_given,
+        as_=sec.as_ if f.as_ is None else f.as_,
+        asp=sec.asp if f.asp is None else f.asp,
+        outer_bf=outer,
+        negative=None,                  # 镜像面不再镜像，防递归
+    ), True
+
+
+def flexural_capacity(sec: CapacitySection, moment: float = 0.0) -> dict:
     """正截面抗弯承载力 Mu（JTG 3362-2018 §5.2.2 矩形 / §5.2.3 工形）。
 
+    ``moment < 0`` 表示负弯矩（受压区在底板），自动切到 `sec.negative`
+    登记的镜像面；未登记时按正弯矩面对称近似并在 ``face`` 里标明。
+
     只算纵向体内普通钢筋（无预应力、无弯起）。返回 dict：
-    ``Mu``(N·m)、``x``(mm)、``xi``、``xi_b``、``over_reinforced``。
+    ``Mu``(N·m)、``x``(mm)、``xi``、``xi_b``、``over_reinforced``、``face``。
     """
+    face = "正弯矩区（顶板受压）"
+    if moment < 0.0:
+        sec, given = mirror_section_for_negative(sec)
+        face = ("负弯矩区（底板受压）" if given
+                else "负弯矩区（按正弯矩面对称近似）")
     co = cm.concrete(sec.concrete_grade)
     rb = cm.rebar(sec.grade_rebar)
     fcd, fsd = co.fcd, rb.fsd            # MPa
@@ -374,7 +459,8 @@ def flexural_capacity(sec: CapacitySection) -> dict:
 
     if sec.As <= 0.0:
         return {"Mu": 0.0, "x": 0.0, "xi": 0.0, "xi_b": xi_b,
-                "over_reinforced": False, "fcd": fcd, "fsd": fsd}
+                "over_reinforced": False, "fcd": fcd, "fsd": fsd,
+                "face": face}
 
     if sec.bf > b and sec.hf > 0.0:
         # 工形 / T 形（受压翼缘在受压区）
@@ -395,7 +481,7 @@ def flexural_capacity(sec: CapacitySection) -> dict:
     return {"Mu": Mu / 1e3,                 # N·mm → N·m
             "x": x, "xi": x / h0, "xi_b": xi_b,
             "over_reinforced": x > xi_b * h0,
-            "fcd": fcd, "fsd": fsd}
+            "fcd": fcd, "fsd": fsd, "face": face}
 
 
 def shear_capacity(sec: CapacitySection, alpha1: float = 1.0,
@@ -428,83 +514,159 @@ def shear_capacity(sec: CapacitySection, alpha1: float = 1.0,
             "P": P, "fsv": fsv, "fcu_k": fcu_k, "alpha1": alpha1}
 
 
+def _fmt_util(v: float) -> str:
+    """利用率显示：不可判定（inf）写「∞」，不写成一个像是通过的数。"""
+    return "∞" if math.isinf(v) else f"{v:.3f}"
+
+
 @dataclass
 class CapacityResult:
-    """一个截面在组合设计内力下的承载力利用率与结论。"""
+    """一个截面在组合设计内力下的承载力利用率与结论。
 
-    Mu: float = 0.0            # 抗弯承载力 N·m
+    正、负弯矩分别按各自的受压面算 Mu；``Mu``、``util_M`` 记的是**控制面**
+    的值，两个面的原值留在 ``Mu_pos/Mu_neg`` 与 ``util_M_pos/util_M_neg``。
+    """
+
+    Mu: float = 0.0            # 控制面的抗弯承载力 N·m
     Vu: float = 0.0            # 抗剪承载力 N
-    util_M: float = 0.0        # γ0·|Md| / Mu
+    Mu_pos: float = 0.0        # 正弯矩区（顶板受压）Mu，N·m
+    Mu_neg: float = 0.0        # 负弯矩区（底板受压）Mu，N·m
+    util_M: float = 0.0        # 控制面 γ0·|Md| / Mu
+    util_M_pos: float = 0.0
+    util_M_neg: float = 0.0
     util_V: float = 0.0        # γ0·|Vd| / Vu
     util: float = 0.0          # 两者取大
     control: str = ""          # 控制项名
+    zone: str = ""             # 控制弯矩方向："正弯矩区…" / "负弯矩区…"
+    negative_approx: bool = False  # 未登记负弯矩面，按正弯矩面对称近似
     over_reinforced: bool = False
     no_rebar: bool = False     # 未配纵向钢筋
     no_stirrup: bool = False   # 未配箍筋
-    note: str = ""             # 超筋 / 少筋 / 缺箍的说明
+    note: str = ""             # 超筋 / 少筋 / 缺箍 / 负弯矩近似的说明
 
     def to_row(self) -> list[str]:
         mu = f"{self.Mu / 1e3:.0f}" if self.Mu > 0 else "—"
         vu = f"{self.Vu / 1e3:.0f}" if self.Vu > 0 else "—"
-        return [mu, vu, f"{self.util_M:.3f}", f"{self.util_V:.3f}",
-                f"{self.util:.3f}", self.control]
+        return [mu, vu, _fmt_util(self.util_M), _fmt_util(self.util_V),
+                _fmt_util(self.util), self.control]
 
 
 def check_capacity(sec: CapacitySection, Md: float, Vd: float,
                    gamma0: float = 1.0, alpha1: float = 1.0,
-                   alpha3: float = 1.0) -> CapacityResult:
+                   alpha3: float = 1.0,
+                   Md_neg: float = 0.0) -> CapacityResult:
     """组合承载力验算：给定弯矩/剪力设计值（N·m / N），返回利用率与结论。
+
+    ``Md`` 正弯矩（受压在顶板）、``Md_neg`` 负弯矩（受压在底板）设计值，
+    传带符号值或绝对值都可以。两个方向分别按各自受压面算 Mu，取利用率
+    大者控制；未登记负弯矩面时按正弯矩面对称近似并写进 ``note``。
 
     ``Md``、``Vd`` 应为**基本组合（承载力）**的设计内力（含 γ0 之前）。
     ``gamma0`` 结构重要性系数乘在效应侧（JTG D60 §4.1.5）。
     ``alpha3`` 受压翼缘影响系数（工形/T 形截面取 1.1）。
     """
-    fm = flexural_capacity(sec)
+    fm_pos = flexural_capacity(sec, +1.0)
+    sec_neg, given = mirror_section_for_negative(sec)
+    fm_neg = flexural_capacity(sec_neg, +1.0)   # sec_neg 已镜像，别再传负号
     sh = shear_capacity(sec, alpha1=alpha1, alpha3=alpha3)
-    r = CapacityResult(Mu=fm["Mu"], Vu=sh["Vu"],
-                       over_reinforced=fm["over_reinforced"])
 
-    if sec.As <= 0.0:
+    r = CapacityResult(
+        Mu_pos=fm_pos["Mu"], Mu_neg=fm_neg["Mu"], Vu=sh["Vu"],
+        over_reinforced=(fm_pos["over_reinforced"]
+                         or fm_neg["over_reinforced"]),
+        negative_approx=(not given and abs(Md_neg) > 0.0))
+
+    # 某一弯矩方向有效应但该面没配筋 → 判「不可判定」（inf），不能给 0
+    r.util_M_pos = (gamma0 * abs(Md) / r.Mu_pos if r.Mu_pos > 0
+                    else (float("inf") if abs(Md) > 0 else 0.0))
+    r.util_M_neg = (gamma0 * abs(Md_neg) / r.Mu_neg if r.Mu_neg > 0
+                    else (float("inf") if abs(Md_neg) > 0 else 0.0))
+    if r.util_M_pos >= r.util_M_neg:
+        r.Mu, r.util_M = r.Mu_pos, r.util_M_pos
+        r.zone, ctrl_fm, h0_ctrl = "正弯矩区（顶板受压）", fm_pos, sec.h0
+    else:
+        r.Mu, r.util_M = r.Mu_neg, r.util_M_neg
+        r.zone = ("负弯矩区（底板受压）" if given
+                  else "负弯矩区（按正弯矩面对称近似）")
+        ctrl_fm, h0_ctrl = fm_neg, sec_neg.h0
+    r.util_V = gamma0 * abs(Vd) / r.Vu if r.Vu > 0 else 0.0
+
+    if r.Mu_pos <= 0.0 and r.Mu_neg <= 0.0:
         r.no_rebar = True
-        r.note = "未配纵向钢筋，无法验算正截面抗弯承载力。"
+        r.note = "正、负弯矩面均未配纵向钢筋，无法验算正截面抗弯承载力。"
+    elif r.Mu_pos <= 0.0:
+        r.note = "正弯矩面（顶板受压）未配纵向钢筋，该方向抗弯承载力不可判定。"
+    elif r.Mu_neg <= 0.0:
+        r.note = "负弯矩面（底板受压）未配纵向钢筋，该方向抗弯承载力不可判定。"
     if sh["rho_sv"] <= 0.0:
         r.no_stirrup = True
-        r.note += "未配箍筋，无法验算斜截面抗剪承载力。" if r.note else \
+        r.note += ("；" if r.note else "") + \
             "未配箍筋，无法验算斜截面抗剪承载力。"
-
-    r.util_M = gamma0 * abs(Md) / r.Mu if r.Mu > 0 else 0.0
-    r.util_V = gamma0 * abs(Vd) / r.Vu if r.Vu > 0 else 0.0
+    if r.negative_approx:
+        r.note += ("；" if r.note else "") + (
+            "模型未登记负弯矩面（底板宽/厚、顶板纵筋），本次按正弯矩截面"
+            "对称近似；若底板较窄或顶板纵筋较少，负弯矩承载力会被高估。")
 
     if r.Mu <= 0 and r.Vu <= 0:
         r.util = 0.0
         r.control = "未配筋，承载力不可判定"
         return r
 
+    # 两个弯矩方向都进候选：控制面恰好缺筋时 inf 不会被漏掉
     cand = []
-    if r.Mu > 0:
-        cand.append((r.util_M, "正截面抗弯"))
+    if r.Mu_pos > 0 or abs(Md) > 0:
+        cand.append((r.util_M_pos, "正截面抗弯（正弯矩区）"))
+    if r.Mu_neg > 0 or abs(Md_neg) > 0:
+        cand.append((r.util_M_neg, "正截面抗弯（负弯矩区）"))
     if r.Vu > 0:
         cand.append((r.util_V, "斜截面抗剪"))
-    r.util, r.control = max(cand, key=lambda kv: kv[0])
+    r.util, r.control = max(cand, key=lambda kv: kv[0]) if cand else (0.0, "无验算项")
 
-    if fm["over_reinforced"]:
+    if ctrl_fm["over_reinforced"]:
         r.control += "（超筋）"
-        r.note += (f"受压区高度 x={fm['x']:.0f}mm > ξb·h0="
-                   f"{fm['xi_b'] * sec.h0:.0f}mm，超筋，应加受压筋或加大截面。")
+        r.note += (f"；控制面受压区高度 x={ctrl_fm['x']:.0f}mm > "
+                   f"ξb·h0={ctrl_fm['xi_b'] * h0_ctrl:.0f}mm，"
+                   f"超筋，应加受压筋或加大截面。")
     return r
 
 
 def capacity_table(rows: list[tuple[str, CapacityResult]]) -> dict:
     """计算书用的承载力验算表。`rows` = [(截面/部位说明, 结果)]。"""
+    note = ("按 JTG 3362-2018 §5.2.2 / §5.2.3 / §5.2.9，"
+            "仅普通钢筋混凝土（无预应力、无弯起钢筋）。"
+            "正、负弯矩分别按顶板/底板受压面算 Mu，表中列控制面的 Mu；"
+            "两面明细见「正/负弯矩区分面验算」表。利用率为 γ0·|效应|/承载力，"
+            ">1.0 即不满足。")
+    if any(r.negative_approx for _, r in rows):
+        note += ("有截面未登记负弯矩面（底板宽/厚、顶板纵筋），"
+                 "其负弯矩 Mu 按正弯矩面对称近似，底板较窄或顶板配筋少时偏不安全。")
     return {
         "title": "正截面 / 斜截面承载力验算",
-        "note": "按 JTG 3362-2018 §5.2.2 / §5.2.3 / §5.2.9，"
-                "仅普通钢筋混凝土（无预应力、无弯起钢筋）。"
-                "Mu 为抗弯承载力、Vu 为抗剪承载力；利用率为 γ0·|效应|/承载力，"
-                ">1.0 即不满足。",
+        "note": note,
         "headers": ["部位", "Mu (kN·m)", "Vu (kN)",
                     "利用率 M", "利用率 V", "利用率", "控制项"],
         "rows": [[name] + r.to_row() for name, r in rows],
+    }
+
+
+def capacity_faces_table(rows: list[tuple[str, CapacityResult]]) -> dict:
+    """计算书用的正/负弯矩区分面验算表（两个方向都留痕，便于复核）。"""
+    return {
+        "title": "正 / 负弯矩区分面抗弯验算",
+        "note": "正弯矩 = 顶板受压、底板纵筋受拉；负弯矩 = 底板受压、顶板"
+                "纵筋受拉。两侧受压翼缘宽厚与配筋可不同，故分别按 "
+                "§5.2.2/§5.2.3 求 Mu 并取利用率大者控制。",
+        "headers": ["部位", "正弯矩区 Mu (kN·m)", "正弯矩区利用率",
+                    "负弯矩区 Mu (kN·m)", "负弯矩区利用率",
+                    "控制区", "备注"],
+        "rows": [[name,
+                  f"{r.Mu_pos / 1e3:.0f}" if r.Mu_pos > 0 else "—",
+                  _fmt_util(r.util_M_pos),
+                  f"{r.Mu_neg / 1e3:.0f}" if r.Mu_neg > 0 else "—",
+                  _fmt_util(r.util_M_neg), r.zone,
+                  ("未登记负弯矩面，按正弯矩面对称近似"
+                   if r.negative_approx else "两个弯矩方向均已验算")]
+                 for name, r in rows],
     }
 
 
@@ -523,8 +685,16 @@ def capacity_table(rows: list[tuple[str, CapacityResult]]) -> dict:
 # 受压为负，且 −f'sd ≤ σs ≤ fsd。长细比较大时按 §5.3.9 用偏心距增大系数
 # η 计入二阶效应。
 #
-# 只做矩形截面、对称配筋（A's=As，桥塔/拱肋的标准做法）；工形/T 形压弯、
-# 非对称配筋留待下一步，接口按矩形对称设计。
+# 配筋可对称也可非对称：``Asp_given=False``（默认）表示未显式给受压筋、
+# 按 A's=As 对称配筋；``Asp_given=True`` 则按 ``Asp`` 字面值（可为 0，即
+# 单筋）。非对称配筋 + 小偏心 + 轴力落在两排钢筋合力点之间时，远侧钢筋
+# 一侧可能先被压碎，须补 §5.3.4-4/5 的「反向破坏」验算：
+#
+#   γ0·Nd·e' ≤ fcd·b·h·(h0'−h/2) + f'sd·As·(h0'−as)      (5.3.4-4)
+#   e' = h/2 − e0 − a'，h0' = h − a'，e0 = Md/Nd（不计 η）  (5.3.4-5)
+#
+# 只做矩形截面的反向破坏验算；工形/箱形非对称配筋的反向破坏公式含受压
+# 较小边翼缘项，本模块未实现，遇此情形在结果里写明「未覆盖」，不静默。
 
 
 def _beta(concrete_grade: str) -> float:
@@ -613,7 +783,10 @@ def _solve_x_small(sec: CapacitySection, N: float, fcd: float, fsd: float,
 
 
 def eccentric_capacity(sec: CapacitySection, N: float) -> dict:
-    """偏心受压正截面抗压承载力（§5.3.4 矩形 / §5.3.5 工形·箱形，对称配筋）。
+    """偏心受压正截面抗压承载力（§5.3.4 矩形 / §5.3.5 工形·箱形）。
+
+    对称配筋（默认 A's=As）与非对称配筋（``Asp_given=True`` 显式给受压筋，
+    含单筋 Asp=0）都支持；力平衡与力矩平衡里的 A's 取 `Asp_eff`。
 
     `N` 轴力设计值（受压为正，N，应已含结构重要性系数 γ0）。返回该轴力
     水平下截面能承受的**一阶**极限弯矩 ``Mu``（N·m，不含 η）；效应侧乘 η
@@ -631,7 +804,7 @@ def eccentric_capacity(sec: CapacitySection, N: float) -> dict:
     eps_cu = _eps_cu(sec.concrete_grade)
     h, h0, b = sec.h, sec.h0, sec.b
     As = sec.As
-    Asp = sec.Asp if sec.Asp > 0.0 else sec.As   # 默认对称配筋 A's=As
+    Asp = sec.Asp_eff        # 未显式给受压筋时按对称配筋 A's=As
     a_sp = sec.asp
     xi_b = _xi_b(sec.grade_rebar, sec.concrete_grade)
 
@@ -695,6 +868,36 @@ def eccentric_capacity(sec: CapacitySection, N: float) -> dict:
             "over_reinforced": x > xi_b * h0}
 
 
+def reverse_failure_util(sec: CapacitySection, Nd: float,
+                         e0: float) -> tuple[float, str] | None:
+    """§5.3.4-4/5 非对称配筋小偏心受压的「反向破坏」验算。
+
+    ``Nd`` 为已含 γ0 的轴力设计值（N，受压为正），``e0 = Md/Nd``（mm，
+    **不含** η）。轴力落在两排纵筋合力点之间时，远侧（受压较小边）混凝土
+    可能先压碎，常规的 5.3.4-1/2 从近侧算看不出来。
+
+        γ0·Nd·e' ≤ fcd·b·h·(h0'−h/2) + f'sd·As·(h0'−as)
+        e' = h/2 − e0 − a'， h0' = h − a'
+
+    返回 ``(利用率, 说明)``；不适用（对称配筋、轴力不在两排钢筋之间）时
+    返回 None。仅矩形截面；工形/箱形的受压较小边翼缘项未实现，由调用方
+    判断并写明「未覆盖」。
+    """
+    if not sec.asymmetric or Nd <= 0.0:
+        return None
+    e_prime = sec.h / 2.0 - e0 - sec.asp
+    if e_prime <= 0.0:                 # 轴力不在两排钢筋合力点之间
+        return None
+    h0_prime = sec.h - sec.asp
+    co = cm.concrete(sec.concrete_grade)
+    rb = cm.rebar(sec.grade_rebar)
+    R = (co.fcd * sec.b * sec.h * (h0_prime - sec.h / 2.0)
+         + rb.fsd_c * sec.As * (h0_prime - sec.as_))
+    util = Nd * e_prime / R if R > 0.0 else float("inf")
+    return util, (f"反向破坏 e'={e_prime:.0f}mm、h0'={h0_prime:.0f}mm，"
+                  f"γ0·Nd·e'/Nu'={util:.3f}（JTG 3362-2018 §5.3.4-4/5）")
+
+
 @dataclass
 class EccentricResult:
     """压弯构件（偏心受压）正截面承载力验算结果。"""
@@ -709,6 +912,9 @@ class EccentricResult:
     xi: float = 0.0
     xi_b: float = 0.0
     sigma_s: float = 0.0      # 受拉钢筋应力 MPa（受压为负）
+    reverse_util: float = 0.0    # §5.3.4-4/5 反向破坏利用率（0=未触发）
+    asymmetric: bool = False     # 是否非对称配筋
+    reverse_covered: bool = True  # False=工形/箱形非对称小偏心的反向破坏未覆盖
     note: str = ""
 
     def to_row(self) -> list[str]:
@@ -724,7 +930,8 @@ def check_eccentric(sec: CapacitySection, N: float, M: float,
 
     `gamma0` 结构重要性系数乘在效应侧（JTG D60 §4.1.5）；`l0` 构件计算长度
     （mm），提供时按 §5.3.9 计入二阶效应；显式传入优先，否则回退到
-    ``sec.l0``，都没有时 η=1。只覆盖矩形对称配筋。
+    ``sec.l0``，都没有时 η=1。支持对称/非对称配筋与矩形/工形/箱形截面；
+    非对称配筋的小偏心受压另按 §5.3.4-4/5 补反向破坏验算。
     """
     r = EccentricResult()
     Nd = gamma0 * N
@@ -755,6 +962,26 @@ def check_eccentric(sec: CapacitySection, N: float, M: float,
         r.util = float("inf")
         r.note = ("轴力 γ0·N 已超过截面全截面受压承载力，"
                   "即使弯矩为零也不满足。")
+
+    # 非对称配筋 + 小偏心：补 §5.3.4-4/5 反向破坏验算（不计 η）
+    r.asymmetric = sec.asymmetric
+    flange = sec.bf > sec.b and sec.hf > 0.0
+    if cap["mode"] == "小偏心受压" and sec.asymmetric:
+        if r.note and not r.note.endswith("；"):
+            r.note += "；"
+        if flange:
+            r.reverse_covered = False
+            r.note += ("工形/箱形截面非对称配筋小偏心的反向破坏验算"
+                       "（§5.3.4-4 含受压较小边翼缘项）未覆盖，需专项复核。")
+        else:
+            e0 = Md / Nd * 1000.0          # N·m / N → m → mm
+            rev = reverse_failure_util(sec, Nd, e0)
+            if rev is not None:
+                r.reverse_util = rev[0]
+                if r.reverse_util > r.util:
+                    r.util = r.reverse_util
+                    r.mode += "（反向破坏控制）"
+                r.note += rev[1] + "。"
     return r
 
 
@@ -762,9 +989,10 @@ def eccentric_table(rows: list[tuple[str, EccentricResult]]) -> dict:
     """计算书用的偏心受压（压弯）承载力验算表。"""
     return {
         "title": "偏心受压（压弯）正截面承载力验算",
-        "note": "按 JTG 3362-2018 §5.3.4 矩形截面对称配筋公式；"
+        "note": "按 JTG 3362-2018 §5.3.4/§5.3.5，支持对称与非对称配筋；"
                 "N 受压为正，Mu 为该轴力下的一阶极限弯矩（不含 η），"
-                "利用率为 η·γ0·|M|/Mu，>1.0 即不满足。",
+                "利用率为 η·γ0·|M|/Mu，>1.0 即不满足。非对称配筋小偏心"
+                "另按 §5.3.4-4/5 验算反向破坏，利用率取两者大者。",
         "headers": ["部位", "N (kN)", "M (kN·m)", "η", "Mu (kN·m)",
                     "利用率", "破坏形态"],
         "rows": [[name] + r.to_row() for name, r in rows],
@@ -860,13 +1088,13 @@ def axial_capacity(sec: CapacitySection, phi: float = 1.0) -> float:
     """§5.3.1 轴心受压抗压承载力 Nu = 0.9·φ·(fcd·A + f'sd·A's)（N）。
 
     ``phi`` 稳定系数（长细比相关，短柱=1）；A 为毛截面面积（矩形=b·h，
-    箱形=空心毛面积），A's 为全部纵向钢筋面积（对称配筋取 As+Asp，Asp=0
-    时取 2·As）。
+    箱形=空心毛面积），全部纵向钢筋面积 = As + Asp_eff（未显式给受压筋时
+    按对称配筋取 2·As；Asp_given=True 且 Asp=0 时为单筋 As）。
     """
     co = cm.concrete(sec.concrete_grade)
     rb = cm.rebar(sec.grade_rebar)
     A = sec.gross_area
-    As_total = sec.As + (sec.Asp if sec.Asp > 0.0 else sec.As)
+    As_total = sec.As + sec.Asp_eff
     return 0.9 * phi * (co.fcd * A + rb.fsd_c * As_total)
 
 

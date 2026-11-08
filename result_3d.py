@@ -590,7 +590,8 @@ class SolveResult:
         return combination.disp_combinations(self)
 
     def combination_checks(self, model: Any = None) -> list[Check]:
-        """组合是否可用、量级是否合理。不做承载力判定——那要配筋。"""
+        """组合是否可用、量级是否合理。承载力判定不在这里——由
+        `_checks_capacity` 按模型里的配筋信息做。"""
         if self.kind != "grillage3d":
             # 索承体系：活载组合已接入。组合内力由 combination.cable_combinations
             # 生成（恒载 [GIRDEREND] + 活载包络 [GIRDER_LIVE]），组合应力验算
@@ -1063,7 +1064,8 @@ class SolveResult:
         ranked_flex: list[tuple[float, str, Any, Any]] = []   # 受弯（轴力≈0）
         for label, sec, eids in cap_secs:
             worst_N: tuple[float, int, str] | None = None   # 受压轴力（正值）
-            worst_M: tuple[float, int, str] | None = None
+            worst_M_pos: tuple[float, int, str] | None = None  # 正弯矩（顶板受压）
+            worst_M_neg: tuple[float, int, str] | None = None  # 负弯矩（底板受压）
             worst_V: tuple[float, int, str] | None = None
             for (eid, end), v in ult.rows.items():
                 if eid not in eids:
@@ -1074,16 +1076,24 @@ class SolveResult:
                     nc = max(-v.get("N", 0.0), 0.0)
                 if worst_N is None or nc > worst_N[0]:
                     worst_N = (nc, eid, end)
+                # 保留弯矩符号：正/负弯矩的受压面与配筋不同，不能只取 |M|
                 for my in (v.get("MyMin", 0.0), v.get("MyMax", 0.0)):
-                    if worst_M is None or abs(my) > worst_M[0]:
-                        worst_M = (abs(my), eid, end)
+                    if my >= 0.0:
+                        if worst_M_pos is None or my > worst_M_pos[0]:
+                            worst_M_pos = (my, eid, end)
+                    elif worst_M_neg is None or -my > worst_M_neg[0]:
+                        worst_M_neg = (-my, eid, end)
                 for vz in (v.get("VzMin", 0.0), v.get("VzMax", 0.0)):
                     if worst_V is None or abs(vz) > worst_V[0]:
                         worst_V = (abs(vz), eid, end)
-            if worst_N is None and worst_M is None and worst_V is None:
+            if (worst_N is None and worst_M_pos is None
+                    and worst_M_neg is None and worst_V is None):
                 continue
             Nc = worst_N[0] if worst_N else 0.0
-            Md = worst_M[0] if worst_M else 0.0
+            M_pos = worst_M_pos[0] if worst_M_pos else 0.0
+            M_neg = worst_M_neg[0] if worst_M_neg else 0.0
+            Md = max(M_pos, M_neg)
+            wm_ctrl = worst_M_pos if M_pos >= M_neg else worst_M_neg
             Vd = worst_V[0] if worst_V else 0.0
             # 轴力显著性：受压轴力 > 5% 截面轴压承载力 → 压弯/轴压，否则受弯。
             try:
@@ -1097,12 +1107,24 @@ class SolveResult:
                     r = section_strength.check_axial(sec, Nc, gamma0=1.0)
                     ranked_axial.append((r.util, label, (worst_N,), r))
                 else:
-                    r = section_strength.check_eccentric(sec, Nc, Md, gamma0=1.0)
-                    ranked_ecc.append((r.util, label, (worst_N, worst_M), r))
+                    r = section_strength.check_eccentric(
+                        sec, Nc, M_pos, gamma0=1.0)
+                    # 非对称配筋压弯构件在两个弯矩方向的承载力不同，取不利面
+                    sec_neg, given = \
+                        section_strength.mirror_section_for_negative(sec)
+                    if given and M_neg > 0.0:
+                        r_neg = section_strength.check_eccentric(
+                            sec_neg, Nc, M_neg, gamma0=1.0)
+                        if r_neg.util > r.util:
+                            r = r_neg
+                            r.note = ((r.note + "；") if r.note else "") + \
+                                "负弯矩面（底板受压）控制。"
+                    ranked_ecc.append((r.util, label, (worst_N, wm_ctrl), r))
             else:
                 r = section_strength.check_capacity(
-                    sec, Md, Vd, gamma0=1.0, alpha1=1.0, alpha3=1.1)
-                ranked_flex.append((r.util, label, (worst_M, worst_V), r))
+                    sec, M_pos, Vd, gamma0=1.0, alpha1=1.0, alpha3=1.1,
+                    Md_neg=M_neg)
+                ranked_flex.append((r.util, label, (wm_ctrl, worst_V), r))
 
         out: list[Check] = []
 
@@ -1110,14 +1132,21 @@ class SolveResult:
         if ranked_flex:
             ranked_flex.sort(key=lambda t: -t[0])
             for _, label, (wm, wv), r in ranked_flex[:3]:
-                if r.Mu > 0:
+                if r.Mu > 0 or math.isinf(r.util_M):
                     src = f"单元 {wm[1]}·{wm[2]} 端" if wm else "—"
+                    util_s = "∞" if math.isinf(r.util_M) else f"{r.util_M:.3f}"
+                    mu_s = "—" if r.Mu <= 0 else f"{r.Mu / 1e3:,.0f}"
                     out.append(Check(
                         f"{label} 正截面抗弯 Mu",
                         r.util_M <= 1.0,
                         f"{src} γ0·|Md| = {abs(wm[0]) / 1e3:,.0f} kN·m ≤ "
-                        f"Mu = {r.Mu / 1e3:,.0f} kN·m，利用率 {r.util_M:.3f}"
+                        f"Mu = {mu_s} kN·m，利用率 {util_s}"
                         f"{'（超筋）' if r.over_reinforced else ''}；"
+                        f"控制区 {r.zone}（正弯矩区 Mu="
+                        f"{r.Mu_pos / 1e3:,.0f} kN·m / 利用率 "
+                        f"{section_strength._fmt_util(r.util_M_pos)}，"
+                        f"负弯矩区 Mu={r.Mu_neg / 1e3:,.0f} kN·m / 利用率 "
+                        f"{section_strength._fmt_util(r.util_M_neg)}）；"
                         f"JTG 3362-2018 §5.2.2/5.2.3",
                         value=r.util_M, limit=1.0, level="error"))
                 if r.Vu > 0:
@@ -1162,7 +1191,8 @@ class SolveResult:
                         f"kN·m，{r.mode}，x = {r.x:.0f} mm，σs = "
                         f"{r.sigma_s:+.0f} MPa；该轴力下 Mu = "
                         f"{r.Mu / 1e3:,.0f} kN·m，利用率 {util_s}；"
-                        f"JTG 3362-2018 §5.3.4/5.3.5（对称配筋）",
+                        f"JTG 3362-2018 §5.3.4/5.3.5"
+                        f"{'（非对称配筋，含 §5.3.4-4/5 反向破坏验算）' if r.asymmetric else '（对称配筋）'}",
                         value=r.util, limit=1.0, level="error"))
                 if r.note:
                     out.append(Check(
@@ -1171,11 +1201,17 @@ class SolveResult:
         out.append(Check(
             "承载力验算适用范围", True,
             "受弯按矩形/工形（受压翼缘在受压区）单筋 §5.2.2/5.2.3、斜截面"
-            "按仅配箍筋 §5.2.9；轴力显著（>5% 轴压承载力）时按偏心距自动分派"
-            "轴心受压 §5.3.1（偏心距 <1% 截面高）或偏心受压 §5.3.4/5.3.5。均为"
-            "普通钢筋混凝土（无预应力、无弯起钢筋）。稳定系数 φ 按长细比"
-            "查表 5.3.1（矩形用 l0/b、箱形用 l0/i）、二阶效应 η 按 §5.3.9；"
-            "未提供计算长度 l0 时按短柱 φ=1、η=1（不静默，λ 标注为「未计」）。",
+            "按仅配箍筋 §5.2.9；正、负弯矩分别按顶板/底板受压面各算一次 Mu，"
+            "取利用率大者控制（不赌梁单元局部坐标朝向）。未登记负弯矩面的"
+            "截面按正弯矩面对称近似，并在验算说明里提示——底板较窄或顶板"
+            "纵筋较少时该近似偏不安全。轴力显著（>5% 轴压承载力）时按偏心距"
+            "自动分派轴心受压 §5.3.1（偏心距 <1% 截面高）或偏心受压 "
+            "§5.3.4/5.3.5；压弯支持非对称配筋，小偏心另按 §5.3.4-4/5 验算"
+            "反向破坏，工形/箱形非对称配筋的反向破坏（含受压较小边翼缘项）"
+            "未覆盖、会在结果里标明。均为普通钢筋混凝土（无预应力、无弯起"
+            "钢筋）。稳定系数 φ 按长细比查表 5.3.1（矩形用 l0/b、箱形用 "
+            "l0/i）、二阶效应 η 按 §5.3.9；未提供计算长度 l0 时按短柱 "
+            "φ=1、η=1（不静默，λ 标注为「未计」）。",
             level="info"))
         return out
 
@@ -1275,8 +1311,10 @@ class SolveResult:
                     out.append(Check(
                         f"{label} 腹板剪应力（量级）", True,
                         f"单元 {eid}·{end} 端 τ = V/AW = {r.tau:.1f} MPa。"
-                        "混凝土梁的抗剪须按斜截面承载力验算（箍筋 + 混凝土"
-                        "贡献），本程序不建钢筋，故不给利用率、也不下结论。",
+                        "混凝土梁的抗剪须按斜截面承载力验算（JTG 3362 "
+                        "§5.2.9，箍筋 + 混凝土贡献），本条只是应力量级、"
+                        "不给利用率也不下结论；填了箍筋的截面另见"
+                        "「斜截面抗剪 Vu」校核条目。",
                         value=r.tau, unit="MPa", level="info"))
 
             if steel:
@@ -1986,25 +2024,31 @@ class SolveResult:
                 if model is not None and self.final_beam:
                     cap_pairs = []
                     for label, sec, eids in _capacity_sections(model):
-                        wm = wv = None
+                        mp = mn = wv = None
                         for (eid, end), v in ult.rows.items():
                             if eid not in eids:
                                 continue
                             for my in (v.get("MyMin", 0.0), v.get("MyMax", 0.0)):
-                                if wm is None or abs(my) > wm[0]:
-                                    wm = (abs(my), eid, end)
+                                if my >= 0.0:
+                                    if mp is None or my > mp[0]:
+                                        mp = (my, eid, end)
+                                elif mn is None or -my > mn[0]:
+                                    mn = (-my, eid, end)
                             for vz in (v.get("VzMin", 0.0), v.get("VzMax", 0.0)):
                                 if wv is None or abs(vz) > wv[0]:
                                     wv = (abs(vz), eid, end)
-                        if wm is None and wv is None:
+                        if mp is None and mn is None and wv is None:
                             continue
                         r = section_strength.check_capacity(
-                            sec, wm[0] if wm else 0.0,
-                            wv[0] if wv else 0.0, alpha3=1.1)
+                            sec, mp[0] if mp else 0.0,
+                            wv[0] if wv else 0.0, alpha3=1.1,
+                            Md_neg=mn[0] if mn else 0.0)
                         cap_pairs.append((label, r))
                     if cap_pairs:
                         out["capacity_table"] = \
                             section_strength.capacity_table(cap_pairs)
+                        out["capacity_faces_table"] = \
+                            section_strength.capacity_faces_table(cap_pairs)
         return out
 
     # ------------------------------------------------------------ 兼容旧字典
@@ -2141,16 +2185,30 @@ def _capacity_sections(model: Any) -> list[tuple[str, Any, set[int]]]:
         if grade.upper() not in code_material.CONCRETE:
             continue        # 钢截面不该带 rebar；带了也不做混凝土承载力
         rb = rc.rebar
+        # 负弯矩面（底板受压 / 顶板受拉）：未登记时为 None，验算会给
+        # "按正弯矩面对称近似"的提示，不静默。None 字段表示沿用正弯矩面。
+        neg = None
+        if bool(getattr(rb, "negative_given", False)):
+            def _opt(name: str) -> float | None:
+                v = getattr(rb, name, None)
+                return None if v is None else float(v)
+            neg = section_strength.FaceSpec(
+                bf=_opt("bf_neg"), hf=_opt("hf_neg"),
+                As=_opt("As_neg"), Asp=_opt("Asp_neg"),
+                as_=_opt("as_neg"), asp=_opt("asp_neg"))
         sec = section_strength.CapacitySection(
             h=float(rb.h), b=float(rb.b), As=float(rb.As),
             bf=float(rb.bf), hf=float(rb.hf),
             as_=float(rb.as_), Asp=float(rb.Asp),
+            asp=float(getattr(rb, "asp", 40.0) or 40.0),
+            Asp_given=bool(getattr(rb, "Asp_given", False)),
             grade_rebar=rb.grade_rebar,
             Asv=float(rb.Asv), sv=float(rb.sv),
             grade_stirrup=rb.grade_stirrup,
             concrete_grade=grade,
             l0=float(getattr(rb, "l0", 0.0) or 0.0),
             hollow=bool(getattr(rb, "hollow", False)),
+            negative=neg,
         )
         eids = {e.id for e in model.elements if e.etype == t.id}
         head = "主梁" if t.id == main_et else f"截面#{t.real}"

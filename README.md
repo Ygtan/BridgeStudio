@@ -83,8 +83,8 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        `_checks_capacity` 把基本组合设计内力换成 Mu/Vu 利用率，出校核条目 +
        `capacity_table` 明细表。`verify_capacity.py` 22/22（矩形/工形/斜截面
        手算对拍 + 超筋/未配筋负例 + 梁格端到端）。
-       **边界**：只做普通钢筋混凝土（无预应力、无弯起），负弯矩区、工形/T 形
-       压弯、非对称配筋未覆盖 —— 2026-11-08
+       **边界**：只做普通钢筋混凝土（无预应力、无弯起）；工形/T 形压弯、
+       负弯矩区与非对称配筋已由后续条目补齐 —— 2026-11-08
 - [x] **P3** 桥塔压弯 / 轴心受压承载力：`section_strength` 加
        `eccentric_capacity`（§5.3.4 矩形对称配筋，大偏心 σs=fsd / 小偏心按
        §5.1.5 平截面二分迭代）、`eta_second_order`（§5.3.9 二阶效应）、
@@ -93,7 +93,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        按轴力+偏心距三分派（轴心受压 / 偏心受压 / 受弯），索承体系也接上承载力
        验算。`verify_capacity.py` 42/42（含大/小偏心、η、轴心受压手算对拍 +
        斜拉桥塔柱端到端）。
-       **边界**：非对称配筋未覆盖（工形/T 形/箱形压弯见下一条） —— 2026-11-08
+       **边界**：非对称配筋与工形/T 形/箱形压弯见后续条目 —— 2026-11-08
 - [x] **P3** 桥塔稳定系数 φ：`section_strength.stability_factor` 按长细比
        查 JTG 3362-2018 表 5.3.1（线性插值）——矩形用 l0/b、箱形用 l0/i
        （最小回转半径）；`check_axial`/`check_eccentric` 从 `sec.l0` 取计算
@@ -106,6 +106,18 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        在 x=hf 处连续）；`cable_stayed_3d`/`suspension_3d` 加 `tower_wall`（>0
        用空心箱形塔柱，等效工形 bf=外宽、hf=壁厚、b=两片腹板厚之和）。箱形
        回转半径大于实心，故 φ 更大、更抗屈曲。—— 2026-11-08
+- [x] **P3** 负弯矩区双向验算 + 非对称配筋（JTG 3362 §5.2.2/5.2.3、
+       §5.3.4-4/5）：`CapacitySection` 加 `FaceSpec negative`（底板宽厚与顶板
+       纵筋可单独登记）和 `Asp_given`（显式受压筋，可为 0=单筋）；
+       `mirror_section_for_negative` 把截面上下翻转后复用 §5.2 公式；
+       `check_capacity` 对正/负弯矩各算一次 Mu、取利用率大者控制，新增
+       `capacity_faces_table` 两面留痕，未登记负弯矩面给「对称近似」告警；
+       `eccentric_capacity` 支持非对称配筋，`reverse_failure_util` 按
+       §5.3.4-4/5 补小偏心反向破坏；`grillage_3d` 加 `rebar_ratio_neg`
+       单独配支点顶板纵筋。`result_3d._checks_capacity` 不再取 |My| 丢掉符号，
+       压弯链也按两个弯矩方向取不利面。`verify_capacity.py` 104/104。
+       **边界**：工形/箱形非对称配筋的反向破坏（含受压较小边翼缘项）
+       未覆盖，结果里如实标注。—— 2026-11-08
 - [x] **P3** 索承体系梁应力：`cable_solver` 新增 `[GIRDEREND]`（每端一行，两种桥型
        都输出），斜拉桥第一次有主梁内力；`result_3d._checks_strength_cable` 用
        `_strength_sections + section_strength` 做正应力/剪应力/折算应力，报告增

@@ -24,10 +24,11 @@
 
 不做什么
 --------
-不算承载力。截面抗弯/抗剪承载力需要配筋，本程序不建钢筋。这里给的是
-**设计内力包络**（含 N / My / Vz）——设计院拿去配筋的输入，也是
-`section_strength.py` 做应力验算的输入，但不是"承载力验算通过"的结论。
-想要承载力结论，得把 Mu、Vu 接进来（路线图下一步）。
+本模块自己不算承载力。这里给的是 **设计内力包络**（含 N / My / Vz），
+是 `section_strength.check_capacity` / `result_3d._checks_capacity` 的效应
+侧输入：配筋信息由 `RealConst3D.rebar` 提供，Mu / Vu 与压弯、轴心受压
+承载力在 `section_strength.py` 里另算。不要把"组合内力"当成"验算通过"
+的结论。
 """
 
 from __future__ import annotations

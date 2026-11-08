@@ -1,16 +1,24 @@
-"""verify_capacity.py —— 正截面抗弯 + 斜截面抗剪承载力验算的端到端回归。
+"""verify_capacity.py —— JTG 3362-2018 第 5 章承载力验算的端到端回归。
 
-覆盖三件事：
+覆盖六件事：
 1. 纯函数手算对拍：矩形/工形正截面抗弯 Mu、斜截面抗剪 Vu 与闭式解逐一
    对照（手算值硬编码在断言里，不用被验代码反算）。
 2. 边界：超筋检测、未配筋负例（不下假结论）。
-3. 端到端：梁格建造器填配筋 → 求解 → 校核含承载力条目且通过、明细表
-   capacity_table 出现。
+3. 偏心受压 / 轴心受压：大/小偏心、η 二阶效应、φ 稳定系数、矩形/工形/
+   箱形毛面积与回转半径。
+4. 负弯矩区：倒 T 形第一/二类 Mu 手算对拍、双向验算取控制、未登记负弯矩
+   面给对称近似告警、缺筋判 ∞ 不可判定。
+5. 非对称配筋：Asp_given/Asp_eff、单筋轴压、非对称大/小偏心力平衡、
+   §5.3.4-4/5 反向破坏手算对拍、工形未覆盖如实标注。
+6. 端到端：梁格建造器填配筋 → 求解 → 校核含承载力条目且通过、明细表
+   capacity_table / capacity_faces_table 出现；塔柱轴压与箱形塔柱端到端。
 
 JTG 3362-2018 依据：
 - §5.2.1 表 5.2.1 相对界限受压区高度 ξb（2018 修订值：HRB400=0.53）
 - §5.2.2 矩形 / §5.2.3 工形（受压翼缘）正截面抗弯
 - §5.2.9 仅配箍筋斜截面抗剪
+- §5.3.1 轴心受压 + 表 5.3.1 稳定系数 φ；§5.3.4 偏心受压（含 5.3.4-4/5
+  反向破坏）；§5.3.5 工形/箱形压弯；§5.3.9 二阶效应 η
 """
 
 from __future__ import annotations
@@ -21,6 +29,7 @@ setup_console()
 
 import math
 import tempfile
+from dataclasses import replace
 
 import section_strength as ss
 
@@ -304,6 +313,189 @@ def main() -> int:
               tb["capacity_table"]["headers"]
               == ["部位", "Mu (kN·m)", "Vu (kN)",
                   "利用率 M", "利用率 V", "利用率", "控制项"], "")
+
+    # ============================================================ 负弯矩区
+    print("\n[10] 负弯矩区（受压在底板、顶板纵筋受拉）§5.2.2/§5.2.3")
+    sec_bi = ss.CapacitySection(
+        h=2500, b=800, As=40000, bf=12000, hf=280, as_=100,
+        Asv=402.0, sv=150, concrete_grade="C50",
+        negative=ss.FaceSpec(bf=2000, hf=250, As=12000, as_=80))
+    sec_m, given = ss.mirror_section_for_negative(sec_bi)
+    check("负弯矩面显式登记", given, "")
+    check("镜像后受压翼缘换成底板宽/厚",
+          sec_m.bf == 2000 and sec_m.hf == 250, f"bf={sec_m.bf} hf={sec_m.hf}")
+    check("镜像后受拉筋换成顶板纵筋", sec_m.As == 12000
+          and sec_m.as_ == 80 and sec_m.h0 == 2420,
+          f"As={sec_m.As:.0f} h0={sec_m.h0:.0f}")
+    check("镜像锁定外轮廓宽、毛面积不变",
+          sec_m.outer_bf == 12000
+          and near(sec_m.gross_area, sec_bi.gross_area, 1e-9),
+          f"outer_bf={sec_m.outer_bf:.0f} A={sec_m.gross_area:.0f}")
+    check("镜像面不再嵌套镜像（防递归）", sec_m.negative is None, "")
+
+    # 第一类倒 T 形（中和轴在底板翼缘内）：x=fsd·As/(fcd·bf_neg)
+    fm_neg = ss.flexural_capacity(sec_bi, -1.0)
+    x_neg = 330 * 12000 / (22.4 * 2000)
+    mu_neg_hand = 22.4 * 2000 * x_neg * (2420 - x_neg / 2) / 1e6   # kN·m
+    check("负弯矩第一类 x 与手算一致", near(fm_neg["x"], x_neg, 1e-3),
+          f"x={fm_neg['x']:.1f} vs {x_neg:.1f}")
+    check("负弯矩第一类 Mu 与手算一致",
+          near(fm_neg["Mu"] / 1e3, mu_neg_hand, 1e-3),
+          f"Mu={fm_neg['Mu']/1e3:.0f} vs {mu_neg_hand:.0f} kN·m")
+    check("负弯矩 Mu 标出受压面", "负弯矩区" in fm_neg["face"], fm_neg["face"])
+
+    # 第二类倒 T 形（中和轴深入腹板）：Ac = b·x + (bf−b)·hf
+    sec_bi2 = replace(sec_bi, negative=ss.FaceSpec(
+        bf=2000, hf=250, As=60000, as_=80))
+    fm_neg2 = ss.flexural_capacity(sec_bi2, -1.0)
+    x_n2 = (330 * 60000 - 22.4 * (2000 - 800) * 250) / (22.4 * 800)
+    mu_n2 = (22.4 * (800 * x_n2 * (2420 - x_n2 / 2)
+                     + (2000 - 800) * 250 * (2420 - 250 / 2))) / 1e6
+    check("负弯矩第二类 x 与手算一致", near(fm_neg2["x"], x_n2, 1e-3),
+          f"x={fm_neg2['x']:.1f} vs {x_n2:.1f}")
+    check("负弯矩第二类 Mu 与手算一致",
+          near(fm_neg2["Mu"] / 1e3, mu_n2, 1e-3),
+          f"Mu={fm_neg2['Mu']/1e3:.0f} vs {mu_n2:.0f} kN·m")
+
+    # 双向验算取控制：底板窄 + 顶板少筋 → 负弯矩 Mu 显著变小
+    r_bi = ss.check_capacity(sec_bi, Md=10329e3, Vd=1000e3,
+                             alpha3=1.1, Md_neg=10884e3)
+    check("Mu_neg 明显小于 Mu_pos（不再拿顶板翼缘冒充）",
+          r_bi.Mu_neg < 0.6 * r_bi.Mu_pos,
+          f"{r_bi.Mu_neg/1e3:.0f} vs {r_bi.Mu_pos/1e3:.0f} kN·m")
+    check("负弯矩利用率高于正弯矩、控制区标为负弯矩",
+          r_bi.util_M_neg > r_bi.util_M_pos
+          and r_bi.zone.startswith("负弯矩区"), r_bi.zone)
+    check("util_M 取两个弯矩方向的大者",
+          near(r_bi.util_M, r_bi.util_M_neg, 1e-9),
+          f"{r_bi.util_M:.4f} vs {r_bi.util_M_neg:.4f}")
+    check("控制项标出弯矩方向", "正截面抗弯" in r_bi.control, r_bi.control)
+
+    # 未登记负弯矩面：给对称近似提示，不静默
+    sec_no = replace(sec_bi, negative=None)
+    r_ap = ss.check_capacity(sec_no, Md=0.0, Vd=1000e3, Md_neg=10884e3)
+    check("未登记负弯矩面 → Mu 两面相同", near(r_ap.Mu_neg, r_ap.Mu_pos, 1e-9), "")
+    check("未登记负弯矩面 → 明确标注对称近似",
+          r_ap.negative_approx and "对称近似" in r_ap.note
+          and "对称近似" in ss.flexural_capacity(sec_no, -1.0)["face"],
+          r_ap.note[:60])
+    check("capacity_table 说明里带对称近似告警",
+          "对称近似" in ss.capacity_table([("主梁", r_ap)])["note"], "")
+
+    # 负弯矩面没配筋 → 不可判定（∞），不能静默给 0
+    r_nn = ss.check_capacity(
+        replace(sec_bi, negative=ss.FaceSpec(As=0.0)),
+        Md=0.0, Vd=1000e3, Md_neg=100e3)
+    check("负弯矩面缺筋 → util_M_neg=∞", math.isinf(r_nn.util_M_neg), "")
+    check("负弯矩面缺筋 → 总利用率=∞", math.isinf(r_nn.util), "")
+    check("缺筋写进说明且表里显示 ∞",
+          "不可判定" in r_nn.note and "∞" in r_nn.to_row(), r_nn.note[:60])
+    ft = ss.capacity_faces_table([("主梁", r_bi)])
+    check("分面明细表 7 列且行对齐",
+          len(ft["headers"]) == 7 and len(ft["rows"][0]) == 7, "")
+    check("分面明细表备注写明两向均验算",
+          "两个弯矩方向均已验算" in ft["rows"][0][-1], ft["rows"][0][-1])
+
+    # ============================================================ 非对称配筋
+    print("\n[11] 非对称配筋偏心受压 + 反向破坏（§5.3.4-4/5）")
+    sec_asym = ss.CapacitySection(
+        h=600, b=400, As=As_e, Asp=800.0, Asp_given=True,
+        as_=40, asp=40, concrete_grade="C30")
+    check("Asp_given=True → 受压筋按字面值、判为非对称",
+          near(sec_asym.Asp_eff, 800.0, 1e-9) and sec_asym.asymmetric, "")
+    check("Asp_given=False（默认）→ 兼容对称配筋",
+          near(sec_e.Asp_eff, As_e, 1e-9) and not sec_e.asymmetric, "")
+    sec_single = replace(sec_asym, Asp=0.0)
+    nu_single = 0.9 * (13.8 * 400 * 600 + 330 * As_e)
+    check("单筋轴压承载力只算 As（不是 2·As）",
+          near(ss.axial_capacity(sec_single), nu_single, 1e-3),
+          f"Nu={ss.axial_capacity(sec_single)/1e3:.0f} kN")
+
+    # 非对称大偏心：x = (N − f'sd·A's + fsd·As)/(fcd·b)
+    x_big_hand = (800e3 - 330 * 800 + 330 * As_e) / (13.8 * 400)
+    cap_big = ss.eccentric_capacity(sec_asym, 800e3)
+    mu_big_hand = (13.8 * 400 * x_big_hand * (560 - x_big_hand / 2)
+                   + 330 * 800 * (560 - 40) - 800e3 * (300 - 40)) / 1e3
+    check("非对称大偏心 x 与手算一致",
+          near(cap_big["x"], x_big_hand, 1e-3)
+          and cap_big["mode"] == "大偏心受压",
+          f"x={cap_big['x']:.1f} vs {x_big_hand:.1f}")
+    check("非对称大偏心 Mu 与手算一致",
+          near(cap_big["Mu"], mu_big_hand, 1e-3),
+          f"Mu={cap_big['Mu']/1e3:.1f} kN·m")
+
+    # 非对称小偏心：力平衡残差（σs 按 §5.1.5 平截面）
+    cap_small = ss.eccentric_capacity(sec_asym, 2500e3)
+    sig_small = 0.0033 * 2.0e5 * (0.8 * 560 / cap_small["x"] - 1)
+    res_force = (13.8 * 400 * cap_small["x"] + 330 * 800
+                 - sig_small * As_e - 2500e3)
+    check("非对称小偏心力平衡闭合",
+          cap_small["mode"] == "小偏心受压"
+          and abs(res_force) / 2500e3 < 1e-6,
+          f"x={cap_small['x']:.1f} 残差={res_force:.1f} N")
+
+    # 反向破坏：e'=h/2−e0−a'、h0'=h−a'、R=fcd·b·h·(h0'−h/2)+f'sd·As·(h0'−as)
+    r_rev = ss.check_eccentric(sec_asym, 2500e3, 100e3)
+    e0_r = 100e3 / 2500e3 * 1000.0
+    ep_r = 300.0 - e0_r - 40.0
+    h0p_r = 600.0 - 40.0
+    R_r = (13.8 * 400 * 600 * (h0p_r - 300.0)
+           + 330 * As_e * (h0p_r - 40.0))
+    util_rev_hand = 2500e3 * ep_r / R_r
+    check("反向破坏利用率与手算一致",
+          near(r_rev.reverse_util, util_rev_hand, 1e-3),
+          f"{r_rev.reverse_util:.4f} vs {util_rev_hand:.4f}")
+    check("反向破坏控制时利用率取大者并标注",
+          near(r_rev.util, util_rev_hand, 1e-3)
+          and "反向破坏控制" in r_rev.mode, r_rev.mode)
+    check("反向破坏不计 η", near(r_rev.eta, 1.0, 1e-9)
+          and "§5.3.4-4/5" in r_rev.note, r_rev.note[:50])
+    r_sym = ss.check_eccentric(sec_e, 2500e3, 100e3)
+    check("对称配筋不触发反向破坏",
+          r_sym.reverse_util == 0.0 and not r_sym.asymmetric, "")
+    r_big2 = ss.check_eccentric(sec_asym, 800e3, 200e3)
+    check("大偏心不触发反向破坏", r_big2.reverse_util == 0.0, "")
+    sec_fl = replace(sec_asym, bf=3000.0, hf=100.0)
+    r_fl = ss.check_eccentric(sec_fl, 10e6, 100e3)
+    check("工形非对称小偏心 → 反向破坏如实标注未覆盖",
+          (not r_fl.reverse_covered) and "未覆盖" in r_fl.note
+          and r_fl.reverse_util == 0.0, r_fl.note[:50])
+
+    # ============================================================ 端到端
+    print("\n[12] 端到端：负弯矩面接入校核与报告明细表")
+    import result_3d
+    secs2 = result_3d._capacity_sections(doc.model)
+    check("梁格截面带负弯矩面参数", secs2 and secs2[0][1].negative is not None, "")
+    check("明细表含正/负弯矩分面表",
+          "capacity_faces_table" in tb
+          and len(tb["capacity_faces_table"]["rows"]) >= 1, "")
+    cM2 = next((c for n, c in names.items() if "正截面抗弯" in n), None)
+    check("抗弯校核标注控制区与两面 Mu",
+          cM2 is not None and "负弯矩区" in cM2.detail
+          and "正弯矩区 Mu" in cM2.detail,
+          cM2.detail[:80] if cM2 else "—")
+    check("默认模型已登记负弯矩面（无对称近似告警）",
+          "未登记负弯矩面" not in tb["capacity_table"]["note"]
+          and "对称近似" not in tb["capacity_table"]["note"], "")
+    import grillage_3d
+    box = grillage_3d.box_section(12.0, 2.5, 0.28, 0.45)
+    rb = grillage_3d._rebar_spec(
+        box, 12.0, 2.5, 0.28, 0.45, 3, 0.012, 0.10, 12.0, 150.0,
+        rebar_ratio_neg=0.006)
+    rb0 = grillage_3d._rebar_spec(
+        box, 12.0, 2.5, 0.28, 0.45, 3, 0.012, 0.10, 12.0, 150.0)
+    check("顶板纵筋配筋率可单独配置（减半生效）",
+          rb.negative_given and near(rb.As_neg, rb.As / 2.0, 1e-9),
+          f"As_neg={rb.As_neg:.0f} vs As={rb.As:.0f}")
+    check("默认顶板筋与底板筋相同",
+          rb0.negative_given and near(rb0.As_neg, rb0.As, 1e-9), "")
+    sec_half = replace(secs2[0][1],
+                       negative=replace(secs2[0][1].negative,
+                                        As=secs2[0][1].negative.As / 2.0))
+    fm_half = ss.flexural_capacity(sec_half, -1.0)
+    check("顶板纵筋减半 → 负弯矩 Mu 下降",
+          fm_half["Mu"] < ss.flexural_capacity(secs2[0][1], -1.0)["Mu"],
+          f"{fm_half['Mu']/1e3:.0f} kN·m")
 
     # ============================================================ 汇总
     n_pass = sum(1 for _, ok, _ in PASS if ok)

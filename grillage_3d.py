@@ -69,17 +69,26 @@ def box_section(B: float, h: float, tf: float, tw: float) -> dict:
 
 def _rebar_spec(box: dict, B: float, h: float, tf: float, tw: float,
                 n_lines: int, rebar_ratio: float, as_: float,
-                stirrup_dia: float, stirrup_sv: float) -> RebarSpec3D | None:
+                stirrup_dia: float, stirrup_sv: float,
+                rebar_ratio_neg: float | None = None) -> RebarSpec3D | None:
     """按全截面配筋率估一条纵梁的配筋，供承载力验算用。
 
     梁格把单箱切成 n_lines 条纵梁，截面属性（A/IY/AW）各 1/n_lines，配筋
     也各 1/n_lines——这样单条纵梁的「内力 Md ↔ 截面 ↔ 配筋」三者自洽。
     箱梁顶板受压时近似为工形：bf=箱宽/n_lines、hf=顶板厚、b=两道腹板宽之和
     /n_lines。``rebar_ratio <= 0`` 表示不配筋（返回 None，验算跳过）。
+
+    负弯矩区（支点，底板受压 / 顶板受拉）单独登记一套配筋：
+    ``rebar_ratio_neg`` 为顶板纵筋配筋率（None = 与跨中底板筋相同）。本
+    建造器的单箱单室截面顶底板等宽等厚（`box_section` 里 A=2·B·tf+…），
+    所以 bf_neg/hf_neg 沿用 bf/hf；若换成底板较窄的真实箱梁，把 bf_neg
+    改小即可，验算会自动按倒 T 形重算 Mu，不再拿顶板翼缘冒充。
     """
     if rebar_ratio <= 0.0:
         return None
-    As = rebar_ratio * box["A"] * 1e6 / n_lines        # m² → mm²
+    As = rebar_ratio * box["A"] * 1e6 / n_lines        # 底板受拉纵筋 mm²
+    ratio_top = rebar_ratio if rebar_ratio_neg is None else rebar_ratio_neg
+    As_top = ratio_top * box["A"] * 1e6 / n_lines       # 顶板纵筋 mm²
     b = 2.0 * tw * 1e3 / n_lines                       # 腹板宽 mm（两道均分）
     bf = B * 1e3 / n_lines                             # 受压翼缘宽 mm
     hf = tf * 1e3
@@ -89,8 +98,13 @@ def _rebar_spec(box: dict, B: float, h: float, tf: float, tw: float,
     if stirrup_dia > 0.0:
         # 两道腹板 × 双肢箍，均分到单条纵梁
         Asv = 4.0 * (math.pi * stirrup_dia ** 2 / 4.0) / n_lines
-    return RebarSpec3D(h=hh, b=b, bf=bf, hf=hf, As=As, as_=as_mm,
-                       Asv=Asv, sv=stirrup_sv)
+    return RebarSpec3D(
+        h=hh, b=b, bf=bf, hf=hf, As=As, as_=as_mm,
+        Asv=Asv, sv=stirrup_sv,
+        negative_given=True,
+        bf_neg=bf, hf_neg=hf,
+        As_neg=As_top, Asp_neg=As, as_neg=as_mm,
+    )
 
 
 def build_box_grillage_3d(
@@ -109,7 +123,8 @@ def build_box_grillage_3d(
     td: float = 0.6,                     # 支承断面横隔板厚度 m
     staged: bool = False,                # True=逐跨浇筑三阶段；False=一次成桥
     lane_code: str = "",                 # "JTG_D60"=中线车道自动荷载 + 跨中影响线
-    rebar_ratio: float = 0.012,          # 纵向受拉钢筋配筋率（按全截面 A，验算用）
+    rebar_ratio: float = 0.012,          # 跨中底板受拉纵筋配筋率（按全截面 A，验算用）
+    rebar_ratio_neg: float | None = None,  # 支点顶板受拉纵筋配筋率（None=同跨中）
     as_: float = 0.10,                   # 受拉钢筋合力点至受拉边缘距离 m
     stirrup_dia: float = 12.0,           # 箍筋直径 mm（双肢，0=不配箍筋）
     stirrup_sv: float = 150.0,           # 箍筋间距 mm
@@ -170,7 +185,8 @@ def build_box_grillage_3d(
                     WT=box["WT"] / n_lines, WB=box["WB"] / n_lines,
                     AW=box["AW"] / n_lines,          # 腹板也按纵梁线均分
                     rebar=_rebar_spec(box, B, h, tf, tw, n_lines,
-                                      rebar_ratio, as_, stirrup_dia, stirrup_sv)),
+                                      rebar_ratio, as_, stirrup_dia, stirrup_sv,
+                                      rebar_ratio_neg)),
         RealConst3D(id=2, A=cross["A"], IY=cross["IY"], IZ=cross["A"] * panel ** 2 / 12,
                     J=cross["J"], G=G, AW=cross["A"] / 1.5),
         RealConst3D(id=3, A=diaph["A"], IY=diaph["IY"], IZ=diaph["A"] * B ** 2 / 12,

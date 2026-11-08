@@ -277,6 +277,11 @@ class RebarSpec3D(BaseModel):
     - 工形 / T 形截面：``bf > b``（受压翼缘宽，箱梁顶板受压取箱宽）且
       ``hf > 0``（翼缘厚）。
     - 斜截面抗剪的 ``b`` 始终取**腹板宽度**（矩形=全宽；箱梁=各腹板宽之和）。
+    - ``Asp_given=False``（默认）表示未显式给受压钢筋、按对称配筋 A's=As；
+      置 True 后 ``Asp`` 按字面值取（可为 0，即单筋非对称配筋）。
+    - ``negative_given=True`` 时启用**负弯矩面**（受压在底板、受拉在顶板）：
+      底板宽/厚、顶板纵筋可与正弯矩面不同，``*_neg`` 为 None 表示沿用对应
+      的正弯矩面值。不启用时负弯矩按正弯矩面对称近似，验算会给提示。
     """
 
     h: float = Field(gt=0)          # 截面全高 mm
@@ -285,13 +290,22 @@ class RebarSpec3D(BaseModel):
     bf: float = 0.0                 # 受压翼缘宽度 mm（0=取 b，即矩形）
     hf: float = 0.0                 # 受压翼缘厚度 mm（0=矩形）
     as_: float = 50.0               # 受拉钢筋合力点至受拉边缘距离 mm
-    Asp: float = 0.0                # 受压钢筋面积 mm²（0=单筋）
+    asp: float = 40.0               # 受压钢筋合力点至受压边缘距离 mm
+    Asp: float = 0.0                # 受压钢筋面积 mm²（Asp_given=True 时按字面值）
+    Asp_given: bool = False         # False=未提供受压筋、按对称配筋；True=非对称/单筋
     Asv: float = 0.0                # 同一截面内箍筋各肢总面积 mm²（0=未配箍）
     sv: float = 150.0               # 箍筋间距 mm
     grade_rebar: str = "HRB400"     # 纵向钢筋牌号
     grade_stirrup: str = "HRB400"   # 箍筋牌号
     l0: float = 0.0                 # 构件计算长度 mm（表5.3.1稳定/§5.3.9二阶效应用；0=未提供）
     hollow: bool = False            # True=空心箱形截面（外 bf×h、腹板 2×(b/2)、翼缘 hf）
+    negative_given: bool = False    # True=登记了负弯矩面（底板受压）
+    bf_neg: float | None = None     # 底板（受压翼缘）宽 mm；None=沿用 bf
+    hf_neg: float | None = None     # 底板厚 mm；None=沿用 hf
+    As_neg: float | None = None     # 顶板受拉纵筋 mm²；None=沿用 As
+    Asp_neg: float | None = None    # 底板受压纵筋 mm²；None=沿用 Asp
+    as_neg: float | None = None     # 顶板筋合力点至顶缘 mm；None=沿用 as_
+    asp_neg: float | None = None    # 底板筋合力点至底缘 mm；None=沿用 asp
 
 
 class ElemTypeDef3D(BaseModel):
