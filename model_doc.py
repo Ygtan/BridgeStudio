@@ -53,6 +53,7 @@ BUILDERS: dict[tuple[str, str], str] = {
     ("arch", "2d"): "arch",
     ("arch", "3d"): "arch_3d",
     ("truss", "2d"): "truss",
+    ("truss", "3d"): "truss_3d",
     ("beam_bridge", "2d"): "beam_bridge",
     ("beam_bridge", "3d"): "grillage3d",
     ("cable_stayed", "2d"): "cable_stayed_2d",
@@ -69,6 +70,7 @@ SOLVER_OF: dict[tuple[str, str], str] = {
     ("arch", "2d"): "2d",
     ("arch", "3d"): "grillage3d",
     ("truss", "2d"): "2d",
+    ("truss", "3d"): "grillage3d",
     ("beam_bridge", "2d"): "2d",
     ("beam_bridge", "3d"): "grillage3d",
     ("cable_stayed", "2d"): "2d",
@@ -182,6 +184,14 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "truss": {
         "span": 60.0, "n_panel": 8, "depth": 6.0, "node_load": 100.0,
         "material": "钢材 Q345", "self_weight": True,
+    },
+    # 三维空间桁架桥：两片竖向 Warren 桁架 + 上下弦横向联系（横联 + 对角撑）。
+    # 纯 TRUSS 单元，cable_bridge=None，detect_kind 落到 grillage3d 线性阶段内核。
+    "truss_3d": {
+        "span": 60.0, "n_panel": 8, "depth": 6.0, "width": 10.0,
+        "A_chord": 20000.0, "A_diag": 12000.0, "A_lat": 10000.0,   # mm²
+        "q_deck": 100.0,                     # 桥面均布恒载 (kN/m，含自重)
+        "material": "钢材 Q345",
     },
     "beam_bridge": {
         "span": 40.0, "n_spans": 1, "udl": 20.0, "point": 0.0,
@@ -398,6 +408,28 @@ FIELDS: dict[str, list[list[Field]]] = {
             {"key": "material", "label": "材料", "type": "choice",
              "choices": MATERIAL_NAMES},
             {"key": "self_weight", "label": "计入自重", "type": "bool"},
+        ],
+    ],
+    "truss_3d": [
+        [
+            {"key": "span", "label": "跨度 (m)", "type": "float",
+             "min": 10.0, "max": 300.0, "step": 5.0},
+            {"key": "n_panel", "label": "节间数", "type": "int",
+             "min": 2, "max": 24, "step": 1},
+            {"key": "depth", "label": "桁高 (m)", "type": "float",
+             "min": 1.0, "max": 30.0, "step": 0.5},
+            {"key": "width", "label": "桥宽 / 桁架间距 (m)", "type": "float",
+             "min": 4.0, "max": 40.0, "step": 1.0},
+        ],
+        [
+            {"key": "A_chord", "label": "弦杆面积 (mm²)", "type": "float",
+             "min": 1000.0, "max": 100000.0, "step": 1000.0},
+            {"key": "A_diag", "label": "腹杆面积 (mm²)", "type": "float",
+             "min": 500.0, "max": 50000.0, "step": 500.0},
+            {"key": "A_lat", "label": "横向联系面积 (mm²)", "type": "float",
+             "min": 500.0, "max": 50000.0, "step": 500.0},
+            {"key": "q_deck", "label": "桥面均布恒载 (kN/m)", "type": "float",
+             "min": 0.0, "max": 500.0, "step": 10.0},
         ],
     ],
     "beam_bridge": [
@@ -840,6 +872,8 @@ class ModelDoc:
             self._model = self._build_arch()
         elif bk == "truss":
             self._model = self._build_truss()
+        elif bk == "truss_3d":
+            self._model = self._build_truss_3d()
         elif bk == "grillage3d":
             self._model = self._build_grillage3d()
         elif bk == "cable_stayed":
@@ -1039,6 +1073,28 @@ class ModelDoc:
             node_load_kN=float(p.get("node_load", 0.0) or 0.0),
             gravity=self._gravity(),
         )
+
+    def _build_truss_3d(self):
+        """三维空间桁架桥：两片竖向 Warren 桁架 + 上下弦横向联系。
+
+        纯 TRUSS 单元（节点只有 3 平动自由度），`cable_bridge=None` 让
+        `detect_kind` 落到 grillage3d 线性阶段内核。弦杆轴力内核不直接输出，
+        由位移反算（N=EA·ΔL/L），见 verify_truss_3d.py。
+        """
+        from truss_3d import build_truss_3d
+
+        p = self.params
+        E, dens = MATERIALS.get(p.get("material", "钢材 Q345"), (2.06e11, 7850.0))
+        model, info = build_truss_3d(
+            span=float(p["span"]), n_panel=int(p["n_panel"]),
+            depth=float(p["depth"]), width=float(p["width"]),
+            A_chord_mm2=float(p["A_chord"]), A_diag_mm2=float(p["A_diag"]),
+            A_lat_mm2=float(p["A_lat"]),
+            q_deck=float(p["q_deck"]) * 1e3,
+            E_steel=E, dens_steel=dens,
+        )
+        self._info = dict(info)
+        return model
 
     def _build_beam_bridge(self):
         from bridge_spec import build_beam_bridge
@@ -1401,6 +1457,25 @@ class ModelDoc:
             if isinstance(q2, (int, float)) and q2 > 0 and p.get("q_deck") and q2 > float(p["q_deck"]):
                 e.append(f"二期恒载 {q2:g} kN/m 超过一期 {float(p['q_deck']):g} kN/m，"
                          "一期恒载会变负")
+        elif self.builder_key == "truss_3d":
+            span = pos("span", "跨度")
+            depth = pos("depth", "桁高")
+            width = pos("width", "桥宽")
+            pos("q_deck", "桥面均布恒载")
+            pos("A_chord", "弦杆面积")
+            pos("A_diag", "腹杆面积")
+            pos("A_lat", "横向联系面积")
+            npnl = p.get("n_panel")
+            if not isinstance(npnl, int) or not 2 <= npnl <= 60:
+                e.append(f"节间数 {npnl} 超出范围（2~60）")
+            if span and depth and depth >= span:
+                e.append(f"桁高 {depth:g} m 已达跨度 {span:g} m，桁架退化成横梁")
+            if span and depth and depth < span / 20.0:
+                e.append(f"桁高 {depth:g} m 对 {span:g} m 跨度偏矮（< L/20），"
+                         "弦杆轴力会畸高")
+            if span and width and width > span / 2.0:
+                e.append(f"桥宽 {width:g} m 超过跨度 {span:g} m 的一半，"
+                         "横向联系杆件过长，请核对是否把桥宽写成了跨度")
         else:
             Lm = pos("Lm", "主跨")
             Ls = pos("Ls", "边跨")
@@ -1669,6 +1744,18 @@ class ModelDoc:
             lines.append(
                 f"施工阶段 {st.get('stages', 0)} 个：拱脚段 → 对称吊装+扣索张拉 → 合拢"
                 " → 拆扣索 → 吊杆主梁 → 二期铺装")
+        elif self.builder_key == "truss_3d":
+            info = self.info
+            lines.append(
+                f"主跨 {info.get('span', 0):.0f} m / 桁高 {info.get('depth', 0):.0f} m"
+                f" / 桥宽 {info.get('width', 0):.0f} m，{info.get('n_panel', 0)} 节间")
+            lines.append(
+                f"弦杆 {len(info.get('chord_elems', []))} 根 / 腹杆 "
+                f"{len(info.get('diag_elems', []))} 根 / 横向联系 "
+                f"{len(info.get('lat_elems', []))} 根")
+            lines.append(
+                "纯 TRUSS 单元，一次成桥静力，走线性阶段内核。"
+                "桥面恒载已含自重；弦杆轴力由位移反算。")
         else:
             lines.append(f"施工阶段 {st.get('stages', 0)} 个，"
                          f"活载工况 {len(getattr(m, 'influences', []) or [])} 个")
@@ -2553,6 +2640,55 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
         notes.append("识别到拱肋分段吊装 + 斜拉扣索辅助，生成「拱脚段 → 对称吊装"
                      " + 扣索张拉 → 拱顶合拢 → 拆扣索 → 吊杆主梁 → 二期铺装」"
                      "阶段序列")
+    elif base == "truss_3d":
+        # 主跨：与拱桥同一套「先主跨后跨度」的优先级。
+        if not grab("span", "主跨", "跨径", "主孔"):
+            if not grab("span", "跨度", "总长", "全长"):
+                p["span"] = d["span"]
+                default("span", "跨度")
+            else:
+                notes.append(f"只给了一个跨度，按 {p['span']:g} m 处理")
+        p["span"] = guard_bridge_span(float(p["span"]), notes)
+        # 桁高：空间桁架的受力与挠度都靠它，缺省取 L/10（Warren 桁常规高跨比）。
+        if not grab("depth", "桁高", "桁架高", "架高", "高度"):
+            p["depth"] = round(float(p["span"]) / 10.0, 1)
+            notes.append(f"未说明桁高，按 L/10 = {p['depth']:g} m")
+        # 桥宽（两片主桁的间距）：缺省取跨度的 1/6，不小于 4 m。
+        if not grab("width", "桥宽", "桁架间距", "两片桁架间距", "宽度"):
+            p["width"] = max(4.0, round(float(p["span"]) / 6.0, 1))
+            notes.append(f"未说明桥宽，按 L/6 = {p['width']:g} m")
+        # 节间数：显式「8 个节间 / 分 8 节间 / 节间数 8」；缺省 8。
+        m = re.search(r"(?:节间数|节间)\s*(?:为|是)?\s*(\d+)|(\d+)\s*个?(?:节间|格)", text)
+        if m:
+            p["n_panel"] = int(next(g for g in m.groups() if g))
+        else:
+            p["n_panel"] = d["n_panel"]
+            default("n_panel", "节间数")
+        if not grab("q_deck", "桥面恒载", "恒载", "均布荷载", "桥面荷载"):
+            p["q_deck"] = d["q_deck"]
+            default("q_deck", "桥面均布恒载")
+        # 弦/腹/横联截面面积属"拟定合理参数"，大多走默认；只抽显式 mm²。
+        def _area_mm2(*names: str) -> float | None:
+            for nm in names:
+                mm = re.search(nm + r"[\s:：为约]*?([0-9]+(?:\.[0-9]+)?)"
+                               r"\s*(?:mm2|mm²|平方毫米|mm)", text, re.I)
+                if mm:
+                    return float(mm.group(1))
+            return None
+
+        for key, names, label in (
+            ("A_chord", ("弦杆面积", "弦杆截面积"), "弦杆面积"),
+            ("A_diag", ("腹杆面积", "腹杆截面积"), "腹杆面积"),
+            ("A_lat", ("横向联系面积", "横联面积", "横向连接面积"), "横向联系面积"),
+        ):
+            v = _area_mm2(*names)
+            if v is None:
+                p[key] = d[key]
+                default(key, label)
+            else:
+                p[key] = v
+        notes.append("识别到空间桁架桥，生成两片竖向 Warren 桁架 + 上下弦横向联系"
+                     "（横联 + 对角撑）的纯 TRUSS 三维模型，走线性阶段内核。")
     else:
         if not grab("sp1", "边跨"):
             p["sp1"] = d["sp1"]

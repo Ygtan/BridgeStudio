@@ -103,6 +103,14 @@ _SCALARS: dict[str, dict[str, tuple[float, float, str, str, str]]] = {
         "panel": (BEAM_MAX_SECTION, 1000.0, "mm", "吊索间距", "m"),
         "clear": (BEAM_MAX_SECTION, 1000.0, "mm", "跨中净空", "m"),
     },
+    # 空间桁架桥：桁高/桥宽沿用桁架/宽幅桥阈值，恒载按 kN/m 哨兵。
+    # 弦杆/腹杆/横联面积是 mm²，不是长度，不登记（避免被当 mm→m 误换算）。
+    "truss_3d": {
+        "span": (BRIDGE_MAX_SPAN, 1000.0, "mm", "跨度", "m"),
+        "depth": (BRIDGE_MAX_DEPTH, 1000.0, "mm", "桁高", "m"),
+        "width": (BRIDGE_MAX_WIDTH, 1000.0, "mm", "桥宽", "m"),
+        "q_deck": (BEAM_MAX_UDL, 1000.0, "N/m", "桥面均布恒载", "kN/m"),
+    },
     # 大跨拱桥：跨度/矢高/截面/恒载的阈值与桥侧其余结构一致。
     "arch_3d": {
         "span": (BRIDGE_MAX_SPAN, 1000.0, "mm", "主跨", "m"),
@@ -179,7 +187,7 @@ def guard_units(data: dict, kind: str, notes: list[str] | None = None) -> list[s
     """就地修正 `data` 里的单位误写，返回提示列表。
 
     kind ∈ {"beam", "arch", "truss", "beam_bridge", "grillage3d", "cable_stayed",
-    "suspension", "arch_3d"}。
+    "suspension", "arch_3d", "truss_3d"}。
     只做"量级明显不可能"的换算，不做业务范围校验（那是 validate() 的事）。
     """
     notes = notes if notes is not None else []
