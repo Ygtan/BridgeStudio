@@ -35,6 +35,12 @@ def _subs(at: AppTest) -> str:
     return " ".join(s.value for s in at.subheader)
 
 
+def _exbtn(at: AppTest, label: str):
+    """按按钮文字找示例按钮。示例按钮的 key 是列表索引生成的（ex0/ex1/...），
+    在 EXAMPLES 里插一个按钮就会整体漂移；按 label 找才不受顺序影响。"""
+    return next(b for b in at.button if b.label == label)
+
+
 def main() -> int:
     print("=" * 78)
     print("界面回归（AppTest）")
@@ -53,7 +59,7 @@ def main() -> int:
     check("默认不显示三维区块", "模型与求解" not in _subs(at))
 
     print("\n[点示例：拱桥]")
-    at.button(key="ex3").click().run()
+    _exbtn(at, "桥 · 拱桥").click().run()
     check("无异常", not _errors(at), _errors(at)[:1])
     check("类型切换为 arch", at.session_state["doc"].kind == "arch",
           at.session_state["doc"].summary()["lines"][0][:36])
@@ -92,7 +98,7 @@ def main() -> int:
 
     # ============================================================ 三维
     print("\n[三维 · 梁格]")
-    at.button(key="ex5").click().run()
+    _exbtn(at, "三维 · 梁格").click().run()
     check("无异常", not _errors(at), _errors(at)[:1])
     check("类型为 beam_bridge×3d",
           at.session_state["doc"].kind == "beam_bridge"
@@ -257,7 +263,7 @@ def main() -> int:
               _warn[:50] or "无警告")
 
     print("\n[三维 · 斜拉桥]")
-    at.button(key="ex6").click().run()
+    _exbtn(at, "三维 · 斜拉桥").click().run()
     check("无异常", not _errors(at), _errors(at)[:1])
     check("类型为 cable_stayed", at.session_state["doc"].kind == "cable_stayed",
           _subs(at)[:50])
@@ -362,7 +368,7 @@ def main() -> int:
                       str([x for x in _warns if "双计" in x])[:50])
 
     print("\n[三维 · 悬索桥（自锚式）]")
-    at.button(key="ex8").click().run()
+    _exbtn(at, "三维 · 自锚式悬索桥").click().run()
     check("无异常", not _errors(at), _errors(at)[:1])
     check("类型为 suspension", at.session_state["doc"].kind == "suspension",
           _subs(at)[:50])
@@ -409,7 +415,7 @@ def main() -> int:
                       not any("cable" in Path(p).name for p in _paths.values()))
 
     print("\n[从三维切回单梁：两条链路不串味]")
-    at.button(key="ex0").click().run()
+    _exbtn(at, "梁 · 简支钢梁").click().run()
     check("无异常", not _errors(at), _errors(at)[:1])
     check("类型回到 beam", at.session_state["doc"].kind == "beam", _subs(at)[:50])
     check("⑤二维区块回来了", "FEM-Eigen 二维求解" in _subs(at), _subs(at)[:80])
