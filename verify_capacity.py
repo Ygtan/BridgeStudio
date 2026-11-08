@@ -192,6 +192,19 @@ def main() -> int:
           f"Nu={r_ax.Nu/1e3:.0f}kN vs {nu_hand/1e3:.0f}")
     check("轴心受压利用率正确", near(r_ax.util, 2000e3 / nu_hand, 1e-3),
           f"util={r_ax.util:.3f}")
+    # ---- 稳定系数 φ 表 5.3.1（l0/b 坐标，b 矩形短边）----
+    sec_stab = ss.CapacitySection(h=600, b=400, As=1963, concrete_grade="C30")
+    for l0, phi_hand in [(3200, 1.0), (8000, 0.75), (12000, 0.52),
+                          (16000, 0.32), (20000, 0.19)]:
+        phi, l0b = ss.stability_factor(sec_stab, l0)
+        check(f"稳定系数 φ（l0/b={l0 / 400:.0f}）", near(phi, phi_hand, 1e-2),
+              f"φ={phi:.3f} vs {phi_hand}")
+    check("短柱（无 l0）φ=1",
+          ss.stability_factor(sec_stab, None)[0] == 1.0, "")
+    r_ax_long = ss.check_axial(sec_stab, 2000e3, gamma0=1.0, l0=8000)
+    check("长柱轴压 φ<1", r_ax_long.phi < 1.0, f"φ={r_ax_long.phi:.3f}")
+    check("长柱轴压 λ=l0/b 正确", near(r_ax_long.lam, 20.0, 1e-3),
+          f"λ={r_ax_long.lam:.0f}")
     # 端到端：斜拉桥塔柱（混凝土 C50 对称配筋）→ 自动走轴心受压
     import cable_stayed_3d
     from solver_3d import solve
@@ -203,6 +216,10 @@ def main() -> int:
     check("斜拉桥塔柱轴心受压条目出现", ax_cb is not None, "")
     check("塔柱轴心受压通过（截面富余大）", ax_cb is not None and ax_cb.ok,
           ax_cb.detail[:60] if ax_cb else "—")
+    check("塔柱稳定系数已计入（φ<1）",
+          ax_cb is not None and "λ=l0/b=" in ax_cb.detail
+          and "φ=0." in ax_cb.detail,
+          ax_cb.detail[:70] if ax_cb else "—")
 
     # ============================================================ 端到端
     print("\n[9] 端到端：梁格建造器 → 求解 → 承载力校核")

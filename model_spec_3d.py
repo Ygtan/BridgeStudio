@@ -290,6 +290,7 @@ class RebarSpec3D(BaseModel):
     sv: float = 150.0               # 箍筋间距 mm
     grade_rebar: str = "HRB400"     # 纵向钢筋牌号
     grade_stirrup: str = "HRB400"   # 箍筋牌号
+    l0: float = 0.0                 # 构件计算长度 mm（表5.3.1稳定/§5.3.9二阶效应用；0=未提供）
 
 
 class ElemTypeDef3D(BaseModel):

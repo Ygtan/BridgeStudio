@@ -77,6 +77,7 @@ def build_suspension_3d(
     tower_b: float = 3.0,
     tower_h: float = 4.0,
     tower_rebar_ratio: float = 0.01,       # 塔柱全截面纵向配筋率（对称配筋，验算用）
+    tower_k: float = 2.0,                  # 塔柱计算长度系数（附录 E；2.0=一端固定一端自由，最保守）
     n_tower_seg: int = 6,
     main_area_mm2: float = 60000.0,       # 单根主缆截面积（全桥两根之一）
     hanger_area_mm2: float = 3000.0,
@@ -205,7 +206,8 @@ def build_suspension_3d(
                                     As=0.5 * tower_rebar_ratio * tower_A * 1e6,
                                     Asp=0.5 * tower_rebar_ratio * tower_A * 1e6,
                                     as_=70.0,
-                                    Asv=2 * math.pi * 16 ** 2 / 4, sv=150.0)
+                                    Asv=2 * math.pi * 16 ** 2 / 4, sv=150.0,
+                                    l0=tower_k * tower_height * 1e3)
                         if tower_rebar_ratio > 0.0 else None
                     )),
         RealConst3D(id=3, A=cable_A, W=cable_w),

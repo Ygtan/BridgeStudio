@@ -270,6 +270,7 @@ class CapacitySection:
     sv: float = 150.0                 # 箍筋间距 mm
     grade_stirrup: str = "HRB400"     # 箍筋牌号
     concrete_grade: str = "C50"
+    l0: float = 0.0                  # 构件计算长度 mm（表5.3.1/§5.3.9 用；0=未提供，按短柱 φ=1/η=1）
 
     @property
     def h0(self) -> float:
@@ -656,7 +657,8 @@ def check_eccentric(sec: CapacitySection, N: float, M: float,
     """压弯构件（偏心受压）验算。N 受压为正（N）、M 为弯矩（N·m），不含 γ0。
 
     `gamma0` 结构重要性系数乘在效应侧（JTG D60 §4.1.5）；`l0` 构件计算长度
-    （mm），提供时按 §5.3.9 计入二阶效应，None 时 η=1。只覆盖矩形对称配筋。
+    （mm），提供时按 §5.3.9 计入二阶效应；显式传入优先，否则回退到
+    ``sec.l0``，都没有时 η=1。只覆盖矩形对称配筋。
     """
     r = EccentricResult()
     Nd = gamma0 * N
@@ -672,7 +674,8 @@ def check_eccentric(sec: CapacitySection, N: float, M: float,
         r.note = "截面轴力为拉（N≤0），偏心受压公式不适用，应按受弯/偏心受拉验算。"
         return r
 
-    r.eta = eta_second_order(sec, N, M, l0) if l0 else 1.0
+    l0 = l0 if l0 is not None else sec.l0
+    r.eta = eta_second_order(sec, N, M, l0)
     cap = eccentric_capacity(sec, Nd)
     r.Mu = cap["Mu"]
     r.x, r.xi, r.xi_b = cap["x"], cap["xi"], cap["xi_b"]
@@ -709,8 +712,48 @@ def eccentric_table(rows: list[tuple[str, EccentricResult]]) -> dict:
 #
 #   γ0·Nd ≤ 0.9·φ·(fcd·A + f'sd·A's)            （5.3.1-1）
 #
-# φ 为稳定系数（表 5.3.1，随长细比 l0/b 减小）。本程序默认 φ=1（短柱），
-# 长柱需计算长度 l0 查表——未提供时不静默降级，由调用方在口径里说明。
+# φ 为稳定系数（表 5.3.1，随长细比 l0/i 减小）。l0 未提供时按短柱 φ=1，
+# 不静默降级——由调用方在口径里说明「未提供计算长度，稳定未计」。
+
+
+#: JTG 3362-2018 表 5.3.1 钢筋混凝土轴心受压构件稳定系数 φ。
+#: 坐标用「l0/b」（b 为矩形截面短边，表注明）；线性插值，两端截断。
+#: 塔柱为矩形实心截面，按 l0/b 精确查表（表的 l0/i 行是任意截面取整近似，
+#: 用回转半径去插反而引入取整误差，故统一用短边）。
+_STABILITY_L0_B: list[float] = [
+    8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28,
+    30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50,
+]
+_STABILITY_PHI: list[float] = [
+    1.00, 0.98, 0.95, 0.92, 0.87, 0.81, 0.75, 0.70, 0.65, 0.60, 0.56,
+    0.52, 0.48, 0.44, 0.40, 0.36, 0.32, 0.29, 0.26, 0.23, 0.21, 0.19,
+]
+
+
+def stability_factor(sec: CapacitySection,
+                     l0: float | None) -> tuple[float, float]:
+    """JTG 3362-2018 表 5.3.1 稳定系数 φ。
+
+    返回 ``(φ, l0/b)``，l0/b 为长细比（b 取矩形短边 min(b, h)）。``l0`` 为
+    None/≤0 时按短柱 φ=1（l0/b 记 0，表示未计）。l0/b > 表尾 50 时取表末值
+    0.19，靠调用方提示超范围。
+    """
+    if l0 is None or l0 <= 0.0:
+        return 1.0, 0.0
+    b = min(sec.b, sec.h)
+    if b <= 0.0:
+        return 1.0, 0.0
+    l0b = l0 / b
+    xs, ys = _STABILITY_L0_B, _STABILITY_PHI
+    if l0b <= xs[0]:
+        return ys[0], l0b
+    if l0b >= xs[-1]:
+        return ys[-1], l0b
+    for j in range(len(xs) - 1):
+        if xs[j] <= l0b <= xs[j + 1]:
+            t = (l0b - xs[j]) / (xs[j + 1] - xs[j])
+            return ys[j] + t * (ys[j + 1] - ys[j]), l0b
+    return ys[-1], l0b          # 不可达，仅作兜底
 
 
 @dataclass
@@ -720,11 +763,13 @@ class AxialResult:
     N: float = 0.0            # 轴力设计值 γ0·N（受压为正，N）
     Nu: float = 0.0           # 抗压承载力 0.9·φ·(fcd·A + f'sd·A's)（N）
     phi: float = 1.0          # 稳定系数
+    lam: float = 0.0          # 长细比 l0/b（b 矩形短边；0=未提供 l0，按短柱）
     util: float = 0.0         # N / Nu
 
     def to_row(self) -> list[str]:
         nu = f"{self.Nu / 1e3:.0f}" if self.Nu > 0 else "—"
-        return [f"{self.N / 1e3:.0f}", nu, f"{self.phi:.3f}",
+        lam = f"{self.lam:.0f}" if self.lam > 0 else "—"
+        return [f"{self.N / 1e3:.0f}", nu, f"{self.phi:.3f}", lam,
                 f"{self.util:.3f}"]
 
 
@@ -742,9 +787,15 @@ def axial_capacity(sec: CapacitySection, phi: float = 1.0) -> float:
 
 
 def check_axial(sec: CapacitySection, N: float, gamma0: float = 1.0,
-                phi: float = 1.0) -> AxialResult:
-    """轴心受压验算。N 受压为正（N），不含 γ0。"""
-    r = AxialResult(N=gamma0 * N, phi=phi)
+                l0: float | None = None) -> AxialResult:
+    """轴心受压验算。N 受压为正（N），不含 γ0。
+
+    ``l0`` 计算长度（mm）：显式传入优先，否则回退到 ``sec.l0``，再没有则
+    按短柱 φ=1（λ 记 0，调用方在口径里说明未计）。
+    """
+    l0 = l0 if l0 is not None else sec.l0
+    phi, lam = stability_factor(sec, l0)
+    r = AxialResult(N=gamma0 * N, phi=phi, lam=lam)
     r.Nu = axial_capacity(sec, phi)
     r.util = r.N / r.Nu if r.Nu > 0 else 0.0
     return r
@@ -756,7 +807,8 @@ def axial_table(rows: list[tuple[str, AxialResult]]) -> dict:
         "title": "轴心受压正截面承载力验算",
         "note": "按 JTG 3362-2018 §5.3.1，Nu = 0.9·φ·(fcd·A + f'sd·A's)；"
                 "N 受压为正，利用率为 γ0·N/Nu，>1.0 即不满足。"
-                "稳定系数 φ 默认 1（短柱），长柱需按 l0/b 查表。",
-        "headers": ["部位", "N (kN)", "Nu (kN)", "φ", "利用率"],
+                "稳定系数 φ 按长细比 l0/b 查表 5.3.1（线性插值），"
+                "λ 为 — 表示未提供计算长度 l0、按短柱 φ=1。",
+        "headers": ["部位", "N (kN)", "Nu (kN)", "φ", "λ", "利用率"],
         "rows": [[name] + r.to_row() for name, r in rows],
     }

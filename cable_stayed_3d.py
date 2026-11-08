@@ -72,6 +72,7 @@ def build_cable_stayed_3d(
     tower_b: float = 3.0,
     tower_h: float = 4.5,
     tower_rebar_ratio: float = 0.01,       # 塔柱全截面纵向配筋率（对称配筋，验算用）
+    tower_k: float = 2.0,                  # 塔柱计算长度系数（附录 E；2.0=一端固定一端自由，最保守）
     n_tower_seg: int = 8,
     anchor_low: float = 0.55,             # 最低索的塔上锚固高度（占塔高）
     main_cover: float = 0.46,             # 单侧索在主跨上的覆盖比例（留中部无索区）
@@ -174,7 +175,8 @@ def build_cable_stayed_3d(
                                     As=0.5 * tower_rebar_ratio * tower_A * 1e6,
                                     Asp=0.5 * tower_rebar_ratio * tower_A * 1e6,
                                     as_=70.0,
-                                    Asv=2 * math.pi * 16 ** 2 / 4, sv=150.0)
+                                    Asv=2 * math.pi * 16 ** 2 / 4, sv=150.0,
+                                    l0=tower_k * tower_height * 1e3)
                         if tower_rebar_ratio > 0.0 else None
                     )),
         RealConst3D(id=3, A=cable_A, W=cable_w),
