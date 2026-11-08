@@ -8,15 +8,15 @@
 
 所以这里的检查分三类：
 
-1. **对拍**：同一份 Report 渲染成三种格式，再从三种格式里把内容读回来
-   比对——HTML 的表格行数、Word 的段落数、CSV 的行数必须对得上
-   `SolveResult`，不是"差不多"。
+1. **对拍**：同一份 Report 渲染成四种格式，再从各格式里把内容读回来
+   比对——HTML 的表格行数、Word 的段落数、CSV 的行数、PDF 的可提取文本
+   必须对得上 `SolveResult`，不是"差不多"。
 2. **方向性**：`_col_widths` 的每列都不低于下限、总和不超过版心；`-0.0`
    不许出现在表里；无量纲量的单位 `1` 不许出现在表头。这些断言在数据正常时
    也会失败（因为它们是恒定性质，不是"这次算出来对不对"）。
-3. **故障注入**：手工造一个未通过的 Check 和一个空结果，看三种渲染器是否
-   真的把"不通过"写出来、是否真的跳过不存在的图——干净模型全绿时最容易
-   把渲染器的分支写成死代码。
+3. **故障注入**：手工造一个未通过的 Check 和一个空结果，看各出口是否
+   真的把"不通过"写出来、是否真的跳过不存在的图；再注入一个不存在的
+   浏览器路径，看 PDF 出口是否明确报错而不是交付空壳文件。
 
 不用 Streamlit，纯函数级。
 """
@@ -27,6 +27,7 @@ from console_utf8 import setup_console
 
 setup_console()          # 输出被重定向到管道/文件时，GBK 会崩（见模块说明）
 
+import os
 import re
 import sys
 import zipfile
@@ -61,10 +62,29 @@ def _text_of_docx(path: Path) -> str:
     return "\n".join(parts)
 
 
+def _text_of_pdf(path: Path) -> tuple[list[str], list[int]]:
+    """(逐页可提取文本, 逐页图片数)。pypdf 仅用于回归时把内容读回来对拍。"""
+    from pypdf import PdfReader
+
+    r = PdfReader(str(path))
+    return ([(p.extract_text() or "") for p in r.pages],
+            [len(p.images or []) for p in r.pages])
+
+
 def main() -> int:
     print("=" * 78)
-    print("  report_3d 回归：三个出口共用一份内容")
+    print("  report_3d 回归：四个出口共用一份内容（PDF 由 HTML 打印）")
     print("=" * 78)
+
+    # PDF 依赖本机浏览器。没有就明确 FAIL，不把判据悄悄"跳过"。
+    try:
+        browser = R._pdf_browser()
+        has_pdf = True
+    except R.PDFExportError as e:
+        has_pdf = False
+        check("本机有 PDF 打印浏览器", False, str(e))
+    else:
+        check("本机有 PDF 打印浏览器", True, str(browser))
 
     # ---------------------------------------------------------- 单元级
     print("\n[列宽与单位这类恒定性质]")
@@ -149,12 +169,46 @@ def main() -> int:
                   rep.figures["girder_live"].caption
                   if "girder_live" in rep.figures else "缺")
 
-        paths = R.write_all(rep, f"out/verify_report/{kind}", stem=f"{kind}_report")
-        check("三种格式都写出来了",
-              all(Path(p).exists() and Path(p).stat().st_size > 2000
-                  for p in paths.values()),
+        paths = R.write_all(rep, f"out/verify_report/{kind}",
+                            stem=f"{kind}_report", pdf=has_pdf)
+        check("HTML / Word / CSV 三件套都写出来了",
+              all(Path(paths[k]).exists() and Path(paths[k]).stat().st_size > 2000
+                  for k in ("html", "docx", "zip")),
               "、".join(f"{k} {Path(v).stat().st_size // 1024}KB"
                         for k, v in paths.items()))
+        check("PDF 计算书已生成且不是空壳",
+              "pdf" in paths
+              and Path(paths["pdf"]).stat().st_size > 10000
+              and Path(paths["pdf"]).read_bytes()[:5] == b"%PDF-",
+              f"{Path(paths['pdf']).stat().st_size // 1024} KB"
+              if "pdf" in paths else "缺浏览器，PDF 出口未运行（见首条判据）")
+
+        # ---- PDF 对拍：内容从 PDF 里读回来，与同一份 Report 比对 ----
+        if "pdf" in paths:
+            page_txt, page_imgs = _text_of_pdf(Path(paths["pdf"]))
+            pdf_txt = "\n".join(page_txt)
+            check("PDF 是多页计算书（不是一页摘要）",
+                  len(page_txt) >= 3 and len(pdf_txt) > 3000,
+                  f"{len(page_txt)} 页 / {len(pdf_txt)} 字")
+            check("PDF 无空白页（纯图页算有内容）",
+                  all(t.strip() or n for t, n in zip(page_txt, page_imgs)),
+                  f"空白页 {[i + 1 for i, (t, n) in enumerate(zip(page_txt, page_imgs)) if not t.strip() and not n]}")
+            h1s_pdf = [b["text"] for b in rep.blocks if b["type"] == "h1"]
+            check("PDF 含全部一级章节（与 blocks 一致）",
+                  all(t in pdf_txt for t in h1s_pdf),
+                  f"{len(h1s_pdf)} 章")
+            first_metric = rep.metrics()[0].value
+            check("PDF 数值与 HTML 同源（首个指标卡数值）",
+                  first_metric in pdf_txt, f"{first_metric}")
+            check("PDF 嵌入了结果图", sum(page_imgs) >= 1,
+                  f"{sum(page_imgs)} 张 / 报告 {len(rep.figures)} 张")
+            if "capacity_calculation_sheet" in rep.tables:
+                sheet = rep.tables["capacity_calculation_sheet"]
+                clauses = {str(r[5]) for r in sheet["rows"] if len(r) >= 6}
+                hit = sum(1 for c in clauses if c and c in pdf_txt)
+                check("PDF 承载力计算书含中间量与条文号",
+                      "承载力计算书" in pdf_txt and hit >= 3,
+                      f"条文命中 {hit}/{len(clauses)}")
 
         # ---- HTML 对拍：表格行数、指标、校核结论 ----
         html = Path(paths["html"]).read_text(encoding="utf-8")
@@ -323,7 +377,10 @@ def main() -> int:
                        {"type": "h1", "text": "结论与说明"},
                        {"type": "bullets", "items": ["**1 项未通过**"]}],
                    meta=[("桥型", "三维梁格")])
-    paths = R.write_all(rep, "out/verify_report/inject", stem="inject")
+    # 故障注入用例只要三件套：不重复启动浏览器，也顺带守住 pdf=False 开关
+    paths = R.write_all(rep, "out/verify_report/inject", stem="inject",
+                        pdf=False)
+    check("pdf=False 显式关掉 PDF 出口", "pdf" not in paths, str(sorted(paths)))
     html = Path(paths["html"]).read_text(encoding="utf-8")
     check("HTML 写入「不通过」", "不通过" in html)
     check("HTML 提示级不标成不通过", html.count("不通过") == 1, f"{html.count('不通过')} 次")
@@ -333,6 +390,36 @@ def main() -> int:
     txt = _text_of_docx(paths["docx"])
     check("Word 写入「不通过」", "不通过" in txt)
     check("空报告不崩（无图无表）", len(rep.figures) == 0 and len(rep.tables) == 0)
+
+    print("\n[故障注入：PDF 出口不静默兜底]")
+    _saved = os.environ.get(R.PDF_BROWSER_ENV)
+    os.environ[R.PDF_BROWSER_ENV] = "D:/__no_such_browser__/nope.exe"
+    try:
+        try:
+            R._pdf_browser()
+            _said = ""
+        except R.PDFExportError as e:
+            _said = str(e)
+        check("指定了不存在的浏览器 → 明确报错并给出环境变量名",
+              "不存在" in _said and R.PDF_BROWSER_ENV in _said, _said[:80])
+        target = Path("out/verify_report/inject/should_not_exist.pdf")
+        target.write_bytes(b"OLD-PDF-STUB")
+        try:
+            R.write_pdf(rep, target)
+            _failed = False
+        except R.PDFExportError:
+            _failed = True
+        check("PDF 打印失败时抛错、且旧文件不被误当新产物",
+              _failed and target.read_bytes() == b"OLD-PDF-STUB")
+    finally:
+        if _saved is None:
+            os.environ.pop(R.PDF_BROWSER_ENV, None)
+        else:
+            os.environ[R.PDF_BROWSER_ENV] = _saved
+    try:
+        check("故障注入后浏览器配置已复原", R._pdf_browser().is_file())
+    except R.PDFExportError as e:
+        check("故障注入后浏览器配置已复原", False, str(e)[:80])
 
     print("\n[故障注入：空的 SolveResult 不许伪造数据]")
     empty = SolveResult(kind="cable_stayed", stats={}, disp={}, beam={},

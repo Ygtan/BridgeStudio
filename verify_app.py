@@ -227,7 +227,7 @@ def main() -> int:
                       f"{Path(_hp).stat().st_size / 1024 / 1024:.1f} MB"
                       if _hp and Path(_hp).exists() else "—")
 
-        # 报告：三出口一次落盘（缺任一份界面上就是死按钮）
+        # 报告：四出口一次落盘（缺任一份界面上就是死按钮；PDF 失败必须显式告警）
         _gb = next((b for b in at.button if b.key == "r3d_report_btn"), None)
         check("报告按钮存在（梁格）", _gb is not None)
         if _gb is not None:
@@ -235,9 +235,13 @@ def main() -> int:
             check("生成报告无异常", not _errors(at), _errors(at)[:1])
             _got = at.session_state.get("r3d_report")
             _paths = (_got or {}).get("paths", {})
-            _ok = bool(_paths) and all(Path(p).exists() and Path(p).stat().st_size > 2000
-                                       for p in _paths.values())
-            check("梁格报告三份已落盘", _ok,
+            _perr = (_got or {}).get("pdf_error")
+            check("PDF 出口未静默失败（无浏览器须显式告警）",
+                  not _perr, str(_perr)[:100])
+            _ok = bool(_paths) and "pdf" in _paths \
+                and all(Path(p).exists() and Path(p).stat().st_size > 2000
+                        for p in _paths.values())
+            check("梁格报告四份已落盘", _ok,
                   "、".join(f"{Path(p).name}" for p in _paths.values()) or "—")
             if _ok:
                 import zipfile as _zip

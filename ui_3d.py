@@ -15,7 +15,9 @@ session_state 键、两套"参数变了作废结果"的判断，第四张图还�
 图不再由界面自己画：`report_3d.figures()` 出 PNG，界面只负责摆。这样
 "屏幕上看到的图"与"报告里的图"是同一个文件，不是各画一张再对齐。
 
-导出也是一处：`report_3d` 的 Word / HTML / CSV 三个出口吃同一份 `Report`。
+导出也是一处：`report_3d` 的 Word / HTML / CSV / PDF 四个出口吃同一份
+`Report`；PDF 由同一份 HTML 打印得到，需要本机 Edge / Chrome，缺浏览器时
+明确警告并保留其余三个出口，不假装四份都生成了。
 斜拉桥另保留"详细计算书（7 章带公式推导）"与"三方格式导出"两个专属按钮，
 因为下料索长与制造线形是 cable 独有的量。
 """
@@ -30,7 +32,8 @@ from typing import Any
 import streamlit as st
 
 from model_doc import DIM_LABELS, KIND_LABELS, ModelDoc
-from report_3d import build_document, figures as build_figures, write_all
+from report_3d import (PDFExportError, build_document,
+                       figures as build_figures, write_all, write_pdf)
 from result_3d import SolveResult
 
 #: 结果缓存键（带模型指纹，避免"换模型后显示上一个模型的结果"）
@@ -392,12 +395,17 @@ def _opt_block(doc: ModelDoc, res: SolveResult) -> None:
 
 
 def _report_block(doc: ModelDoc, res: SolveResult) -> None:
-    """Word / HTML / CSV 三出口，同一份 Report。"""
+    """Word / HTML / CSV / PDF 四出口，同一份 Report。
+
+    PDF 单独一步：它依赖本机浏览器。失败时给 warning 并保留另外三个出口，
+    而不是让整份报告生成失败、也不假装"四份都好了"。
+    """
     st.markdown("**报告与数据导出**")
     c1, c2 = st.columns([1.1, 2.2])
     if c1.button("生成报告", key="r3d_report_btn",
-                 help="同一份内容同时产出 Word、HTML 与 CSV 数据包"):
-        with st.spinner("排版报告（表格、插图、结论）…"):
+                 help="同一份内容同时产出 Word、HTML、CSV 数据包与 PDF 计算书"
+                      "（PDF 需本机 Microsoft Edge / Chrome）"):
+        with st.spinner("排版报告（表格、插图、结论、PDF 打印）…"):
             try:
                 _opt = st.session_state.get("r3d_opt")
                 _opt_payload = (_opt.get("opt") if _opt and _opt.get("fp") == res.fingerprint
@@ -406,10 +414,21 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
                                      out_dir=Path("out") / doc.kind / "report",
                                      kind_label=KIND_LABELS.get(doc.kind),
                                      opt=_opt_payload)
-                paths = write_all(rep, Path("out") / doc.kind / "report",
-                                  stem=f"{doc.kind}_report")
+                _out = Path("out") / doc.kind / "report"
+                _stem = f"{doc.kind}_report"
+                paths = write_all(rep, _out, stem=_stem, pdf=False)
+                pdf_error = None
+                try:
+                    paths["pdf"] = write_pdf(rep, _out / f"{_stem}.pdf")
+                except PermissionError:
+                    # 目标 PDF 正被阅读器占用：改名写，与三件套的 _put 同口径
+                    paths["pdf"] = write_pdf(
+                        rep, _out / f"{_stem}_{res.fingerprint}.pdf")
+                except PDFExportError as e:
+                    pdf_error = str(e)
                 st.session_state[SS_REPORT] = {
                     "fingerprint": res.fingerprint, "paths": paths,
+                    "pdf_error": pdf_error,
                     "n_blocks": len(rep.blocks)}
             except Exception as e:                  # noqa: BLE001
                 st.session_state.pop(SS_REPORT, None)
@@ -417,19 +436,25 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
 
     got = st.session_state.get(SS_REPORT)
     if not got:
-        c2.caption("报告含：计算概要、工程校核、结果图、结论、明细表。"
-                   "数值与界面逐项同源（同一个 SolveResult）。")
+        c2.caption("报告含：计算概要、工程校核、承载力计算书、结果图、结论、"
+                   "明细表。数值与界面逐项同源（同一个 SolveResult）。")
         return
     if got["fingerprint"] != res.fingerprint:
         c2.warning("报告是上一次求解的结果，模型已变，请重新生成。")
         return
+    if got.get("pdf_error"):
+        c2.warning(f"PDF 计算书未生成：{got['pdf_error']}　其余格式照常可下载。")
     names = {"docx": ("Word (.docx)", "application/vnd.openxmlformats-"
                                       "officedocument.wordprocessingml.document"),
              "html": ("HTML (.html)", "text/html"),
-             "zip": ("数据表 (.zip)", "application/zip")}
-    cols = c2.columns(3)
+             "zip": ("数据表 (.zip)", "application/zip"),
+             "pdf": ("PDF 计算书 (.pdf)", "application/pdf")}
+    cols = c2.columns(4)
     for i, (fmt, (label, mime)) in enumerate(names.items()):
-        p = Path(got["paths"][fmt])
+        p = got["paths"].get(fmt)
+        if p is None:
+            continue
+        p = Path(p)
         if p.exists():
             cols[i].download_button(label, data=p.read_bytes(), file_name=p.name,
                                     mime=mime, key=f"r3d_dl_{fmt}")

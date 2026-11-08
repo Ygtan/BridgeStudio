@@ -13,8 +13,8 @@
 6. 端到端：梁格建造器填配筋 → 求解 → 校核含承载力条目且通过、明细表
    capacity_table / capacity_faces_table 出现；塔柱轴压与箱形塔柱端到端。
 7. 承载力计算书：纯函数中间量留痕且与结论同源、六列明细表带条文号、
-   三条验算链齐全、∞ 不可判定排最前；报告独立章节 + HTML / DOCX / CSV
-   三种出口逐行导出。
+   三条验算链齐全、∞ 不可判定排最前；报告独立章节 + HTML / DOCX / CSV /
+   PDF 四种出口逐行导出（PDF 从 HTML 打印，用 pypdf 读回文本对拍）。
 
 JTG 3362-2018 依据：
 - §5.2.1 表 5.2.1 相对界限受压区高度 ξb（2018 修订值：HRB400=0.53）
@@ -501,7 +501,7 @@ def main() -> int:
           f"{fm_half['Mu']/1e3:.0f} kN·m")
 
     # ============================================================ 计算书
-    print("\n[13] 承载力计算书：中间量留痕 + 条文号 + 报告三种出口")
+    print("\n[13] 承载力计算书：中间量留痕 + 条文号 + 报告四种出口")
     # ---- 纯函数只留痕、不改数值 ----
     fm_k = ss.flexural_capacity(sec3)
     check("抗弯纯函数导出 Ac/kind/条文号",
@@ -653,6 +653,12 @@ def main() -> int:
           csv_name is not None
           and n_lines == len(tb["capacity_calculation_sheet"]["rows"]) + 1,
           f"{n_lines} 行 / 表 {len(tb['capacity_calculation_sheet']['rows'])} 行")
+    from pypdf import PdfReader
+    pdf_txt = "\n".join(p.extract_text() or ""
+                        for p in PdfReader(str(paths["pdf"])).pages)
+    check("PDF 计算书含中间量与条文号（从 PDF 读回）",
+          "承载力计算书" in pdf_txt and "相对受压区高度" in pdf_txt
+          and "§5.2.2" in pdf_txt and "ξb" in pdf_txt, "")
 
     # ============================================================ 汇总
     n_pass = sum(1 for _, ok, _ in PASS if ok)

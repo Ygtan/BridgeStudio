@@ -115,7 +115,20 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        条文出处）。`result_3d._capacity_cases` 让工程校核与 `tables()` 共用一份
        分派结果，`report_3d` 新增独立「承载力计算书」章（汇总表 + 逐项复核表，
        不落进文末明细表章）；梁格与索承体系（塔柱 φ/λ）都出表，HTML / DOCX /
-       CSV 三种出口同源。`verify_capacity.py` 130/130。—— 2026-11-08
+       CSV 三种出口同源（PDF 出口见下一条）。`verify_capacity.py` 130/130。—— 2026-11-08
+- [x] **P3** PDF 计算书出口：`report_3d.write_pdf` 把 `render_html()` 的**同一份
+       自包含 HTML** 交给本机无头 Edge / Chrome 按 A4 打印，不另写一套排版，
+       也不引 reportlab 之类第三方 PDF 库——中文、ξ/φ/η/σs、200+ 行明细表的
+       断行与插图缩放因此与 HTML 完全一致。加强 `@media print`：`@page A4`、
+       `thead` 逐页重复、按 `tr` 分页（整表 `break-inside:avoid` 会在长表上
+       留大片空白）、图与标题不跨页。`_pdf_browser()` 按环境变量
+       `BRIDGESTUDIO_PDF_BROWSER` → PATH → 常见安装位置查找；找不到或打印
+       失败抛 `PDFExportError`，界面显式告警并保留 Word/HTML/CSV 三份，
+       **不生成占位 PDF**。先打到临时文件、校验 `%PDF-` 头与大小后才复制，
+       避免目标路径上的旧 PDF 被误当新产物。`write_all(pdf=True)` 默认含
+       PDF，界面 `ui_3d._report_block` 四按钮下载。`verify_report_3d.py`
+       125/125（含 PDF 逐页文本、条文号、插图、空白页与故障注入）、
+       `verify_capacity.py` 131/131。—— 2026-11-08
 - [x] **P3** 负弯矩区双向验算 + 非对称配筋（JTG 3362 §5.2.2/5.2.3、
        §5.3.4-4/5）：`CapacitySection` 加 `FaceSpec negative`（底板宽厚与顶板
        纵筋可单独登记）和 `Asp_given`（显式受压筋，可为 0=单筋）；
@@ -186,7 +199,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 - [x] **P3.5** 自然语言输入文件：三个算例（悬索/斜拉/拱）的描述统一落到 `examples/*.txt`
       （唯一真源），`run_nl.py` 作命令行统一入口（`--list` / 跑全部 / 跑单个），三个
       `example_*_nl.py` 的 `DESC` 改为从 `.txt` 读 —— 2026-11-05
-- [ ] **P4** 成果层：PDF 计算书、3D 包络视图、MIDAS 双向互导（Word/DOCX 计算书已支持，含承载力逐项复核章）
+- [ ] **P4** 成果层：3D 包络视图、MIDAS 双向互导（Word/DOCX 与 PDF 计算书已支持，含承载力逐项复核章）
 
 ## 质量保障闭环（铁律）
 

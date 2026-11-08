@@ -1,8 +1,8 @@
-"""report_3d.py —— 三维结果的四个出口（界面 / Word / HTML / CSV）共用的报告层。
+"""report_3d.py —— 三维结果的五个出口（界面 / Word / HTML / CSV / PDF）共用的报告层。
 
 问题
 ----
-"接入"完成后，求解只返回一种结果（`SolveResult`），但**出口**还是三份：
+"接入"完成后，求解只返回一种结果（`SolveResult`），但**出口**一度散成三处：
 
 - 界面自己画图（`ui_3d._plot_grillage` / `_plot_cable`），图注、颜色、坐标轴
   各写一遍；
@@ -24,7 +24,9 @@
                 │
                 ├─ write_html()   单文件 HTML（图片内嵌 base64）
                 ├─ write_docx()   复用 report_docx 的版式积木
-                └─ write_csv()    zip 包（指标 / 校核 / 每张明细表一个 csv）
+                ├─ write_csv()    zip 包（指标 / 校核 / 每张明细表一个 csv）
+                └─ write_pdf()    把**同一份 HTML**交给无头浏览器打印成 A4 PDF
+                                   （不另写一套排版/内容生成，详见函数说明）
 
 界面不再画图，只负责把 `figures()` 的 PNG 摆出来。这样"界面看到的"
 与"下载到的"是同一张图、同一张表、同一句结论——不是"尽量一致"。
@@ -32,8 +34,9 @@
 为什么中间结构用 dict 而不是类
 ------------------------------
 块类型只有七八种（h1/h2/p/bullets/metrics/checks/table/figure/note），
-用 dict 让三个渲染器各写一个 `if t == ...` 分支就能穷举完；换成类层次
-反而要在每个渲染器里 import 一遍所有块类型。
+用 dict 让三个内容渲染器（HTML / DOCX / CSV）各写一个 `if t == ...` 分支
+就能穷举完；换成类层次反而要在每个渲染器里 import 一遍所有块类型。
+PDF 不是第四个渲染器——它直接打印 HTML 渲染器的产物。
 """
 
 from __future__ import annotations
@@ -43,6 +46,10 @@ import csv
 import datetime as _dt
 import io
 import math
+import os
+import shutil
+import subprocess
+import tempfile
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -1004,8 +1011,9 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
 class Report:
     """一份报告的**全部内容**，不含任何排版参数。
 
-    三个渲染器（HTML / DOCX / CSV）都只读这个结构；界面的指标卡与校核清单
-    也读同一份 `blocks` 里的 items，因此"界面看到的"和"下载到的"不会分叉。
+    三个内容渲染器（HTML / DOCX / CSV）都只读这个结构，PDF 再打印 HTML 的
+    产物；界面的指标卡与校核清单也读同一份 `blocks` 里的 items，因此"界面
+    看到的"和"下载到的"不会分叉。
     """
 
     title: str
@@ -1448,9 +1456,25 @@ figcaption{font-size:12.5px;font-weight:700;color:var(--mut);text-align:center;m
 ul{margin:6px 0 12px;padding-left:22px;} li{margin:3px 0;}
 .foot{margin-top:36px;padding-top:12px;border-top:1px solid var(--line);color:var(--mut);
       font-size:11.5px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
-@media print{body{background:#fff}.page{box-shadow:none;margin:0;max-width:none;padding:0}
-  h1{page-break-after:avoid}figure,table{page-break-inside:avoid}
-  .tw{overflow:visible} table.wide{font-size:9.5px}}
+/* 打印 / PDF：A4，长表按行分页且表头逐页重复，图与标题不跨页。
+   注意别对整张 table 用 break-inside:avoid —— 明细表有 200+ 行，
+   浏览器塞不进一页时会留大片空白甚至丢行。 */
+@page{size:A4;margin:14mm 12mm 16mm}
+@media print{
+  body{background:#fff;font-size:11px;line-height:1.55}
+  .page{box-shadow:none;margin:0;max-width:none;padding:0;border-radius:0}
+  h1,h2,caption{break-after:avoid;page-break-after:avoid}
+  figure,.cards,.foot,.meta{break-inside:avoid;page-break-inside:avoid}
+  figure img{max-height:170mm;object-fit:contain}
+  .tw{overflow:visible}
+  table{break-inside:auto;page-break-inside:auto;font-size:9px}
+  table.wide{font-size:8px}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  td,th{word-break:break-word}
+  th.nw,td.nw{font-size:8.5px}
+  p,li{orphans:2;widows:2}
+}
 """
 
 
@@ -1582,6 +1606,129 @@ def write_html(rep: Report, path: str | Path) -> Path:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(render_html(rep), encoding="utf-8")
     return p
+
+
+# ---------------------------------------------------------------- PDF 出口
+
+
+PDF_BROWSER_ENV = "BRIDGESTUDIO_PDF_BROWSER"
+
+
+class PDFExportError(RuntimeError):
+    """PDF 出口做不了。带原因抛出，**绝不生成一个空壳或占位 PDF**。
+
+    界面据此给 warning、其余出口照常下载；不会假装"四种格式都生成了"。
+    """
+
+
+def _pdf_browser() -> Path:
+    """找本机 Chromium 系浏览器（Edge / Chrome / Chromium）可执行文件。
+
+    优先级：环境变量显式指定 > PATH > 各平台常见安装位置。
+    显式指定却不存在时直接报错，不悄悄回退到别的浏览器——否则用户以为
+    按自己指定的版本排版，实际用的是另一份，出问题无从查起。
+    """
+    override = os.environ.get(PDF_BROWSER_ENV, "").strip()
+    if override:
+        p = Path(override)
+        if not p.is_file():
+            raise PDFExportError(
+                f"{PDF_BROWSER_ENV} 指向的浏览器不存在：{p}。"
+                "请改成 msedge.exe / chrome.exe 的完整路径，或取消该环境变量。")
+        return p
+
+    for name in ("msedge", "chrome", "google-chrome", "chromium",
+                 "chromium-browser"):
+        w = shutil.which(name)
+        if w and Path(w).is_file():
+            return Path(w)
+
+    roots: list[Path] = []
+    for key in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"):
+        v = os.environ.get(key)
+        if v:
+            roots.append(Path(v))
+    roots += [Path("C:/Program Files (x86)"), Path("C:/Program Files"),
+              Path("/usr/bin"), Path("/usr/local/bin"),
+              Path("/opt/google/chrome")]
+    for root in roots:
+        for rel in ("Microsoft/Edge/Application/msedge.exe",
+                    "Google/Chrome/Application/chrome.exe"):
+            p = root / rel
+            if p.is_file():
+                return p
+    for root in (Path("/usr/bin"), Path("/usr/local/bin"),
+                 Path("/opt/google/chrome")):
+        for name in ("google-chrome", "chrome", "chromium",
+                     "chromium-browser", "msedge"):
+            p = root / name
+            if p.is_file():
+                return p
+
+    raise PDFExportError(
+        "未找到可用于生成 PDF 的浏览器（Microsoft Edge / Google Chrome / "
+        "Chromium）。请安装其一，或用环境变量 "
+        f"{PDF_BROWSER_ENV} 指定浏览器可执行文件的完整路径。"
+        "PDF 必须由同一份 HTML 打印得到，本程序不生成占位 PDF。")
+
+
+def write_pdf(rep: Report, path: str | Path, *, timeout: float = 180.0) -> Path:
+    """把 `render_html(rep)` 交给无头浏览器按 A4 打印成 PDF。
+
+    为什么不装第三方 PDF 库
+    ------------------------
+    报告里有中文、上下标符号（ξ/φ/η/σs）、200+ 行的明细表、base64 内嵌
+    的 PNG 图。用 reportlab 之类重写一遍排版，必然与 HTML / Word 分叉：
+    表宽、断行、图片缩放各算各的，"同源"就只是口号。Chromium 的打印引擎
+    直接吃现成 HTML，等于让 PDF 继承 HTML 的排版，只多一层 `@media print`。
+    代价是一个外部浏览器进程，所以找不到浏览器时明确报错，不静默降级。
+
+    产物校验：先打到临时文件，确认是 `%PDF-` 开头且非空，再复制到目标。
+    这样"目标路径上有个旧 PDF"或"浏览器写失败"都不会被误判为成功。
+    """
+    browser = _pdf_browser()
+    out = Path(path).resolve()
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="bridgestudio_pdf_",
+                                     ignore_cleanup_errors=True) as td:
+        tmp = Path(td)
+        html_path = tmp / "report.html"
+        tmp_pdf = tmp / "report.pdf"
+        html_path.write_text(render_html(rep), encoding="utf-8")
+        cmd = [
+            str(browser),
+            "--headless=new", "--disable-gpu", "--no-sandbox",
+            "--no-first-run", "--no-default-browser-check",
+            "--disable-extensions", "--disable-background-networking",
+            "--no-pdf-header-footer", "--virtual-time-budget=8000",
+            f"--user-data-dir={tmp / 'profile'}",
+            f"--print-to-pdf={tmp_pdf}",
+            html_path.as_uri(),
+        ]
+        try:
+            cp = subprocess.run(cmd, capture_output=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            raise PDFExportError(
+                f"PDF 打印超时（>{timeout:.0f}s）：{browser.name}。"
+                "报告可能过大，可缩小明细表或换用 HTML / Word 出口。") from None
+        except OSError as e:
+            raise PDFExportError(f"无法启动浏览器 {browser}：{e}") from e
+
+        err = (cp.stderr or b"").decode("utf-8", "replace").strip()
+        if not tmp_pdf.is_file():
+            raise PDFExportError(
+                f"浏览器未产出 PDF（退出码 {cp.returncode}）。"
+                + (f" 浏览器输出：{err[-400:]}" if err else "")
+                + f" 可用 {PDF_BROWSER_ENV} 指定其它浏览器。")
+        with tmp_pdf.open("rb") as fh:
+            head = fh.read(5)
+        if head != b"%PDF-" or tmp_pdf.stat().st_size < 1024:
+            raise PDFExportError(
+                "浏览器产出的文件不是有效 PDF（头或大小异常），已拒绝交付。")
+        # 目标文件被 PDF 阅读器占用时 → PermissionError，交给 write_all._put 改名
+        shutil.copyfile(tmp_pdf, out)
+    return out
 
 
 # ================================================================ 渲染器：DOCX
@@ -1757,13 +1904,18 @@ def write_csv(rep: Report, path: str | Path) -> Path:
 # ================================================================ 一次性出口
 
 
-def write_all(rep: Report, out_dir: str | Path, stem: str = "report") -> dict[str, Path]:
-    """三种文件一次写全，返回 {格式: 路径}。界面按钮直接用这个。
+def write_all(rep: Report, out_dir: str | Path, stem: str = "report",
+              *, pdf: bool = True) -> dict[str, Path]:
+    """四种文件一次写全，返回 {格式: 路径}。界面按钮直接用这个。
 
-    目标文件被 Word / Excel 打开着时，Windows 直接拒写（PermissionError）。
-    "生成失败：Permission denied" 对用户毫无指导意义——他不会想到是自己开着
-    那份文档。这里退一步改名写到同目录，并把实际路径返回给界面，用户仍能
-    下载到正确内容，且不会覆盖他正在看的那一份。
+    ``pdf=False`` 用于"只要三件套"的场景（故障注入测试、界面分步降级）。
+    PDF 依赖本机浏览器，失败抛 `PDFExportError`——**不放进返回值里假装
+    成功**，调用方要么显示错误、要么显式关掉这个出口。
+
+    目标文件被 Word / Excel / PDF 阅读器打开着时，Windows 直接拒写
+    （PermissionError）。"生成失败：Permission denied" 对用户毫无指导意义
+    ——他不会想到是自己开着那份文档。这里退一步改名写到同目录，并把实际
+    路径返回给界面，用户仍能下载到正确内容，且不会覆盖他正在看的那一份。
     """
     d = Path(out_dir)
 
@@ -1774,11 +1926,14 @@ def write_all(rep: Report, out_dir: str | Path, stem: str = "report") -> dict[st
             alt = path.with_name(f"{path.stem}_{rep.fingerprint}{path.suffix}")
             return fn(rep, alt)
 
-    return {
+    paths = {
         "html": _put(write_html, d / f"{stem}.html"),
         "docx": _put(write_docx, d / f"{stem}.docx"),
         "zip": _put(write_csv, d / f"{stem}_数据表.zip"),
     }
+    if pdf:
+        paths["pdf"] = _put(write_pdf, d / f"{stem}.pdf")
+    return paths
 
 
 # ---------------------------------------------------------------- 自检
