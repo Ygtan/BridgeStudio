@@ -73,8 +73,18 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        JTG D64-2015 表 3.2.1 的强度设计值，按板厚分档）+ `section_strength.py`
        （钢按 D64 §5.3.1 三款算正应力/剪应力/折算应力，混凝土按 3362 §7.1.5
        算 0.5fck）；荷载组合扩到含轴力 N。`verify_section_strength.py` 46/46。
-       **边界**：只做应力、不做承载力（不建钢筋）；混凝土按 0.5fck 只作量级判据
+       **边界**：应力验算不算承载力；混凝土按 0.5fck 只作量级判据
        —— 2026-10-31
+- [x] **P3** 正截面/斜截面承载力验算：`section_strength.py` 加
+       `CapacitySection` + `flexural_capacity`/`shear_capacity`（JTG 3362-2018
+       §5.2.2/5.2.3/5.2.9：矩形/工形正截面单筋 + 仅配箍筋斜截面，ξb 用 2018
+       修订值）；`model_spec_3d.RebarSpec3D` 挂 `RealConst3D.rebar`（不进 .dat）；
+       `grillage_3d` 按全截面配筋率给混凝土箱梁填配筋。`result_3d` 的
+       `_checks_capacity` 把基本组合设计内力换成 Mu/Vu 利用率，出校核条目 +
+       `capacity_table` 明细表。`verify_capacity.py` 22/22（矩形/工形/斜截面
+       手算对拍 + 超筋/未配筋负例 + 梁格端到端）。
+       **边界**：只做普通钢筋混凝土（无预应力、无弯起），压弯构件与负弯矩区
+       需按偏心受压公式另行验算 —— 2026-11-08
 - [x] **P3** 索承体系梁应力：`cable_solver` 新增 `[GIRDEREND]`（每端一行，两种桥型
        都输出），斜拉桥第一次有主梁内力；`result_3d._checks_strength_cable` 用
        `_strength_sections + section_strength` 做正应力/剪应力/折算应力，报告增

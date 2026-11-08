@@ -262,6 +262,34 @@ class RealConst3D(BaseModel):
     #: 控制板厚 mm（腹板/翼缘中较厚者）。查 JTG D64 表 3.2.1 的厚度档用。
     #: 0 = 未提供，按 0 处理（落在 ≤16mm 档，偏不保守，故建造器都应填）。
     T_PLATE: float = 0.0
+    #: 混凝土梁截面的配筋（承载力验算用）。None = 无配筋信息（钢截面/索/
+    #: 桁架杆不填），承载力验算跳过并说明。不写进 .dat、不参与力学求解。
+    rebar: "RebarSpec3D | None" = None
+
+
+class RebarSpec3D(BaseModel):
+    """混凝土梁截面配筋（JTG 3362-2018 承载力验算用，验算侧信息）。
+
+    尺寸单位 mm、面积 mm²、牌号照 `code_material`。**不写进 .dat、不参与
+    求解**——它只给 `section_strength.check_capacity` 提供截面几何与配筋。
+
+    - 矩形截面：``bf == b``（``bf`` 留 0 即退化为矩形）且 ``hf == 0``。
+    - 工形 / T 形截面：``bf > b``（受压翼缘宽，箱梁顶板受压取箱宽）且
+      ``hf > 0``（翼缘厚）。
+    - 斜截面抗剪的 ``b`` 始终取**腹板宽度**（矩形=全宽；箱梁=各腹板宽之和）。
+    """
+
+    h: float = Field(gt=0)          # 截面全高 mm
+    b: float = Field(gt=0)          # 腹板宽度 mm
+    As: float = Field(gt=0)         # 受拉钢筋面积 mm²
+    bf: float = 0.0                 # 受压翼缘宽度 mm（0=取 b，即矩形）
+    hf: float = 0.0                 # 受压翼缘厚度 mm（0=矩形）
+    as_: float = 50.0               # 受拉钢筋合力点至受拉边缘距离 mm
+    Asp: float = 0.0                # 受压钢筋面积 mm²（0=单筋）
+    Asv: float = 0.0                # 同一截面内箍筋各肢总面积 mm²（0=未配箍）
+    sv: float = 150.0               # 箍筋间距 mm
+    grade_rebar: str = "HRB400"     # 纵向钢筋牌号
+    grade_stirrup: str = "HRB400"   # 箍筋牌号
 
 
 class ElemTypeDef3D(BaseModel):

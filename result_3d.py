@@ -1010,8 +1010,8 @@ class SolveResult:
                     out.append(Check(
                         f"{label} 腹板剪应力（量级）", True,
                         f"单元 {ws[0]}·{ws[1]} 端 τ = V/AW = {ws[2].tau:.1f} MPa。"
-                        "混凝土梁的抗剪须按斜截面承载力验算（箍筋 + 混凝土"
-                        "贡献），本程序不建钢筋，故不给利用率、也不下结论。",
+                        "混凝土梁的抗剪由斜截面承载力控制（JTG 3362 §5.2.9），"
+                        "已配筋时见下方「斜截面抗剪 Vu」条目；此处 τ 只作量级。",
                         value=ws[2].tau, unit="MPa", level="info"))
 
             if steel:
@@ -1029,8 +1029,8 @@ class SolveResult:
             out.append(Check(
                 "混凝土应力验算的适用范围", True,
                 "钢筋混凝土构件的使用阶段应力验算不是 JTG 3362 的强制项"
-                "（规范靠承载力与裂缝宽度控制）；本程序不建钢筋，那两条"
-                "都做不了，故 0.5fck 只作量级判据，不构成「验算通过」。",
+                "（规范靠承载力与裂缝宽度控制），故 0.5fck 只作量级判据、"
+                "不构成「验算通过」；正截面/斜截面承载力验算见下方条目。",
                 level="info"))
         if len(ranked) > len(shown):
             out.append(Check(
@@ -1039,6 +1039,76 @@ class SolveResult:
                 f"{len(shown)} 个；其余 {len(ranked) - len(shown)} 个截面的"
                 "利用率更低（横梁、隔板在纵向弯曲中基本不参与）。",
                 level="info"))
+        out.extend(self._checks_capacity(model, ult))
+        return out
+
+    def _checks_capacity(self, model: Any, ult: Any) -> list[Check]:
+        """承载力验算（混凝土配筋截面）：正截面抗弯 Mu + 斜截面抗剪 Vu。
+
+        用基本组合的设计内力（My / Vz 包络，取绝对值大者），按
+        JTG 3362-2018 §5.2.2 / §5.2.3 / §5.2.9 算承载力与利用率。只覆盖
+        填了配筋的混凝土截面；钢截面走应力验算，未配筋的混凝土截面不判定。
+        """
+        cap_secs = _capacity_sections(model)
+        if not cap_secs:
+            return []
+
+        ranked: list[tuple[float, str, Any, Any]] = []
+        for label, sec, eids in cap_secs:
+            worst_M: tuple[float, int, str] | None = None
+            worst_V: tuple[float, int, str] | None = None
+            for (eid, end), v in ult.rows.items():
+                if eid not in eids:
+                    continue
+                for my in (v.get("MyMin", 0.0), v.get("MyMax", 0.0)):
+                    if worst_M is None or abs(my) > worst_M[0]:
+                        worst_M = (abs(my), eid, end)
+                for vz in (v.get("VzMin", 0.0), v.get("VzMax", 0.0)):
+                    if worst_V is None or abs(vz) > worst_V[0]:
+                        worst_V = (abs(vz), eid, end)
+            if worst_M is None and worst_V is None:
+                continue
+            Md = worst_M[0] if worst_M else 0.0
+            Vd = worst_V[0] if worst_V else 0.0
+            r = section_strength.check_capacity(
+                sec, Md, Vd, gamma0=1.0, alpha1=1.0, alpha3=1.1)
+            ranked.append((r.util, label, (worst_M, worst_V), r))
+
+        if not ranked:
+            return []
+        ranked.sort(key=lambda t: -t[0])
+
+        out: list[Check] = []
+        for _, label, (wm, wv), r in ranked[:3]:
+            if r.Mu > 0:
+                src = f"单元 {wm[1]}·{wm[2]} 端" if wm else "—"
+                out.append(Check(
+                    f"{label} 正截面抗弯 Mu",
+                    r.util_M <= 1.0,
+                    f"{src} γ0·|Md| = {abs(wm[0]) / 1e3:,.0f} kN·m ≤ "
+                    f"Mu = {r.Mu / 1e3:,.0f} kN·m，利用率 {r.util_M:.3f}"
+                    f"{'（超筋）' if r.over_reinforced else ''}；"
+                    f"JTG 3362-2018 §5.2.2/5.2.3",
+                    value=r.util_M, limit=1.0, level="error"))
+            if r.Vu > 0:
+                src = f"单元 {wv[1]}·{wv[2]} 端" if wv else "—"
+                out.append(Check(
+                    f"{label} 斜截面抗剪 Vu",
+                    r.util_V <= 1.0,
+                    f"{src} γ0·|Vd| = {abs(wv[0]) / 1e3:,.0f} kN ≤ "
+                    f"Vu = {r.Vu / 1e3:,.0f} kN，利用率 {r.util_V:.3f}；"
+                    f"JTG 3362-2018 §5.2.9（仅配箍筋，α1=1.0、α3=1.1）",
+                    value=r.util_V, limit=1.0, level="error"))
+            if r.note:
+                out.append(Check(
+                    f"{label} 承载力验算说明", True, r.note, level="info"))
+
+        out.append(Check(
+            "承载力验算适用范围", True,
+            "正截面按矩形/工形（受压翼缘在受压区）单筋公式，斜截面按仅配箍筋"
+            "公式，均为普通钢筋混凝土（无预应力、无弯起钢筋）；负弯矩区与"
+            "轴力较大的压弯构件需按偏心受压公式另行验算。",
+            level="info"))
         return out
 
     def _checks_strength_cable(self, model: Any) -> list[Check]:
@@ -1838,6 +1908,29 @@ class SolveResult:
             ult = next((c for c in combos if c.spec.key == "ultimate"), None)
             if ult is not None and ult.rows:
                 out["combo_ultimate"] = combination.beam_table(ult)
+                # 承载力验算明细表（混凝土配筋截面，仅梁格填了配筋）
+                if model is not None and self.final_beam:
+                    cap_pairs = []
+                    for label, sec, eids in _capacity_sections(model):
+                        wm = wv = None
+                        for (eid, end), v in ult.rows.items():
+                            if eid not in eids:
+                                continue
+                            for my in (v.get("MyMin", 0.0), v.get("MyMax", 0.0)):
+                                if wm is None or abs(my) > wm[0]:
+                                    wm = (abs(my), eid, end)
+                            for vz in (v.get("VzMin", 0.0), v.get("VzMax", 0.0)):
+                                if wv is None or abs(vz) > wv[0]:
+                                    wv = (abs(vz), eid, end)
+                        if wm is None and wv is None:
+                            continue
+                        r = section_strength.check_capacity(
+                            sec, wm[0] if wm else 0.0,
+                            wv[0] if wv else 0.0, alpha3=1.1)
+                        cap_pairs.append((label, r))
+                    if cap_pairs:
+                        out["capacity_table"] = \
+                            section_strength.capacity_table(cap_pairs)
         return out
 
     # ------------------------------------------------------------ 兼容旧字典
@@ -1940,6 +2033,52 @@ def _strength_sections(model: Any) -> list[tuple[str, Any, set[int]]]:
         eids = {e.id for e in model.elements if e.etype == t.id}
         head = "主梁" if t.id == main_et else f"截面#{t.real}"
         out.append((f"{head}（{sec.describe()}）", sec, eids))
+    return out
+
+
+def _capacity_sections(model: Any) -> list[tuple[str, Any, set[int]]]:
+    """从模型取出可做承载力验算的配筋截面。
+
+    返回 `[(标签, CapacitySection, 该截面下的单元号集合)]`。只含混凝土
+    截面且填了 `RealConst3D.rebar` 的；钢截面走应力验算，索/桁架杆没有
+    配筋概念。未配筋的混凝土截面不在此列——由调用方说明原因。
+    """
+    out: list[tuple[str, Any, set[int]]] = []
+    try:
+        ets = [t for t in model.etypes if getattr(t, "kind", "") == "BEAM"]
+        mats = {m.id: m for m in model.materials}
+        reals = {r.id: r for r in model.reals}
+    except AttributeError:
+        return out
+    if not ets:
+        return out
+
+    counts: dict[int, int] = {}
+    for e in model.elements:
+        counts[e.etype] = counts.get(e.etype, 0) + 1
+    main_et = max(ets, key=lambda t: counts.get(t.id, 0)).id
+
+    for t in ets:
+        mat = mats.get(t.mat)
+        rc = reals.get(t.real)
+        if mat is None or rc is None or getattr(rc, "rebar", None) is None:
+            continue
+        grade = (getattr(mat, "grade", "") or "").strip()
+        if grade.upper() not in code_material.CONCRETE:
+            continue        # 钢截面不该带 rebar；带了也不做混凝土承载力
+        rb = rc.rebar
+        sec = section_strength.CapacitySection(
+            h=float(rb.h), b=float(rb.b), As=float(rb.As),
+            bf=float(rb.bf), hf=float(rb.hf),
+            as_=float(rb.as_), Asp=float(rb.Asp),
+            grade_rebar=rb.grade_rebar,
+            Asv=float(rb.Asv), sv=float(rb.sv),
+            grade_stirrup=rb.grade_stirrup,
+            concrete_grade=grade,
+        )
+        eids = {e.id for e in model.elements if e.etype == t.id}
+        head = "主梁" if t.id == main_et else f"截面#{t.real}"
+        out.append((f"{head}（{grade}）", sec, eids))
     return out
 
 

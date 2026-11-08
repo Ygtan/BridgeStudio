@@ -228,3 +228,244 @@ def result_table(rows: list[tuple[str, StressResult]]) -> dict:
                     "折算应力 (MPa)", "利用率", "控制项"],
         "rows": [[name] + r.to_row() for name, r in rows],
     }
+
+
+# ---------------------------------------------------------------- 承载力验算
+#
+# 应力验算回答"截面边缘应力超不超强度"，承载力验算回答"配筋够不够扛住
+# 设计内力"。前者对钢构件是硬判据、对混凝土只是量级参考；后者才是钢筋
+# 混凝土受弯构件的正牌验算（JTG 3362-2018 第 5 章 持久状况承载能力极限
+# 状态）。本模块只做普通钢筋混凝土（无预应力、无弯起钢筋）：
+#
+#   正截面抗弯  §5.2.2 矩形 / §5.2.3 工形（受压翼缘）
+#   斜截面抗剪  §5.2.9 仅配箍筋
+#
+# 不做：压弯构件 N-M 相关（轴力较大时需用 §5.3 偏心受压公式，纯弯公式
+# 会偏不安全）、受扭、抗冲切。这几条留待下一步，接口先按"受弯为主"设计。
+
+
+@dataclass(frozen=True)
+class CapacitySection:
+    """正截面抗弯 + 斜截面抗剪承载力验算所需的截面与配筋。
+
+    尺寸单位一律 mm，面积 mm²，强度 MPa；钢筋牌号/混凝土等级照
+    `code_material`。
+
+    - 矩形截面：``bf == b`` 且 ``hf == 0``（``bf`` 留 0 即退化为矩形）。
+    - 工形 / T 形截面：``bf > b``（受压翼缘宽）且 ``hf > 0``（翼缘厚）。
+      箱梁顶板受压时近似为工形（bf=箱宽、hf=顶板厚、b=各腹板宽之和）。
+    - 斜截面抗剪的 ``b`` 始终取**腹板宽度**（矩形=全宽；箱梁=各腹板宽之和）。
+    """
+
+    h: float                          # 截面全高 mm
+    b: float                          # 腹板宽度 mm
+    As: float                         # 受拉钢筋面积 mm²
+    bf: float = 0.0                   # 受压翼缘宽度 mm（0=取 b，即矩形）
+    hf: float = 0.0                   # 受压翼缘厚度 mm（0=矩形）
+    as_: float = 50.0                 # 受拉钢筋合力点至受拉边缘距离 mm
+    Asp: float = 0.0                  # 受压钢筋面积 mm²（0=单筋）
+    asp: float = 40.0                 # 受压钢筋合力点至受压边缘距离 mm
+    grade_rebar: str = "HRB400"       # 纵向钢筋牌号
+    Asv: float = 0.0                  # 同一截面内箍筋各肢总面积 mm²
+    sv: float = 150.0                 # 箍筋间距 mm
+    grade_stirrup: str = "HRB400"     # 箍筋牌号
+    concrete_grade: str = "C50"
+
+    @property
+    def h0(self) -> float:
+        """有效高度 = h − as（mm）。"""
+        return self.h - self.as_
+
+    @property
+    def b_eff(self) -> float:
+        """受压区有效宽度：工形/T 形取翼缘宽，矩形取 b。"""
+        return self.bf if self.bf > self.b else self.b
+
+
+#: JTG 3362-2018 表 5.2.1 相对界限受压区高度 ξb。
+#: 三档：C50 及以下 / C55~C60 / C65~C70（C75/C80 该表不适用）。
+_XI_B: dict[str, tuple[float, float, float]] = {
+    "HPB300": (0.58, 0.56, 0.54),
+    "HRB400": (0.53, 0.51, 0.49),
+    "HRB500": (0.49, 0.47, 0.46),
+}
+_XI_B_ALIAS = {"HRBF400": "HRB400", "RRB400": "HRB400"}
+
+
+def _xi_b(rebar_grade: str, concrete_grade: str) -> float:
+    """按钢筋种类 + 混凝土等级查 ξb（表 5.2.1）。"""
+    key = (rebar_grade or "HRB400").strip().upper().replace(" ", "")
+    key = _XI_B_ALIAS.get(key, key)
+    if key not in _XI_B:
+        raise KeyError(f"未登记 ξb 的钢筋牌号 {rebar_grade!r}")
+    fcu = cm.concrete(concrete_grade).fcu_k
+    if fcu <= 50:
+        return _XI_B[key][0]
+    if fcu <= 60:
+        return _XI_B[key][1]
+    if fcu <= 70:
+        return _XI_B[key][2]
+    raise ValueError(
+        f"{concrete_grade} 超出 ξb 表范围（C75/C80 不适用），应做专项验算。")
+
+
+#: JTG 3362-2018 §9.3.12 最小箍筋配筋率 ρsv,min。
+_RHO_SV_MIN: dict[str, float] = {
+    "HPB300": 0.0012,
+    "HRB400": 0.0010,
+    "HRB500": 0.0010,
+}
+
+
+def _rho_sv_min(grade_stirrup: str) -> float:
+    key = (grade_stirrup or "HRB400").strip().upper().replace(" ", "")
+    key = _XI_B_ALIAS.get(key, key)
+    return _RHO_SV_MIN.get(key, 0.0010)
+
+
+def flexural_capacity(sec: CapacitySection) -> dict:
+    """正截面抗弯承载力 Mu（JTG 3362-2018 §5.2.2 矩形 / §5.2.3 工形）。
+
+    只算纵向体内普通钢筋（无预应力、无弯起）。返回 dict：
+    ``Mu``(N·m)、``x``(mm)、``xi``、``xi_b``、``over_reinforced``。
+    """
+    co = cm.concrete(sec.concrete_grade)
+    rb = cm.rebar(sec.grade_rebar)
+    fcd, fsd = co.fcd, rb.fsd            # MPa
+    h0, b = sec.h0, sec.b
+    xi_b = _xi_b(sec.grade_rebar, sec.concrete_grade)
+
+    if sec.As <= 0.0:
+        return {"Mu": 0.0, "x": 0.0, "xi": 0.0, "xi_b": xi_b,
+                "over_reinforced": False, "fcd": fcd, "fsd": fsd}
+
+    if sec.bf > b and sec.hf > 0.0:
+        # 工形 / T 形（受压翼缘在受压区）
+        if fsd * sec.As <= fcd * sec.bf * sec.hf:
+            # 第一类 T 形：中和轴在翼缘内，按 bf 宽矩形
+            x = fsd * sec.As / (fcd * sec.bf)
+            Mu = fcd * sec.bf * x * (h0 - x / 2)
+        else:
+            # 第二类 T 形：中和轴在腹板内
+            x = (fsd * sec.As - fcd * (sec.bf - b) * sec.hf) / (fcd * b)
+            Mu = (fcd * b * x * (h0 - x / 2)
+                  + fcd * (sec.bf - b) * sec.hf * (h0 - sec.hf / 2))
+    else:
+        # 矩形
+        x = fsd * sec.As / (fcd * b)
+        Mu = fcd * b * x * (h0 - x / 2)
+
+    return {"Mu": Mu / 1e3,                 # N·mm → N·m
+            "x": x, "xi": x / h0, "xi_b": xi_b,
+            "over_reinforced": x > xi_b * h0,
+            "fcd": fcd, "fsd": fsd}
+
+
+def shear_capacity(sec: CapacitySection, alpha1: float = 1.0,
+                   alpha2: float = 1.0, alpha3: float = 1.0) -> dict:
+    """斜截面抗剪承载力 Vu（JTG 3362-2018 §5.2.9，仅配箍筋、无弯起筋）。
+
+    ``alpha1`` 异号弯矩影响系数（简支/连续近边支点 1.0，连续/悬臂近中间
+    支点 0.9）；``alpha2`` 预应力提高系数（普通钢筋混凝土 1.0）；
+    ``alpha3`` 受压翼缘影响系数（矩形 1.0，T/I 形 1.1）。
+
+    返回 dict：``Vu``(N)、``rho_sv``、``rho_sv_min``、``P``、``fsv``。
+    """
+    co = cm.concrete(sec.concrete_grade)
+    fcu_k = min(co.fcu_k, 50.0)            # 公式取值上限 50 MPa
+    b, h0 = sec.b, sec.h0
+    P = min(100.0 * sec.As / (b * h0), 2.5)   # 纵向配筋百分率，>2.5 取 2.5
+    rho_sv = sec.Asv / (sec.sv * b) if sec.Asv > 0.0 and sec.sv > 0.0 else 0.0
+    fsv = cm.rebar_fsd_tension(sec.grade_stirrup)   # 箍筋抗拉设计值（≤330）
+
+    if sec.Asv <= 0.0 or rho_sv <= 0.0:
+        return {"Vu": 0.0, "rho_sv": rho_sv,
+                "rho_sv_min": _rho_sv_min(sec.grade_stirrup),
+                "P": P, "fsv": fsv, "fcu_k": fcu_k, "alpha1": alpha1}
+
+    # 半经验公式：b、h0 取 mm、强度取 MPa 时结果即为 kN，×1e3 得 N。
+    Vu = (0.45e-3 * alpha1 * alpha2 * alpha3 * b * h0
+          * math.sqrt((2 + 0.6 * P) * math.sqrt(fcu_k) * rho_sv * fsv))
+    return {"Vu": Vu * 1e3, "rho_sv": rho_sv,
+            "rho_sv_min": _rho_sv_min(sec.grade_stirrup),
+            "P": P, "fsv": fsv, "fcu_k": fcu_k, "alpha1": alpha1}
+
+
+@dataclass
+class CapacityResult:
+    """一个截面在组合设计内力下的承载力利用率与结论。"""
+
+    Mu: float = 0.0            # 抗弯承载力 N·m
+    Vu: float = 0.0            # 抗剪承载力 N
+    util_M: float = 0.0        # γ0·|Md| / Mu
+    util_V: float = 0.0        # γ0·|Vd| / Vu
+    util: float = 0.0          # 两者取大
+    control: str = ""          # 控制项名
+    over_reinforced: bool = False
+    no_rebar: bool = False     # 未配纵向钢筋
+    no_stirrup: bool = False   # 未配箍筋
+    note: str = ""             # 超筋 / 少筋 / 缺箍的说明
+
+    def to_row(self) -> list[str]:
+        mu = f"{self.Mu / 1e3:.0f}" if self.Mu > 0 else "—"
+        vu = f"{self.Vu / 1e3:.0f}" if self.Vu > 0 else "—"
+        return [mu, vu, f"{self.util_M:.3f}", f"{self.util_V:.3f}",
+                f"{self.util:.3f}", self.control]
+
+
+def check_capacity(sec: CapacitySection, Md: float, Vd: float,
+                   gamma0: float = 1.0, alpha1: float = 1.0,
+                   alpha3: float = 1.0) -> CapacityResult:
+    """组合承载力验算：给定弯矩/剪力设计值（N·m / N），返回利用率与结论。
+
+    ``Md``、``Vd`` 应为**基本组合（承载力）**的设计内力（含 γ0 之前）。
+    ``gamma0`` 结构重要性系数乘在效应侧（JTG D60 §4.1.5）。
+    ``alpha3`` 受压翼缘影响系数（工形/T 形截面取 1.1）。
+    """
+    fm = flexural_capacity(sec)
+    sh = shear_capacity(sec, alpha1=alpha1, alpha3=alpha3)
+    r = CapacityResult(Mu=fm["Mu"], Vu=sh["Vu"],
+                       over_reinforced=fm["over_reinforced"])
+
+    if sec.As <= 0.0:
+        r.no_rebar = True
+        r.note = "未配纵向钢筋，无法验算正截面抗弯承载力。"
+    if sh["rho_sv"] <= 0.0:
+        r.no_stirrup = True
+        r.note += "未配箍筋，无法验算斜截面抗剪承载力。" if r.note else \
+            "未配箍筋，无法验算斜截面抗剪承载力。"
+
+    r.util_M = gamma0 * abs(Md) / r.Mu if r.Mu > 0 else 0.0
+    r.util_V = gamma0 * abs(Vd) / r.Vu if r.Vu > 0 else 0.0
+
+    if r.Mu <= 0 and r.Vu <= 0:
+        r.util = 0.0
+        r.control = "未配筋，承载力不可判定"
+        return r
+
+    cand = []
+    if r.Mu > 0:
+        cand.append((r.util_M, "正截面抗弯"))
+    if r.Vu > 0:
+        cand.append((r.util_V, "斜截面抗剪"))
+    r.util, r.control = max(cand, key=lambda kv: kv[0])
+
+    if fm["over_reinforced"]:
+        r.control += "（超筋）"
+        r.note += (f"受压区高度 x={fm['x']:.0f}mm > ξb·h0="
+                   f"{fm['xi_b'] * sec.h0:.0f}mm，超筋，应加受压筋或加大截面。")
+    return r
+
+
+def capacity_table(rows: list[tuple[str, CapacityResult]]) -> dict:
+    """计算书用的承载力验算表。`rows` = [(截面/部位说明, 结果)]。"""
+    return {
+        "title": "正截面 / 斜截面承载力验算",
+        "note": "按 JTG 3362-2018 §5.2.2 / §5.2.3 / §5.2.9，"
+                "仅普通钢筋混凝土（无预应力、无弯起钢筋）。"
+                "Mu 为抗弯承载力、Vu 为抗剪承载力；利用率为 γ0·|效应|/承载力，"
+                ">1.0 即不满足。",
+        "headers": ["部位", "Mu (kN·m)", "Vu (kN)",
+                    "利用率 M", "利用率 V", "利用率", "控制项"],
+        "rows": [[name] + r.to_row() for name, r in rows],
+    }

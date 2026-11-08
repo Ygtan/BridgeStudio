@@ -23,6 +23,8 @@
 
 from __future__ import annotations
 
+import math
+
 from model_spec_3d import (
     Boundary3D,
     Element3D,
@@ -34,6 +36,7 @@ from model_spec_3d import (
     Node3D,
     NodalLoad3D,
     RealConst3D,
+    RebarSpec3D,
     Stage3D,
 )
 
@@ -64,6 +67,32 @@ def box_section(B: float, h: float, tf: float, tw: float) -> dict:
     }
 
 
+def _rebar_spec(box: dict, B: float, h: float, tf: float, tw: float,
+                n_lines: int, rebar_ratio: float, as_: float,
+                stirrup_dia: float, stirrup_sv: float) -> RebarSpec3D | None:
+    """按全截面配筋率估一条纵梁的配筋，供承载力验算用。
+
+    梁格把单箱切成 n_lines 条纵梁，截面属性（A/IY/AW）各 1/n_lines，配筋
+    也各 1/n_lines——这样单条纵梁的「内力 Md ↔ 截面 ↔ 配筋」三者自洽。
+    箱梁顶板受压时近似为工形：bf=箱宽/n_lines、hf=顶板厚、b=两道腹板宽之和
+    /n_lines。``rebar_ratio <= 0`` 表示不配筋（返回 None，验算跳过）。
+    """
+    if rebar_ratio <= 0.0:
+        return None
+    As = rebar_ratio * box["A"] * 1e6 / n_lines        # m² → mm²
+    b = 2.0 * tw * 1e3 / n_lines                       # 腹板宽 mm（两道均分）
+    bf = B * 1e3 / n_lines                             # 受压翼缘宽 mm
+    hf = tf * 1e3
+    hh = h * 1e3
+    as_mm = as_ * 1e3
+    Asv = 0.0
+    if stirrup_dia > 0.0:
+        # 两道腹板 × 双肢箍，均分到单条纵梁
+        Asv = 4.0 * (math.pi * stirrup_dia ** 2 / 4.0) / n_lines
+    return RebarSpec3D(h=hh, b=b, bf=bf, hf=hf, As=As, as_=as_mm,
+                       Asv=Asv, sv=stirrup_sv)
+
+
 def build_box_grillage_3d(
     spans: tuple[float, float, float] = (30.0, 50.0, 30.0),
     B: float = 12.0,
@@ -80,6 +109,10 @@ def build_box_grillage_3d(
     td: float = 0.6,                     # 支承断面横隔板厚度 m
     staged: bool = False,                # True=逐跨浇筑三阶段；False=一次成桥
     lane_code: str = "",                 # "JTG_D60"=中线车道自动荷载 + 跨中影响线
+    rebar_ratio: float = 0.012,          # 纵向受拉钢筋配筋率（按全截面 A，验算用）
+    as_: float = 0.10,                   # 受拉钢筋合力点至受拉边缘距离 m
+    stirrup_dia: float = 12.0,           # 箍筋直径 mm（双肢，0=不配箍筋）
+    stirrup_sv: float = 150.0,           # 箍筋间距 mm
     title: str = "三跨连续箱梁 3D 梁格",
 ) -> ModelSpec3D:
     """生成三跨连续箱梁空间梁格模型。"""
@@ -135,7 +168,9 @@ def build_box_grillage_3d(
                     IZ=box["A"] / n_lines * (B / n_lines) ** 2 / 8,  # 横向弯曲粗估
                     J=box["J"] / n_lines, G=G,
                     WT=box["WT"] / n_lines, WB=box["WB"] / n_lines,
-                    AW=box["AW"] / n_lines),          # 腹板也按纵梁线均分
+                    AW=box["AW"] / n_lines,          # 腹板也按纵梁线均分
+                    rebar=_rebar_spec(box, B, h, tf, tw, n_lines,
+                                      rebar_ratio, as_, stirrup_dia, stirrup_sv)),
         RealConst3D(id=2, A=cross["A"], IY=cross["IY"], IZ=cross["A"] * panel ** 2 / 12,
                     J=cross["J"], G=G, AW=cross["A"] / 1.5),
         RealConst3D(id=3, A=diaph["A"], IY=diaph["IY"], IZ=diaph["A"] * B ** 2 / 12,

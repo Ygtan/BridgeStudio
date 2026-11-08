@@ -1166,7 +1166,7 @@ def _conclusion_bullets(res: SolveResult, model: Any,
         out.append(f"基本组合（1.2G + 1.4Q）控制弯矩 {w[1] / 1e3:,.0f} kN·m，"
                    f"位于单元 {w[0][0]} 的 {w[0][1]} 端{tail}；"
                    "该项为配筋设计用的**设计内力包络**，"
-                   "本程序不建钢筋，未做正截面/斜截面承载力验算。")
+                   "正截面/斜截面承载力验算见「工程校核」。")
     if res.stage_cables:
         sr = res.stage_cable_summary()
         low = min(sr, key=lambda r: r["Tmin"])
