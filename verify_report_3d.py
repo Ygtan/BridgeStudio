@@ -409,7 +409,8 @@ def main() -> int:
                                  value=0.5, limit=0.1833, unit="m"),
                            Check("预抬高量级", True, "0.2 m", level="info")]},
                        {"type": "h1", "text": "结论与说明"},
-                       {"type": "bullets", "items": ["**1 项未通过**"]}],
+                       {"type": "bullets", "items": ["**1 项未通过**"]},
+                       {"type": "note", "text": "表注里也有**粗体**，不能把星号印出来"}],
                    meta=[("桥型", "三维梁格")])
     # 故障注入用例只要三件套：不重复启动浏览器，也顺带守住 pdf=False 开关
     paths = R.write_all(rep, "out/verify_report/inject", stem="inject",
@@ -418,8 +419,9 @@ def main() -> int:
     html = Path(paths["html"]).read_text(encoding="utf-8")
     check("HTML 写入「不通过」", "不通过" in html)
     check("HTML 提示级不标成不通过", html.count("不通过") == 1, f"{html.count('不通过')} 次")
-    check("HTML 把 **粗体** 转成标签",
-          "<strong>" in html and "**" not in html)
+    check("HTML 把 **粗体** 转成标签（p/bullets/note 全覆盖）",
+          "<strong>" in html and "**" not in html
+          and "<strong>粗体</strong>" in html)
     check("HTML 转义尖括号（防注入）", "<script>" not in html)
     txt = _text_of_docx(paths["docx"])
     check("Word 写入「不通过」", "不通过" in txt)

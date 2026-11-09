@@ -1766,7 +1766,9 @@ def render_html(rep: Report) -> str:
             items = "".join(f"<li>{rich(x)}</li>" for x in b["items"])
             body.append(f"<ul>{items}</ul>")
         elif t == "note":
-            body.append(f'<p style="color:#59636e;font-size:12.5px">{_h(b["text"])}</p>')
+            # 与 Word 的 DocWriter.note() 对齐：note 里同样会写 **粗体**，
+            # 直接 _h 会把星号原样印进 HTML/PDF（Word 侧早就用 _text_runs 处理了）。
+            body.append(f'<p style="color:#59636e;font-size:12.5px">{rich(b["text"])}</p>')
         elif t == "metrics":
             cards = "".join(
                 f'<div class="card"><div class="k">{_h(m.label)}</div>'
