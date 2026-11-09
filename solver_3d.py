@@ -75,6 +75,10 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
     # 模态：内核在成桥态构型 + 线弹性刚度上求的 Kφ=λMφ，与下面
     # lane_impact 的 f1_vertical 是同一次特征求解，不是 Python 另算的。
     res.modal = dict(raw.get("modal") or {})
+    # 线性屈曲：内核在成桥态构型 + 成桥态恒载合力上解 (K+λKg)φ=0。
+    # λ 为空不一定是失败（STATUS=no_compression 是物理预期），状态与
+    # 诊断一并带过来，由 buckling_3d 统一解释，不在这里另判一遍。
+    res.buckling = dict(raw.get("buckling") or {})
     res.disp = dict(raw.get("disp") or {})
     res.beam = {int(k): dict(v) for k, v in (raw.get("beam") or {}).items()}
     res.live = {int(k): tuple(v) for k, v in (raw.get("live") or {}).items()}
@@ -107,6 +111,11 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
         "模态取成桥态构型（各阶段 activate/deactivate 后的单元）+ 线弹性刚度"
         "的一致质量矩阵，求前 8 阶 Kφ=λMφ；与汽车冲击系数的 f1_vertical "
         "出自同一次特征求解。参与质量未覆盖全部竖向质量时不宜做反应谱分析。")
+    res.diagnostics.append(
+        "线性屈曲取成桥态构型 + 成桥态恒载合力作参考荷载（阶段增量累加），"
+        "按 (K+λ·Kg)φ=0 求前 6 阶 λ，Pcr=λ·P_ref。λ 是荷载整体放大倍数，"
+        "不是规范稳定安全系数；不含初始缺陷/材料非线性/几何非线性，是上限。"
+        "参考荷载下没有受压杆件时 STATUS=no_compression、无 λ，属物理预期。")
     if any(float(getattr(s, "time", 0.0) or 0.0) > 0.0
            for s in getattr(model, "stages", []) or []):
         from result_3d import stage_time_effect_note
@@ -131,6 +140,9 @@ def _adapt_cable(model: Any, raw: dict, res: SolveResult) -> None:
     # 索承体系模态必须用成桥态一致切线刚度（张紧索的切线刚度 >> 弹性刚度），
     # 由内核 modalFromTangent 给出，与 f1_vertical / μ 同源。
     res.modal = dict(raw.get("modal") or {})
+    # 内核对索承体系只写 ERROR=nonlinear_state_not_supported 段，这里照收，
+    # 报告层如实标注「本次未产出」，不拿线弹性 λ 冒充非线性稳定结论。
+    res.buckling = dict(raw.get("buckling") or {})
     meta = dict(raw.get("meta") or {})
     res.meta = meta
     res.converged = bool(raw.get("converged"))
@@ -170,6 +182,10 @@ def _adapt_cable(model: Any, raw: dict, res: SolveResult) -> None:
     res.diagnostics.append(
         "模态在成桥态一致切线刚度上求 Kφ=λMφ（含索的 Ernst 效应与几何刚度），"
         "线弹性装配刚度会把索算软、基频算低；与 f1_vertical / 冲击系数 μ 同源。")
+    res.diagnostics.append(
+        "线性屈曲因子不适用：成桥态是共转列式几何非线性平衡态，一致切线刚度"
+        "已含成桥态几何刚度。需做非线性稳定全过程（荷载–位移极值点）分析，"
+        "本版本未覆盖，内核写 [BUCKLING] ERROR 段而不是给一个假的 λ。")
     res.diagnostics.append(
         "梁端内力（[GIRDEREND]）是成桥态恒载标准值；活载内力包络（[GIRDER_LIVE]）"
         "在成桥态切线刚度上线性化求得（索的切线刚度远大于弹性刚度，不能用线弹性"

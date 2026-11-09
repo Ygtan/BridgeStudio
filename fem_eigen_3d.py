@@ -22,6 +22,7 @@ import re
 import subprocess
 from pathlib import Path
 
+from buckling_3d import parse_buckling_section
 from fem_eigen_export import FEM_EIGEN_DIR
 from modal_3d import parse_modal_section
 
@@ -54,6 +55,7 @@ def parse_summary(path: Path) -> dict:
           "final_disp": {(node,dof): u} # 成桥态位移
           "live_beam": {elem: {MyMin,MyMax,VzMin,VzMax}}}  # 成桥态活载内力包络
           "modal": {...}                  # 各阶频率/周期/参与质量/节点振型
+          "buckling": {...}               # 各阶线性屈曲荷载因子 λ / Pcr / 诊断
 
     梁内力**逐分量**解析（键名不写死）。旧版 summary 只输出 N/Mz，新版输出
     六个分量——竖向受弯的弯矩落在 My 上（纵向梁沿 X，绕局部 y 水平轴），
@@ -73,10 +75,13 @@ def parse_summary(path: Path) -> dict:
     lane_impact: dict = {}
     stage_cables: dict = {}
     stage_prestress: dict = {}
-    modal_lines: list[str] | None = None   # None = 内核根本没写 modal 段
+    modal_lines: list[str] | None = None      # None = 内核根本没写 modal 段
+    buckling_lines: list[str] | None = None   # None = 内核根本没写 buckling 段
 
     # 段名按**完整前缀**分派，不做子串匹配："beam force envelope" 与
     # "final stage beam force" 都含 "beam force"，用子串会串段。
+    # 新段必须登记在这里：不登记的段头会留在上一个 section 里，buckling
+    # 的 REF/L 行会被当成 modal 段的行收进去，污染旧段。
     sections = (
         "stage displacement envelope",
         "beam force envelope",
@@ -88,6 +93,7 @@ def parse_summary(path: Path) -> dict:
         "stage cable tension",
         "stage prestress force",
         "modal",
+        "buckling",
     )
     section = ""
     re_disp = re.compile(r"^N(\d+) dof(\d+) min=(\S+) max=(\S+)$")
@@ -120,6 +126,8 @@ def parse_summary(path: Path) -> dict:
             section = hit
             if hit == "modal":
                 modal_lines = []
+            elif hit == "buckling":
+                buckling_lines = []
             continue
         if section == "stage displacement envelope":
             m = re_disp.match(line)
@@ -175,16 +183,21 @@ def parse_summary(path: Path) -> dict:
             # 模态段的行格式由 modal_3d.py 统一解析（与 cable_solver 共用），
             # 这里只负责收行——两个求解器不各写一套正则。
             modal_lines.append(line)
+        elif section == "buckling" and buckling_lines is not None:
+            buckling_lines.append(line)
 
     modal = parse_modal_section(modal_lines or [])
     if modal_lines is None:
         modal["error"] = "no_modal_section"
+    buckling = parse_buckling_section(buckling_lines or [])
+    if buckling_lines is None:
+        buckling["error"] = "no_buckling_section"
     return {"disp": disp, "beam": beam, "live": live,
             "final_beam": final_beam, "final_disp": final_disp,
             "live_beam": live_beam, "lane_impact": lane_impact,
             "stage_cables": stage_cables,
             "stage_prestress": stage_prestress,
-            "modal": modal}
+            "modal": modal, "buckling": buckling}
 
 
 def solve_3d(model, out_dir: str | Path, dat_name: str = "model_3d.dat") -> dict:

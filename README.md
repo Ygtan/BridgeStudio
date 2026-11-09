@@ -63,8 +63,8 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        3D .dat 导出；基准 = 三跨连续箱梁 3D 梁格（对照 FEM-Eigen 黄金基线
        `bridge_3d_grillage`）
 - [ ] **P2** 高级能力全量暴露：施工阶段（STAGE）、预应力（PRESTRESS_LOSS）、
-       车道荷载/影响面（LANE_3D/INFLUENCE_3D）、**屈曲因子**（内核已算但尚未
-       全量暴露）；模态已于 2026-11-08 全量暴露（见下）；JTG D60 荷载组合引擎
+       车道荷载/影响面（LANE_3D/INFLUENCE_3D）；模态（2026-11-08）与线性屈曲
+       因子（2026-11-09）已全量暴露（见下）；JTG D60 荷载组合引擎
 - [x] **P3** 内核攻坚：共转列式非线性 + 索长迭代 → 斜拉桥成桥态 —— 2026-10-30
 - [x] **P3** 悬索桥成桥态（自锚式 / 地锚式）：主缆索多边形找形（对 H 二分命中
        矢高）→ 平衡态弦长反算 L₀ → 索长迭代；两体系共用同一套内核，只差边界。
@@ -143,6 +143,30 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        PDF，界面 `ui_3d._report_block` 四按钮下载。`verify_report_3d.py`
        125/125（含 PDF 逐页文本、条文号、插图、空白页与故障注入）、
        `verify_capacity.py` 131/131。—— 2026-11-08
+- [x] **P3** 线性屈曲因子全量暴露：内核 `computeBucklingResult3D` 本来就在解
+       `(K+λ·Kg)φ=0`（此前只在 `example_3d_modal` / `modal_bench` 打印到控制台）。
+       新增 `FEM-Eigen/buckling_output_3d.hpp` 写 `buckling` / `[BUCKLING]` 段
+       （前 6 阶 λ、Pcr=λ·P_ref、Kg 非零元数/受压标志/自由自由度等诊断）；
+       `finalStageBucklingModel3D` 用成桥态构型 + 成桥态恒载合力作参考荷载
+       （阶段增量按节点/自由度累加）。几何刚度补齐 TRUSS/CABLE 的横向投影式
+       （原来只装 BEAM，空间桁架桥 Kg 恒为 0、永远算不出 λ）。Python 侧
+       `buckling_3d.py` 统一解析 → `SolveResult.buckling` → 指标卡 / info 校核 /
+       `buckling_table` → 报告独立「线性屈曲与稳定」章与 λ 柱状图 → 四出口。
+       **口径**：λ 是荷载整体放大倍数，不是 JTG 3362 §5.3 的稳定系数 φ，
+       规范没有 λ 的合格限值；`STATUS=no_compression`（梁格只受竖向荷载、无压杆）
+       是物理预期，不摆空表；索承体系成桥态为几何非线性、切线刚度已含几何刚度，
+       内核写 `ERROR=nonlinear_state_not_supported`，报告如实标注「本次未产出」。
+       `verify_buckling_3d.py`（含 20 段悬臂柱 Euler 闭式解 λ₁=20.33138507 对拍，
+       误差 5×10⁻⁸）。—— 2026-11-09
+- [x] **P3** PDF 归档增强（页码 / 章节书签）：`write_pdf` 在 Chromium 打印后
+       加一层 pypdf 后处理——页脚叠 `N / 总页数`（Helvetica 标准字体，
+       不嵌中文字体）、按 `render_html` 打印的 4px 白色锚点 `BKSEC<块号>Z`
+       精确定位章节页并写 `/Outlines`（h1 一级 / h2 二级）、补齐标题与结果
+       指纹等元数据。**Chromium 仍是唯一排版器**，pypdf 不改正文一个字。
+       锚点丢失 / 书签为空 / pypdf 缺失一律抛 `PDFExportError`，界面保留
+       Word/HTML/CSV，不交付"假归档版"；`navigation=False` 为显式降级对照。
+       `verify_buckling_3d.py` + `verify_report_3d.py` 逐页对拍页码、书签标题与
+       目标页顺序。—— 2026-11-09
 - [x] **P3** 负弯矩区双向验算 + 非对称配筋（JTG 3362 §5.2.2/5.2.3、
        §5.3.4-4/5）：`CapacitySection` 加 `FaceSpec negative`（底板宽厚与顶板
        纵筋可单独登记）和 `Asp_given`（显式受压筋，可为 0=单筋）；

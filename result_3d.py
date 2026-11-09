@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import buckling_3d
 import combination
 import code_material
 import modal_3d
@@ -276,6 +277,15 @@ class SolveResult:
     # 此时不产生模态校核，也不假装"验过了"；真实求解总有这一段，
     # 内核算不出时会带 error 并给出 warn。
     modal: dict[str, Any] = field(default_factory=dict)
+
+    # ---- 线性屈曲荷载因子 ----------------------------------------------
+    # (K + λ·Kg)φ = 0 由 FEM-Eigen 线性内核求解；形状见
+    # buckling_3d.parse_buckling_section：
+    #   {"nmodes", "ndof", "basis", "ref": {...}, "status",
+    #    "modes": [{order, lambda, pcr_kN}], "error"}。
+    # 索承体系成桥态是几何非线性，内核只给 ERROR=nonlinear_state_not_supported；
+    # 空 dict = 手工构造/旧序列化结果，此时不产生屈曲校核，也不假装验过。
+    buckling: dict[str, Any] = field(default_factory=dict)
 
     diagnostics: list[str] = field(default_factory=list)
 
@@ -587,6 +597,20 @@ class SolveResult:
             out.append(Metric(
                 "一阶自振频率", "未产出",
                 hint=modal_3d.ERROR_TEXT.get(md["error"], md["error"])))
+        # 屈曲：λ 是荷载放大倍数，不是规范安全系数。没有 λ 时按内核
+        # STATUS / ERROR 写明是"物理上无压杆"还是"本内核不适用"。
+        bk = self.buckling or {}
+        lam1 = buckling_3d.first_factor(bk)
+        if lam1 is not None:
+            out.append(Metric(
+                "一阶屈曲因子 λ₁", f"{lam1:.2f}",
+                hint=f"Pcr = {bk['modes'][0]['pcr_kN']:,.0f} kN；"
+                     f"参考荷载 {bk['ref']['pref_kN']:,.0f} kN；"
+                     f"共 {len(bk['modes'])} 阶"))
+        elif bk:
+            out.append(Metric(
+                "一阶屈曲因子 λ₁", "未产出",
+                hint=buckling_3d.status_note(bk)))
         return out
 
     def max_bending(self) -> tuple[int, float] | None:
@@ -696,6 +720,7 @@ class SolveResult:
         out += self._checks_stage_cable(model)
         out += self._checks_stage_prestress(model)
         out += self._checks_modal()
+        out += self._checks_buckling()
         return out
 
     def _checks_modal(self) -> list[Check]:
@@ -737,6 +762,63 @@ class SolveResult:
                 "竖向参与质量覆盖率", True,
                 modal_3d.participation_note(md),
                 value=ratios[-1], unit="1", level="info"))
+        return out
+
+    def _checks_buckling(self) -> list[Check]:
+        """线性屈曲结果的自检与工程提示。
+
+        这里判的是"λ 与 P_ref 同不同源、内核状态是什么、参考荷载有没有
+        超过临界荷载"，**不是**"稳定验算合不合格"——规范没有 λ 的合格
+        限值，硬编一个就是假校核。唯一够格判"不通过"的是数学事实
+        λ₁ ≤ 1（参考荷载已达到/超过线性临界荷载）。
+        """
+        bk = self.buckling or {}
+        if not bk:
+            return []                     # 手工构造/旧结果：没有就不假装验过
+        issues = buckling_3d.validate(bk)
+        lam = buckling_3d.first_factor(bk)
+        # 索承体系"线弹性屈曲不适用"是**设计边界**，不是这次求解算砸了。
+        # 标成 warn/不通过会让工程校核汇总凭空多一条"不通过"，读者以为
+        # 结果有问题；用 info 级把边界写清楚，报告章与 diagnostics 照样
+        # 明确写"本次未产出"，不静默。
+        if bk.get("error") == "nonlinear_state_not_supported":
+            return [Check(
+                "线性屈曲与稳定", True,
+                buckling_3d.status_note(bk)
+                + " 构件稳定仍按 JTG 3362-2018 §5.3 在「工程校核」验算，"
+                  "整体稳定需另做非线性稳定全过程分析。",
+                level="info")]
+        hard = bool(bk.get("error")) or bk.get("status") in (
+            "no_modes", "no_free_dof", "cholesky_failed")
+        if issues and hard:
+            return [Check("线性屈曲与稳定", False,
+                          "；".join(issues), level="warn")]
+        if lam is None:
+            # STATUS=no_compression：参考荷载下没有受压杆件，本来就没有
+            # 压屈模态。写清楚，别让用户以为"安全系数无限大"。
+            return [Check(
+                "线性屈曲荷载因子", True,
+                buckling_3d.status_note(bk)
+                + " 本次未产出 λ，不构成稳定验算结论。",
+                level="info")]
+        out = [Check(
+            "一阶线性屈曲荷载因子", True,
+            buckling_3d.load_note(bk),
+            value=lam, unit="1", level="info")]
+        out.append(Check(
+            "线性屈曲适用范围", True,
+            "λ 是参考荷载整体放大倍数，不是 JTG 3362-2018 §5.3 的构件稳定"
+            "系数 φ；规范没有 λ 的合格限值。线性屈曲不含初始缺陷、材料非线性"
+            "与几何非线性，是稳定承载力的上限。构件稳定仍按 §5.3 验算，整体"
+            "稳定需另做非线性全过程（荷载–位移极值点）分析。",
+            level="info"))
+        if lam <= 1.0:
+            out.append(Check(
+                "参考荷载与临界荷载", False,
+                f"λ₁ = {lam:.4f} ≤ 1：按 (K+λ·Kg)φ=0，参考荷载已达到或超过"
+                "线性临界荷载。这里的 1 是数学分界，不是规范限值；须复核"
+                "荷载/约束/构型并改做非线性稳定分析。",
+                value=lam, limit=1.0, unit="1", level="warn"))
         return out
 
     def _checks_stage_cable(self, model: Any) -> list[Check]:
@@ -1784,6 +1866,11 @@ class SolveResult:
         md = self.modal or {}
         if md.get("modes") and not md.get("error"):
             out["modal_table"] = modal_3d.modal_table(md)
+        # 屈曲表：只在内核确实给出 λ 时给。no_compression / ERROR 段不给表，
+        # 由 checks() 的 info/warn 写明原因，不摆一张只有表头的空表。
+        bk = self.buckling or {}
+        if bk.get("status") == "ok" and bk.get("modes") and not bk.get("error"):
+            out["buckling_table"] = buckling_3d.buckling_table(bk)
 
         if self.cables:
             rows = []
@@ -2129,6 +2216,9 @@ class SolveResult:
             "n_reaction": len(self.reaction),
             "n_modes": len(self.modal.get("modes") or []),
             "modal_error": self.modal.get("error", ""),
+            "n_buckling_modes": len(self.buckling.get("modes") or []),
+            "buckling_status": self.buckling.get("status", ""),
+            "buckling_error": self.buckling.get("error", ""),
             "diagnostics": list(self.diagnostics),
             "metrics": [m.to_dict() for m in self.metrics()],
             "checks": [c.to_dict() for c in self.checks()],

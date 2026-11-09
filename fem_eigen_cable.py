@@ -35,6 +35,9 @@
     res["u"]       = {(node, dof): 值}        成桥位移（dof 1..6）
     res["modal"]   = modal_3d 的统一结构      成桥态切线刚度上的各阶频率/周期/
                                               参与质量/节点振型（[MODAL] 段）
+    res["buckling"] = buckling_3d 的统一结构  线性屈曲不适用 → ERROR 段
+                                              （nonlinear_state_not_supported），
+                                              不静默、不拿线弹性 λ 冒充
     res["dat"], res["result"], res["stdout"]
 
 用法
@@ -51,6 +54,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from buckling_3d import parse_buckling_section
 from fem_eigen_export import FEM_EIGEN_DIR
 from modal_3d import parse_modal_section
 
@@ -104,7 +108,9 @@ def parse_cable_result(path: str | Path) -> dict:
     erection: list[dict] = []
     erection_shape: dict[int, list[float]] = {}
     modal_lines: list[str] = []
+    buckling_lines: list[str] = []
     has_modal_section = False
+    has_buckling_section = False
     sec = ""
     for raw in txt:
         line = raw.strip()
@@ -114,6 +120,10 @@ def parse_cable_result(path: str | Path) -> dict:
             sec = line.strip("[]").upper()
             if sec == "MODAL":
                 has_modal_section = True
+            elif sec == "BUCKLING":
+                # 必须登记：否则 ERROR=nonlinear_state_not_supported 会
+                # 被当成 [MODAL] 段的未知行，下游"没解析到"就当没这回事。
+                has_buckling_section = True
             continue
         if sec in ("", "CABLE_SOLVER"):
             if line.startswith("cable_solver"):
@@ -206,12 +216,17 @@ def parse_cable_result(path: str | Path) -> dict:
         elif sec == "MODAL":
             # 成桥态切线刚度上的模态段，与 fem_eigen_3d 共用同一个解析器。
             modal_lines.append(line)
+        elif sec == "BUCKLING":
+            buckling_lines.append(line)
 
     modal = parse_modal_section(modal_lines)
     if not has_modal_section:
         modal["error"] = "no_modal_section"
+    buckling = parse_buckling_section(buckling_lines)
+    if not has_buckling_section:
+        buckling["error"] = "no_buckling_section"
     return {"meta": meta, "cables": cables, "camber": camber,
-            "modal": modal,
+            "modal": modal, "buckling": buckling,
             "erected": erected, "u": u, "main_cable": main_cable,
             "hangers": hangers, "girder": girder, "girder_ends": girder_ends,
             "girder_live": girder_live, "reaction": reaction,

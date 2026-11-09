@@ -404,7 +404,8 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
     c1, c2 = st.columns([1.1, 2.2])
     if c1.button("生成报告", key="r3d_report_btn",
                  help="同一份内容同时产出 Word、HTML、CSV 数据包与 PDF 计算书"
-                      "（PDF 需本机 Microsoft Edge / Chrome）"):
+                      "（PDF 需本机 Microsoft Edge / Chrome；归档版带页码与"
+                      "章节书签）"):
         with st.spinner("排版报告（表格、插图、结论、PDF 打印）…"):
             try:
                 _opt = st.session_state.get("r3d_opt")

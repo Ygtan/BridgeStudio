@@ -47,6 +47,7 @@ import datetime as _dt
 import io
 import math
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -55,6 +56,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+import buckling_3d
 import modal_3d
 import view_3d
 from result_3d import (CABLE_FPU_DEFAULT, CABLE_SAFETY_MIN,
@@ -233,6 +235,37 @@ def figure_mode_shape(res: SolveResult, model: Any, path: Path,
     ax.set_xlabel("顺桥向 x (m)　（红虚线 = 支承断面）")
     ax.set_ylabel("归一化竖向振型 φw")
     ax.grid(alpha=0.25, lw=0.5)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
+def figure_buckling(res: SolveResult, model: Any, path: Path) -> Path:
+    """各阶线性屈曲荷载因子 λ（对数纵轴）。λ=1 是参考荷载分界线。
+
+    高阶 λ 常比一阶大一个数量级，线性纵轴会把低阶挤成一条线；用对数轴
+    才能同时看清 λ₁ 与后续各阶。柱顶标数值、λ≤1 的柱标红 —— 那是
+    "参考荷载已达临界荷载"的数学事实，不是规范限值判定。
+    """
+    plt = _plt()
+    modes = (res.buckling or {}).get("modes") or []
+    orders = [int(m["order"]) for m in modes]
+    lams = [float(m["lambda"]) for m in modes]
+    fig, ax = plt.subplots(figsize=(7.4, 3.0))
+    if lams:
+        ax.bar(orders, lams, width=0.6,
+               color=[C_RED if v <= 1.0 else C_BLUE for v in lams], alpha=0.85)
+        for o, v in zip(orders, lams):
+            ax.text(o, v, f"{v:.2f}", ha="center", va="bottom", fontsize=8)
+        ax.set_yscale("log")
+        ax.set_ylim(min(0.5, min(lams) * 0.5), max(lams) * 3.0)
+    ax.axhline(1.0, color=C_RED, ls="--", lw=1.0, label="λ = 1（参考荷载）")
+    ax.set_xticks(orders)
+    ax.set_xlabel("屈曲阶次")
+    ax.set_ylabel("荷载因子 λ（对数）")
+    ax.grid(alpha=0.25, lw=0.5, axis="y")
+    ax.legend(frameon=False, fontsize=9)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     fig.tight_layout()
@@ -897,6 +930,10 @@ CAPACITY_TABLE_KEYS = (
 MODAL_TABLE_KEY = "modal_table"
 MODAL_FIGURE_PREFIX = "mode_shape_"
 
+#: 屈曲章：λ 表与 λ 柱状图跟着章节走，不塞进通用图循环或文末明细表。
+BUCKLING_TABLE_KEY = "buckling_table"
+BUCKLING_FIGURE_KEY = "buckling_factors"
+
 
 @dataclass
 class Figure:
@@ -1068,6 +1105,16 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
                 note="主梁节点竖向分量 φw，按本阶峰值归一到 ±1；纵轴数值无量纲，"
                      "形状与零点位置才有物理意义。振型由内核 Kφ=λMφ 给出，"
                      "未叠加到结构几何上，故不是变形图。")
+
+    # 屈曲图：只在内核确实给出 λ 时生成。no_compression / ERROR 段不画
+    # 一张空坐标轴 —— 那会被读成"λ 全为零"，而不是"本次没有 λ"。
+    bk = res.buckling or {}
+    if bk.get("modes") and not bk.get("error"):
+        out[BUCKLING_FIGURE_KEY] = Figure(
+            BUCKLING_FIGURE_KEY, "各阶线性屈曲荷载因子 λ",
+            figure_buckling(res, model, d / "buckling_factors.png"),
+            note="纵轴为对数刻度；红色虚线 λ=1 表示参考荷载本身，即"
+                 "「荷载放大 1 倍就失稳」的数学分界，不是规范限值。")
     return out
 
 
@@ -1187,6 +1234,39 @@ def _modal_paragraph(res: SolveResult) -> str:
         txt += f" 竖向主导的最低阶约 {vf:.4f} Hz。"
     txt += " " + modal_3d.participation_note(md)
     return txt
+
+
+def _buckling_paragraph(res: SolveResult) -> str:
+    """屈曲章节引言：把"λ 是什么、P_ref 是什么、不是什么"写死在纸上。
+
+    最容易翻车的两处：把 λ 当成规范稳定安全系数去判"合格"；把
+    "参考荷载下没有受压杆件"写成"稳定验算通过"。两者都不能出现。
+    """
+    bk = res.buckling or {}
+    if not bk:
+        return ("本次结果没有线性屈曲段（旧内核或手工构造结果）。"
+                "内核没算就不补一个估计的 λ。")
+    if bk.get("error"):
+        return ("本次未产出线性屈曲荷载因子：" + buckling_3d.status_note(bk)
+                + " 索承体系的构件稳定仍按 JTG 3362-2018 §5.3 在"
+                  "「工程校核」章验算；整体稳定需另做非线性全过程分析。")
+    modes = bk.get("modes") or []
+    ref = bk.get("ref") or {}
+    if not modes:
+        return (f"参考荷载 P_ref = Σ|Fi| = {ref.get('pref_kN', 0.0):,.1f} kN"
+                "（成桥态构型 + 成桥态恒载合力，阶段增量按节点/自由度累加），"
+                "在其上组装几何刚度 Kg 并解 (K + λ·Kg)φ = 0。"
+                + buckling_3d.status_note(bk)
+                + " 本次没有 λ，也不摆一张空表冒充验算结果。")
+    return (
+        f"按 (K + λ·Kg)·φ = 0 求前 {len(modes)} 阶线性屈曲荷载因子，"
+        "K、Kg 与 λ 均由 FEM-Eigen 内核给出：K 取成桥态构型的线弹性刚度，"
+        "Kg 由参考荷载下各单元轴力组装（BEAM 一致几何刚度、TRUSS/CABLE "
+        f"横向投影式），参考荷载 P_ref = Σ|Fi| = {ref.get('pref_kN', 0.0):,.1f} kN，"
+        f"临界荷载 Pcr = λ·P_ref。{buckling_3d.load_note(bk)} "
+        "λ 是荷载整体放大倍数，不是规范稳定安全系数；线性屈曲不含初始缺陷、"
+        "材料非线性与几何非线性，是稳定承载力的上限。构件稳定另按 "
+        "JTG 3362-2018 §5.3 验算，整体稳定需做非线性全过程分析。")
 
 
 def _stage_paragraph(res: SolveResult) -> str:
@@ -1388,6 +1468,12 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     modal_fig_keys = [k for k in figs if k.startswith(MODAL_FIGURE_PREFIX)]
     if modal_chapter:
         skip_fig.update(modal_fig_keys)   # 振型图只在模态章出现一次
+    # 屈曲章只要内核给了段就出：索承体系的 ERROR 段、梁格的
+    # no_compression 段都得在报告里写明"本次未产出 λ"及原因，不能
+    # 因为没表就整章消失（那样用户会以为这项根本没算过）。
+    buckling_chapter = bool(res.buckling)
+    if buckling_chapter:
+        skip_fig.add(BUCKLING_FIGURE_KEY)
     if stage_chapter:
         skip_fig.add(STAGE_FIGURE_KEY)
     if erection_chapter:
@@ -1413,6 +1499,23 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
             "逐阶累计越接近该方向平动总质量，截断阶数越充分。本程序只给"
             "自振频率、周期与振型，不做反应谱、模态叠加、时程或风致振动"
             "分析；累计占比不足时不得把前几阶当作全模态使用。")})
+
+    if buckling_chapter:
+        blocks.append({"type": "h1", "text": "线性屈曲与稳定"})
+        blocks.append({"type": "p", "text": _buckling_paragraph(res)})
+        if BUCKLING_TABLE_KEY in tabs:
+            blocks.append({"type": "table", "key": BUCKLING_TABLE_KEY})
+        if BUCKLING_FIGURE_KEY in figs:
+            blocks.append({"type": "figure", "key": BUCKLING_FIGURE_KEY})
+        blocks.append({"type": "note", "text": (
+            "本章是**整体线弹性屈曲**，与 JTG 3362-2018 §5.3 的构件稳定系数 "
+            "φ（按 l0/b 或 l0/i 查表）不是一回事，后者在「工程校核」与"
+            "「承载力计算书」章单独验算。线性屈曲假设完善直杆、小变形、"
+            "线弹性材料，不含初始缺陷、残余应力、局部屈曲与几何非线性，"
+            "所得 λ·P_ref 是真实稳定承载力的上限。规范没有 λ 的合格限值，"
+            "本报告不据此给出合格判定；λ₁ ≤ 1 只说明参考荷载已达"
+            "或超过线性临界荷载。索承体系成桥态为几何非线性平衡态，"
+            "本章按内核返回的 ERROR 段如实标注「本次未产出」。")})
 
     if stage_chapter:
         blocks.append({"type": "h1", "text": "施工阶段索力"})
@@ -1514,6 +1617,7 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     rest.pop("monitor_plan", None)
     rest.pop("opt_round", None)
     rest.pop(MODAL_TABLE_KEY, None)      # 已跟着「模态与自振特性」章走
+    rest.pop(BUCKLING_TABLE_KEY, None)   # 已跟着「线性屈曲与稳定」章走
     for key in CAPACITY_TABLE_KEYS:      # 已跟着「承载力计算书」章走
         rest.pop(key, None)
     if rest:
@@ -1574,6 +1678,12 @@ figcaption{font-size:12.5px;font-weight:700;color:var(--mut);text-align:center;m
 ul{margin:6px 0 12px;padding-left:22px;} li{margin:3px 0;}
 .foot{margin-top:36px;padding-top:12px;border-top:1px solid var(--line);color:var(--mut);
       font-size:11.5px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+/* 归档书签锚点：屏幕/Word/CSV 都不显示，只在打印时以 4px 白字进入
+   PDF 文本层。pypdf 逐页搜 BKSEC<块号> 即可精确定位章节页，不必靠
+   "标题文字在第几页出现"猜（目录、正文引用里都可能撞上同名字符串）。
+   这条必须写在 @media print 之前，否则同特异性的 display:none
+   会在打印时反过来盖掉内联规则。 */
+.om{display:none}
 /* 打印 / PDF：A4，长表按行分页且表头逐页重复，图与标题不跨页。
    注意别对整张 table 用 break-inside:avoid —— 明细表有 200+ 行，
    浏览器塞不进一页时会留大片空白甚至丢行。 */
@@ -1592,6 +1702,7 @@ ul{margin:6px 0 12px;padding-left:22px;} li{margin:3px 0;}
   td,th{word-break:break-word}
   th.nw,td.nw{font-size:8.5px}
   p,li{orphans:2;widows:2}
+  .om{display:inline;font-size:4px;color:#fff;white-space:nowrap}
 }
 """
 
@@ -1642,12 +1753,13 @@ def render_html(rep: Report) -> str:
 
     body: list[str] = []
     fig_no = tab_no = 0
-    for b in rep.blocks:
+    for idx, b in enumerate(rep.blocks):
         t = b["type"]
-        if t == "h1":
-            body.append(f"<h1>{_h(b['text'])}</h1>")
-        elif t == "h2":
-            body.append(f"<h2>{_h(b['text'])}</h2>")
+        if t in ("h1", "h2"):
+            # 书签锚点用**块下标**：write_pdf 的后处理按同一个下标从
+            # rep.blocks 取标题文本，标题改字也不会让书签对错位。
+            mark = f'<span class="om">BKSEC{idx:04d}Z</span>'
+            body.append(f"<{t}>{mark}{_h(b['text'])}</{t}>")
         elif t == "p":
             body.append(f"<p>{rich(b['text'])}</p>")
         elif t == "bullets":
@@ -1790,7 +1902,125 @@ def _pdf_browser() -> Path:
         "PDF 必须由同一份 HTML 打印得到，本程序不生成占位 PDF。")
 
 
-def write_pdf(rep: Report, path: str | Path, *, timeout: float = 180.0) -> Path:
+#: render_html 给每个 h1/h2 打印的锚点（块下标），pypdf 逐页搜它定位章节。
+_OUTLINE_TOKEN = re.compile(r"BKSEC(\d+)Z")
+
+
+def _stamp_page_number(page: Any, text: str) -> None:
+    """在页面底部空白区叠一行页码。
+
+    只写 ASCII，用 PDF 标准 14 字体 Helvetica（无需嵌入字体）。中文页码要
+    嵌 CJK 字体会让归档 PDF 体积暴涨，且 pypdf 无内置中文字形；报告正文
+    的中文仍由 Chromium 打印，不受影响。
+    """
+    from pypdf._page import PageObject
+    from pypdf.generic import (DecodedStreamObject, DictionaryObject,
+                               NameObject)
+
+    box = page.mediabox
+    w, h = float(box.width), float(box.height)
+    x0, y0 = float(box.left), float(box.bottom)
+    ov = PageObject.create_blank_page(width=w, height=h)
+    font = DictionaryObject({
+        NameObject("/Type"): NameObject("/Font"),
+        NameObject("/Subtype"): NameObject("/Type1"),
+        NameObject("/BaseFont"): NameObject("/Helvetica"),
+        NameObject("/Encoding"): NameObject("/WinAnsiEncoding"),
+    })
+    ov[NameObject("/Resources")] = DictionaryObject({
+        NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})})
+    # Helvetica 9pt 平均字宽 ≈ 4.6pt；页脚 y=18pt 落在 @page 16mm 下边距内，
+    # 不会压到正文（正文底边约 45pt）。
+    x = x0 + (w - len(text) * 4.6) / 2.0
+    y = y0 + 18.0
+    content = ("q\nBT\n/F1 9 Tf\n0.40 0.40 0.40 rg\n"
+               f"1 0 0 1 {x:.2f} {y:.2f} Tm\n({text}) Tj\nET\nQ\n")
+    stream = DecodedStreamObject()
+    stream.set_data(content.encode("ascii"))
+    ov[NameObject("/Contents")] = stream
+    page.merge_page(ov)
+
+
+def _pdf_postprocess(src: Path, dst: Path, rep: Report) -> int:
+    """给浏览器打印出的 PDF 加页码、章节书签与归档元数据。
+
+    返回书签字条数。**不改排版、不动内容**：Chromium 仍是唯一排版器，
+    pypdf 只在页面内容流上叠一行页脚、往 /Outlines 写目录。
+
+    锚点定位：``render_html`` 在每个 h1/h2 前打印 4px 白色 token
+    ``BKSEC<块下标>Z``，逐页 ``extract_text()`` 搜到它就知道该章从哪页
+    开始。按标题文字猜页码是不行的——正文、结论里会反复出现同一句话。
+
+    不静默：锚点丢失、书签没写进去、页数对不上都抛 `PDFExportError`，
+    界面据此给 warning 并保留 Word/HTML/CSV，绝不交付"看起来有书签、
+    实际没有"的 PDF。
+    """
+    try:
+        from pypdf import PdfReader, PdfWriter
+    except ImportError as e:
+        raise PDFExportError(
+            "PDF 归档增强（页码/书签）需要 pypdf；请先安装，或用 "
+            "write_pdf(..., navigation=False) 导出不带书签的纯打印版。") from e
+
+    reader = PdfReader(str(src))
+    n = len(reader.pages)
+    if n == 0:
+        raise PDFExportError("浏览器产出的 PDF 没有任何页面，无法归档。")
+
+    heads = [(i, b["text"], b["type"])
+             for i, b in enumerate(rep.blocks) if b["type"] in ("h1", "h2")]
+    page_of: dict[int, int] = {}
+    for pno, page in enumerate(reader.pages):
+        txt = page.extract_text() or ""
+        for m in _OUTLINE_TOKEN.finditer(txt):
+            page_of.setdefault(int(m.group(1)), pno)
+    missing = [i for i, _, _ in heads if i not in page_of]
+    if missing:
+        raise PDFExportError(
+            f"PDF 章节锚点丢失 {len(missing)}/{len(heads)} 个"
+            f"（块号 {missing[:5]}…）。可能是 HTML 走了非 render_html 的"
+            "渲染路径，或打印时锚点被裁掉；书签无法定位，已拒绝交付"
+            "一个没有书签却自称归档版的 PDF。")
+
+    writer = PdfWriter()
+    for page in reader.pages:
+        writer.add_page(page)
+    for k, page in enumerate(writer.pages):
+        _stamp_page_number(page, f"BridgeStudio  |  {k + 1} / {n}")
+
+    # h1 作一级书签、h2 挂在最近一个 h1 下；h1 之前若有 h2 就平铺为一级。
+    parent = None
+    for i, text, kind in heads:
+        pno = page_of[i]
+        if kind == "h1":
+            parent = writer.add_outline_item(text, pno)
+        elif parent is not None:
+            writer.add_outline_item(text, pno, parent=parent)
+        else:
+            writer.add_outline_item(text, pno)
+    writer.add_metadata({
+        "/Title": rep.title,
+        "/Subject": f"{rep.subtitle} 计算报告",
+        "/Author": "BridgeStudio",
+        "/Creator": "BridgeStudio / FEM-Eigen",
+        "/Producer": "Chromium 无头打印 + pypdf 归档",
+        "/Keywords": f"结果指纹 {rep.fingerprint}",
+    })
+    with dst.open("wb") as fh:
+        writer.write(fh)
+
+    # 读回自检：页数、书签存在性。页码文字由 verify_report_3d 逐页对拍，
+    # 这里不重复提取整份 200 行表，避免归档多花一倍时间。
+    chk = PdfReader(str(dst))
+    if len(chk.pages) != n:
+        raise PDFExportError("归档后页数与打印版不一致，已拒绝交付。")
+    if heads and not chk.outline:
+        raise PDFExportError("归档后 PDF 没有书签（/Outlines 为空），已拒绝交付。")
+    return len(heads)
+
+
+def write_pdf(rep: Report, path: str | Path, *, timeout: float = 180.0,
+              navigation: bool = True) -> Path:
     """把 `render_html(rep)` 交给无头浏览器按 A4 打印成 PDF。
 
     为什么不装第三方 PDF 库
@@ -1801,8 +2031,18 @@ def write_pdf(rep: Report, path: str | Path, *, timeout: float = 180.0) -> Path:
     直接吃现成 HTML，等于让 PDF 继承 HTML 的排版，只多一层 `@media print`。
     代价是一个外部浏览器进程，所以找不到浏览器时明确报错，不静默降级。
 
-    产物校验：先打到临时文件，确认是 `%PDF-` 开头且非空，再复制到目标。
-    这样"目标路径上有个旧 PDF"或"浏览器写失败"都不会被误判为成功。
+    归档增强（默认开）
+    ------------------
+    打印出的 PDF 再过一遍 `_pdf_postprocess`：页脚叠页码、按 h1/h2 写
+    /Outlines 章节书签、补齐标题/结果指纹等元数据。Chromium **仍是唯一
+    排版器**，pypdf 不改正文一个字，只加页脚与目录——不会出现"PDF 是
+    第四个渲染器"。锚点丢失、书签没写进去、pypdf 缺失都抛
+    `PDFExportError`，界面据此保留 Word/HTML/CSV，不交付"假归档版"；
+    `navigation=False` 用于回归对拍与显式降级，直接交付纯打印版。
+
+    产物校验：先打到临时文件，确认是 `%PDF-` 开头且非空，后处理完再校验
+    归档版，最后才复制到目标。这样"目标路径上有个旧 PDF"或"浏览器写失败"
+    都不会被误判为成功。
     """
     browser = _pdf_browser()
     out = Path(path).resolve()
@@ -1844,8 +2084,25 @@ def write_pdf(rep: Report, path: str | Path, *, timeout: float = 180.0) -> Path:
         if head != b"%PDF-" or tmp_pdf.stat().st_size < 1024:
             raise PDFExportError(
                 "浏览器产出的文件不是有效 PDF（头或大小异常），已拒绝交付。")
+
+        deliver = tmp_pdf
+        if navigation:
+            deliver = tmp / "report_nav.pdf"
+            try:
+                _pdf_postprocess(tmp_pdf, deliver, rep)
+            except PDFExportError:
+                raise
+            except Exception as e:                  # noqa: BLE001
+                raise PDFExportError(
+                    f"PDF 归档增强（页码/书签）失败：{e}。"
+                    "已拒绝交付不带书签的替代品；其余出口照常可用。") from e
+            with deliver.open("rb") as fh:
+                nav_head = fh.read(5)
+            if nav_head != b"%PDF-" or deliver.stat().st_size < 1024:
+                raise PDFExportError(
+                    "归档后 PDF 文件头或大小异常，已拒绝交付。")
         # 目标文件被 PDF 阅读器占用时 → PermissionError，交给 write_all._put 改名
-        shutil.copyfile(tmp_pdf, out)
+        shutil.copyfile(deliver, out)
     return out
 
 

@@ -210,6 +210,40 @@ def main() -> int:
                       "承载力计算书" in pdf_txt and hit >= 3,
                       f"条文命中 {hit}/{len(clauses)}")
 
+            # ---- 归档增强：页码 / 章节书签 / 元数据 ----
+            # write_all 走的是 write_pdf 默认 navigation=True，这里把成品
+            # 读回来对拍，确认不是"打印成功就自称归档版"。
+            from pypdf import PdfReader
+
+            def _flat(items):
+                for it in items:
+                    if isinstance(it, list):
+                        yield from _flat(it)
+                    else:
+                        yield it
+
+            rd = PdfReader(str(paths["pdf"]))
+            n_pdf = len(page_txt)
+            stamps = [f"{i + 1} / {n_pdf}" in txt for i, txt in enumerate(page_txt)]
+            check("PDF 每页都有页码「N / 总页数」", all(stamps),
+                  f"缺页码页 {[i + 1 for i, v in enumerate(stamps) if not v]}")
+            heads = [b["text"] for b in rep.blocks
+                     if b["type"] in ("h1", "h2")]
+            items = list(_flat(rd.outline))
+            titles = [str(x.get("/Title")) for x in items]
+            check("PDF 书签条数与报告章节数一致",
+                  len(items) == len(heads) and titles == heads,
+                  f"{len(items)} 条 / {len(heads)} 章；前 3 {titles[:3]}")
+            dests = [rd.get_destination_page_number(x) for x in items]
+            check("书签目标页有效且按章节顺序不倒退",
+                  all(0 <= d < n_pdf for d in dests)
+                  and all(dests[i + 1] >= dests[i]
+                          for i in range(len(dests) - 1)),
+                  f"{dests}")
+            check("PDF 元数据写入结果指纹与中文标题",
+                  rep.fingerprint in str((rd.metadata or {}).get("/Keywords", ""))
+                  and str((rd.metadata or {}).get("/Title", "")) == rep.title)
+
         # ---- HTML 对拍：表格行数、指标、校核结论 ----
         html = Path(paths["html"]).read_text(encoding="utf-8")
         check("HTML 无外链资源", "src=\"http" not in html and "<script src" not in html)
