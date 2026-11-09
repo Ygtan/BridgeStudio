@@ -40,6 +40,8 @@
                                               不静默、不拿线弹性 λ 冒充
     res["cable_length"] = cable_length_3d 的统一结构  索长迭代 / 几何闭合逐轮过程
                                               （[LENGTH] 段；无外层迭代写 ERROR）
+    res["newton"] = newton_3d 的 bundle         最终成桥态那一次共转列式内层
+                                              Newton 过程（[NEWTON] 段）
     res["dat"], res["result"], res["stdout"]
 
 用法
@@ -60,6 +62,8 @@ from buckling_3d import parse_buckling_section
 from cable_length_3d import parse_cable_length_section
 from fem_eigen_export import FEM_EIGEN_DIR
 from modal_3d import parse_modal_section
+from newton_3d import bundle as newton_bundle
+from newton_3d import parse_newton_section
 
 EXE_CABLE_CANDIDATES = [
     (FEM_EIGEN_DIR / "build" / "cable_solver.exe") if FEM_EIGEN_DIR else None,
@@ -113,9 +117,11 @@ def parse_cable_result(path: str | Path) -> dict:
     modal_lines: list[str] = []
     buckling_lines: list[str] = []
     length_lines: list[str] = []
+    newton_lines: list[str] = []
     has_modal_section = False
     has_buckling_section = False
     has_length_section = False
+    has_newton_section = False
     sec = ""
     for raw in txt:
         line = raw.strip()
@@ -133,6 +139,9 @@ def parse_cable_result(path: str | Path) -> dict:
                 # 必须登记：否则 [LENGTH] 的 ERROR= 会被当成前一个段
                 # 的未知行，下游"没解析到"就当没这回事。
                 has_length_section = True
+            elif sec == "NEWTON":
+                # 同样必须登记：否则 S 行会污染 [LENGTH] 段。
+                has_newton_section = True
             continue
         if sec in ("", "CABLE_SOLVER"):
             if line.startswith("cable_solver"):
@@ -229,6 +238,8 @@ def parse_cable_result(path: str | Path) -> dict:
             buckling_lines.append(line)
         elif sec == "LENGTH":
             length_lines.append(line)
+        elif sec == "NEWTON":
+            newton_lines.append(line)
 
     modal = parse_modal_section(modal_lines)
     if not has_modal_section:
@@ -239,9 +250,11 @@ def parse_cable_result(path: str | Path) -> dict:
     cable_length = parse_cable_length_section(length_lines)
     if not has_length_section:
         cable_length["error"] = "no_length_section"
+    newton = newton_bundle([parse_newton_section(newton_lines)],
+                           "" if has_newton_section else "no_newton_section")
     return {"meta": meta, "cables": cables, "camber": camber,
             "modal": modal, "buckling": buckling,
-            "cable_length": cable_length,
+            "cable_length": cable_length, "newton": newton,
             "erected": erected, "u": u, "main_cable": main_cable,
             "hangers": hangers, "girder": girder, "girder_ends": girder_ends,
             "girder_live": girder_live, "reaction": reaction,

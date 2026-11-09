@@ -184,6 +184,24 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        规范意义上的合格判定**。`verify_cable_length_3d.py` 58/58：手写段逐
        字段对拍 + 10 类故障注入 + 段分派不串段 + 独立 oracle（J 对角全负、
        误差单调下降、两段同源）+ 三模式实跑 + 四出口 PDF 读回。—— 2026-11-09
+- [x] **P3** 阶段二 A 续「暴露内层共转列式 Newton 过程量」：上一轮只补了
+       **外层**迭代，`solveModel3DNonlinear` 的荷载步 / 逐次 Newton 残差仍只
+       打在 verbose 控制台。内核新增 `NewtonStep3D` / `NewtonTrace3D` 与
+       `FEM-Eigen/newton_output_3d.hpp`，写 `[NEWTON]` 段（逐迭代 `S` 行：
+       荷载步、步内迭代、λ、|R|、|du|、|Ftarget|、重建分解、本步收敛）；
+       `cable_solver` 输出最终成桥态那一段，`example_3d_stage_nl` 每阶段
+       各输出一段（`STAGE=<id>`）。Python 侧 `newton_3d.py` 唯一解析 →
+       `SolveResult.newton`（bundle，支持多阶段）→ 指标卡 / info 校核 /
+       逐荷载步表 / 逐迭代表 / 阶段汇总表 → 报告独立「内层 Newton 与共转
+       列式求解」章 + 残差收敛图 → 四出口同源。**口径**：收敛判据是
+       `|R| ≤ tolForce·max(|Ftarget|,1e-12)` **或** `|du| ≤ tolDisp·max(1,|u|)`，
+       每个荷载步都要满足；换步时 |Ftarget| 变大、残差允许跳升，不是一根
+       单调收敛曲线；规范没有 Newton 迭代轮数限值，不判合格。
+       顺带核销 `TODO(P3-2b)`（影响矩阵复用同一次分解早已实现，只是注释
+       过时），并对 `TODO(P3-3b)` 做了取证：实测 COMPLETION 六轮全走
+       Newton 步、零次 FALLBACK，收敛比约 0.025，故未盲改成桥态数值路径，
+       把完整敏感度的实现规格与验收 oracle 写进 `USER_MANUAL.md` §9.8。
+       `verify_newton_3d.py` 52/52（离线 34 + live 18）。—— 2026-11-09
 - [x] **P3** 负弯矩区双向验算 + 非对称配筋（JTG 3362 §5.2.2/5.2.3、
        §5.3.4-4/5）：`CapacitySection` 加 `FaceSpec negative`（底板宽厚与顶板
        纵筋可单独登记）和 `Asp_given`（显式受压筋，可为 0=单筋）；
@@ -258,7 +276,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 30 个脚本全绿，带汇总输出的脚本合计 1196 项断言；`verify_cable_length_3d.py` 58/58）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 31 个脚本全绿，带汇总输出的脚本合计 1252 项断言；`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

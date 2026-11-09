@@ -45,6 +45,7 @@ import cable_length_3d
 import combination
 import code_material
 import modal_3d
+import newton_3d
 import section_strength
 
 #: 内核键 → 中文名。界面标题、计算书章节名都取这里，不各写一份。
@@ -295,6 +296,13 @@ class SolveResult:
     #    "sens", "steps", "cables", "nj", "J", "error"}。
     # 线性梁格 / 旧序列化结果为空 dict，此时不产生校核，也不假装收敛过。
     cable_length: dict[str, Any] = field(default_factory=dict)
+
+    # ---- 内层共转列式 Newton 过程量 ------------------------------------
+    # 内核 fem_3d_nl.hpp 的 NewtonTrace3D → [NEWTON] 段，形状见
+    # newton_3d.parse_newton_section。bundle = {"traces": [...], "error": ...}：
+    # 成桥态一段（最终平衡），非线性施工阶段每阶段一段。空 dict = 手工构造
+    # 或旧序列化结果，此时不产生校核，也不假装收敛过。
+    newton: dict[str, Any] = field(default_factory=dict)
 
     diagnostics: list[str] = field(default_factory=list)
 
@@ -631,6 +639,19 @@ class SolveResult:
                 hint=f"末轮控制误差 {fe:.3g}{unit}"
                      f"（{cable_length_3d.err_unit(cl)}）；"
                      + cable_length_3d.status_note(cl)))
+        # 内层 Newton：只陈述荷载步/迭代次数与残差量级，不把"收敛了"
+        # 包装成设计合格判定。多阶段时给出阶段数便于区分。
+        trs = self.newton_traces()
+        if trs:
+            nit = sum(t.get("niter", 0) for t in trs)
+            nstep = sum(len(newton_3d.load_step_groups(t)) for t in trs)
+            last = trs[-1]
+            out.append(Metric(
+                "内层 Newton",
+                f"{nstep} 步 / {nit} 次" + (f" · {len(trs)} 阶段" if len(trs) > 1 else ""),
+                hint=f"末次 |R| {last.get('res_last', 0.0):.3g} N，"
+                     f"容差 tolForce={last.get('tol_force', 0.0):.3g}；"
+                     + newton_3d.status_note(last)))
         return out
 
     def max_bending(self) -> tuple[int, float] | None:
@@ -742,6 +763,7 @@ class SolveResult:
         out += self._checks_modal()
         out += self._checks_buckling()
         out += self._checks_cable_length()
+        out += self._checks_newton()
         return out
 
     def _checks_cable_length(self) -> list[Check]:
@@ -792,6 +814,52 @@ class SolveResult:
                 "只命中索力，制造线形（预抬高）需 MODE=COMPLETION 的"
                 "几何闭合迭代，两者不是同一件事。",
                 level="info"))
+        return out
+
+    def newton_traces(self) -> list[dict[str, Any]]:
+        """有效（有逐迭代数据、无 ERROR）的内层 Newton trace 列表。"""
+        return [t for t in (self.newton.get("traces") or [])
+                if t and not t.get("error") and t.get("steps")]
+
+    def _checks_newton(self) -> list[Check]:
+        """内层共转列式 Newton 过程量的自检与工程提示。
+
+        判的是"逐迭代数据对不对、每个荷载步是否收敛"，**不是**"设计合不合格"
+        ——规范没有 Newton 迭代轮数的限值。旧内核 / 线性链路没有这段是设计
+        边界，标 info；数据自相矛盾或真的未收敛才给 warn。
+        """
+        nb = self.newton or {}
+        if not nb:
+            return []                     # 旧序列化结果：没有就不假装验过
+        trs = self.newton_traces()
+        if not trs:
+            err = nb.get("error") or ""
+            if not err:
+                err = next((t.get("error") or "" for t in nb.get("traces") or []), "")
+            return [Check("内层 Newton 与共转列式", True,
+                          newton_3d.ERROR_TEXT.get(err, err or
+                          "本次求解路径未输出内层 Newton 过程量。")
+                          + " 本次报告不给逐迭代收敛表。", level="info")]
+        issues: list[str] = []
+        for t in trs:
+            label = ("阶段 " + str(t["stage"])) if t.get("stage") is not None else "成桥态"
+            bad = newton_3d.validate(t)
+            if bad:
+                issues.append(f"{label}：" + "；".join(bad))
+        if issues:
+            return [Check("内层 Newton 与共转列式", False,
+                          "；".join(issues), level="warn")]
+        nit = sum(t.get("niter", 0) for t in trs)
+        nstep = sum(len(newton_3d.load_step_groups(t)) for t in trs)
+        out = [Check(
+            "内层 Newton 收敛", True,
+            f"共 {len(trs)} 段平衡、{nstep} 个荷载步、{nit} 次 Newton 迭代，"
+            "每个荷载步均满足残差/位移增量容差。"
+            + newton_3d.convergence_note(trs[-1])
+            + " 该结论只说明数值收敛，不构成设计规范意义上的合格判定。",
+            level="info")]
+        out.append(Check(
+            "共转列式求解口径", True, newton_3d.mode_note(trs[-1]), level="info"))
         return out
 
     def _checks_modal(self) -> list[Check]:
@@ -1949,6 +2017,14 @@ class SolveResult:
             out["cable_length_table"] = cable_length_3d.iteration_table(cl)
             if cl.get("cables"):
                 out["cable_length_cables_table"] = cable_length_3d.cable_table(cl)
+        # 内层 Newton：只在内核确实记录了逐迭代过程时给表。多阶段时给
+        # 一张阶段汇总（正文），逐迭代明细归文末明细表章。
+        trs = self.newton_traces()
+        if trs:
+            if len(trs) > 1:
+                out["newton_stages_table"] = newton_3d.stages_table(self.newton)
+            out["newton_step_table"] = newton_3d.step_table(trs[-1])
+            out["newton_iteration_table"] = newton_3d.iteration_table(trs[-1])
 
         if self.cables:
             rows = []
@@ -2301,6 +2377,11 @@ class SolveResult:
             "cable_length_status": self.cable_length.get("status", ""),
             "cable_length_niter": len(self.cable_length.get("steps") or []),
             "cable_length_error": self.cable_length.get("error", ""),
+            "newton_traces": len(self.newton_traces()),
+            "newton_niter": sum(t.get("niter", 0) for t in self.newton_traces()),
+            "newton_status": (self.newton_traces()[-1].get("status", "")
+                              if self.newton_traces() else ""),
+            "newton_error": self.newton.get("error", ""),
             "diagnostics": list(self.diagnostics),
             "metrics": [m.to_dict() for m in self.metrics()],
             "checks": [c.to_dict() for c in self.checks()],

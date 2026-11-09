@@ -10,6 +10,8 @@ import subprocess
 from pathlib import Path
 
 from fem_eigen_export import FEM_EIGEN_DIR
+from newton_3d import bundle as newton_bundle
+from newton_3d import parse_newton_section
 from result_3d import SolveResult
 
 
@@ -24,15 +26,29 @@ def find_stage_nl_exe() -> Path:
 
 
 def parse_nlstage(text: str) -> list[dict]:
-    """每个阶段：converged、位移 {(node, dof): u}、索力 {elem: {T, L0}}。"""
+    """每个阶段：converged、位移 {(node, dof): u}、索力、内层 Newton 过程。"""
     stages: list[dict] = []
     cur: dict | None = None
     section = ""
+
+    def finalize(row: dict) -> None:
+        lines = row.pop("_newton", [])
+        tr = parse_newton_section(lines)
+        if not lines:
+            tr["error"] = "no_newton_section"
+        row["newton"] = tr
+
     for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         if line.startswith("STAGE "):
+            # STAGE=<id> 是 [NEWTON] 段内的字段行，不是阶段头；阶段头形如
+            # "STAGE 3 converged=1 ndof=..."，靠空格后的编号区分。
+            if "=" in line.split()[0]:
+                continue
+            if cur is not None and "_newton" in cur:
+                finalize(cur)
             parts = line.split()
             cur = {
                 "id": int(parts[1]),
@@ -40,6 +56,7 @@ def parse_nlstage(text: str) -> list[dict]:
                 "u": {},
                 "cables": {},
                 "beams": {},
+                "_newton": [],
             }
             stages.append(cur)
             section = ""
@@ -53,10 +70,19 @@ def parse_nlstage(text: str) -> list[dict]:
         if line == "[BEAM]":
             section = "BEAM"
             continue
+        if line == "[NEWTON]":
+            # 每阶段一段；必须登记，否则 S 行会被前面的 BEAM 段误读。
+            section = "NEWTON"
+            continue
         if line == "[ENDSTAGE]":
+            if cur is not None:
+                finalize(cur)
             section = ""
             continue
         if cur is None:
+            continue
+        if section == "NEWTON":
+            cur["_newton"].append(line)
             continue
         bits = line.split()
         if section == "U" and len(bits) >= 3:
@@ -221,6 +247,9 @@ def as_solve_result(model, rows: list[dict], *, dat_path: Path) -> SolveResult:
         live_beam=live_beam,
         live=live,
         meta=meta,
+        # 每阶段一段内层 Newton 过程；旧内核的 error trace 也保留，
+        # 由结果层写明"未输出"而不是静默跳过。
+        newton=newton_bundle([r["newton"] for r in rows if r.get("newton")]),
     )
     note = (
         "本结果来自非线性施工阶段：每个阶段在当前已激活结构上做全量平衡，"

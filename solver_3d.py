@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from newton_3d import empty_bundle as empty_newton_bundle
 from result_3d import KIND_LABELS, SolveResult, _impact_note
 
 
@@ -82,6 +83,9 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
     # 索长迭代 / 几何闭合过程量：只有索承体系链路会带 [LENGTH] 段，
     # 线性梁格这里自然是空 dict，报告层按"不适用"处理，不摆空表。
     res.cable_length = dict(raw.get("cable_length") or {})
+    # 线性内核没有共转列式 Newton：明确写"不适用"，不摆空表也不冒充收敛。
+    res.newton = dict(raw.get("newton") or
+                      empty_newton_bundle("no_newton_section"))
     res.disp = dict(raw.get("disp") or {})
     res.beam = {int(k): dict(v) for k, v in (raw.get("beam") or {}).items()}
     res.live = {int(k): tuple(v) for k, v in (raw.get("live") or {}).items()}
@@ -149,6 +153,10 @@ def _adapt_cable(model: Any, raw: dict, res: SolveResult) -> None:
     # [LENGTH] 段：内核把索长迭代 / 制造线形几何闭合的逐轮误差、步长、
     # 影响矩阵 J 写进来；Python 只解析，不重跑 Newton。
     res.cable_length = dict(raw.get("cable_length") or {})
+    # [NEWTON] 段：最终成桥态那一次共转列式 Newton 的荷载步 / 残差过程；
+    # 旧内核没这段时保留 error，报告层写明"未输出"。
+    res.newton = dict(raw.get("newton") or
+                      empty_newton_bundle("no_newton_section"))
     meta = dict(raw.get("meta") or {})
     res.meta = meta
     res.converged = bool(raw.get("converged"))

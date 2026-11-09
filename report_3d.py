@@ -59,6 +59,7 @@ from typing import Any, Iterable, Sequence
 import buckling_3d
 import cable_length_3d
 import modal_3d
+import newton_3d
 import view_3d
 from result_3d import (CABLE_FPU_DEFAULT, CABLE_SAFETY_MIN,
                        CABLE_SAFETY_MIN_STAGE, Check, Metric,
@@ -313,6 +314,48 @@ def figure_cable_length(res: SolveResult, model: Any, path: Path) -> Path:
     for s in ("top",):
         ax.spines[s].set_visible(False)
         ax2.spines[s].set_visible(False)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
+def figure_newton(res: SolveResult, model: Any, path: Path) -> Path:
+    """内层共转列式 Newton 的残差收敛曲线（取最后一段平衡）。
+
+    每个荷载步单独看残差下降；荷载进阶时 |Ftarget| 变大，残差会**跳升**，
+    所以整条曲线不是单调的，不能当成一根跨步的收敛曲线来读。红色虚线是
+    逐步的残差容差 tolForce*max(|Ftarget|,1e-12)，落在它下面才算该步收敛。
+    """
+    plt = _plt()
+    trs = res.newton_traces()
+    tr = trs[-1] if trs else {}
+    steps = tr.get("steps") or []
+    xs = list(range(1, len(steps) + 1))
+    r = [max(float(s["residual"]), 1e-16) for s in steps]
+    tol = [max(float(tr.get("tol_force") or 0.0) *
+               max(float(s["ref"]), 1e-12), 1e-16) for s in steps]
+    fig, ax = plt.subplots(figsize=(7.4, 3.2))
+    ax.plot(xs, r, "o-", color=C_BLUE, lw=1.6, ms=4, label="|R|（自由自由度）")
+    ax.plot(xs, tol, "--", color=C_RED, lw=1.0,
+            label="tolForce*|Ftarget| 残差容差")
+    # 荷载步分界：换步处残差会跳升，标注出来才不会被误读成发散。
+    prev = None
+    for i, s in enumerate(steps, start=1):
+        k = int(s["load_step"])
+        if k != prev:
+            if prev is not None:
+                ax.axvline(x=i - 0.5, color=C_GRAY, ls=":", lw=0.8, alpha=0.7)
+            ax.text(i, 1.01, f" λ={float(s['lambda']):.2f}",
+                    transform=ax.get_xaxis_transform(),
+                    fontsize=7, color=C_GRAY, va="bottom")
+            prev = k
+    ax.set_yscale("log")
+    ax.set_xticks(xs)
+    ax.set_xlabel("全局 Newton 迭代序号（竖虚线 = 荷载步分界）")
+    ax.set_ylabel("残差 |R| (N，对数)")
+    ax.grid(alpha=0.25, lw=0.5, axis="y")
+    ax.legend(frameon=False, fontsize=8, loc="upper right")
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
     fig.tight_layout()
     return _save(fig, path)
 
@@ -985,6 +1028,13 @@ LENGTH_TABLE_KEY = "cable_length_table"
 LENGTH_CABLES_TABLE_KEY = "cable_length_cables_table"
 LENGTH_FIGURE_KEY = "cable_length_convergence"
 
+#: 内层 Newton 章：逐荷载步表与残差图跟着章节走；多阶段汇总表也跟章走；
+#: 逐迭代明细（几十行）归文末明细表。残差图必须从通用图循环里排除。
+NEWTON_STEP_TABLE_KEY = "newton_step_table"
+NEWTON_STAGES_TABLE_KEY = "newton_stages_table"
+NEWTON_ITERATION_TABLE_KEY = "newton_iteration_table"
+NEWTON_FIGURE_KEY = "newton_residual"
+
 
 @dataclass
 class Figure:
@@ -1176,6 +1226,15 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
             note="左轴（对数）是控制误差，红色虚线是收敛容差；右轴（线性）"
                  "是成桥弦长相对设计弦长的最大偏差 (m)。两者单位与判据不同，"
                  "分轴绘制，不能读成同一条曲线的两种刻度。")
+    # 内层 Newton 残差图：只在内核确实记录了逐迭代过程时画。线性链路
+    # 与旧内核走 ERROR 段，不摆一张空坐标轴。
+    if res.newton_traces():
+        out[NEWTON_FIGURE_KEY] = Figure(
+            NEWTON_FIGURE_KEY, "内层 Newton 残差收敛",
+            figure_newton(res, model, d / "newton_residual.png"),
+            note="取最后一段平衡（成桥态或最后一个施工阶段）。竖虚线是荷载步"
+                 "分界；换步时 |Ftarget| 变大，残差会跳升，整条曲线并非单调，"
+                 "不能当成一根跨步收敛曲线来读。红色虚线是逐步残差容差。")
     return out
 
 
@@ -1323,6 +1382,35 @@ def _cable_length_paragraph(res: SolveResult) -> str:
            + (f"相邻轮误差比几何均值 {rate:.3g}。" if rate is not None else ""))
     txt += " " + cable_length_3d.mode_note(cl)
     txt += " " + cable_length_3d.sens_note(cl)
+    return txt
+
+
+def _newton_paragraph(res: SolveResult) -> str:
+    """内层 Newton 章引言：把"这是另一层迭代"写死在纸上。
+
+    最容易翻车的两处：把内层 Newton 与外层索长迭代混成一层；把跨荷载步
+    的残差跳升读成"发散"。两者都不能出现。
+    """
+    nb = res.newton or {}
+    if not nb:
+        return ("本次结果没有内层 Newton 段（旧序列化结果或手工构造结果）。"
+                "内核没算就不补一条估计的残差曲线。")
+    trs = res.newton_traces()
+    if not trs:
+        err = nb.get("error") or next(
+            (t.get("error") or "" for t in nb.get("traces") or []), "")
+        return ("本次未产出内层 Newton 逐迭代过程：" + newton_3d.ERROR_TEXT.get(
+            err, err or "求解路径不含几何非线性平衡。")
+            + " 位移、索力与梁端内力仍按内核结果使用；没有过程量不等于没算。")
+    last = trs[-1]
+    txt = (f"内核共记录 {len(trs)} 段共转列式平衡，合计 "
+           f"{sum(len(newton_3d.load_step_groups(t)) for t in trs)} 个荷载步、"
+           f"{sum(t.get('niter', 0) for t in trs)} 次 Newton 迭代。"
+           + (f"非线性施工阶段的每个阶段都是全量平衡，位移不能跨阶段累加；"
+              f"下表逐阶段独立列出。" if len(trs) > 1 else ""))
+    txt += " " + newton_3d.status_note(last)
+    txt += " " + newton_3d.mode_note(last)
+    txt += " " + newton_3d.convergence_note(last)
     return txt
 
 
@@ -1569,6 +1657,11 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     length_chapter = bool(res.cable_length)
     if length_chapter:
         skip_fig.add(LENGTH_FIGURE_KEY)
+    # 内层 Newton 章同样只要内核给了段就出：ERROR 段（线性链路 / 旧内核）
+    # 也要写明"本次路径没有共转列式平衡"，不能整章消失。
+    newton_chapter = bool(res.newton)
+    if newton_chapter:
+        skip_fig.add(NEWTON_FIGURE_KEY)
     if stage_chapter:
         skip_fig.add(STAGE_FIGURE_KEY)
     if erection_chapter:
@@ -1625,6 +1718,23 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
             "不参与判据。逐索的目标索力、成桥索力与下料 L0 见文末明细表；"
             "本章只说明数值如何收敛，不构成规范意义上的合格判定。未收敛时"
             "内核写 STATUS=not_converged，报告如实标注，不摆空表冒充通过。")})
+
+    if newton_chapter:
+        blocks.append({"type": "h1", "text": "内层 Newton 与共转列式求解"})
+        blocks.append({"type": "p", "text": _newton_paragraph(res)})
+        if NEWTON_STAGES_TABLE_KEY in tabs:
+            blocks.append({"type": "table", "key": NEWTON_STAGES_TABLE_KEY})
+        if NEWTON_STEP_TABLE_KEY in tabs:
+            blocks.append({"type": "table", "key": NEWTON_STEP_TABLE_KEY})
+        if NEWTON_FIGURE_KEY in figs:
+            blocks.append({"type": "figure", "key": NEWTON_FIGURE_KEY})
+        blocks.append({"type": "note", "text": (
+            "本章是**给定模型上**求节点位移的内层迭代，与上一章改 L0 / 制造"
+            "线形的外层迭代不是同一层。收敛判据是 |R| ≤ tolForce*max("
+            "|Ftarget|,1e-12) **或** |du| ≤ tolDisp*max(1,|u|)，每个荷载步"
+            "都要满足；荷载进阶时残差允许跳升。逐迭代残差明细见文末明细表。"
+            "规范没有 Newton 迭代轮数的合格限值，本章只说明数值如何收敛，"
+            "不构成设计合格判定。")})
 
     if stage_chapter:
         blocks.append({"type": "h1", "text": "施工阶段索力"})
@@ -1729,6 +1839,9 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     rest.pop(BUCKLING_TABLE_KEY, None)   # 已跟着「线性屈曲与稳定」章走
     rest.pop(LENGTH_TABLE_KEY, None)     # 逐轮表已跟着「索长迭代」章走
     # LENGTH_CABLES_TABLE_KEY（逐索终值，几十行）故意留在文末明细表。
+    rest.pop(NEWTON_STEP_TABLE_KEY, None)    # 已跟着「内层 Newton」章走
+    rest.pop(NEWTON_STAGES_TABLE_KEY, None)  # 同上
+    # NEWTON_ITERATION_TABLE_KEY（逐迭代残差，几十行）留在文末明细表。
     for key in CAPACITY_TABLE_KEYS:      # 已跟着「承载力计算书」章走
         rest.pop(key, None)
     if rest:
