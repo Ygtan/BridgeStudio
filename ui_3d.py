@@ -401,11 +401,17 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
     而不是让整份报告生成失败、也不假装"四份都好了"。
     """
     st.markdown("**报告与数据导出**")
+    st.caption("「索长迭代与成桥态几何闭合」章只对索承体系（斜拉桥 / 悬索桥）"
+               "成桥态且内核给出 [LENGTH] 段时出现：展示逐轮收敛、影响矩阵与"
+               "下料索长 / 制造线形。线性梁格、桁架、拱桥没有这类外层迭代，"
+               "报告不摆空表；MODE=STATIC 与悬索桥找形走闭式反算，只标注"
+               "「本次无迭代」，不伪装成收敛过程。迭代轮数与误差没有规范合格"
+               "限值，该章不判通过 / 不通过。")
     c1, c2 = st.columns([1.1, 2.2])
     if c1.button("生成报告", key="r3d_report_btn",
                  help="同一份内容同时产出 Word、HTML、CSV 数据包与 PDF 计算书"
                       "（PDF 需本机 Microsoft Edge / Chrome；归档版带页码与"
-                      "章节书签）"):
+                      "章节书签；索承体系成桥态另含索长迭代收敛章）"):
         with st.spinner("排版报告（表格、插图、结论、PDF 打印）…"):
             try:
                 _opt = st.session_state.get("r3d_opt")
@@ -437,9 +443,11 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
 
     got = st.session_state.get(SS_REPORT)
     if not got:
-        c2.caption("报告含：计算概要、工程校核、模态与自振特性、结果图、"
-                   "荷载组合、承载力计算书、结论、明细表。数值与界面逐项同源"
-                   "（同一个 SolveResult）。")
+        c2.caption("报告含：计算概要、工程校核、结果图、模态与自振特性、"
+                   "线性屈曲与稳定、荷载组合、承载力计算书、结论与说明、明细表；"
+                   "按模型另有「索长迭代与成桥态几何闭合」「施工阶段索力」"
+                   "「施工阶段（分级找形）」「优化建议」「施工监控细则」等条件章。"
+                   "数值与界面逐项同源（同一个 SolveResult）。")
         return
     if got["fingerprint"] != res.fingerprint:
         c2.warning("报告是上一次求解的结果，模型已变，请重新生成。")
