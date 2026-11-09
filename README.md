@@ -202,6 +202,30 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        Newton 步、零次 FALLBACK，收敛比约 0.025，故未盲改成桥态数值路径，
        把完整敏感度的实现规格与验收 oracle 写进 `USER_MANUAL.md` §9.8。
        `verify_newton_3d.py` 52/52（离线 34 + live 18）。—— 2026-11-09
+- [x] **P3** 阶段二 B「架构口径收口」：`example_3d_stage_nl.exe` 正式注册进
+       `solver_3d.py` 的 `_registry()`（第四个键 `stage_nl`），`SolverSpec`
+       加 `result_key` 让结果对象仍表现为 `grillage3d`、不破坏界面缓存与
+       报告分支；`fem_eigen_stage_nl.solve_staged_result` 拆成两段式
+       `run` / `adapt`，去掉 `model_doc.solve()` 的硬编码旁路（4 处）；
+       `ui_3d.py` 的求解器名从注册表取，不再写死 exe 名。修正
+       `example_cable_stayed_nl.py` 头部注释与实际非线性链路的矛盾，
+       并给 `nl_steps` / `newton` / `max_iter` / `mint` 补界面参数入口
+       （默认值下 `.dat` 一字不变）。`verify_stage_nl.py` 14/14、
+       `verify_solver_3d.py` 67/67，两条链路的 `.dat` / 索力 / 位移 /
+       梁端内力逐项一致。—— 2026-11-09
+- [x] **P3** 阶段二 D「真正的带约束成桥目标索力优化」：内核新增
+       `cable_opt_3d.hpp`，用已有 `Ld` / `solveMulti` / `beamEndForcesAt`
+       组装弯矩影响矩阵，解带索力箱约束 + 逐塔 `ΣT·cos=0` 软约束的二次型
+       （`MINMAXM` 用 IRLS、`MINENERGY` 用弯曲应变能），T\* 写回后仍走既有
+       索长/几何闭合命中路径。`OPTIMIZE=1` 显式开启，默认全关、
+       既有算例逐位不变。前端 `cable_opt_3d.py` 唯一解析 `[OPT]` 段 →
+       `SolveResult.cable_opt` → 指标卡 / info 校核 / 逐轮表 / 逐索表 →
+       报告独立「带约束成桥目标索力优化」章 → 四出口同源。
+       **口径**：线性化弯矩目标、成桥态 `[GIRDEREND]` 实际 `max|My|`、
+       无量纲归一化目标三者分列，禁止互相相减冒充改善量；
+       `APPLIED=0`（守卫拦下）时 T\* 未写回、只是过程量；塔顶平衡是软约束
+       且与 min max|M| 有实测权衡，未采纳 / 未收敛都不冒充通过。
+       `verify_cable_opt_3d.py` 82/82。—— 2026-11-09
 - [x] **P3** 负弯矩区双向验算 + 非对称配筋（JTG 3362 §5.2.2/5.2.3、
        §5.3.4-4/5）：`CapacitySection` 加 `FaceSpec negative`（底板宽厚与顶板
        纵筋可单独登记）和 `Asp_given`（显式受压筋，可为 0=单筋）；
@@ -276,7 +300,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 31 个脚本全绿，带汇总输出的脚本合计 1252 项断言；`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **32 个脚本全绿**，其中 27 个带汇总输出的脚本合计 **1347 项断言**；`verify_cable_opt_3d.py` 82/82、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

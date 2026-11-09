@@ -91,6 +91,12 @@ def build_cable_stayed_3d(
     method: str = "DECK",                 # DECK | MINENERGY | RIGID
     cable_tensions: dict[int, float] | None = None,   # 指定索力（N），缺省按 method 定
     min_tension_fraction: float = 0.02,
+    # 成桥态 `*CABLE_BRIDGE` 段的求解控制量。默认值与
+    # `model_spec_3d.CableBridge3D` 逐字一致，不传时 .dat 一字不变；
+    # 界面暴露这几个（避免 1e-8 这类容差被 number_input 的 %.3f 截成 0）。
+    nl_steps: int = 3,
+    newton: int = 30,
+    max_iter: int = 20,
     staged: bool = False,               # 生成悬臂施工 + 张拉阶段序列
     creep_rh: float = 0.0,              # 相对湿度 %。与 h、fcm 同时给出才改用规范曲线
     creep_h: float = 0.0,               # 理论厚度 mm
@@ -469,6 +475,7 @@ def build_cable_stayed_3d(
         cables=cables,
         min_tension_fraction=min_tension_fraction,
         deck_load=q_deck * L_tot,
+        nl_steps=nl_steps, newton=newton, max_iter=max_iter,
     )
 
     model = ModelSpec3D(

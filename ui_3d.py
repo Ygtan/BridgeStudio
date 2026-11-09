@@ -408,14 +408,19 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
                "（[NEWTON] 段），非线性施工阶段每阶段各一段；两层迭代的控制量"
                "与判据不同，不要混读。线性梁格、桁架、拱桥没有这类迭代，报告"
                "不摆空表；MODE=STATIC 与悬索桥找形走闭式反算，只标注"
-               "「本次无迭代」，不伪装成收敛过程。迭代轮数、残差与误差都没有"
-               "规范合格限值，这两章不据此给出设计合格判定。")
+               "「本次无迭代」，不伪装成收敛过程。「带约束成桥目标索力优化」"
+               "章只在 OPTIMIZE=1 时有过程数据（[OPT] 段）：展示逐轮目标下降"
+               "与逐索 T*，并明确区分线性化弯矩目标、成桥态实际 max|My| 与"
+               "无量纲归一化目标三个口径。OPTIMIZE=0 时只标注「本次未请求优化」，"
+               "既有索力口径逐位不变；APPLIED=0 表示 T* 未被写回 *CABLE，"
+               "逐索表只是过程量，不能当设计索力。迭代轮数、残差、误差与"
+               "优化收敛率都没有规范合格限值，这三章不据此给出设计合格判定。")
     c1, c2 = st.columns([1.1, 2.2])
     if c1.button("生成报告", key="r3d_report_btn",
                  help="同一份内容同时产出 Word、HTML、CSV 数据包与 PDF 计算书"
                       "（PDF 需本机 Microsoft Edge / Chrome；归档版带页码与"
-                      "章节书签；索承体系成桥态另含索长迭代与内层 Newton "
-                      "两个收敛章）"):
+                      "章节书签；索承体系成桥态另含索长迭代、内层 Newton "
+                      "与成桥目标索力优化三个过程章）"):
         with st.spinner("排版报告（表格、插图、结论、PDF 打印）…"):
             try:
                 _opt = st.session_state.get("r3d_opt")
@@ -450,7 +455,8 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
         c2.caption("报告含：计算概要、工程校核、结果图、模态与自振特性、"
                    "线性屈曲与稳定、荷载组合、承载力计算书、结论与说明、明细表；"
                    "按模型另有「索长迭代与成桥态几何闭合」"
-                   "「内层 Newton 与共转列式求解」「施工阶段索力」"
+                   "「内层 Newton 与共转列式求解」"
+                   "「带约束成桥目标索力优化」「施工阶段索力」"
                    "「施工阶段（分级找形）」「优化建议」「施工监控细则」等条件章。"
                    "数值与界面逐项同源（同一个 SolveResult）。")
         return
@@ -613,7 +619,11 @@ def render(doc: ModelDoc) -> None:
     try:
         from solver_3d import solvers
 
-        spec = solvers().get(doc.solver_kind)
+        # 非线性施工阶段已注册为 stage_nl；它的结果 kind 仍是 grillage3d，
+        # 所以不能拿 doc.solver_kind 去查表，否则会显示成线性梁格 exe。
+        key = ("stage_nl" if doc.params.get("staged")
+               and doc.params.get("nonlinear_stages") else doc.solver_kind)
+        spec = solvers().get(key)
         solver_name = spec.exe_name if spec else solver_name
     except Exception:                               # noqa: BLE001
         pass
@@ -648,7 +658,7 @@ def render(doc: ModelDoc) -> None:
 
     # ---- 求解 ----
     if doc.params.get("nonlinear_stages") and doc.params.get("staged"):
-        solver_name = "example_3d_stage_nl.exe"
+        # exe 名由上面的注册表给出，这里只说明工况，不再硬编码文件名。
         case = "非线性施工阶段（全量平衡，索力由无应力索长命中）"
     elif cap["nonlinear"]:
         case = "几何非线性成桥态（索垂度 + 索长反算）"

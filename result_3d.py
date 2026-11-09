@@ -42,6 +42,7 @@ from typing import Any
 
 import buckling_3d
 import cable_length_3d
+import cable_opt_3d
 import combination
 import code_material
 import modal_3d
@@ -53,6 +54,9 @@ KIND_LABELS: dict[str, str] = {
     "grillage3d": "三维梁格",
     "cable_stayed": "斜拉桥成桥态",
     "suspension": "悬索桥成桥态",
+    # 注册表里的第 4 个内核键：非线性施工阶段。结果对象的 kind 仍写
+    # grillage3d（见 SolverSpec.result_kind），这里只给注册表 label 用。
+    "stage_nl": "非线性施工阶段",
 }
 
 #: 索的最小安全系数下限（JTG/T 3365-01-2020 拉索安全系数 ≥ 2.5）
@@ -303,6 +307,13 @@ class SolveResult:
     # 成桥态一段（最终平衡），非线性施工阶段每阶段一段。空 dict = 手工构造
     # 或旧序列化结果，此时不产生校核，也不假装收敛过。
     newton: dict[str, Any] = field(default_factory=dict)
+
+    # ---- 带约束成桥目标索力优化 ----------------------------------------
+    # 内核 cable_opt_3d.hpp 的 CableOptResult3D → [OPT] 段，形状见
+    # cable_opt_3d.parse_cable_opt_section。OPTIMIZE=0 / 线性链路写 ERROR 段
+    # （no_optimization_requested / no_opt_section），校核按 info 处理，
+    # 不能凭空多一条"不通过"。空 dict = 旧序列化结果，不产生校核。
+    cable_opt: dict[str, Any] = field(default_factory=dict)
 
     diagnostics: list[str] = field(default_factory=list)
 
@@ -652,6 +663,18 @@ class SolveResult:
                 hint=f"末次 |R| {last.get('res_last', 0.0):.3g} N，"
                      f"容差 tolForce={last.get('tol_force', 0.0):.3g}；"
                      + newton_3d.status_note(last)))
+        # 成桥目标索力优化：只在真有过程数据时给指标卡。卡片明确写
+        # "已采纳 / 未采纳"，避免把未写回的 T* 当成设计索力展示。
+        co = self.cable_opt or {}
+        if cable_opt_3d.has_data(co):
+            out.append(Metric(
+                "成桥索力优化",
+                ("已采纳" if co.get("applied") else "未采纳")
+                + f" · {co.get('niter', 0)} 次",
+                hint=f"{co.get('objective', '')}（起点 {co.get('start', '')}）；"
+                     f"线性化 max|M| {co.get('mpeak0', 0):.3g} → "
+                     f"{co.get('mpeak', 0):.3g} N·m；"
+                     + cable_opt_3d.status_note(co)))
         return out
 
     def max_bending(self) -> tuple[int, float] | None:
@@ -764,6 +787,7 @@ class SolveResult:
         out += self._checks_buckling()
         out += self._checks_cable_length()
         out += self._checks_newton()
+        out += self._checks_cable_opt()
         return out
 
     def _checks_cable_length(self) -> list[Check]:
@@ -860,6 +884,46 @@ class SolveResult:
             level="info")]
         out.append(Check(
             "共转列式求解口径", True, newton_3d.mode_note(trs[-1]), level="info"))
+        return out
+
+    def _checks_cable_opt(self) -> list[Check]:
+        """带约束成桥目标索力优化过程量的自检与工程提示。
+
+        判的是"段内数据自不自洽、T\\* 有没有被采纳、口径有没有混用"，
+        **不是**"成桥索力设计合不合格"——规范没有优化迭代轮数或收敛率的
+        合格限值。OPTIMIZE=0 / 旧内核 / 线性链路是设计边界，标 info，
+        绝不凭空多一条"不通过"；只有数据自相矛盾才给 warn。
+        """
+        co = self.cable_opt or {}
+        if not co:
+            return []                     # 旧序列化结果：没有就不假装验过
+        if not cable_opt_3d.has_data(co):
+            return [Check("带约束成桥目标索力优化", True,
+                          cable_opt_3d.error_note(co)
+                          + " 本次报告不给优化过程表。", level="info")]
+        issues = cable_opt_3d.validate(co)
+        if issues:
+            return [Check("带约束成桥目标索力优化", False,
+                          "；".join(issues), level="warn")]
+        # 未采纳 / 未收敛是内核守卫的**如实结果**，不是求解失败，更不是
+        # 设计规范意义上的"不通过"。按 [LENGTH]/[NEWTON] 的既有惯例统一
+        # ok=True + info，状态写在 detail 里；否则 verify_report_3d 的
+        # 结论标记计数会凭空多一条"不通过"。
+        out = [Check(
+            "成桥目标索力优化", True,
+            cable_opt_3d.summary_note(co)
+            + " 该结论只说明优化过程与采纳状态，不构成设计规范意义上的"
+              "设计合格判定。",
+            level="info")]
+        out.append(Check("优化目标与边界", True,
+                         cable_opt_3d.objective_note(co), level="info"))
+        out.append(Check("两组弯矩口径不可混用", True,
+                         cable_opt_3d.scale_note(co), level="info"))
+        if not co.get("converged"):
+            out.append(Check("优化迭代收敛状态", True,
+                             cable_opt_3d.status_note(co)
+                             + " 过程量仍可用，但不得当作已收敛的最优解。",
+                             level="info"))
         return out
 
     def _checks_modal(self) -> list[Check]:
@@ -2025,6 +2089,15 @@ class SolveResult:
                 out["newton_stages_table"] = newton_3d.stages_table(self.newton)
             out["newton_step_table"] = newton_3d.step_table(trs[-1])
             out["newton_iteration_table"] = newton_3d.iteration_table(trs[-1])
+        # 带约束目标索力优化：只在真有过程数据时给表。OPTIMIZE=0 /
+        # 旧内核走 ERROR 段，不给空表；APPLIED=0 时逐索表的表注会写明
+        # "只是过程量，不能当设计索力"。
+        co = self.cable_opt or {}
+        if cable_opt_3d.has_data(co):
+            if co.get("steps"):
+                out["cable_opt_iteration_table"] = \
+                    cable_opt_3d.iteration_table(co)
+            out["cable_opt_cables_table"] = cable_opt_3d.cable_table(co)
 
         if self.cables:
             rows = []
@@ -2382,6 +2455,11 @@ class SolveResult:
             "newton_status": (self.newton_traces()[-1].get("status", "")
                               if self.newton_traces() else ""),
             "newton_error": self.newton.get("error", ""),
+            "cable_opt_status": self.cable_opt.get("status", ""),
+            "cable_opt_applied": bool(self.cable_opt.get("applied", False)),
+            "cable_opt_objective": self.cable_opt.get("objective", ""),
+            "cable_opt_niter": self.cable_opt.get("niter", 0),
+            "cable_opt_error": self.cable_opt.get("error", ""),
             "diagnostics": list(self.diagnostics),
             "metrics": [m.to_dict() for m in self.metrics()],
             "checks": [c.to_dict() for c in self.checks()],

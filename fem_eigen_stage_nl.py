@@ -1,12 +1,20 @@
 """调用 example_3d_stage_nl.exe，读回非线性施工阶段的全量平衡结果。
 
 与 example_3d_grillage 的线性增量结果不是同一套数，不能相加，也不能互相替换。
-悬臂斜拉的界面仍走线性内核。
+该 exe 已在 `solver_3d._registry()` 注册为 `stage_nl` 内核键：界面在
+`staged + nonlinear_stages`（或 3D 大跨自动判定）时由 `ModelDoc.solve()`
+显式传 `kind="stage_nl"`，走统一注册表分派，不再有旁路。
+
+本模块同时提供注册表所需的 `run` / `adapt` 两段式接口：
+`run_stage_nl()` 只跑 exe + 解析，返回原始字典；`adapt_stage_nl()` 把
+原始字典填进调用方已构造好的 `SolveResult`。`as_solve_result()` /
+`solve_staged_result()` 保留为旧调用方的兼容包装。
 """
 
 from __future__ import annotations
 
 import subprocess
+from dataclasses import fields
 from pathlib import Path
 
 from fem_eigen_export import FEM_EIGEN_DIR
@@ -23,6 +31,14 @@ def find_stage_nl_exe() -> Path:
         raise FileNotFoundError(
             f"未找到 {path}。请在 FEM-Eigen 里编译 example_3d_stage_nl")
     return path
+
+
+def stage_nl_available() -> bool:
+    """注册表 `available` 钩子：只做存在性判断，不抛异常。"""
+    try:
+        return find_stage_nl_exe().is_file()
+    except Exception:                       # noqa: BLE001
+        return False
 
 
 def parse_nlstage(text: str) -> list[dict]:
@@ -150,10 +166,13 @@ def _kv(text: str) -> dict[str, float]:
     return out
 
 
-def solve_stages_nonlinear(model, out_dir: str | Path,
-                           dat_name: str = "stage_nl.dat",
-                           timeout: int = 180) -> list[dict]:
-    """写出 .dat 并求解。返回各阶段的全量平衡结果。"""
+def _run_exe(model, out_dir: str | Path, dat_name: str,
+             timeout: int) -> tuple[Path, list[dict]]:
+    """写 .dat → 起 exe → 解析，返回 (dat 绝对路径, 各阶段原始行)。
+
+    注册表 `run` 钩子与旧的 `solve_stages_nonlinear()` 共用这一条路径，
+    避免「界面走一条、脚本走另一条」导致两份 .dat / 两份结果口径分叉。
+    """
     exe = find_stage_nl_exe()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -168,7 +187,26 @@ def solve_stages_nonlinear(model, out_dir: str | Path,
     result = Path(str(dat) + ".nlstage.txt")
     if not result.is_file():
         raise RuntimeError(f"未找到结果文件 {result}\n{proc.stdout}")
-    return parse_nlstage(result.read_text(encoding="utf-8"))
+    return dat, parse_nlstage(result.read_text(encoding="utf-8"))
+
+
+def solve_stages_nonlinear(model, out_dir: str | Path,
+                           dat_name: str = "stage_nl.dat",
+                           timeout: int = 180) -> list[dict]:
+    """写出 .dat 并求解。返回各阶段的全量平衡结果。"""
+    _, rows = _run_exe(model, out_dir, dat_name, timeout)
+    return rows
+
+
+def run_stage_nl(model, out_dir: str | Path, dat_name: str,
+                 timeout: int = 600) -> dict:
+    """`solver_3d.SolverSpec.run` 钩子：只跑 exe + 解析，返回原始字典。
+
+    `dat` 是注册表 `solve()` 回读 `.dat` 文本用的键，必须有。
+    """
+    dat, rows = _run_exe(model, out_dir, dat_name, timeout)
+    return {"dat": str(dat), "rows": rows,
+            "solver": "example_3d_stage_nl.exe"}
 
 
 def as_solve_result(model, rows: list[dict], *, dat_path: Path) -> SolveResult:
@@ -276,9 +314,27 @@ def as_solve_result(model, rows: list[dict], *, dat_path: Path) -> SolveResult:
     return res
 
 
+def adapt_stage_nl(model, raw: dict, res: SolveResult) -> None:
+    """`solver_3d.SolverSpec.adapt` 钩子：把原始字典填进已构造的 SolveResult。
+
+    `as_solve_result()` 是唯一的结果装配真源，这里按 dataclass 字段逐个搬运，
+    不另写一份装配逻辑。注册表 `solve()` 预先写入的 `kind`（由
+    `SolverSpec.result_kind` 决定，保持 grillage3d 以免界面把结果藏起来）
+    必须保留，不能被搬运覆盖。
+    """
+    tmp = as_solve_result(model, list(raw.get("rows") or []),
+                          dat_path=Path(raw["dat"]))
+    keep_kind = res.kind
+    for f in fields(SolveResult):
+        setattr(res, f.name, getattr(tmp, f.name))
+    res.kind = keep_kind
+
+
 def solve_staged_result(model, out_dir: str | Path,
                         dat_name: str = "stage_nl.dat",
                         timeout: int = 600) -> SolveResult:
-    rows = solve_stages_nonlinear(model, out_dir, dat_name=dat_name, timeout=timeout)
-    dat = (Path(out_dir) / dat_name).resolve()
-    return as_solve_result(model, rows, dat_path=dat)
+    """兼容包装：和注册表走同一条 `run` / `adapt` 链路。"""
+    raw = run_stage_nl(model, out_dir, dat_name, timeout=timeout)
+    res = SolveResult(kind="grillage3d", solver=raw["solver"])
+    adapt_stage_nl(model, raw, res)
+    return res

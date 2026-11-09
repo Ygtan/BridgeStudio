@@ -58,6 +58,7 @@ from typing import Any, Iterable, Sequence
 
 import buckling_3d
 import cable_length_3d
+import cable_opt_3d
 import modal_3d
 import newton_3d
 import view_3d
@@ -1035,6 +1036,12 @@ NEWTON_STAGES_TABLE_KEY = "newton_stages_table"
 NEWTON_ITERATION_TABLE_KEY = "newton_iteration_table"
 NEWTON_FIGURE_KEY = "newton_residual"
 
+#: 带约束成桥目标索力优化章：逐轮表跟章走；逐索表（几十行）归文末明细表。
+#: 本章不画图——归一化目标与 max|M| / 塔顶不平衡不同量纲，画在同一张图上
+#: 会暗示它们可以互相换算，正是本项目要避免的口径混淆。
+OPT_ITERATION_TABLE_KEY = "cable_opt_iteration_table"
+OPT_CABLES_TABLE_KEY = "cable_opt_cables_table"
+
 
 @dataclass
 class Figure:
@@ -1414,6 +1421,26 @@ def _newton_paragraph(res: SolveResult) -> str:
     return txt
 
 
+def _cable_opt_paragraph(res: SolveResult) -> str:
+    """成桥目标索力优化章引言：把"定目标"与"命中目标"分两层写死。
+
+    最容易翻车的三处：拿线性化目标冒充成桥态效应；把未采纳的 T\\* 当
+    设计索力；把优化过程量当成规范合格判定。三者都不能出现。
+    """
+    co = res.cable_opt or {}
+    if not co:
+        return ("本次结果没有带约束成桥目标索力优化段（旧序列化结果或手工"
+                "构造结果）。内核没算就不补一组估计的目标索力。")
+    if not cable_opt_3d.has_data(co):
+        return ("本次未产出带约束成桥目标索力优化过程：" +
+                cable_opt_3d.error_note(co)
+                + " 索力仍按内核既有口径使用；没有优化过程不等于没算。")
+    return (cable_opt_3d.summary_note(co)
+            + " 本章是**定目标索力 T\\*** 的外层优化，与下一层「命中 T\\*」"
+              "的索长 / 几何闭合迭代不是同一层；优化只把 T\\* 写回 *CABLE，"
+              "成桥态索力仍由内核迭代命中，本报告不另算一组索力。")
+
+
 def _buckling_paragraph(res: SolveResult) -> str:
     """屈曲章节引言：把"λ 是什么、P_ref 是什么、不是什么"写死在纸上。
 
@@ -1662,6 +1689,9 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     newton_chapter = bool(res.newton)
     if newton_chapter:
         skip_fig.add(NEWTON_FIGURE_KEY)
+    # 目标索力优化章同样只要内核给了段就出：OPTIMIZE=0 的 ERROR 段也要
+    # 写明"本次未请求优化、既有链路数值不变"，不能整章消失让人以为漏算。
+    opt_chapter = bool(res.cable_opt)
     if stage_chapter:
         skip_fig.add(STAGE_FIGURE_KEY)
     if erection_chapter:
@@ -1734,6 +1764,21 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
             "|Ftarget|,1e-12) **或** |du| ≤ tolDisp*max(1,|u|)，每个荷载步"
             "都要满足；荷载进阶时残差允许跳升。逐迭代残差明细见文末明细表。"
             "规范没有 Newton 迭代轮数的合格限值，本章只说明数值如何收敛，"
+            "不构成设计合格判定。")})
+
+    if opt_chapter:
+        blocks.append({"type": "h1", "text": "带约束成桥目标索力优化"})
+        blocks.append({"type": "p", "text": _cable_opt_paragraph(res)})
+        if OPT_ITERATION_TABLE_KEY in tabs:
+            blocks.append({"type": "table", "key": OPT_ITERATION_TABLE_KEY})
+        blocks.append({"type": "note", "text": (
+            "本章的**线性化弯矩目标**、**成桥态实际 max|My|**、**无量纲"
+            "归一化目标**是三个不同口径，实测可能反向变化，不得互相相减"
+            "当作改善量；未优化基线须另跑 OPTIMIZE=0 取 [GIRDEREND] 对拍。"
+            "APPLIED=0 时逐索表的 T\\* 只是过程量，没有写回 *CABLE，"
+            "不能当设计索力。塔顶水平力平衡是软约束罚项，与弯矩目标存在"
+            "权衡；索力上界属程序口径而非规范限值。规范没有优化迭代轮数或"
+            "收敛率的合格限值，本章只说明优化过程与采纳状态，"
             "不构成设计合格判定。")})
 
     if stage_chapter:
@@ -1841,7 +1886,9 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     # LENGTH_CABLES_TABLE_KEY（逐索终值，几十行）故意留在文末明细表。
     rest.pop(NEWTON_STEP_TABLE_KEY, None)    # 已跟着「内层 Newton」章走
     rest.pop(NEWTON_STAGES_TABLE_KEY, None)  # 同上
-    # NEWTON_ITERATION_TABLE_KEY（逐迭代残差，几十行）留在文末明细表。
+    rest.pop(OPT_ITERATION_TABLE_KEY, None)  # 已跟着「目标索力优化」章走
+    # OPT_CABLES_TABLE_KEY（逐索 48 行）与 NEWTON_ITERATION_TABLE_KEY
+    # （逐迭代残差，几十行）都留在文末明细表。
     for key in CAPACITY_TABLE_KEYS:      # 已跟着「承载力计算书」章走
         rest.pop(key, None)
     if rest:

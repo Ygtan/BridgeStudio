@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from cable_opt_3d import empty_cable_opt
 from newton_3d import empty_bundle as empty_newton_bundle
 from result_3d import KIND_LABELS, SolveResult, _impact_note
 
@@ -55,10 +56,18 @@ class SolverSpec:
     run: Callable[[Any, Path, str], dict]
     adapt: Callable[[Any, dict, SolveResult], None]
     build_hint: str
+    # 结果对象里写的 kind。默认与注册表键一致；非线性施工阶段虽然注册为
+    # 独立的 stage_nl 内核，结果仍按 grillage3d 消费（报告/校核/界面缓存
+    # 都按这一支分流），故该键显式声明 result_kind="grillage3d"。
+    result_kind: str | None = None
 
     @property
     def label(self) -> str:
         return KIND_LABELS.get(self.key, self.key)
+
+    @property
+    def result_key(self) -> str:
+        return self.result_kind or self.key
 
 
 # ---------------------------------------------------------------- 适配器
@@ -86,6 +95,10 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
     # 线性内核没有共转列式 Newton：明确写"不适用"，不摆空表也不冒充收敛。
     res.newton = dict(raw.get("newton") or
                       empty_newton_bundle("no_newton_section"))
+    # [OPT] 段：带约束目标索力优化只挂在 cable_solver 的索承体系链路，
+    # 线性梁格不产出；写 no_optimization_requested 而不是空 dict。
+    res.cable_opt = dict(raw.get("cable_opt") or
+                         empty_cable_opt("no_optimization_requested"))
     res.disp = dict(raw.get("disp") or {})
     res.beam = {int(k): dict(v) for k, v in (raw.get("beam") or {}).items()}
     res.live = {int(k): tuple(v) for k, v in (raw.get("live") or {}).items()}
@@ -157,6 +170,10 @@ def _adapt_cable(model: Any, raw: dict, res: SolveResult) -> None:
     # 旧内核没这段时保留 error，报告层写明"未输出"。
     res.newton = dict(raw.get("newton") or
                       empty_newton_bundle("no_newton_section"))
+    # [OPT] 段：OPTIMIZE=0 时内核也写 ERROR 段，照收不静默；旧内核没段时
+    # 由 fem_eigen_cable 统一写 no_opt_section。
+    res.cable_opt = dict(raw.get("cable_opt") or
+                         empty_cable_opt("no_opt_section"))
     meta = dict(raw.get("meta") or {})
     res.meta = meta
     res.converged = bool(raw.get("converged"))
@@ -247,6 +264,17 @@ def _adapt_suspension(model: Any, raw: dict, res: SolveResult) -> None:
         "计入该反力，请在 [REACTION] 里取塔位梁节点的竖向反力叠加。")
 
 
+def _adapt_stage_nl(model: Any, raw: dict, res: SolveResult) -> None:
+    """非线性施工阶段的适配器：装配真源在 `fem_eigen_stage_nl`。
+
+    这里不碰数值，只把注册表 `run` 交回的原始行交给同一份装配逻辑，
+    保证「界面走注册表」和「脚本直接调 solve_staged_result」得到同一个结果。
+    """
+    from fem_eigen_stage_nl import adapt_stage_nl
+
+    adapt_stage_nl(model, raw, res)
+
+
 # ---------------------------------------------------------------- 注册表
 
 
@@ -254,6 +282,7 @@ def _registry() -> dict[str, SolverSpec]:
     """延迟构建：内核模块导入失败不该让整个界面崩掉。"""
     from fem_eigen_3d import fem_eigen_3d_available, solve_3d
     from fem_eigen_cable import cable_solver_available, find_cable_solver, solve_cable_bridge
+    from fem_eigen_stage_nl import find_stage_nl_exe, run_stage_nl, stage_nl_available
 
     def _find_grillage() -> Path:
         from fem_eigen_3d import _find_exe
@@ -291,6 +320,24 @@ def _registry() -> dict[str, SolverSpec]:
             run=lambda m, d, n: solve_cable_bridge(m, out_dir=d, dat_name=n),
             adapt=_adapt_suspension,
             build_hint="cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver",
+        ),
+        # 非线性施工阶段：以前靠 ModelDoc.solve() 直接调
+        # fem_eigen_stage_nl.solve_staged_result() 旁路，注册表里查不到它，
+        # capabilities()/require() 也管不到。现在正式登记，链路选择仍由
+        # ModelDoc 的 staged + nonlinear_stages 参数决定（模型自述里没有
+        # 这个开关，detect_kind 只看 cable_bridge，不能替它判）。
+        # result_kind 保持 grillage3d：结果层按这一支做报告/校核/界面缓存，
+        # 键拆开只为让能力自述、编译提示、run/adapt 契约统一。
+        "stage_nl": SolverSpec(
+            key="stage_nl",
+            exe_name="example_3d_stage_nl.exe",
+            available=stage_nl_available,
+            find=find_stage_nl_exe,
+            run=lambda m, d, n: run_stage_nl(m, d, n),
+            adapt=_adapt_stage_nl,
+            build_hint="cd D:/AI-work/FEM-Eigen && cmake --build build "
+                       "--target example_3d_stage_nl",
+            result_kind="grillage3d",
         ),
     }
 
@@ -346,9 +393,10 @@ def require(kind: str) -> SolverSpec:
 def _fallback_hints() -> dict[str, SolverSpec]:
     """模块都导不进来时，至少把各内核的编译命令说清楚。
 
-    键必须与真注册表一致（`grillage3d` / `cable_stayed` / `suspension`）：
-    少一个键，用户在那种情况下会看到"未知内核键"而不是"请先编译"，
-    提示就白写了。
+    键必须与真注册表一致（`grillage3d` / `cable_stayed` / `suspension` /
+    `stage_nl`）：少一个键，用户在那种情况下会看到"未知内核键"而不是
+    "请先编译"，提示就白写了。`result_kind` 也要跟着填，否则降级提示里的
+    编译命令对得上、结果口径却对不上。
     """
     def _no() -> bool:
         return False
@@ -364,16 +412,23 @@ def _fallback_hints() -> dict[str, SolverSpec]:
 
     return {
         k: SolverSpec(key=k, exe_name=e, available=_no, find=_nofind,
-                      run=_norun, adapt=_noad, build_hint=h)
-        for k, e, h in (
+                      run=_norun, adapt=_noad, build_hint=h,
+                      result_kind=rk)
+        for k, e, h, rk in (
             ("grillage3d", "example_3d_grillage.exe",
-             "cd D:/AI-work/FEM-Eigen && cmake --build build --target example_3d_grillage"),
+             "cd D:/AI-work/FEM-Eigen && cmake --build build --target example_3d_grillage",
+             None),
             ("cable_stayed", "cable_solver.exe",
-             "cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver"),
+             "cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver",
+             None),
             # 悬索桥与斜拉桥共用 cable_solver.exe，但同样是独立的一个键：
             # adapt 与出口不同，键合并会让 detect_kind 的分支无处落地。
             ("suspension", "cable_solver.exe",
-             "cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver"),
+             "cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver",
+             None),
+            ("stage_nl", "example_3d_stage_nl.exe",
+             "cd D:/AI-work/FEM-Eigen && cmake --build build --target example_3d_stage_nl",
+             "grillage3d"),
         )
     }
 
@@ -409,7 +464,9 @@ def solve(
         raise RuntimeError(f"内核未写出 .dat：{dat}")
 
     res = SolveResult(
-        kind=k,
+        # 注册表键与结果 kind 可以不同（stage_nl → grillage3d）：结果层按
+        # kind 分流报告/校核/界面缓存，注册表按 key 分流能力与编译提示。
+        kind=spec.result_key,
         title=str(getattr(model, "title", "") or ""),
         solver=spec.exe_name,
         dat_text=dat.read_text(encoding="utf-8", errors="replace"),

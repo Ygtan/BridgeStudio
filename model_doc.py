@@ -533,6 +533,25 @@ FIELDS: dict[str, list[list[Field]]] = {
             {"key": "nonlinear_stages", "label": "非线性施工阶段", "type": "bool",
              "when": lambda p: p.get("staged")},
         ],
+        # 成桥态 `*CABLE_BRIDGE` 的求解控制量。以前只能写 .dat / 调 API，
+        # 界面完全看不见；现在与 `CableBridge3D` 同默认值，缺省时 .dat 不变。
+        # staged 模型不挂 cable_bridge，这些量不写进 .dat，故整行隐藏。
+        # 1e-8 / 1e-7 这类收敛容差仍不暴露：number_input 的 %.3f 会把它们
+        # 显示成 0.000，用户一碰就变成 0，属于静默改口径，宁可留 API。
+        [
+            {"key": "nl_steps", "label": "非线性荷载步", "type": "int",
+             "min": 1, "max": 20, "step": 1, "default": 3,
+             "when": lambda p: not p.get("staged")},
+            {"key": "newton", "label": "Newton 迭代上限", "type": "int",
+             "min": 5, "max": 100, "step": 5, "default": 30,
+             "when": lambda p: not p.get("staged")},
+            {"key": "max_iter", "label": "索长迭代上限", "type": "int",
+             "min": 1, "max": 60, "step": 1, "default": 20,
+             "when": lambda p: not p.get("staged")},
+            {"key": "mint", "label": "保力下限比例", "type": "float",
+             "min": 0.0, "max": 0.2, "step": 0.005, "default": 0.02,
+             "when": lambda p: not p.get("staged")},
+        ],
     ],
     "cable_stayed_2d": [
         [
@@ -1148,6 +1167,10 @@ class ModelDoc:
             q2_deck=float(p.get("q2_deck", 0.0) or 0.0) * 1e3,
             cable_area_mm2=float(p["A"]),
             method=str(p.get("method", "DECK")),
+            min_tension_fraction=float(p.get("mint", 0.02) or 0.02),
+            nl_steps=int(p.get("nl_steps", 3) or 3),
+            newton=int(p.get("newton", 30) or 30),
+            max_iter=int(p.get("max_iter", 20) or 20),
             staged=bool(p.get("staged", False)),
             retune=bool(p.get("retune", True)),
             system=str(p.get("system") or "semi"),
@@ -1572,12 +1595,9 @@ class ModelDoc:
             if (self.kind == "cable_stayed" and self.params.get("staged")
                     and self.params.get("nonlinear_stages")):
                 nonlinear = True
-                try:
-                    from fem_eigen_stage_nl import find_stage_nl_exe
-                    find_stage_nl_exe()
-                    ok3d = True
-                except Exception:
-                    ok3d = False
+                # `stage_nl` 已正式注册进 solver_3d，能力自述走注册表，
+                # 文档层不再自己拼 exe 路径（少一处硬编码补位）。
+                ok3d = bool(capabilities().get("stage_nl"))
             return {
                 "anastruct": False,
                 "fem_eigen": ok3d,          # 实际内核是否可用
@@ -1617,14 +1637,16 @@ class ModelDoc:
             from solver_3d import solve as solve_3d_model
 
             out = out_dir or Path("out") / self.kind
-            # 悬臂斜拉默认仍走线性阶段。显式打开非线性施工阶段时，改用共转
-            # 全量平衡；结果 kind 仍是 grillage3d，界面不会把结果藏起来。
+            # 悬臂斜拉默认仍走线性阶段。显式打开非线性施工阶段（或 3D 大跨
+            # 自动判定）时，改走注册表里的 `stage_nl` 内核：分派、可用性、
+            # 编译提示、run/adapt 契约都与另外三个内核一致，不再有旁路。
+            # `stage_nl` 的 result_kind 仍是 grillage3d，界面缓存与报告分支
+            # 不会因为新键把结果藏起来。
             if (self.kind == "cable_stayed" and self.params.get("staged")
                     and self.params.get("nonlinear_stages")):
-                from fem_eigen_stage_nl import solve_staged_result
-
-                return solve_staged_result(
-                    self.model, out_dir=out, dat_name=dat_name or "stage_nl.dat")
+                return solve_3d_model(
+                    self.model, out_dir=out, kind="stage_nl",
+                    dat_name=dat_name or "stage_nl.dat")
             # 不硬传 kind：悬臂施工的斜拉桥（staged）摘掉了 cable_bridge，按
             # detect_kind 该走线性阶段内核（grillage3d），而不是成桥态内核
             # （cable_stayed）。内核键由模型自述决定，不靠 self.kind 猜。

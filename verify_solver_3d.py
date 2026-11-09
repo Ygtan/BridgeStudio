@@ -29,6 +29,7 @@ from model_doc import ModelDoc, extract_3d_params  # noqa: E402
 from result_3d import SolveResult  # noqa: E402
 from solver_3d import (  # noqa: E402
     SolverUnavailable,
+    _fallback_hints,
     capabilities,
     detect_kind,
     require,
@@ -53,18 +54,31 @@ def main() -> int:
     # ---------------------------------------------------------- ① 注册表
     print("\n[① 注册表]")
     keys = solver_keys()
-    # 三个内核：梁格、斜拉桥成桥态、悬索桥成桥态。后两个共用同一个 exe，
-    # 但 adapt 与出口不同，在注册表里是两个键——"同一个 exe"不等于"同一个
-    # 内核"，混成一个键会让 detect_kind 的分支无处落地。
-    check("注册表含三个内核",
-          set(keys) == {"grillage3d", "cable_stayed", "suspension"}, str(keys))
+    # 四个内核：梁格、斜拉桥成桥态、悬索桥成桥态、非线性施工阶段。
+    # 中间两个共用 cable_solver.exe，但 adapt 与出口不同，仍各占一键；
+    # stage_nl 独立 exe，以前靠 ModelDoc 旁路，现在也正式登记。
+    # "同一个 exe"不等于"同一个内核"，混成一个键会让 detect_kind 的分支
+    # 无处落地。
+    expected = {"grillage3d", "cable_stayed", "suspension", "stage_nl"}
+    check("注册表含四个内核", set(keys) == expected, str(keys))
     caps = capabilities()
     check("capabilities 与注册表同键", set(caps) == set(keys), str(caps))
+    check("降级提示与注册表同键", set(_fallback_hints()) == set(keys),
+          str(sorted(_fallback_hints())))
     for k in keys:
         spec = require(k)                   # 不可用会抛，这里就是"可用性断言"
         check(f"{k} 元数据齐全",
               bool(spec.exe_name) and spec.build_hint.startswith("cd ") and spec.label,
               f"{spec.exe_name} / {spec.label}")
+    check("stage_nl 结果 kind 仍是 grillage3d",
+          require("stage_nl").result_key == "grillage3d",
+          require("stage_nl").result_key)
+    check("其余内核 result_key == 注册键",
+          all(require(k).result_key == k
+              for k in ("grillage3d", "cable_stayed", "suspension")))
+    check("stage_nl exe 名来自注册表",
+          require("stage_nl").exe_name == "example_3d_stage_nl.exe",
+          require("stage_nl").exe_name)
 
     try:
         require("nope")

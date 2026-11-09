@@ -7,8 +7,17 @@
 → 报告」全链路，证明斜拉桥的**施工过程**也能用一句话完整描述并被程序识别。
 
 这里重点演示的是**施工阶段**，不是成桥态：程序从「悬臂施工 / 从塔向两侧
-逐段张拉 / 二次调索」这几个词里推断出要生成施工阶段序列（*STAGE），再走
-线性阶段内核逐阶段求解，输出每一根索在每一个阶段的索力过程。
+逐段张拉 / 二次调索」这几个词里推断出要生成施工阶段序列（*STAGE），
+`.dat` 里不带 `*CABLE_BRIDGE` 段。
+
+链路选择（与 `ModelDoc.solve()` 一致，别按旧注释理解）：
+  · 描述含「空间三维」→ 3D 建造器；主跨 400 m 达到自动阈值
+    `CABLE_STAYED_LARGE_SPAN_M`，打开 `nonlinear_stages`，走注册表的
+    `stage_nl` 内核 `example_3d_stage_nl.exe`，逐阶段做共转列式全量平衡。
+  · 描述里写「线性施工」→ 回退 `grillage3d` 线性阶段内核。
+  · 原语料没有维度词，默认判 2D（走 `solve_2d`，结果是 Solve2DResult），
+    与本脚本用的 3D SolveResult 接口不兼容，故下面显式补一个维度词。
+输出的是每一根索在每一个阶段的索力过程，不是成桥态索力。
 
 运行
 ----
@@ -20,7 +29,9 @@
     单索面积 10000 平方毫米，悬臂施工，从塔向两侧逐段张拉，合拢后二次调索
 
 产出（out/cs_nl/）
-    nl.dat / nl_summary.txt / report.html
+    nl.dat / nl.dat.nlstage.txt / report.html
+（`stage_nl` 内核的结果文件是 `<dat>.nlstage.txt`，不是线性内核的
+ `nl_summary.txt`；`res.result_path` 在该链路里为空，看 `res.dat_path`。）
 """
 
 from __future__ import annotations
@@ -36,9 +47,10 @@ from report_3d import build_document, write_html
 OUT = Path(__file__).parent / "out" / "cs_nl"
 
 # 自然语言描述的唯一真源在 examples/cable_stayed_400m.txt（与 run_nl.py 共用），
-# 这里从文件读，避免脚本与输入文件两处漂移。
+# 这里从文件读，避免脚本与输入文件两处漂移。补维度词只作用于本算例的
+# 解析结果，不改写语料文件，run_nl.py 的 2D 链路不受影响。
 DESC = (Path(__file__).parent / "examples" / "cable_stayed_400m.txt").read_text(
-    encoding="utf-8").strip()
+    encoding="utf-8").strip() + "，空间三维"
 
 
 def main() -> None:
@@ -106,7 +118,7 @@ def main() -> None:
     html_path = write_html(rep, OUT / "report.html")
     print(f"\n已产出：")
     print(f"  HTML 报告   {html_path}")
-    print(f"  原始输出    {res.result_path}")
+    print(f"  原始输出    {res.dat_path}.nlstage.txt")
 
 
 if __name__ == "__main__":

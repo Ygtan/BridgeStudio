@@ -42,6 +42,8 @@
                                               （[LENGTH] 段；无外层迭代写 ERROR）
     res["newton"] = newton_3d 的 bundle         最终成桥态那一次共转列式内层
                                               Newton 过程（[NEWTON] 段）
+    res["cable_opt"] = cable_opt_3d 的统一结构  带约束成桥目标索力优化过程
+                                              （[OPT] 段；OPTIMIZE=0 写 ERROR）
     res["dat"], res["result"], res["stdout"]
 
 用法
@@ -60,6 +62,7 @@ from pathlib import Path
 
 from buckling_3d import parse_buckling_section
 from cable_length_3d import parse_cable_length_section
+from cable_opt_3d import parse_cable_opt_section
 from fem_eigen_export import FEM_EIGEN_DIR
 from modal_3d import parse_modal_section
 from newton_3d import bundle as newton_bundle
@@ -118,10 +121,12 @@ def parse_cable_result(path: str | Path) -> dict:
     buckling_lines: list[str] = []
     length_lines: list[str] = []
     newton_lines: list[str] = []
+    opt_lines: list[str] = []
     has_modal_section = False
     has_buckling_section = False
     has_length_section = False
     has_newton_section = False
+    has_opt_section = False
     sec = ""
     for raw in txt:
         line = raw.strip()
@@ -142,6 +147,10 @@ def parse_cable_result(path: str | Path) -> dict:
             elif sec == "NEWTON":
                 # 同样必须登记：否则 S 行会污染 [LENGTH] 段。
                 has_newton_section = True
+            elif sec == "OPT":
+                # [OPT] 的 I/T 行若不单独收，会落到前一个段被静默丢弃
+                # （甚至被 [LENGTH] 的解析器误读成逐轮数据）。
+                has_opt_section = True
             continue
         if sec in ("", "CABLE_SOLVER"):
             if line.startswith("cable_solver"):
@@ -240,6 +249,8 @@ def parse_cable_result(path: str | Path) -> dict:
             length_lines.append(line)
         elif sec == "NEWTON":
             newton_lines.append(line)
+        elif sec == "OPT":
+            opt_lines.append(line)
 
     modal = parse_modal_section(modal_lines)
     if not has_modal_section:
@@ -252,9 +263,13 @@ def parse_cable_result(path: str | Path) -> dict:
         cable_length["error"] = "no_length_section"
     newton = newton_bundle([parse_newton_section(newton_lines)],
                            "" if has_newton_section else "no_newton_section")
+    cable_opt = parse_cable_opt_section(opt_lines)
+    if not has_opt_section:
+        cable_opt["error"] = "no_opt_section"
     return {"meta": meta, "cables": cables, "camber": camber,
             "modal": modal, "buckling": buckling,
             "cable_length": cable_length, "newton": newton,
+            "cable_opt": cable_opt,
             "erected": erected, "u": u, "main_cable": main_cable,
             "hangers": hangers, "girder": girder, "girder_ends": girder_ends,
             "girder_live": girder_live, "reaction": reaction,

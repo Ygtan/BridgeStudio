@@ -296,8 +296,12 @@ def _render_field(col, field: dict, params: dict, prefix: str) -> None:
             format="%.3f", key=wkey,
         )
     elif ftype == "int":
+        # 和 float 一样支持 `default`：新增的求解控制量（荷载步 / 迭代上限）
+        # 若没有默认值就会被顶到 min 上，界面一打开就把 .dat 口径改了。
+        raw = params.get(key)
+        val = int(raw) if raw is not None else int(field.get("default", field["min"]))
         params[key] = int(col.number_input(
-            field["label"], value=int(params.get(key, field["min"])),
+            field["label"], value=val,
             min_value=int(field["min"]), max_value=int(field["max"]),
             step=int(field["step"]), key=wkey,
         ))
