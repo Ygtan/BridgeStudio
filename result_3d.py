@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Any
 
 import buckling_3d
+import cable_length_3d
 import combination
 import code_material
 import modal_3d
@@ -286,6 +287,14 @@ class SolveResult:
     # 索承体系成桥态是几何非线性，内核只给 ERROR=nonlinear_state_not_supported；
     # 空 dict = 手工构造/旧序列化结果，此时不产生屈曲校核，也不假装验过。
     buckling: dict[str, Any] = field(default_factory=dict)
+
+    # ---- 索长迭代 / 成桥态几何闭合过程量 --------------------------------
+    # 内核 fem_3d_nl.hpp 的 IterationTrace3D → [LENGTH] 段，形状见
+    # cable_length_3d.parse_cable_length_section：
+    #   {"kind", "status", "err_kind", "niter", "tol", "converged",
+    #    "sens", "steps", "cables", "nj", "J", "error"}。
+    # 线性梁格 / 旧序列化结果为空 dict，此时不产生校核，也不假装收敛过。
+    cable_length: dict[str, Any] = field(default_factory=dict)
 
     diagnostics: list[str] = field(default_factory=list)
 
@@ -611,6 +620,17 @@ class SolveResult:
             out.append(Metric(
                 "一阶屈曲因子 λ₁", "未产出",
                 hint=buckling_3d.status_note(bk)))
+        # 成桥态迭代：只陈述"几轮、末轮误差多少、哪种口径"的事实，
+        # 不把"收敛了"包装成设计合格判定。
+        cl = self.cable_length or {}
+        if cl.get("steps") and not cl.get("error"):
+            fe = cable_length_3d.final_error(cl)
+            unit = " m" if cl.get("err_kind") == "closure_m" else ""
+            out.append(Metric(
+                "成桥态迭代", f"{cl.get('niter', 0)} 轮",
+                hint=f"末轮控制误差 {fe:.3g}{unit}"
+                     f"（{cable_length_3d.err_unit(cl)}）；"
+                     + cable_length_3d.status_note(cl)))
         return out
 
     def max_bending(self) -> tuple[int, float] | None:
@@ -721,6 +741,57 @@ class SolveResult:
         out += self._checks_stage_prestress(model)
         out += self._checks_modal()
         out += self._checks_buckling()
+        out += self._checks_cable_length()
+        return out
+
+    def _checks_cable_length(self) -> list[Check]:
+        """索长迭代 / 几何闭合过程量的自检与工程提示。
+
+        判的是"逐轮数据对不对、有没有收敛、两种误差口径有没有混用"，
+        **不是**"成桥态设计合不合格"——规范没给迭代轮数或收敛率的
+        合格限值。只有真的未收敛 / 数据自相矛盾才给 warn。
+        """
+        cl = self.cable_length or {}
+        if not cl:
+            return []                     # 线性梁格 / 旧结果：没有就不假装验过
+        # 无外层迭代（STATIC / 悬索桥找形）是设计边界，不是求解失败；
+        # 标 warn 会让校核汇总凭空多一条"不通过"。
+        if cl.get("error") in ("no_iteration_static_mode",
+                               "no_iteration_suspension_formfinding",
+                               "no_length_section"):
+            return [Check("索长迭代与成桥态几何闭合", True,
+                          cable_length_3d.status_note(cl)
+                          + " 本次报告不给逐轮收敛表。", level="info")]
+        issues = cable_length_3d.validate(cl)
+        if issues:
+            return [Check("索长迭代与成桥态几何闭合", False,
+                          "；".join(issues), level="warn")]
+        fe = cable_length_3d.final_error(cl)
+        rate = cable_length_3d.mean_convergence_rate(cl)
+        out = [Check(
+            "成桥态外层迭代收敛", True,
+            f"{cl.get('niter', 0)} 轮（上限 {cl.get('maxiter', 0)}）收敛，"
+            f"末轮控制误差 {fe:.3g}，容差 {cl.get('tol', 0):.3g}；"
+            + (f"相邻轮误差比几何均值 {rate:.3g}。" if rate is not None else "")
+            + " 该结论只说明数值收敛，不构成设计规范意义上的合格判定。",
+            level="info")]
+        out.append(Check(
+            "迭代口径", True, cable_length_3d.mode_note(cl), level="info"))
+        sens = cl.get("sens") or {}
+        if sens.get("j_available") or sens.get("j_rebuild"):
+            out.append(Check(
+                "影响矩阵 / 敏感度", True,
+                cable_length_3d.sens_note(cl), level="info"))
+        # TENSION 模式索力命中但线形未闭合：明确写出来，别让读者把
+        # "收敛"误读成"制造线形已给出"。
+        if cl.get("kind") == "cable_length" and cl.get("steps"):
+            geom = float(cl["steps"][-1]["geom_err"])
+            out.append(Check(
+                "索力命中与线形闭合的区别", True,
+                f"末轮成桥弦长相对设计弦长最大偏差 {geom:.4g} m；索长迭代"
+                "只命中索力，制造线形（预抬高）需 MODE=COMPLETION 的"
+                "几何闭合迭代，两者不是同一件事。",
+                level="info"))
         return out
 
     def _checks_modal(self) -> list[Check]:
@@ -1871,6 +1942,13 @@ class SolveResult:
         bk = self.buckling or {}
         if bk.get("status") == "ok" and bk.get("modes") and not bk.get("error"):
             out["buckling_table"] = buckling_3d.buckling_table(bk)
+        # 索长迭代 / 几何闭合：只在内核确实记录了逐轮过程时给表。
+        # STATIC / 悬索桥找形走 ERROR 段，不给一张只有表头的空表。
+        cl = self.cable_length or {}
+        if cl.get("steps") and not cl.get("error"):
+            out["cable_length_table"] = cable_length_3d.iteration_table(cl)
+            if cl.get("cables"):
+                out["cable_length_cables_table"] = cable_length_3d.cable_table(cl)
 
         if self.cables:
             rows = []
@@ -2219,6 +2297,10 @@ class SolveResult:
             "n_buckling_modes": len(self.buckling.get("modes") or []),
             "buckling_status": self.buckling.get("status", ""),
             "buckling_error": self.buckling.get("error", ""),
+            "cable_length_kind": self.cable_length.get("kind", ""),
+            "cable_length_status": self.cable_length.get("status", ""),
+            "cable_length_niter": len(self.cable_length.get("steps") or []),
+            "cable_length_error": self.cable_length.get("error", ""),
             "diagnostics": list(self.diagnostics),
             "metrics": [m.to_dict() for m in self.metrics()],
             "checks": [c.to_dict() for c in self.checks()],

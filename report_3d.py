@@ -57,6 +57,7 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 import buckling_3d
+import cable_length_3d
 import modal_3d
 import view_3d
 from result_3d import (CABLE_FPU_DEFAULT, CABLE_SAFETY_MIN,
@@ -268,6 +269,50 @@ def figure_buckling(res: SolveResult, model: Any, path: Path) -> Path:
     ax.legend(frameon=False, fontsize=9)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    return _save(fig, path)
+
+
+def figure_cable_length(res: SolveResult, model: Any, path: Path) -> Path:
+    """索长迭代 / 几何闭合的逐轮收敛曲线。
+
+    控制误差与成桥弦长偏差**单位不同、判据不同**，不能画在同一根轴上：
+    左轴是对数的控制误差（相对索力偏差或几何闭合误差 m）+ 容差线，
+    右轴是线性的成桥弦长偏差 (m)。TENSION 模式下左轴一路降到 1e-8，
+    右轴却稳定在 0.15 m 左右——这正是"索力命中但线形未闭合"的证据。
+    """
+    plt = _plt()
+    cl = res.cable_length or {}
+    steps = cl.get("steps") or []
+    it = [int(s["iter"]) for s in steps]
+    err = [max(float(s["err"]), 1e-16) for s in steps]
+    geom = [float(s["geom_err"]) for s in steps]
+    fig, ax = plt.subplots(figsize=(7.4, 3.2))
+    ax.plot(it, err, "o-", color=C_BLUE, lw=1.6, ms=4,
+            label="控制误差（左轴，对数）")
+    tol = float(cl.get("tol") or 0.0)
+    if tol > 0.0:
+        ax.axhline(tol, color=C_RED, ls="--", lw=1.0,
+                   label=f"收敛容差 {tol:.1e}")
+    ax.set_yscale("log")
+    ax.set_xticks(it)
+    ax.set_xlabel("外层迭代轮次")
+    if cl.get("err_kind") == "tension_rel":
+        ax.set_ylabel("最大相对索力偏差（对数）")
+    else:
+        ax.set_ylabel("最大几何闭合误差 (m，对数)")
+    ax.grid(alpha=0.25, lw=0.5, axis="y")
+    ax2 = ax.twinx()
+    if any(abs(g) > 0.0 for g in geom):
+        ax2.plot(it, geom, "s--", color=C_GREEN, lw=1.2, ms=3.5,
+                 label="成桥弦长偏差（右轴）")
+    ax2.set_ylabel("max|成桥弦长 - 设计弦长| (m)")
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, frameon=False, fontsize=8, loc="upper right")
+    for s in ("top",):
+        ax.spines[s].set_visible(False)
+        ax2.spines[s].set_visible(False)
     fig.tight_layout()
     return _save(fig, path)
 
@@ -934,6 +979,12 @@ MODAL_FIGURE_PREFIX = "mode_shape_"
 BUCKLING_TABLE_KEY = "buckling_table"
 BUCKLING_FIGURE_KEY = "buckling_factors"
 
+#: 索长迭代章：逐轮收敛表与收敛图跟着章节走；逐索终值表（几十行）
+#: 归文末明细表。收敛图必须从通用图循环里排除，否则一图两处出现。
+LENGTH_TABLE_KEY = "cable_length_table"
+LENGTH_CABLES_TABLE_KEY = "cable_length_cables_table"
+LENGTH_FIGURE_KEY = "cable_length_convergence"
+
 
 @dataclass
 class Figure:
@@ -1115,6 +1166,16 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
             figure_buckling(res, model, d / "buckling_factors.png"),
             note="纵轴为对数刻度；红色虚线 λ=1 表示参考荷载本身，即"
                  "「荷载放大 1 倍就失稳」的数学分界，不是规范限值。")
+    # 索长迭代 / 几何闭合收敛图：只在内核确实记录了逐轮过程时画。
+    # STATIC / 悬索桥找形走 ERROR 段，不摆一张空坐标轴。
+    cl = res.cable_length or {}
+    if cl.get("steps") and not cl.get("error"):
+        out[LENGTH_FIGURE_KEY] = Figure(
+            LENGTH_FIGURE_KEY, "外层迭代逐轮收敛",
+            figure_cable_length(res, model, d / "cable_length_convergence.png"),
+            note="左轴（对数）是控制误差，红色虚线是收敛容差；右轴（线性）"
+                 "是成桥弦长相对设计弦长的最大偏差 (m)。两者单位与判据不同，"
+                 "分轴绘制，不能读成同一条曲线的两种刻度。")
     return out
 
 
@@ -1233,6 +1294,35 @@ def _modal_paragraph(res: SolveResult) -> str:
     if vf:
         txt += f" 竖向主导的最低阶约 {vf:.4f} Hz。"
     txt += " " + modal_3d.participation_note(md)
+    return txt
+
+
+def _cable_length_paragraph(res: SolveResult) -> str:
+    """索长迭代章引言：把"这一章在讲什么、判据是什么"写死在纸上。
+
+    最容易翻车的两处：把"索力迭代收敛"写成"成桥线形已闭合"；把
+    "本路径没有外层迭代"写成"求解失败"。两者都不能出现。
+    """
+    cl = res.cable_length or {}
+    if not cl:
+        return ("本次结果没有索长迭代段（线性链路、旧内核或手工构造结果）。"
+                "内核没算就不补一张估计的收敛曲线。")
+    if cl.get("error"):
+        return ("本次未产出逐轮迭代过程：" + cable_length_3d.status_note(cl)
+                + " 成桥索力、下料索长与制造线形仍按「计算结果」与"
+                  "「明细表」章给出的内核结果使用；没有过程量不等于没算。")
+    fe = cable_length_3d.final_error(cl)
+    if fe is None:
+        return ("内核给出了索长迭代段但没有逐轮记录："
+                + cable_length_3d.status_note(cl))
+    unit = " m" if cl.get("err_kind") == "closure_m" else ""
+    rate = cable_length_3d.mean_convergence_rate(cl)
+    txt = (f"内核共记录 {cl.get('niter', 0)} 轮外层迭代"
+           f"（上限 {cl.get('maxiter', 0)} 轮，收敛容差 {cl.get('tol', 0):.3g}），"
+           f"末轮控制误差 {fe:.3g}{unit}；"
+           + (f"相邻轮误差比几何均值 {rate:.3g}。" if rate is not None else ""))
+    txt += " " + cable_length_3d.mode_note(cl)
+    txt += " " + cable_length_3d.sens_note(cl)
     return txt
 
 
@@ -1474,6 +1564,11 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     buckling_chapter = bool(res.buckling)
     if buckling_chapter:
         skip_fig.add(BUCKLING_FIGURE_KEY)
+    # 索长迭代章只要内核给了段就出：连 ERROR 段（STATIC / 悬索桥找形）
+    # 也要写明"本路径本来就没有外层迭代"，不能整章消失让人以为没算过。
+    length_chapter = bool(res.cable_length)
+    if length_chapter:
+        skip_fig.add(LENGTH_FIGURE_KEY)
     if stage_chapter:
         skip_fig.add(STAGE_FIGURE_KEY)
     if erection_chapter:
@@ -1516,6 +1611,20 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
             "本报告不据此给出合格判定；λ₁ ≤ 1 只说明参考荷载已达"
             "或超过线性临界荷载。索承体系成桥态为几何非线性平衡态，"
             "本章按内核返回的 ERROR 段如实标注「本次未产出」。")})
+
+    if length_chapter:
+        blocks.append({"type": "h1", "text": "索长迭代与成桥态几何闭合"})
+        blocks.append({"type": "p", "text": _cable_length_paragraph(res)})
+        if LENGTH_TABLE_KEY in tabs:
+            blocks.append({"type": "table", "key": LENGTH_TABLE_KEY})
+        if LENGTH_FIGURE_KEY in figs:
+            blocks.append({"type": "figure", "key": LENGTH_FIGURE_KEY})
+        blocks.append({"type": "note", "text": (
+            "控制误差与成桥弦长偏差是两种量：前者是收敛判据（索长迭代为"
+            "无量纲的相对索力偏差，几何闭合为 m），后者只是成桥变形量级、"
+            "不参与判据。逐索的目标索力、成桥索力与下料 L0 见文末明细表；"
+            "本章只说明数值如何收敛，不构成规范意义上的合格判定。未收敛时"
+            "内核写 STATUS=not_converged，报告如实标注，不摆空表冒充通过。")})
 
     if stage_chapter:
         blocks.append({"type": "h1", "text": "施工阶段索力"})
@@ -1618,6 +1727,8 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     rest.pop("opt_round", None)
     rest.pop(MODAL_TABLE_KEY, None)      # 已跟着「模态与自振特性」章走
     rest.pop(BUCKLING_TABLE_KEY, None)   # 已跟着「线性屈曲与稳定」章走
+    rest.pop(LENGTH_TABLE_KEY, None)     # 逐轮表已跟着「索长迭代」章走
+    # LENGTH_CABLES_TABLE_KEY（逐索终值，几十行）故意留在文末明细表。
     for key in CAPACITY_TABLE_KEYS:      # 已跟着「承载力计算书」章走
         rest.pop(key, None)
     if rest:
@@ -1789,7 +1900,9 @@ def render_html(rep: Report) -> str:
                        f"{c.value:.4g}" + (f" {u}" if u else ""))
                 lim = ("—" if c.limit is None else
                        f"{c.limit:.4g}" + (f" {u}" if u else ""))
-                rows.append([c.name, mark, val, lim, c.detail])
+                # 校核说明里也会写 **加粗**（例：未给截面模量时的应力口径
+                # 提示）；文字列要转义+转换，mark 是 HTML 标签不能过 rich。
+                rows.append([rich(c.name), mark, val, lim, rich(c.detail)])
             rows_html = "".join(
                 "<tr>" + "".join(
                     f'<td class="l">{x}</td>' if i in (0, 4)
@@ -1806,7 +1919,9 @@ def render_html(rep: Report) -> str:
             body.append(_table_html(f"表 {tab_no}　{tb['title']}",
                                     tb["headers"], tb["rows"], left_cols=(0,)))
             if tb.get("note"):
-                body.append(f'<p class="tnote">{_h(tb["note"])}</p>')
+                # 表注里的 **加粗** 与 Word 侧 _text_runs 对齐，原样印星号
+                # 会漏进 HTML/PDF 文本层（见 verify_cable_length_3d 的读回判据）。
+                body.append(f'<p class="tnote">{rich(tb["note"])}</p>')
         elif t == "figure":
             f = rep.figures.get(b["key"])
             if f is None:
@@ -1816,7 +1931,8 @@ def render_html(rep: Report) -> str:
                 f'<figure><img alt="{_h(f.caption)}" src="{_img_b64(f.path)}">'
                 f"<figcaption>图 {fig_no}　{_h(f.caption)}</figcaption></figure>")
             if f.note:
-                body.append(f'<p style="color:#59636e;font-size:12px">{_h(f.note)}</p>')
+                body.append(
+                    f'<p style="color:#59636e;font-size:12px">{rich(f.note)}</p>')
 
     meta = "".join(f"<dt>{_h(k)}</dt><dd>{_h(v)}</dd>" for k, v in rep.meta)
     return f"""<!DOCTYPE html>

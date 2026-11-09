@@ -38,6 +38,8 @@
     res["buckling"] = buckling_3d 的统一结构  线性屈曲不适用 → ERROR 段
                                               （nonlinear_state_not_supported），
                                               不静默、不拿线弹性 λ 冒充
+    res["cable_length"] = cable_length_3d 的统一结构  索长迭代 / 几何闭合逐轮过程
+                                              （[LENGTH] 段；无外层迭代写 ERROR）
     res["dat"], res["result"], res["stdout"]
 
 用法
@@ -55,6 +57,7 @@ import subprocess
 from pathlib import Path
 
 from buckling_3d import parse_buckling_section
+from cable_length_3d import parse_cable_length_section
 from fem_eigen_export import FEM_EIGEN_DIR
 from modal_3d import parse_modal_section
 
@@ -109,8 +112,10 @@ def parse_cable_result(path: str | Path) -> dict:
     erection_shape: dict[int, list[float]] = {}
     modal_lines: list[str] = []
     buckling_lines: list[str] = []
+    length_lines: list[str] = []
     has_modal_section = False
     has_buckling_section = False
+    has_length_section = False
     sec = ""
     for raw in txt:
         line = raw.strip()
@@ -124,6 +129,10 @@ def parse_cable_result(path: str | Path) -> dict:
                 # 必须登记：否则 ERROR=nonlinear_state_not_supported 会
                 # 被当成 [MODAL] 段的未知行，下游"没解析到"就当没这回事。
                 has_buckling_section = True
+            elif sec == "LENGTH":
+                # 必须登记：否则 [LENGTH] 的 ERROR= 会被当成前一个段
+                # 的未知行，下游"没解析到"就当没这回事。
+                has_length_section = True
             continue
         if sec in ("", "CABLE_SOLVER"):
             if line.startswith("cable_solver"):
@@ -218,6 +227,8 @@ def parse_cable_result(path: str | Path) -> dict:
             modal_lines.append(line)
         elif sec == "BUCKLING":
             buckling_lines.append(line)
+        elif sec == "LENGTH":
+            length_lines.append(line)
 
     modal = parse_modal_section(modal_lines)
     if not has_modal_section:
@@ -225,8 +236,12 @@ def parse_cable_result(path: str | Path) -> dict:
     buckling = parse_buckling_section(buckling_lines)
     if not has_buckling_section:
         buckling["error"] = "no_buckling_section"
+    cable_length = parse_cable_length_section(length_lines)
+    if not has_length_section:
+        cable_length["error"] = "no_length_section"
     return {"meta": meta, "cables": cables, "camber": camber,
             "modal": modal, "buckling": buckling,
+            "cable_length": cable_length,
             "erected": erected, "u": u, "main_cable": main_cable,
             "hangers": hangers, "girder": girder, "girder_ends": girder_ends,
             "girder_live": girder_live, "reaction": reaction,

@@ -79,6 +79,9 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
     # λ 为空不一定是失败（STATUS=no_compression 是物理预期），状态与
     # 诊断一并带过来，由 buckling_3d 统一解释，不在这里另判一遍。
     res.buckling = dict(raw.get("buckling") or {})
+    # 索长迭代 / 几何闭合过程量：只有索承体系链路会带 [LENGTH] 段，
+    # 线性梁格这里自然是空 dict，报告层按"不适用"处理，不摆空表。
+    res.cable_length = dict(raw.get("cable_length") or {})
     res.disp = dict(raw.get("disp") or {})
     res.beam = {int(k): dict(v) for k, v in (raw.get("beam") or {}).items()}
     res.live = {int(k): tuple(v) for k, v in (raw.get("live") or {}).items()}
@@ -143,6 +146,9 @@ def _adapt_cable(model: Any, raw: dict, res: SolveResult) -> None:
     # 内核对索承体系只写 ERROR=nonlinear_state_not_supported 段，这里照收，
     # 报告层如实标注「本次未产出」，不拿线弹性 λ 冒充非线性稳定结论。
     res.buckling = dict(raw.get("buckling") or {})
+    # [LENGTH] 段：内核把索长迭代 / 制造线形几何闭合的逐轮误差、步长、
+    # 影响矩阵 J 写进来；Python 只解析，不重跑 Newton。
+    res.cable_length = dict(raw.get("cable_length") or {})
     meta = dict(raw.get("meta") or {})
     res.meta = meta
     res.converged = bool(raw.get("converged"))

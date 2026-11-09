@@ -63,8 +63,8 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        3D .dat 导出；基准 = 三跨连续箱梁 3D 梁格（对照 FEM-Eigen 黄金基线
        `bridge_3d_grillage`）
 - [ ] **P2** 高级能力全量暴露：施工阶段（STAGE）、预应力（PRESTRESS_LOSS）、
-       车道荷载/影响面（LANE_3D/INFLUENCE_3D）；模态（2026-11-08）与线性屈曲
-       因子（2026-11-09）已全量暴露（见下）；JTG D60 荷载组合引擎
+       车道荷载/影响面（LANE_3D/INFLUENCE_3D）；模态（2026-11-08）、线性屈曲
+       因子与索长迭代过程量（2026-11-09）已全量暴露（见下）；JTG D60 荷载组合引擎
 - [x] **P3** 内核攻坚：共转列式非线性 + 索长迭代 → 斜拉桥成桥态 —— 2026-10-30
 - [x] **P3** 悬索桥成桥态（自锚式 / 地锚式）：主缆索多边形找形（对 H 二分命中
        矢高）→ 平衡态弦长反算 L₀ → 索长迭代；两体系共用同一套内核，只差边界。
@@ -167,6 +167,23 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        Word/HTML/CSV，不交付"假归档版"；`navigation=False` 为显式降级对照。
        `verify_buckling_3d.py` + `verify_report_3d.py` 逐页对拍页码、书签标题与
        目标页顺序。—— 2026-11-09
+- [x] **P3** 阶段二 A「暴露索长迭代过程量」：内核 `fem_3d_nl.hpp` 的两类外层
+       迭代（影响矩阵 `J = M·D` 的 Newton 求下料 L0、Woodbury 低秩 Newton +
+       回溯线搜索求制造线形 ΔX）原本只把每轮误差打到控制台，结果文件里只有
+       4 个汇总标量。新增 `FEM-Eigen/cable_length_output_3d.hpp` 把同一份
+       `IterationTrace3D` 写成 `[LENGTH]` 段（逐轮 `I` 行、逐索 `E` 行、完整
+       `NJ`+`J`、`SENS` 诊断），**数值口径一字未改**；Python 侧
+       `cable_length_3d.py` 唯一解析 → `SolveResult.cable_length` → 指标卡 /
+       info 校核 / 逐轮表 / 逐索表 → 报告独立「索长迭代与成桥态几何闭合」章 +
+       双轴收敛图 → 四出口同源。**口径**：`KIND=cable_length`（TENSION，
+       判据是最大相对索力偏差）与 `KIND=erection_geometry`（COMPLETION，
+       判据是 max|ΔX+u|，单位 m）控制误差单位不同、不能画同一根轴；
+       `geomErr` 只是结果量，实测索力收敛到 3e-8 而弦长偏差稳定在 0.15 m，
+       即「索力命中 ≠ 线形闭合」；STATIC / 悬索桥找形本无外层迭代，内核写
+       ERROR 段、报告写明原因，不摆空表冒充「0 轮收敛」。过程量**不构成
+       规范意义上的合格判定**。`verify_cable_length_3d.py` 58/58：手写段逐
+       字段对拍 + 10 类故障注入 + 段分派不串段 + 独立 oracle（J 对角全负、
+       误差单调下降、两段同源）+ 三模式实跑 + 四出口 PDF 读回。—— 2026-11-09
 - [x] **P3** 负弯矩区双向验算 + 非对称配筋（JTG 3362 §5.2.2/5.2.3、
        §5.3.4-4/5）：`CapacitySection` 加 `FaceSpec negative`（底板宽厚与顶板
        纵筋可单独登记）和 `Asp_given`（显式受压筋，可为 0=单筋）；
@@ -241,7 +258,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 20 个脚本、761 项全绿）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 30 个脚本全绿，带汇总输出的脚本合计 1196 项断言；`verify_cable_length_3d.py` 58/58）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
