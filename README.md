@@ -25,7 +25,7 @@
 X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（唯一真源
 `ModelSpec3D` / 唯一转换点 `to_canonical` / 只出不进）、A/B/C 三档处理分级、
 统一字段·单位·坐标与分块编号规范、已知缺陷修正清单、资产登记表、禁止项，
-全部收敛在 **`X20_接入约定.md`**，并由 **`verify_x20_contract.py`**（77/77）
+全部收敛在 **`X20_接入约定.md`**，并由 **`verify_x20_contract.py`**（78/78）
 做成可执行守卫。新增或修改 X20 资产必须先登记再实现；仓库内不得出现
 归档目录的路径常量或 `bridge_fe_modeler` 导入。
 
@@ -34,7 +34,7 @@ X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（
 `X20_接入约定.md` 管「X20 资产怎么接」，**`能力边界矩阵.md` 管「接到之后到底有哪些能力、哪些还没有」**：
 6 桥型 × 2 维度主矩阵（建造器键 / 求解入口 / 阶段·活载·预应力参数逐格对拍）、
 19 项维度级能力的 `文件::符号` 依据、参数覆盖契约与刻意隐藏白名单、
-5 条真实缺口。由 **`verify_capability_matrix.py`**（197/197）纯离线守卫：
+4 条真实缺口 + 1 条已闭环记录。由 **`verify_capability_matrix.py`**（197/197）纯离线守卫：
 主矩阵与 `BUILDERS` / `SOLVER_OF` 对拍、依据符号真实存在、
 `DEFAULTS ⊆ FIELDS ∪ 白名单`、额外控件带 `default`、默认值在区间内、
 12 个建造器「控件渲染写回 params 后默认 `.dat` 逐位不变」、
@@ -101,7 +101,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        A/B/C 三档处理，把散在 5 个建造器编号表、两处「借 / 不借」注释、
        导出器 docstring 里的口径收口到一处；`verify_fem_eigen_link.py`
        去掉归档目录旁路，默认用例改用 FEM-Eigen 自带 `.dat`。
-       `verify_x20_contract.py` 77/77 守卫唯一转换点、无旁路、字段映射与
+       `verify_x20_contract.py` 78/78 守卫唯一转换点、无旁路、字段映射与
        C 档不借理由 —— 2026-11-10。注意：这**不等于** X20 桥型全量移植，
        下一条仍是真实能力缺口。
 - [x] **P1 能力口径可核对化 + 界面参数覆盖**：新增 `能力边界矩阵.md`
@@ -117,6 +117,9 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        `[OPT]`、承载力、四出口计算书、多格式导出、严格校验）只在 3D 链路，
        2D ↔ 3D 不对齐。逐条依据见 `能力边界矩阵.md` §4.1 / §4.2。
        **这是真实能力缺口、不是文档滞后**，与 P4 一起排期。
+       内核侧尚无协作体系求解键（注册表 4 键、`detect_kind` 二选一），
+       分阶段规格与验收断言见 `组合体系接入规格.md`；未实现期输入这类描述
+       由 `verify_combo_system.py` 守卫显式拒绝，不会静默按单体系计算 —— 2026-11-10
 - [x] **P2** 高级能力暴露（STAGE / LANE_3D / INFLUENCE_3D / 模态 / 屈曲 /
        过程量 / JTG D60 组合）：施工阶段 `*STAGE`（`TENSION=` / `L0=` 调索、
        全过程索力包络）、车道荷载与影响面 `*LANE_3D` / `*INFLUENCE_3D`
@@ -405,14 +408,33 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
       （3D ps_beam 原先会掉进 2D `spec_to_dat` 并抛 `AttributeError`）。
       结果层新增 `stage_prestress_table`、报告「施工阶段预应力」专章与
       四出口同源；默认张拉力 0 时 `.dat` 逐位不变。
-      `verify_stage_tension_3d.py` **54/54**（live 无外荷载时每条纵梁成桥态
-      轴力精确 = −P·loss，loss / e / s 各自对拍；并把建造器既有的
-      「单元号段容量」限制写成明确中文硬报错）—— 2026-11-10
+      `verify_stage_tension_3d.py` **84/84**（live 无外荷载时每条纵梁成桥态
+      轴力精确 = −P·loss，loss / e / s 各自对拍；编号容量放开后另加
+      12 格默认 `.dat` 黄金哈希与 wide 号段 live 闭式解断言）—— 2026-11-10
+- [x] **P1 组合体系：先定规格 + 显式拒绝，不静默降级**：内核只有
+      `grillage3d / cable_stayed / suspension / stage_nl` 4 键，`detect_kind()`
+      在斜拉/悬索间二选一，**没有协作体系成桥态找形**；Python 侧硬拼模型
+      会给出收敛但力学错误的结果。新增 `组合体系接入规格.md`（内核/Python
+      两阶段规格、编号段登记、验收断言），`ModelDoc.from_text()` 识别
+      「斜拉-悬索协作 / 梁拱组合」写 `combo_system` 哨兵，`validate()` 与
+      `solve()` 用同源中文文案拒绝。`verify_combo_system.py` **86/86**
+      锁住拒绝路径、正常语料不误伤、注册表仍是 4 键、12 格默认 `.dat`
+      逐位不变。契约 §7 `B2` 仍如实标「部分」—— 2026-11-10
+- [x] **P1 梁格编号容量放开，默认 `.dat` 逐位不变**：`grillage_3d.numbering_plan()`
+      按 `n_lines` / 总梁段数自动选 legacy（默认容量，黄金基线原样）或
+      wide（`S=max(10000, 段数+2)`，三段不重叠硬校验）号段；阶段激活与
+      张拉链改按元素元数据查表，不再 `e.id < 500` 反解。顺带校正契约 §5
+      与模块头陈旧的斜拉塔单元号段（200/300 → 800/900）。12 格默认 `.dat`
+      的 sha256 黄金哈希在 `verify_stage_tension_3d.py::DEFAULT_DAT_SHA`；
+      wide 的节点/单元唯一、阶段覆盖、张拉链引用与 live
+      `N = −P·loss/n_lines` 全绿。**未改任何默认输出行，`dat_byte_regression`
+      37/37 基线无需刷新**；能力矩阵 §4 缺口由 5 条减为 4 条并留闭环记录
+      —— 2026-11-10
 - [ ] **P4** 成果层：3D 包络视图、MIDAS 双向互导（Word/DOCX 与 PDF 计算书已支持，含承载力逐项复核章）。两条边界的逐条说明见 `使用说明.md` 第十一章；`.mct` 往返自检不等于与 MIDAS 数值对拍。
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **36 个脚本全绿**，其中 31 个带汇总输出的脚本合计 **1767 项断言**；`verify_app.py` 108/108、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145、`verify_stage_tension_3d.py` 54/54、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_x20_contract.py` 77/77、`verify_capability_matrix.py` 197/197，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **37 个脚本全绿**，其中 32 个带汇总输出的脚本合计 **1884 项断言**；`verify_app.py` 108/108、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 197/197，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

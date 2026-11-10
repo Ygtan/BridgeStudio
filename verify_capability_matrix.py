@@ -274,8 +274,11 @@ def live_effect(builder_map: dict[str, tuple[str, str]]) -> None:
 def gaps_and_process() -> None:
     text = read(DOC)
     for i, kw in enumerate(("组合体系桥型没有独立建造器", "2D ↔ 3D 高级能力不对齐",
-                            "P4 成果层", "梁格编号容量限制", "界面 PDF 默认关闭"), 1):
+                            "P4 成果层", "界面 PDF 默认关闭"), 1):
         check(f"§4 缺口 {i} 有明确条目", kw in text)
+    check("§4 记录编号容量闭环（不靠删断言假装没发生过）",
+          "梁格编号容量限制" in text and "缺口由 5 条减为 4 条" in text
+          and "DEFAULT_DAT_SHA" in text and "wide_numbering()" in text)
     check("§5 写明新增桥型/能力/参数流程", "## 5. 维护流程" in text
           and "新增 / 修改桥型" in text and "白名单写理由" in text)
     check("§3.1 写明有控件≠能改 .dat 的边界",

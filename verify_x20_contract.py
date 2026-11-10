@@ -113,7 +113,11 @@ def contract_doc() -> None:
     check("§4 自由度口径（FZ / UR3）", "FZ" in text and "UR3" in text)
     check("§4 信息有损必须 warnings",
           "静默丢信息比导出失败更难查" in text and "warnings" in text)
-    check("§5 登记已知编号容量限制", "n_lines ≥ 5" in text and "刷新" in text)
+    check("§5 登记梁格 legacy/wide 双编号方案",
+          all(s in text for s in ("n_lines ≥ 5", "numbering_plan()",
+                                  "逐位不变", "DEFAULT_DAT_SHA")))
+    check("§5 写明宽编号仍要 live 闭式解守卫",
+          "wide_numbering()" in text and "−P·loss/n_lines" in text)
     check("§9 禁止项不少于 6 条",
           len([ln for ln in text.split("## 9. 禁止项")[1].splitlines()
                if ln.startswith("- ")]) >= 6)

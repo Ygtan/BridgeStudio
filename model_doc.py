@@ -860,6 +860,21 @@ _DUAL_PLANE_RE = re.compile(r"双索面|两索面|双缆面|双主缆")
 _FLOATING_RE = re.compile(r"半漂浮|漂浮体系|纵向漂浮")
 _FIXED_RE = re.compile(r"塔梁固结|固结体系")
 
+# 组合体系（X20 第 5 类桥型）：内核没有对应的成桥态求解键。识别到就拒绝，
+# 不按 `_classify_kind` 的顺序悄悄落到悬索或斜拉——那会给出「收敛但错误」的答案。
+# 实施规格与验收断言见《组合体系接入规格.md》。
+_COMBO_SYSTEM_RE = re.compile(
+    r"组合体系|协作体系|协作桥|组合桥"
+    r"|斜拉\s*[-—－+]\s*悬索|悬索\s*[-—－+]\s*斜拉"
+    r"|斜拉悬索|悬索斜拉|梁拱组合|拱梁组合", re.I)
+COMBO_SYSTEM_MSG = (
+    "描述是组合体系（斜拉-悬索协作 / 梁拱组合）。当前内核只有 "
+    "grillage3d / cable_stayed / suspension / stage_nl 四种求解键，"
+    "detect_kind 只能在斜拉与悬索之间二选一，没有协作体系的成桥态找形；"
+    "按单一体系建模会给出看似收敛、实则力学错误的结果。"
+    "请拆成两个单一体系分别计算，或等内核侧补第 5 个求解键"
+    "（实施规格与验收断言见《组合体系接入规格.md》）。")
+
 
 def _classify_kind(text: str, hint: str | None = None) -> str:
     """判断结构类型（旧 8 值语义，含 grillage3d/arch_3d）。
@@ -1445,6 +1460,10 @@ class ModelDoc:
     def validate(self) -> list[str]:
         """返回中文问题列表；空列表表示可以安全求解。**不抛异常**。"""
         errs: list[str] = []
+        # 组合体系没有对应内核键：先拦在参数校验层，避免界面把它当成
+        # 「一点小问题」继续求解。文案与 from_text 的 notes 同源。
+        if self.params.get("combo_system"):
+            return [COMBO_SYSTEM_MSG]
         # 逐跨张拉的参数问题先给中文提示：建造器也会硬拦，但若等它抛出来，
         # 界面只会看到一句「模型参数不完整或非法」，看不出是哪个控件填错了。
         if self.builder_key == "beam_bridge":
@@ -1835,6 +1854,9 @@ class ModelDoc:
         （Solve2DResult，施工阶段 + 车道活载 + 规范组合）。单梁（ModelSpec）没有
         施工阶段/车道，仍走 `fem_eigen_export.run_fem_eigen` 的一次性静力。
         """
+        # 即使调用方绕过界面校验，也不允许把组合体系偷偷送进单一体系内核。
+        if self.params.get("combo_system"):
+            raise ValueError(COMBO_SYSTEM_MSG)
         if self.is_3d:
             from solver_3d import solve as solve_3d_model
 
@@ -2048,13 +2070,30 @@ class ModelDoc:
         hint: str | None = None,
         dim_hint: str | None = None,
     ) -> tuple["ModelDoc", str, Diag]:
-        """统一解析入口：先分类，再走对应管线。
+        """统一解析入口（薄包装）：分类解析后统一注入「组合体系」哨兵。
 
         返回值与 `nl_parser.parse_nl` 同构（doc, source, diag），界面不必分叉。
+        `dim_hint` 是界面维度下拉（"二维"/"三维"）；给了就覆盖描述判定。
 
-        `dim_hint` 是界面维度下拉（"二维"/"三维"）；给了就覆盖描述判定，
-        不给则按描述关键词自动判（默认 2d）。
+        组合体系不在这里分类（没有对应建造器），而是记进 params 与 notes，
+        由 `validate()` / `solve()` 明确拒绝，避免静默按单一体系求解。
         """
+        doc, source, diag = cls._parse_text(text, prev, llm_config, hint, dim_hint)
+        if _COMBO_SYSTEM_RE.search(text or ""):
+            doc.params["combo_system"] = True
+            diag.notes.append(COMBO_SYSTEM_MSG)
+        return doc, source, diag
+
+    @classmethod
+    def _parse_text(
+        cls,
+        text: str,
+        prev: "ModelDoc | None" = None,
+        llm_config: Any = None,
+        hint: str | None = None,
+        dim_hint: str | None = None,
+    ) -> tuple["ModelDoc", str, Diag]:
+        """分类解析主体；只由 `from_text` 调用。"""
         if prev is not None and not isinstance(prev, ModelDoc):
             # 最常见的误用：把 LLMConfig 当成第二个位置参数传进来
             raise TypeError(
