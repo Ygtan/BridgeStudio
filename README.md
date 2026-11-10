@@ -59,12 +59,31 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        `fem_eigen_3d.py`（对接 example_3d_grillage.exe 求解与包络解析）——
        2026-10-28，`verify_grillage_3d.py` 12/12 全绿：中跨跨中挠度 8.21mm
        vs anastruct 理论 8.11mm（1.2%），与三弯矩闭式解独立吻合
-- [ ] **P1** ModelDoc 3D 化：3D ModelSpec（IY/IZ/J/IW 截面）、X20 桥型建造器移植、
-       3D .dat 导出；基准 = 三跨连续箱梁 3D 梁格（对照 FEM-Eigen 黄金基线
-       `bridge_3d_grillage`）
-- [ ] **P2** 高级能力全量暴露：施工阶段（STAGE）、预应力（PRESTRESS_LOSS）、
-       车道荷载/影响面（LANE_3D/INFLUENCE_3D）；模态（2026-11-08）、线性屈曲
-       因子与索长迭代过程量（2026-11-09）已全量暴露（见下）；JTG D60 荷载组合引擎
+- [x] **P1** ModelDoc 3D 化（ModelSpec / 3D `.dat` / 梁格基准）：
+       `model_spec_3d.py` 的 3D 实常数含 IY/IZ/J/IW（BEAM7 翘曲常数单独校验）、
+       6 自由度边界，`to_dat()` 已能导出 `*STAGE` / `*LANE_3D` /
+       `*INFLUENCE_3D` / `*PRESTRESS` 等 3D 段；基准为三跨连续箱梁 3D 梁格，
+       对 FEM-Eigen `bridge_3d_grillage.dat` 黄金算例，`verify_grillage_3d.py`
+       现行 13/13（上一条记的 12/12 是 2026-10-28 当时的项数；中跨跨中
+       挠度 -8.21 mm vs anastruct -8.11 mm，1.2%），
+       并与三弯矩闭式解独立吻合 —— 2026-11-10 核销
+- [ ] **P1** X20 桥型建造器全量移植：3D 链路目前只有梁格 / 斜拉 / 悬索 /
+       桁架 / 拱 5 类建造器（`grillage_3d.py`、`cable_stayed_3d.py`、
+       `suspension_3d.py`、`truss_3d.py`、`arch_3d.py`），2D 链路另有独立
+       建造器。**这是真实能力缺口、不是文档滞后**，与 P4 一起排期。
+- [x] **P2** 高级能力暴露（STAGE / LANE_3D / INFLUENCE_3D / 模态 / 屈曲 /
+       过程量 / JTG D60 组合）：施工阶段 `*STAGE`（`TENSION=` / `L0=` 调索、
+       全过程索力包络）、车道荷载与影响面 `*LANE_3D` / `*INFLUENCE_3D`
+       （含横向分布与冲击系数）、模态（2026-11-08）、线性屈曲因子与
+       `[LENGTH]` / `[NEWTON]` / `[OPT]` 过程量（2026-11-09~10）均已走通
+       内核 → 解析 → 结果 → 报告 → 四出口；`combination.py` 按
+       JTG D60-2015 表 4.1.5 / 4.1.7 给基本 / 频遇 / 准永久三组合。
+       **边界**：组合只计恒载 + 汽车，多可变作用的组合值系数未做；
+       3D 施工阶段预应力只给 `loss` 有效/张拉比 —— 2026-11-10 核销
+- [ ] **P2** 3D 预应力分项损失（JTG 3362-2018 §6.2）：`*PRESTRESS_LOSS`
+       分项损失表（σl5 松弛等）目前是 **2D 内核** `fem_2d.cpp` 的能力，
+       `fem_3d.hpp` 只按 `loss` 一个比值直接乘，不做分项损失。
+       **这是真实能力缺口、不是文档滞后**。详见 `使用说明.md` 第十一章。
 - [x] **P3** 内核攻坚：共转列式非线性 + 索长迭代 → 斜拉桥成桥态 —— 2026-10-30
 - [x] **P3** 悬索桥成桥态（自锚式 / 地锚式）：主缆索多边形找形（对 H 二分命中
        矢高）→ 平衡态弦长反算 L₀ → 索长迭代；两体系共用同一套内核，只差边界。
@@ -310,7 +329,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 - [x] **P3.5** 自然语言输入文件：三个算例（悬索/斜拉/拱）的描述统一落到 `examples/*.txt`
       （唯一真源），`run_nl.py` 作命令行统一入口（`--list` / 跑全部 / 跑单个），三个
       `example_*_nl.py` 的 `DESC` 改为从 `.txt` 读 —— 2026-11-05
-- [ ] **P4** 成果层：3D 包络视图、MIDAS 双向互导（Word/DOCX 与 PDF 计算书已支持，含承载力逐项复核章）
+- [ ] **P4** 成果层：3D 包络视图、MIDAS 双向互导（Word/DOCX 与 PDF 计算书已支持，含承载力逐项复核章）。两条边界的逐条说明见 `使用说明.md` 第十一章；`.mct` 往返自检不等于与 MIDAS 数值对拍。
 
 ## 质量保障闭环（铁律）
 
