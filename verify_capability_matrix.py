@@ -274,8 +274,16 @@ def live_effect(builder_map: dict[str, tuple[str, str]]) -> None:
 def gaps_and_process() -> None:
     text = read(DOC)
     for i, kw in enumerate(("组合体系桥型没有独立建造器", "2D ↔ 3D 高级能力不对齐",
-                            "P4 成果层", "界面 PDF 默认关闭"), 1):
+                            "P4 成果层"), 1):
         check(f"§4 缺口 {i} 有明确条目", kw in text)
+    check("§4 记录界面 PDF 记载纠正（不是删断言假装没发生过）",
+          "界面 PDF 默认关闭" in text and "纠正错误记载" in text
+          and "4 条减为 3 条" in text and "write_pdf" in text)
+    ui_src = read(ROOT / "ui_3d.py")
+    check("界面 PDF 走三件套 + 单独打印且失败有中文降级",
+          "write_all(rep, _out, stem=_stem, pdf=False)" in ui_src
+          and 'paths["pdf"] = write_pdf(' in ui_src
+          and "PDF 计算书未生成" in ui_src and "pdf_error" in ui_src)
     check("§4 记录编号容量闭环（不靠删断言假装没发生过）",
           "梁格编号容量限制" in text and "缺口由 5 条减为 4 条" in text
           and "DEFAULT_DAT_SHA" in text and "wide_numbering()" in text)

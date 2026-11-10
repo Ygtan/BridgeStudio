@@ -435,6 +435,10 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
                                      opt=_opt_payload)
                 _out = Path("out") / doc.kind / "report"
                 _stem = f"{doc.kind}_report"
+                # 三件套先落盘，PDF 单独打印：一次浏览器失败只降级这一个
+                # 出口（pdf_error + st.warning），其余三种照常可下载。
+                # 这里的 pdf=False **不是「界面不出 PDF」**，别改成
+                # write_all(pdf=True)——那会让 PDF 抛错吞掉整份报告。
                 paths = write_all(rep, _out, stem=_stem, pdf=False)
                 pdf_error = None
                 try:
