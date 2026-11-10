@@ -28,6 +28,12 @@
 → `modal_2d` 解析，把 2D 内核本来就在算的自振频率与线性屈曲因子接进结果/报告。
 只暴露内核输出：不重算 K/M、不造周期 T / 振型 / 参与质量，屈曲段缺失如实写明。
 
+第五条链（**opt-in，默认关闭**）：`final_beam` + `beam_combinations` →
+`strength_2d.evaluate` → `section_strength.check`，出 2D **截面应力**验算表。
+只做应力这一半：2D 没有配筋契约，承载力 Mu/Vu 一律显式写「做不了」。
+**不解析内核「单元应力 (Pa)」段**（那是第二套 σ，且阶段结果文件没有该段）；
+截面参数缺 AW / WT / WB / grade / kind / 板厚时整章拒绝，不静默兜底。
+
 坐标约定
 --------
 2D 内核自由度：1=u(x)、2=v(y)、3=θ。竖向位移是 dof 2（不是三维的 dof 3）。
@@ -48,6 +54,7 @@ from typing import Any
 
 import combination
 import modal_2d
+import strength_2d
 
 
 class SolverUnavailable2D(RuntimeError):
@@ -136,6 +143,11 @@ class Solve2DResult:
     modal: dict[str, Any] = field(
         default_factory=lambda: {"status": "not_requested",
                                  "source": modal_2d.SOURCE})
+    # 2D 截面应力验算（opt-in）：strength_2d.evaluate 的结果。
+    # 默认 "not_requested"；只做应力，承载力在 note 里显式写「做不了」。
+    strength: dict[str, Any] = field(
+        default_factory=lambda: {"status": "not_requested",
+                                 "source": strength_2d.SOURCE, "tables": {}})
 
     def modal_tables(self) -> dict[str, dict[str, Any]]:
         """报告 / 界面同源的两张表；无可用结果时为空 dict。"""
@@ -147,6 +159,10 @@ class Solve2DResult:
         if b:
             out["buckling_table"] = b
         return out
+
+    def strength_tables(self) -> dict[str, dict[str, Any]]:
+        """2D 截面应力验算表：报告 / 界面唯一取数口，拒绝时为空 dict。"""
+        return dict((self.strength or {}).get("tables") or {})
 
     @property
     def fingerprint(self) -> str:
@@ -342,12 +358,18 @@ def solve_2d(
     dat_name: str | None = None,
     timeout: float = 120.0,
     modal: bool = False,
+    strength: bool = False,
 ) -> Solve2DResult:
     """求解一个 BridgeSpec，返回 `Solve2DResult`。
 
     `modal=True` 时额外跑 `example_modal.exe`（读同一份 .dat）并把
     2D 自振 / 屈曲结果放进 `res.modal`。默认 False：不调该 exe、不写
     任何新 diagnostics、HTML 计算书也一字不多，默认路径完全不变。
+
+    `strength=True` 时用同一份成桥态内力与 spec 做 2D **截面应力**验算，
+    结果进 `res.strength`（表由 `res.strength_tables()` 取）。这是纯 Python
+    校核，不跑新内核、不解析「单元应力」段、不写进 `.dat`；缺验算参数或
+    2D 无配筋契约时按 `strength_2d.status_text()` 显式写中文，不静默兜底。
 
     用法::
 
@@ -519,6 +541,13 @@ def solve_2d(
             res.modal, res.stats.get("f1_vertical"))
         res.diagnostics.append(modal_2d.status_text(res.modal))
         res.diagnostics.append(res.modal["consistency"]["note"])
+
+    # ④ 2D 截面应力验算（opt-in）：只用成桥态内力 + 同一份 spec 的显式
+    #    截面/材料参数，不跑新内核、不解析「单元应力 (Pa)」段、不写 .dat。
+    #    承载力因 2D 无配筋契约一律显式拒绝（CAPACITY_NOTE）。
+    if strength:
+        res.strength = strength_2d.evaluate(res, spec)
+        res.diagnostics.append(strength_2d.status_text(res.strength))
     return res
 
 

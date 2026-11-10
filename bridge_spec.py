@@ -47,6 +47,11 @@ class MaterialDef(BaseModel):
     E: float = 2.06e11          # Pa
     alpx: float = 1.2e-5        # 1/℃
     dens: float = 7850.0        # kg/m³（给 DENS 就会自动算自重）
+    # 以下两个是 2D 截面应力验算的 **opt-in Python-only 契约**，不是 .dat 字段：
+    # to_dat() 只写 E/ALPX/DENS，绝不把 grade/kind 写进 *MP。留空 = 未声明，
+    # strength_2d.evaluate() 会整章显式拒绝，不从 name 这个自由文本里猜牌号。
+    grade: str = ""             # "C50" / "Q345" 等，查 code_material 表
+    kind: str = ""              # "steel" | "concrete"
 
 
 class ElemTypeDef(BaseModel):
@@ -67,6 +72,12 @@ class ElemTypeDef(BaseModel):
     istrn: float | None = None  # 初应变，正值预拉（索/杆用）
     mat: int = 1                # 材料 id（*MP 表里的编号）
     h_th_mm: float = 0.0        # 理论厚度 mm。0 表示没有。统一厚度优先。
+    # 以下两个是 2D 截面应力验算的 **opt-in Python-only 契约**，不是 .dat 字段：
+    # to_dat() 的 *R 只写 A/I/WT/WB/H/ADDMASS/ISTRN/HTH，绝不写这两项，
+    # 因此默认 .dat 逐位不变。0 = 未声明，strength_2d.evaluate() 显式拒绝：
+    # 缺 AW 会让 τ 静默取 0，缺板厚会让 steel(grade, 0) 落到最薄板档。
+    AW: float = 0.0             # 腹板总面积 m²（剪应力 τ 用）
+    t_plate: float = 0.0        # 控制板厚 mm（仅钢，查 D64 表 3.2.1 强度档）
 
 
 class NodeDef(BaseModel):

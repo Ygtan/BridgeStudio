@@ -316,6 +316,25 @@ def gaps_and_process() -> None:
     check("README 同步 7 项且不再写 9 项",
           "7 项高级能力" in read(ROOT / "README.md")
           and "9 项高级能力" not in read(ROOT / "README.md"))
+    # 2026-11-10 第六次：2D 截面应力按 P 口径接通，承载力仍显式拒绝。
+    st_rows = [ln for ln in text.splitlines()
+               if ln.startswith("| 截面应力 / 承载力验算 |")]
+    check("§2 截面应力 / 承载力 2D 标 P（不虚报为 Y）",
+          len(st_rows) == 1 and "| P | Y |" in st_rows[0], str(st_rows))
+    check("§2 登记 2D 应力的真实依据符号",
+          "strength_2d.py::evaluate" in text
+          and "solve_2d.py::strength_tables" in text)
+    check("§4.2 写 6 个 N + 1 个 P 且保留历史 7 个计数",
+          "6 个" in text and "1 个 `2D=P`" in text and "7 个" in text)
+    st_src = read(ROOT / "strength_2d.py")
+    check("2D 应力口径层不消费内核应力段",
+          "不解析内核「单元应力 (Pa)」段" in st_src
+          and "parse_result" not in st_src)
+    check("2D 应力口径层写明承载力本次未做",
+          "承载力验算（Mu / Vu / 压弯 / 轴压）本次未做" in st_src)
+    check("README 同步 1 项部分接入",
+          "1 项部分接入" in read(ROOT / "README.md"))
+    check("能力矩阵登记第六次闭环记录", "第六次闭环记录" in text)
     src = read(Path(__file__))
     # 拼接构造，避免「禁用词字面量本身出现在源码里」让自检自相矛盾。
     for banned in ("sub" + "process", "os." + "system", "solve_" + "3d(",

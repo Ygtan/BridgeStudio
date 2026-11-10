@@ -164,6 +164,33 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
             _chunks.append(
                 f"<div class=\"note\">{html.escape(str(_cons['note']))}</div>")
         modal_html = "".join(_chunks)
+    # 2D 截面应力验算（opt-in）：默认 not_requested 时整章不出现，未请求的
+    # 计算书逐位不变；开启但被拒绝时照出章节 + 中文说明，不摆空表、不补零。
+    # 承载力因 2D 无配筋契约永远单独写「做不了」，不出 Mu/Vu 表。
+    strength_html = ""
+    _s = getattr(res, "strength", None) or {}
+    if _s.get("status") != "not_requested":
+        from strength_2d import CAPACITY_NOTE
+        from strength_2d import status_text as strength_status_text
+
+        _chunks = ["<h2>2D 截面应力验算</h2>"]
+        _tables = res.strength_tables() if hasattr(res, "strength_tables") else {}
+        for _t in _tables.values():
+            _chunks.append(f"<h3>{html.escape(str(_t['title']))}</h3>")
+            _chunks.append("<table><tr>" + "".join(
+                f"<th>{html.escape(str(h))}</th>" for h in _t["headers"]) + "</tr>")
+            for _row in _t["rows"]:
+                _chunks.append("<tr>" + "".join(
+                    f"<td>{html.escape(str(c))}</td>" for c in _row) + "</tr>")
+            _chunks.append("</table>")
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(str(_t['note']))}</div>")
+        if not _tables:
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(strength_status_text(_s))}</div>")
+        _chunks.append(
+            f"<div class=\"note\">{html.escape(CAPACITY_NOTE)}</div>")
+        strength_html = "".join(_chunks)
     age_rows = []
     for s in getattr(spec, "stages", []) or []:
         t = float(getattr(s, "time", 0.0) or 0.0)
@@ -280,6 +307,7 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
 {age_html}
 {live_v}
 {modal_html}
+{strength_html}
 <h2>成桥态梁端内力</h2>
 <table>
 <tr><th>单元</th><th>端</th><th>N (kN)</th><th>My (kN·m)</th><th>Vz (kN)</th></tr>

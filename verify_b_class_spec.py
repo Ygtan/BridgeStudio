@@ -136,6 +136,33 @@ def bs_boundaries() -> None:
           "- [ ] **P1**" in rd and "真实能力缺口" in rd)
     check("README 仍写 MIDAS 数值对拍未做",
           "MIDAS 数值对拍仍未做" in rd and "本机无 MIDAS" in rd)
+    # 第六次 A 档：B2「截面应力」半部接入，但该格只能标 P，不能涂成 Y。
+    check("能力矩阵该格 2D 标 P（不是 Y）",
+          "| 截面应力 / 承载力验算 | P | Y |" in mat)
+    check("能力矩阵 §4.2 写 6 个 N + 1 个 P",
+          "6 个" in mat and "1 个 `2D=P`" in mat)
+    check("README 同步 1 项部分接入", "1 项部分接入" in rd)
+
+
+def b2_strength() -> None:
+    t = read(SPEC)
+    check("规格写明承载力需 RebarSpec2D 配筋契约",
+          "RebarSpec2D" in t and "配筋契约" in t)
+    check("规格写明应力半部已接入",
+          "已接入" in t and "strength_2d.py" in t)
+    check("规格写明标 P 不标 Y", "标 `P` 不标 `Y`" in t)
+    st = read(ROOT / "strength_2d.py")
+    check("2D 应力层不消费内核单元应力段",
+          "不解析内核「单元应力 (Pa)」段" in st and "parse_result" not in st)
+    check("2D 应力层写明承载力本次未做",
+          "承载力验算（Mu / Vu / 压弯 / 轴压）本次未做" in st)
+    check("2D 应力守卫在位", (ROOT / "verify_strength_2d.py").is_file())
+    g = read(ROOT / "verify_strength_2d.py")
+    check("2D 应力守卫汇总按布尔位统计（不把名称当通过）",
+          "PASS.append((name, bool(ok), detail))" in g
+          and "sum(1 for _, ok, _ in PASS if ok)" in g)
+    check("开发手册登记 2D 应力守卫",
+          "verify_strength_2d.py" in read(ROOT / "开发使用手册.md"))
 
 
 def spec_rules() -> None:
@@ -229,6 +256,7 @@ def main() -> int:
     structure()
     fe_sources()
     bs_boundaries()
+    b2_strength()
     spec_rules()
     no_new_capability()
     dat_invariant()

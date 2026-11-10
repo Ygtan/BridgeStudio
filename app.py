@@ -624,6 +624,17 @@ if doc.kind != "beam" and _cap.get("solve2d"):
     if not _cap.get("modal2d"):
         st.caption("未编译 example_modal.exe；勾选也只会得到中文「做不了」说明。")
 
+    # 2D 截面应力验算同为 opt-in：只做应力，承载力因 2D 无配筋契约
+    # 一律写「做不了」；模型未显式给 grade/kind/AW/板厚时整章拒绝。
+    _strength2d_on = st.checkbox(
+        "同时输出 2D 截面应力验算（默认关闭，承载力不做）",
+        value=False, key="strength2d_opt",
+        help="只从成桥态内力与 JTG D60 组合取值，不解析内核「单元应力」段。"
+             "需模型显式给出材料等级 grade、构件类型 kind、腹板面积 AW"
+             "与钢材板厚；缺任一项会在结果里整章写明原因，不补零。")
+    if not _cap.get("strength2d"):
+        st.caption("2D 求解链不可用；勾选也只会得到中文「做不了」说明。")
+
     _dat_now_2d = doc.to_dat()
     if st.button("运行施工阶段 + 规范组合求解", type="primary"):
         _outdir = Path("out/gui_2d")
@@ -631,17 +642,21 @@ if doc.kind != "beam" and _cap.get("solve2d"):
         with st.spinner("二维施工阶段 + 车道活载求解中…"):
             try:
                 _res2d = doc.solve(out_dir=_outdir, dat_name="gui_2d.dat",
-                                   modal_2d=_modal2d_on)
+                                   modal_2d=_modal2d_on,
+                                   strength_2d=_strength2d_on)
                 st.session_state.solve2d = {"dat_text": _dat_now_2d,
-                                            "modal2d": _modal2d_on, "res": _res2d}
+                                            "modal2d": _modal2d_on,
+                                            "strength2d": _strength2d_on,
+                                            "res": _res2d}
             except Exception as _e:
                 st.session_state.solve2d = None
                 st.error(f"二维求解失败：{_e}")
 
     _s2d = st.session_state.get("solve2d")
     if _s2d and (_s2d.get("dat_text") != _dat_now_2d
-                 or bool(_s2d.get("modal2d", False)) != _modal2d_on):
-        st.warning("模型参数或模态开关已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
+                 or bool(_s2d.get("modal2d", False)) != _modal2d_on
+                 or bool(_s2d.get("strength2d", False)) != _strength2d_on):
+        st.warning("模型参数或求解开关已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
         _s2d = None
     if _s2d:
         _r2d = _s2d["res"]
@@ -690,6 +705,22 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                 st.error(str(_c2.get("note", "")))
             elif _c2.get("note"):
                 st.caption(str(_c2["note"]))
+        if _strength2d_on:
+            from strength_2d import CAPACITY_NOTE
+            from strength_2d import status_text as strength_status_text
+
+            _s2 = getattr(_r2d, "strength", None) or {}
+            _st = getattr(_r2d, "strength_tables", lambda: {})()
+            st.markdown("**2D 截面应力验算**")
+            for _t in _st.values():
+                st.markdown(
+                    "| " + " | ".join(_t["headers"]) + " |\n|"
+                    + "---|" * len(_t["headers"]) + "\n"
+                    + "\n".join("| " + " | ".join(r) + " |" for r in _t["rows"]))
+                st.caption(_t["note"])
+            if _s2.get("status") != "ok" or not _st:
+                st.warning(strength_status_text(_s2))
+            st.caption(CAPACITY_NOTE)
         for _d in _r2d.diagnostics:
             st.caption(f"· {_d}")
 
