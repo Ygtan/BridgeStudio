@@ -14,8 +14,13 @@
 2. ``I`` 行的 ``objective`` 是**无量纲归一化目标**（优化变量
    ``x = T / Tscale``），只能看相对下降，不能与 N·m / N 混算。
 3. ``APPLIED=0`` 表示这组 T\\* **没有被写回 ``*CABLE``**（求解失败、
-   或线性化目标不降反升被守卫拦下）。此时 ``T`` 行只是过程量，
+   线性化目标不降反升，或体系守卫拒绝）。此时 ``T`` 行只是过程量，
    绝不能当成设计索力；``MPEAK_FINAL_KIND=NOT_APPLICABLE``。
+4. ``SYSCHECK_PRED`` 是**写回 T\\* 之前**用 T\\* 按计算书工程校核表同一口径
+   预估的体系判据（索承担桥面恒载 / 支座不上拔 / 同跨相邻索力比），
+   ``SYSCHECK_FINAL`` 是**成桥态实测索力**回填的同一组量。
+   ``APPLIED=0`` 时实测列属于原方案，不是 T 行过程量。
+   这三条是体系合理性判据，**不是规范条文**，也不是设计合格判定。
 
 迭代轮数、收敛率、目标下降幅度都**不构成设计规范意义上的合格判定**：
 规范没有"成桥索力优化收敛轮数"的限值。未收敛 / 未采纳必须如实标注，
@@ -47,6 +52,17 @@ _RE_FINAL_KIND = re.compile(r"^MPEAK_FINAL_KIND=(\S+)$")
 _RE_FINAL = re.compile(r"^MPEAK_FINAL=(\S+)$")
 _RE_I = re.compile(r"^I (\d+) (\d+) (\S+) (\S+) (\S+) (\S+)$")
 _RE_T = re.compile(r"^T (\d+) (\S+) (\S+) (\S+) (\S+)$")
+# 体系守卫（写回 T* 前的采纳判据）。SYSCHECK_PASS 允许 NA：守卫关闭或
+# DECKLOAD 缺失时是「未判定」，绝不能当成 1 冒充合格。
+_RE_SYS = re.compile(r"^SYSCHECK=(\S+) AVAILABLE=([01])$")
+_RE_SYS_LIMITS = re.compile(
+    r"^SYSCHECK_LIMITS DECKSHARE_MIN=(\S+) DECKSHARE_MAX=(\S+)"
+    r" ADJRATIO_MAX=(\S+)$")
+_RE_SYS_LINE = re.compile(
+    r"^SYSCHECK_(PRED|FINAL) DECKSHARE=(\S+) SUPPORT_KN=(\S+)"
+    r" ADJRATIO=(\S+) AT_X=(\S+),(\S+)$")
+_RE_SYS_FINAL_KIND = re.compile(r"^SYSCHECK_FINAL_KIND=(\S+)$")
+_RE_SYS_PASS = re.compile(r"^SYSCHECK_PASS=(NA|[01]) REJECT=(\S+)$")
 
 #: 内核错误码 → 中文说明。不静默：解析不到段时按这个写明原因。
 ERROR_TEXT = {
@@ -78,7 +94,33 @@ STATUS_TEXT = {
         "线性化弯矩目标不降反升，内核守卫已拒绝把 T* 写回 *CABLE，"
         "保留原索力口径；段里的 T 行只是过程量，不能当设计索力。",
     "not_applicable": "本次求解路径不含带约束成桥目标索力优化。",
+    "system_check_rejected":
+        "体系守卫拒绝采纳：这组 T* 虽然改善了线性化弯矩目标，但索承担桥面"
+        "恒载、支座不上拔或同跨索力平顺度中至少一项未满足，内核未把 T* "
+        "写回 *CABLE，结果仍按原索力口径计算。段里的 T 行只是过程量，"
+        "不能当设计索力。",
 }
+
+#: 体系守卫拒绝原因码 → 中文说明。与计算书工程校核表同一口径。
+REJECT_TEXT = {
+    "system_deck_share_low":
+        "索承担桥面恒载低于下限：主梁被迫独立跨越主跨，成桥线形会失控。",
+    "system_support_uplift":
+        "索竖向分量超过桥面恒载，支座需向下压（支座上拔），体系不成立。",
+    "system_adjacent_jump":
+        "同跨相邻索力比超限：索力沿桥呈锯齿，是索力集中到少数索上的征兆。",
+}
+
+def empty_syscheck() -> dict[str, Any]:
+    """体系守卫空结构：默认「未判定」，不假判合格。"""
+    return {
+        "present": False,           # 内核是否真的写了 SYSCHECK 行
+        "mode": "NOT_AVAILABLE", "available": False, "guarded": False,
+        "limits": {"deck_share_min": 90.0, "deck_share_max": 100.0,
+                   "adjratio_max": 1.5},
+        "pass": None, "reject": [],
+        "pred": None, "final": None, "final_kind": "",
+    }
 
 
 def empty_cable_opt(error: str = "") -> dict[str, Any]:
@@ -93,7 +135,8 @@ def empty_cable_opt(error: str = "") -> dict[str, Any]:
         "mpeak_kind": "", "mpeak0": 0.0, "mpeak": 0.0,
         "bal0": 0.0, "bal": 0.0,
         "mpeak_final_kind": "", "mpeak_final": 0.0,
-        "steps": [], "cables": [], "error": error,
+        "steps": [], "cables": [], "syscheck": empty_syscheck(),
+        "error": error,
     }
 
 
@@ -195,6 +238,46 @@ def parse_cable_opt_section(lines: Iterable[str]) -> dict[str, Any]:
                 "T": _f(m.group(3)), "lo": _f(m.group(4)),
                 "hi": _f(m.group(5)),
             })
+            continue
+        m = _RE_SYS.match(line)
+        if m:
+            sc = out["syscheck"]
+            sc["present"] = True
+            sc["mode"] = m.group(1)
+            sc["available"] = m.group(2) == "1"
+            sc["guarded"] = sc["mode"] == "GUARDED"
+            continue
+        m = _RE_SYS_LIMITS.match(line)
+        if m:
+            out["syscheck"]["limits"] = {
+                "deck_share_min": _f(m.group(1)),
+                "deck_share_max": _f(m.group(2)),
+                "adjratio_max": _f(m.group(3)),
+            }
+            continue
+        m = _RE_SYS_FINAL_KIND.match(line)
+        if m:
+            out["syscheck"]["final_kind"] = m.group(1)
+            continue
+        m = _RE_SYS_LINE.match(line)
+        if m:
+            rec = {
+                "deck_share": _f(m.group(2)),
+                "support_kn": _f(m.group(3)),
+                "adjratio": _f(m.group(4)),
+                "at_x": [_f(m.group(5)), _f(m.group(6))],
+            }
+            key = "pred" if m.group(1) == "PRED" else "final"
+            out["syscheck"][key] = rec
+            continue
+        m = _RE_SYS_PASS.match(line)
+        if m:
+            sc = out["syscheck"]
+            sc["pass"] = None if m.group(1) == "NA" else m.group(1) == "1"
+            codes = m.group(2)
+            sc["reject"] = ([] if codes in ("", "none")
+                            else codes.split(","))
+            continue
     return out
 
 
@@ -285,10 +368,113 @@ def validate(opt: dict[str, Any], tol: float = 1e-6) -> list[str]:
         issues.append("APPLIED=0 却给出了成桥态 MPEAK_FINAL 口径")
     if opt.get("status") == "objective_not_improved" and opt.get("applied"):
         issues.append("STATUS=objective_not_improved 却被标为已采纳")
+    # 体系守卫：未判定绝不冒充合格，拒绝必有原因码，采纳与守卫结论一致。
+    sc = opt.get("syscheck") or {}
+    if sc:
+        passed, rej = sc.get("pass"), sc.get("reject") or []
+        if passed is False and not rej:
+            issues.append("SYSCHECK_PASS=0 却没给出拒绝原因码")
+        if passed is True and rej:
+            issues.append("SYSCHECK_PASS=1 却带着拒绝原因码")
+        # SYSGUARD=0（诊断）时 PASS=NA 但 REJECT 仍如实记录「哪条判据超限」，
+        # 这是「只记录不拦截」的正常输出；只有守卫开启却未判定才是矛盾。
+        if passed is None and rej and sc.get("mode") == "GUARDED":
+            issues.append("SYSCHECK_PASS=NA 却带着拒绝原因码")
+        if sc.get("mode") == "GUARDED" and sc.get("available") and passed is None:
+            issues.append("守卫开启且判据可用，SYSCHECK_PASS 却未判定")
+        if sc.get("mode") == "NOT_AVAILABLE" and (sc.get("pred") or sc.get("final")):
+            issues.append("SYSCHECK=NOT_AVAILABLE 却给出了判据数值")
+        if sc.get("final") and not sc.get("final_kind"):
+            issues.append("SYSCHECK_FINAL 缺少 FINAL_KIND 口径标注")
+        if opt.get("status") == "system_check_rejected":
+            if opt.get("applied"):
+                issues.append("STATUS=system_check_rejected 却被标为已采纳")
+            if not rej:
+                issues.append("STATUS=system_check_rejected 却没给出拒绝原因码")
+        if passed is False and opt.get("applied"):
+            issues.append("体系守卫未满足却 APPLIED=1")
+        for code in rej:
+            if code not in REJECT_TEXT:
+                issues.append(f"未登记的体系拒绝原因码 {code!r}")
     return issues
 
 
 # ---------------------------------------------------------------- 展示表
+
+def syscheck_note(opt: dict[str, Any]) -> str:
+    """体系守卫的中文结论。报告层与校核层共用，不假判合格、不冒充规范。"""
+    sc = (opt or {}).get("syscheck") or {}
+    mode = sc.get("mode", "NOT_AVAILABLE")
+    if not sc or not sc.get("present"):
+        return ("本次 [OPT] 段没有体系守卫行（未请求优化，或旧版内核未输出）："
+                "三条体系判据本次不可用，按未判定处理，不静默补一条估计结论。")
+    if mode == "NOT_AVAILABLE":
+        return ("体系守卫：本次缺少可用的桥面恒载或支座断面数据，三条体系"
+                "判据未判定，不据此声称合格，也不据此拒绝采纳。")
+    if mode == "OFF":
+        txt = ("体系守卫由 SYSGUARD=0 关闭（仅供诊断过程量）：三条体系判据"
+               "只记录不拦截，本次结果不得作为设计计算书使用。")
+        if sc.get("reject"):
+            txt += " 本次判据超限（仅记录）：" + "；".join(
+                REJECT_TEXT.get(c, c) for c in sc["reject"]) + "。"
+        return txt
+    lim = sc.get("limits") or {}
+    pred = sc.get("pred") or {}
+    bits = [f"体系守卫：T* 预估索承担桥面恒载 "
+            f"{pred.get('deck_share', 0):.2f}%（要求 "
+            f"> {lim.get('deck_share_min', 90):g}% 且 "
+            f"≤ {lim.get('deck_share_max', 100):g}% 不上拔）、"
+            f"同跨相邻索力比 {pred.get('adjratio', 0):.2f}"
+            f"（要求 ≤ {lim.get('adjratio_max', 1.5):g}）。"]
+    if sc.get("pass"):
+        bits.append("三条均满足，允许把 T* 写回 *CABLE。")
+    else:
+        reasons = "；".join(REJECT_TEXT.get(c, c)
+                            for c in (sc.get("reject") or []))
+        bits.append("守卫拒绝采纳：" + reasons + "。内核保留原索力口径，"
+                    "段里的 T 行只是过程量，不能当设计索力。")
+    return " ".join(bits)
+
+
+def _sys_verdict(sc: dict[str, Any], code: str) -> str:
+    if sc.get("pass") is None:
+        return "未判定"
+    return "拒绝" if code in (sc.get("reject") or []) else "满足"
+
+
+def system_check_table(opt: dict[str, Any]) -> dict[str, Any]:
+    """三条体系判据：写回前预估 vs 成桥态实测，并排给结论。"""
+    sc = (opt or {}).get("syscheck") or empty_syscheck()
+    lim = sc.get("limits") or {}
+    pred, fin = sc.get("pred"), sc.get("final")
+
+    def cell(rec, key: str, unit: str = "") -> str:
+        if not rec:
+            return "—"
+        return f"{rec.get(key, 0.0):.2f}{unit}"
+
+    return {
+        "title": "成桥体系守卫判据（写回 T* 前）",
+        "headers": ["判据", "限值", "T* 预估（守卫依据）",
+                    "成桥态实测", "守卫结论"],
+        "rows": [
+            ["索承担桥面恒载", f"> {lim.get('deck_share_min', 90):g} %",
+             cell(pred, "deck_share", " %"), cell(fin, "deck_share", " %"),
+             _sys_verdict(sc, "system_deck_share_low")],
+            ["支座分担（不上拔）",
+             f"≥ 0 kN（比例 ≤ {lim.get('deck_share_max', 100):g} %）",
+             cell(pred, "support_kn", " kN"), cell(fin, "support_kn", " kN"),
+             _sys_verdict(sc, "system_support_uplift")],
+            ["同跨相邻索力比", f"≤ {lim.get('adjratio_max', 1.5):g}",
+             cell(pred, "adjratio"), cell(fin, "adjratio"),
+             _sys_verdict(sc, "system_adjacent_jump")],
+        ],
+        "note": "预估列用 T* 在写回前判定，是内核采纳守卫的依据；实测列用本次"
+                "成桥态实际索力按同一口径回填。APPLIED=0 时实测列是原方案，"
+                "不是 T 行过程量。三条均为体系合理性判据，不是规范条文，"
+                "也不构成设计合格判定；SYSGUARD=0（诊断）时只记录不拦截。",
+    }
+
 
 def iteration_table(opt: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -330,5 +516,6 @@ def summary_note(opt: dict[str, Any]) -> str:
         if opt.get("applied") and opt.get("mpeak_final", 0) > 0:
             bits.append(f"本次成桥态 [GIRDEREND] 实际 max|My| = "
                         f"{opt['mpeak_final']:.4g} N·m。")
+    bits.append(syscheck_note(opt))
     bits.append(scale_note(opt))
     return " ".join(bits)

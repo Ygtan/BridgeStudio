@@ -108,6 +108,50 @@ T 1 100 80 1 1000
 """
 
 
+#: 体系守卫手写段：守卫拒绝（APPLIED=0，实测列属于原方案）。
+_SYS_REJECTED = """KIND=constrained_cable_force STATUS=system_check_rejected
+OBJECTIVE=MINENERGY START=GIVEN OBJECTIVE_KIND=NORMALIZED
+NCABLES=2 NMOMENTS=8 NBALANCE=0 IRLS=0
+NITER=196 CONVERGED=1 CONVBY=projected_gradient APPLIED=0
+TMIN=28056.32906 TMAX=2104224.68 TMAXSRC=DEFAULT_1.5_RIGID
+MPEAK_KIND=LINEAR_BARE
+MPEAK0=35504728.63 MPEAK=29328621.44 BAL0=0 BAL=0
+MPEAK_FINAL_KIND=NOT_APPLICABLE
+MPEAK_FINAL=0
+SYSCHECK=GUARDED AVAILABLE=1
+SYSCHECK_LIMITS DECKSHARE_MIN=90 DECKSHARE_MAX=100 ADJRATIO_MAX=1.5
+SYSCHECK_PRED DECKSHARE=89.04 SUPPORT_KN=3944.29 ADJRATIO=31.98 AT_X=261.25,267.5
+SYSCHECK_FINAL_KIND=ORIGINAL_TENSIONS
+SYSCHECK_FINAL DECKSHARE=99.31 SUPPORT_KN=250 ADJRATIO=1.08 AT_X=248.75,255
+SYSCHECK_PASS=0 REJECT=system_deck_share_low,system_adjacent_jump
+I 0 1 1.0 33000000 0 0.1
+T 1 682510.3021 28056.32906 28056.32906 2104224.68
+T 2 713978.7287 2104224.68 28056.32906 2104224.68
+"""
+
+#: 体系守卫手写段：三条全过（未收敛但仍被采纳，如实标 CONVERGED=0）。
+_SYS_PASSED = """KIND=constrained_cable_force STATUS=ok
+OBJECTIVE=MINMAXM START=GIVEN OBJECTIVE_KIND=NORMALIZED
+NCABLES=2 NMOMENTS=8 NBALANCE=0 IRLS=4
+NITER=324 CONVERGED=0 CONVBY=none APPLIED=1
+TMIN=420845.0 TMAX=2104224.68 TMAXSRC=DEFAULT_1.5_RIGID
+MPEAK_KIND=LINEAR_BARE
+MPEAK0=35504728.63 MPEAK=25364000 BAL0=0 BAL=0
+MPEAK_FINAL_KIND=GIRDEREND_FINAL
+MPEAK_FINAL=21674900
+SYSCHECK=GUARDED AVAILABLE=1
+SYSCHECK_LIMITS DECKSHARE_MIN=90 DECKSHARE_MAX=100 ADJRATIO_MAX=1.5
+SYSCHECK_PRED DECKSHARE=97.92 SUPPORT_KN=748.05 ADJRATIO=1.39 AT_X=211.25,217.5
+SYSCHECK_FINAL_KIND=OPTIMIZED_TENSIONS
+SYSCHECK_FINAL DECKSHARE=97.92 SUPPORT_KN=748.05 ADJRATIO=1.39 AT_X=142.5,148.75
+SYSCHECK_PASS=1 REJECT=none
+I 1 1 -1.2 30000000 0 0.1
+I 2 8 -1.5 25364000 0 1e-6
+T 1 682510.3021 700000 420845.0 2104224.68
+T 2 713978.7287 760000 420845.0 2104224.68
+"""
+
+
 def offline_checks() -> None:
     print("\n[解析层：手写段逐字段对拍]")
     t = O.parse_cable_opt_section(_FINAL.splitlines())
@@ -281,6 +325,103 @@ def offline_checks() -> None:
     check("线性链路适配器写 no_optimization_requested",
           "no_optimization_requested" in _linear_adapt_probe())
 
+    print("\n[体系守卫：SYSCHECK 段解析与自检]")
+    rej = O.parse_cable_opt_section(_SYS_REJECTED.splitlines())
+    sc = rej["syscheck"]
+    check("守卫拒绝段：模式 / 可用性 / 结论 / 原因码",
+          sc["present"] and sc["mode"] == "GUARDED" and sc["available"]
+          and sc["pass"] is False
+          and sc["reject"] == ["system_deck_share_low",
+                               "system_adjacent_jump"])
+    check("守卫拒绝段：限值与预估数值逐字段对拍",
+          sc["limits"] == {"deck_share_min": 90.0, "deck_share_max": 100.0,
+                           "adjratio_max": 1.5}
+          and near(sc["pred"]["deck_share"], 89.04)
+          and near(sc["pred"]["support_kn"], 3944.29)
+          and near(sc["pred"]["adjratio"], 31.98)
+          and sc["pred"]["at_x"] == [261.25, 267.5])
+    check("守卫拒绝段：成桥态实测标 ORIGINAL_TENSIONS 且为原方案值",
+          sc["final_kind"] == "ORIGINAL_TENSIONS"
+          and near(sc["final"]["deck_share"], 99.31)
+          and near(sc["final"]["adjratio"], 1.08))
+    check("守卫拒绝段：validate 全绿且未采纳",
+          O.validate(rej) == [] and not rej["applied"]
+          and rej["mpeak_final_kind"] == "NOT_APPLICABLE",
+          str(O.validate(rej))[:90])
+    check("守卫拒绝中文说明写明原因与保留原索力",
+          "体系守卫拒绝" in O.STATUS_TEXT["system_check_rejected"]
+          and "不能当设计索力" in O.STATUS_TEXT["system_check_rejected"]
+          and all(k in O.syscheck_note(rej) for k in
+                  ("守卫拒绝采纳", "低于下限", "锯齿")))
+    check("三条拒绝原因码都有中文说明",
+          all(O.REJECT_TEXT.get(k) for k in
+              ("system_deck_share_low", "system_support_uplift",
+               "system_adjacent_jump")))
+    st = O.system_check_table(rej)
+    check("体系守卫表契约（headers / rows / note / title）",
+          all(k in st for k in ("headers", "rows", "note", "title"))
+          and len(st["headers"]) == 5 and len(st["rows"]) == 3)
+    check("体系守卫表：两拒绝一满足，预估 / 实测分列",
+          [r[4] for r in st["rows"]] == ["拒绝", "满足", "拒绝"]
+          and "89.04" in st["rows"][0][2] and "99.31" in st["rows"][0][3])
+    check("体系守卫表注写明不是规范条文、APPLIED=0 实测属原方案",
+          "不是规范条文" in st["note"] and "原方案" in st["note"])
+
+    okc = O.parse_cable_opt_section(_SYS_PASSED.splitlines())
+    check("守卫放行段：三条全过、无原因码、validate 全绿",
+          okc["syscheck"]["pass"] is True
+          and okc["syscheck"]["reject"] == []
+          and okc["syscheck"]["final_kind"] == "OPTIMIZED_TENSIONS"
+          and O.validate(okc) == [], str(O.validate(okc))[:90])
+    check("守卫放行表三行都是「满足」",
+          [r[4] for r in O.system_check_table(okc)["rows"]] == ["满足"] * 3)
+    na_sc = O.parse_cable_opt_section(
+        _SYS_PASSED.replace("SYSCHECK=GUARDED", "SYSCHECK=OFF")
+                   .replace("SYSCHECK_PASS=1 REJECT=none",
+                            "SYSCHECK_PASS=NA REJECT=none").splitlines())
+    check("SYSGUARD=0 诊断：未判定且只记录不拦截",
+          na_sc["syscheck"]["pass"] is None
+          and na_sc["syscheck"]["mode"] == "OFF"
+          and O.validate(na_sc) == []
+          and "只记录不拦截" in O.syscheck_note(na_sc)
+          and [r[4] for r in O.system_check_table(na_sc)["rows"]]
+          == ["未判定"] * 3)
+
+    print("\n[体系守卫：validate 故障注入]")
+    sc_cases: list[tuple[str, dict]] = []
+    d = copy.deepcopy(okc); d["syscheck"]["pass"] = False
+    sc_cases.append(("PASS=0 无原因码", d))
+    d = copy.deepcopy(okc); d["syscheck"]["reject"] = ["system_deck_share_low"]
+    sc_cases.append(("PASS=1 却带原因码", d))
+    d = copy.deepcopy(okc); d["syscheck"]["pass"] = None
+    d["syscheck"]["reject"] = ["system_deck_share_low"]
+    sc_cases.append(("PASS=NA 却带原因码", d))
+    d = copy.deepcopy(okc); d["syscheck"]["pass"] = None
+    sc_cases.append(("GUARDED 却未判定", d))
+    d = copy.deepcopy(okc); d["syscheck"]["mode"] = "NOT_AVAILABLE"
+    sc_cases.append(("NOT_AVAILABLE 却有判据数值", d))
+    d = copy.deepcopy(okc); d["syscheck"]["final_kind"] = ""
+    sc_cases.append(("SYSCHECK_FINAL 缺口径标注", d))
+    d = copy.deepcopy(rej); d["applied"] = True
+    sc_cases.append(("体系拒绝却被标已采纳", d))
+    d = copy.deepcopy(rej); d["syscheck"]["reject"] = ["unknown_code"]
+    sc_cases.append(("未登记的拒绝原因码", d))
+    for name, bad in sc_cases:
+        check(f"守卫故障注入：{name}", bool(O.validate(bad)),
+              str(O.validate(bad))[:70])
+
+    r_sys = SolveResult(kind="cable_stayed", cable_opt=rej)
+    check("体系守卫表进 tables() 且 to_dict 三个新键齐全",
+          R.OPT_SYSTEM_TABLE_KEY in r_sys.tables()
+          and all(k in r_sys.to_dict() for k in
+                  ("cable_opt_syscheck_mode", "cable_opt_syscheck_pass",
+                   "cable_opt_reject")))
+    check("体系守卫拒绝时校核仍为 info、不凭空多一条不通过",
+          all(c.ok and c.level == "info" for c in r_sys.checks()
+              if c.name in _OPT_CHECKS))
+    check("旧手写段（无 SYSCHECK）不摆守卫空表",
+          R.OPT_SYSTEM_TABLE_KEY not in res.tables())
+
 
 def _parse_text(txt: str) -> dict:
     p = Path("out/verify_cable_opt/_no_section_cable.txt")
@@ -335,10 +476,12 @@ def live_checks() -> None:
     text = model.to_dat()
     assert "MODE=COMPLETION" in text
     # 关掉塔顶平衡软约束取已验证的稳定路径；MINMAXM / MINENERGY 各跑一次。
+    # 这一组专门验证「优化器本身」的采纳链路，因此显式 SYSGUARD=0 把体系
+    # 守卫置于诊断模式（只记录不拦截）；守卫行为另由下面一组真实算例验证。
     variants = {
-        "opt_mm": "OPTIMIZE=1\nOPTOBJ=MINMAXM\nOPTBALANCE=0\n",
-        "opt_en": "OPTIMIZE=1\nOPTOBJ=MINENERGY\nOPTBALANCE=0\n",
-        "opt_bal": "OPTIMIZE=1\nOPTOBJ=MINENERGY\nOPTBALANCE=1\n",
+        "opt_mm": "OPTIMIZE=1\nOPTOBJ=MINMAXM\nOPTBALANCE=0\nSYSGUARD=0\n",
+        "opt_en": "OPTIMIZE=1\nOPTOBJ=MINENERGY\nOPTBALANCE=0\nSYSGUARD=0\n",
+        "opt_bal": "OPTIMIZE=1\nOPTOBJ=MINENERGY\nOPTBALANCE=1\nSYSGUARD=0\n",
     }
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
@@ -397,10 +540,14 @@ def live_checks() -> None:
             1)
         # TMAX 小于下界时内核会放大 hi 保证可行；这里只验证守卫文案存在，
         # 真正的 objective_not_improved 由实桥 OPTBALANCE=1 的 MINMAXM 触发。
+        # 这里只验数学守卫（线性化目标不降反升），体系守卫同样置诊断模式，
+        # 避免两种拒绝原因混在同一条断言里。
         bad_t = text.replace(
             "*CABLE_BRIDGE\n",
-            "*CABLE_BRIDGE\nOPTIMIZE=1\nOPTOBJ=MINMAXM\nOPTBALANCE=1\n", 1)
-        bad = _run_dat(tmp, "opt_guard", bad_t)["cable_opt"]
+            "*CABLE_BRIDGE\nOPTIMIZE=1\nOPTOBJ=MINMAXM\nOPTBALANCE=1\n"
+            "SYSGUARD=0\n", 1)
+        bad_raw = _run_dat(tmp, "opt_guard", bad_t)
+        bad = bad_raw["cable_opt"]
         check("守卫路径：段里有 APPLIED 字段且状态可解析",
               "applied" in bad and bad.get("status") in
               ("ok", "not_converged", "objective_not_improved"),
@@ -409,14 +556,129 @@ def live_checks() -> None:
             check("未采纳时 MPEAK_FINAL_KIND=NOT_APPLICABLE",
                   bad.get("mpeak_final_kind") == "NOT_APPLICABLE"
                   and not bad.get("applied"))
-            check("未采纳时原索力口径保留",
-                  bad_t == text.replace(
-                      "*CABLE_BRIDGE\n",
-                      "*CABLE_BRIDGE\nOPTIMIZE=1\nOPTOBJ=MINMAXM\nOPTBALANCE=1\n", 1))
+            check("未采纳时原索力口径逐位保留",
+                  len(bad_raw["cables"]) == len(base_T)
+                  and all(near(a["T"], b, 1e-5)
+                          for a, b in zip(bad_raw["cables"], base_T)))
         else:
             check("守卫路径：状态与 APPLIED 自洽",
                   O.validate(bad) == [], str(O.validate(bad))[:90])
         (void := bad_text)  # noqa: F841  保留取样文本，避免误删诊断分支
+
+        print("\n[内核 oracle：体系守卫真实算例（默认 SYSGUARD=1）]")
+        import re
+        from solver_3d import _adapt_cable
+
+        def _variant(name: str, obj: str, bal: str,
+                     mint: str | None = None, extra: str = "") -> dict:
+            t = text
+            if mint is not None:
+                # 「后写覆盖先写」：改索力下界必须替换原 MINT 行，
+                # 不能在段头插一行，否则原 MINT=0.02 会把它盖掉。
+                t, n = re.subn(r"(?m)^MINT=\S+", f"MINT={mint}", t, count=1)
+                assert n == 1, "MINT 行替换失败"
+            kv = f"OPTIMIZE=1\nOPTOBJ={obj}\nOPTBALANCE={bal}\n" + extra
+            return _run_dat(tmp, name,
+                            t.replace("*CABLE_BRIDGE\n",
+                                      "*CABLE_BRIDGE\n" + kv, 1))
+
+        _SYS_CHECK_NAMES = ("索承担桥面恒载",
+                            "同跨索力无跳变（相邻比 ≤ 1.5）")
+
+        def _cable_checks(raw: dict) -> list:
+            r = SolveResult(kind="cable_stayed")
+            _adapt_cable(model, raw, r)
+            return [c for c in r.checks(model) if c.name in _SYS_CHECK_NAMES]
+
+        # ① 原示例：数学上收敛，但索承担恒载跌到 89.04%、相邻比涨到
+        #    31.98 —— 必须被守卫拦下，工程校核表两条体系判据回到通过。
+        g_raw = _variant("opt_sys_reject", "MINENERGY", "0")
+        g = g_raw["cable_opt"]
+        gsc = g.get("syscheck") or {}
+        check("默认守卫：原示例 STATUS=system_check_rejected / APPLIED=0",
+              g.get("status") == "system_check_rejected"
+              and not g.get("applied")
+              and g.get("mpeak_final_kind") == "NOT_APPLICABLE",
+              f"status={g.get('status')}")
+        check("默认守卫：SYSCHECK_PASS=0 且两条原因码齐全",
+              gsc.get("mode") == "GUARDED" and gsc.get("pass") is False
+              and "system_deck_share_low" in (gsc.get("reject") or [])
+              and "system_adjacent_jump" in (gsc.get("reject") or []),
+              str(gsc.get("reject")))
+        check("默认守卫：T* 预估 89% / 31.98 与内核实测口径对得上",
+              near(gsc["pred"]["deck_share"], 89.04, 0.01)
+              and gsc["pred"]["adjratio"] > 1.5
+              and near(gsc["final"]["deck_share"],
+                       float(g_raw["meta"]["deck_share_pct"]), 0.01))
+        check("默认守卫：未写回时 tension_method 不是 ConstrainedOpt",
+              "ConstrainedOpt" not in str(g_raw["meta"].get("tension_method", "")))
+        gcc = _cable_checks(g_raw)
+        check("默认守卫：计算书两条体系判据回到通过（用户报告里的红灯）",
+              len(gcc) == 2 and all(c.ok for c in gcc),
+              str([(c.name, c.ok) for c in gcc]))
+        check("默认守卫：段自检全绿", O.validate(g) == [],
+              str(O.validate(g))[:90])
+
+        # ② 诊断模式：守卫关闭只记录不拦截，两条体系判据仍如实标出。
+        o_raw = _variant("opt_sys_off", "MINENERGY", "0", extra="SYSGUARD=0\n")
+        o = o_raw["cable_opt"]
+        check("SYSGUARD=0：只记录不拦截，APPLIED=1 且 PASS=NA",
+              o.get("applied") and (o.get("syscheck") or {}).get("mode") == "OFF"
+              and (o.get("syscheck") or {}).get("pass") is None
+              and near(o["syscheck"]["pred"]["deck_share"], 89.04, 0.01))
+        occ = _cable_checks(o_raw)
+        check("SYSGUARD=0：两条体系判据仍如实标出（不掩盖工程后果）",
+              len(occ) == 2 and all(not c.ok for c in occ),
+              str([(c.name, c.ok) for c in occ]))
+
+        # ③ 守卫放行：MINMAXM + MINT=0.30 三条全过，证明守卫不误杀。
+        p_raw = _variant("opt_sys_pass", "MINMAXM", "0", mint="0.30")
+        p = p_raw["cable_opt"]
+        check("守卫放行：三条全过时 APPLIED=1 / SYSCHECK_PASS=1",
+              (p.get("syscheck") or {}).get("pass") is True
+              and p.get("applied")
+              and (p.get("syscheck") or {}).get("reject") == []
+              and p_raw["meta"].get("tension_method") == "ConstrainedOpt",
+              f"status={p.get('status')}")
+        check("守卫放行：未收敛也如实标注，不冒充已收敛最优解",
+              p.get("status") == "not_converged"
+              and "不得" in O.STATUS_TEXT["not_converged"])
+
+        # ④ 第三条判据：索力下界过高会把索竖向分量顶过恒载 → 支座上拔。
+        u_raw = _variant("opt_sys_uplift", "MINMAXM", "0", mint="0.40")
+        u = u_raw["cable_opt"]
+        usc = u.get("syscheck") or {}
+        check("守卫能拦支座上拔（system_support_uplift）",
+              "system_support_uplift" in (usc.get("reject") or [])
+              and usc["pred"]["deck_share"] > 100
+              and usc["pred"]["support_kn"] < 0
+              and not u.get("applied"), str(usc.get("reject")))
+
+        # ⑤ 数学守卫优先时 REJECT 仍如实列出体系原因码，不让段自检矛盾。
+        ni_raw = _variant("opt_sys_notimproved", "MINMAXM", "0", mint="0.35")
+        ni = ni_raw["cable_opt"]
+        check("两种守卫叠加时 REJECT 与 SYSCHECK_PASS 自洽",
+              ni.get("status") == "objective_not_improved"
+              and (ni.get("syscheck") or {}).get("pass") is False
+              and bool((ni.get("syscheck") or {}).get("reject"))
+              and O.validate(ni) == [], str(O.validate(ni))[:90])
+
+        # ⑥ 报告层：体系守卫表跟优化章走，不落在文末明细表。
+        res3 = SolveResult(kind="cable_stayed")
+        for f in ("cables", "cable_length", "newton", "modal", "buckling",
+                  "meta", "girder_ends", "camber", "reaction", "stats"):
+            setattr(res3, f, getattr(res, f, None) or {})
+        res3.cable_opt = g
+        rep3 = R.build_document(res3, model, out_dir=str(out))
+        keys3 = [b.get("key") for b in rep3.blocks if b["type"] == "table"]
+        check("体系守卫表跟优化章走、排在逐索明细表之前",
+              R.OPT_SYSTEM_TABLE_KEY in keys3
+              and (R.OPT_CABLES_TABLE_KEY not in keys3
+                   or keys3.index(R.OPT_SYSTEM_TABLE_KEY)
+                   < keys3.index(R.OPT_CABLES_TABLE_KEY)))
+        html3 = R.render_html(rep3)
+        check("守卫拒绝章 HTML 无星号残留且写明体系守卫",
+              "**" not in html3 and "体系守卫" in html3)
 
     print("\n[端到端：报告与四出口]")
     rep = R.build_document(res, model, out_dir=str(out))

@@ -667,14 +667,19 @@ class SolveResult:
         # "已采纳 / 未采纳"，避免把未写回的 T* 当成设计索力展示。
         co = self.cable_opt or {}
         if cable_opt_3d.has_data(co):
+            sc = co.get("syscheck") or {}
+            guard = ("体系守卫通过" if sc.get("pass") is True else
+                     "体系守卫拒绝" if sc.get("pass") is False else
+                     "体系守卫未判定")
             out.append(Metric(
                 "成桥索力优化",
                 ("已采纳" if co.get("applied") else "未采纳")
-                + f" · {co.get('niter', 0)} 次",
+                + f" · {co.get('niter', 0)} 次 · {guard}",
                 hint=f"{co.get('objective', '')}（起点 {co.get('start', '')}）；"
                      f"线性化 max|M| {co.get('mpeak0', 0):.3g} → "
                      f"{co.get('mpeak', 0):.3g} N·m；"
-                     + cable_opt_3d.status_note(co)))
+                     + cable_opt_3d.status_note(co)
+                     + " " + cable_opt_3d.syscheck_note(co)))
         return out
 
     def max_bending(self) -> tuple[int, float] | None:
@@ -2097,6 +2102,10 @@ class SolveResult:
             if co.get("steps"):
                 out["cable_opt_iteration_table"] = \
                     cable_opt_3d.iteration_table(co)
+            # 体系守卫表：三条判据的 T* 预估与成桥态实测并排，跟优化章走。
+            if (co.get("syscheck") or {}).get("present"):
+                out["cable_opt_system_table"] = \
+                    cable_opt_3d.system_check_table(co)
             out["cable_opt_cables_table"] = cable_opt_3d.cable_table(co)
 
         if self.cables:
@@ -2460,6 +2469,12 @@ class SolveResult:
             "cable_opt_objective": self.cable_opt.get("objective", ""),
             "cable_opt_niter": self.cable_opt.get("niter", 0),
             "cable_opt_error": self.cable_opt.get("error", ""),
+            "cable_opt_syscheck_mode": (self.cable_opt.get("syscheck") or {}).get(
+                "mode", ""),
+            "cable_opt_syscheck_pass": (self.cable_opt.get("syscheck") or {}).get(
+                "pass"),
+            "cable_opt_reject": ",".join(
+                (self.cable_opt.get("syscheck") or {}).get("reject") or []),
             "diagnostics": list(self.diagnostics),
             "metrics": [m.to_dict() for m in self.metrics()],
             "checks": [c.to_dict() for c in self.checks()],

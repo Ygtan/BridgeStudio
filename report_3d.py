@@ -1041,6 +1041,8 @@ NEWTON_FIGURE_KEY = "newton_residual"
 #: 会暗示它们可以互相换算，正是本项目要避免的口径混淆。
 OPT_ITERATION_TABLE_KEY = "cable_opt_iteration_table"
 OPT_CABLES_TABLE_KEY = "cable_opt_cables_table"
+#: 体系守卫表（三条判据的 T* 预估 / 成桥态实测）也跟优化章走。
+OPT_SYSTEM_TABLE_KEY = "cable_opt_system_table"
 
 
 @dataclass
@@ -1769,6 +1771,8 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     if opt_chapter:
         blocks.append({"type": "h1", "text": "带约束成桥目标索力优化"})
         blocks.append({"type": "p", "text": _cable_opt_paragraph(res)})
+        if OPT_SYSTEM_TABLE_KEY in tabs:
+            blocks.append({"type": "table", "key": OPT_SYSTEM_TABLE_KEY})
         if OPT_ITERATION_TABLE_KEY in tabs:
             blocks.append({"type": "table", "key": OPT_ITERATION_TABLE_KEY})
         blocks.append({"type": "note", "text": (
@@ -1776,9 +1780,12 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
             "归一化目标**是三个不同口径，实测可能反向变化，不得互相相减"
             "当作改善量；未优化基线须另跑 OPTIMIZE=0 取 [GIRDEREND] 对拍。"
             "APPLIED=0 时逐索表的 T\\* 只是过程量，没有写回 *CABLE，"
-            "不能当设计索力。塔顶水平力平衡是软约束罚项，与弯矩目标存在"
-            "权衡；索力上界属程序口径而非规范限值。规范没有优化迭代轮数或"
-            "收敛率的合格限值，本章只说明优化过程与采纳状态，"
+            "不能当设计索力。体系守卫三条判据（索承担桥面恒载、支座不上拔、"
+            "同跨相邻索力比）是**写回 T\\* 之前**按计算书工程校核表同一口径"
+            "预估的体系合理性判据，不是规范条文；守卫拒绝时内核保留原索力，"
+            "实测列因此属于原方案。塔顶水平力平衡是软约束罚项，与弯矩目标"
+            "存在权衡；索力上界属程序口径而非规范限值。规范没有优化迭代轮数"
+            "或收敛率的合格限值，本章只说明优化过程与采纳状态，"
             "不构成设计合格判定。")})
 
     if stage_chapter:
@@ -1887,6 +1894,7 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     rest.pop(NEWTON_STEP_TABLE_KEY, None)    # 已跟着「内层 Newton」章走
     rest.pop(NEWTON_STAGES_TABLE_KEY, None)  # 同上
     rest.pop(OPT_ITERATION_TABLE_KEY, None)  # 已跟着「目标索力优化」章走
+    rest.pop(OPT_SYSTEM_TABLE_KEY, None)     # 体系守卫表也跟着该章走
     # OPT_CABLES_TABLE_KEY（逐索 48 行）与 NEWTON_ITERATION_TABLE_KEY
     # （逐迭代残差，几十行）都留在文末明细表。
     for key in CAPACITY_TABLE_KEYS:      # 已跟着「承载力计算书」章走

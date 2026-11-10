@@ -226,6 +226,20 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        `APPLIED=0`（守卫拦下）时 T\* 未写回、只是过程量；塔顶平衡是软约束
        且与 min max|M| 有实测权衡，未采纳 / 未收敛都不冒充通过。
        `verify_cable_opt_3d.py` 82/82。—— 2026-11-09
+- [x] **P3** 阶段二 D 补「成桥体系守卫」：原示例 `MINENERGY+OPTBALANCE=0`
+       数学上收敛（`NITER=196`、成桥态弯矩降 26.5 %），却把边跨索压到
+       `TMIN`，索承担桥面恒载 99.31 % → 89.04 %、同跨相邻索力比
+       1.08 → 31.98，计算书工程校核表出现两处不通过。内核在**写回 T\*
+       之前**按与计算书同一口径预估三条体系判据（索承担恒载 > 90 %、
+       支座不上拔、同跨相邻比 ≤ 1.5），不合格写
+       `STATUS=system_check_rejected` / `APPLIED=0`、**不写回 T\***、
+       `REJECT` 列原因码；成桥态求解后回填 `SYSCHECK_FINAL`
+       （`APPLIED=0` 时属原方案）。新增 `SYSGUARD/SYSDECKMIN/
+       SYSDECKMAX/SYSADJMAX`，默认开启，`SYSGUARD=0` 仅供诊断。
+       前端新增体系守卫表与中文结论，`verify_cable_opt_3d.py` 119/119
+       （离线 72 / live 47）；全套 32 脚本 1384 项断言、内核 ctest 7/7。
+       实测原示例被拦下后工程校核表两处不通过消失，`MINMAXM+MINT=0.30`
+       三条全过正常放行。—— 2026-11-10
 - [x] **P3** 负弯矩区双向验算 + 非对称配筋（JTG 3362 §5.2.2/5.2.3、
        §5.3.4-4/5）：`CapacitySection` 加 `FaceSpec negative`（底板宽厚与顶板
        纵筋可单独登记）和 `Asp_given`（显式受压筋，可为 0=单筋）；
@@ -300,7 +314,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **32 个脚本全绿**，其中 27 个带汇总输出的脚本合计 **1347 项断言**；`verify_cable_opt_3d.py` 82/82、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **32 个脚本全绿**，其中 27 个带汇总输出的脚本合计 **1384 项断言**；`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
