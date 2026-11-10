@@ -279,6 +279,11 @@ def gaps_and_process() -> None:
     check("§4 记录编号容量闭环（不靠删断言假装没发生过）",
           "梁格编号容量限制" in text and "缺口由 5 条减为 4 条" in text
           and "DEFAULT_DAT_SHA" in text and "wide_numbering()" in text)
+    check("§2 登记 3D 活载包络结构云图能力",
+          "3D 活载包络结构云图" in text)
+    check("§4 记录 3D 包络云图闭环且 MIDAS 对拍仍欠",
+          "结构云图已闭环" in text and "verify_envelope_3d.py" in text
+          and "MIDAS 数值对拍" in text and "仍未完成" in text)
     check("§5 写明新增桥型/能力/参数流程", "## 5. 维护流程" in text
           and "新增 / 修改桥型" in text and "白名单写理由" in text)
     check("§3.1 写明有控件≠能改 .dat 的边界",

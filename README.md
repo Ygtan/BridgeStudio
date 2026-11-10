@@ -33,8 +33,8 @@ X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（
 
 `X20_接入约定.md` 管「X20 资产怎么接」，**`能力边界矩阵.md` 管「接到之后到底有哪些能力、哪些还没有」**：
 6 桥型 × 2 维度主矩阵（建造器键 / 求解入口 / 阶段·活载·预应力参数逐格对拍）、
-19 项维度级能力的 `文件::符号` 依据、参数覆盖契约与刻意隐藏白名单、
-4 条真实缺口 + 1 条已闭环记录。由 **`verify_capability_matrix.py`**（197/197）纯离线守卫：
+20 项维度级能力的 `文件::符号` 依据、参数覆盖契约与刻意隐藏白名单、
+4 条真实缺口 + 2 条已闭环记录。由 **`verify_capability_matrix.py`**（201/201）纯离线守卫：
 主矩阵与 `BUILDERS` / `SOLVER_OF` 对拍、依据符号真实存在、
 `DEFAULTS ⊆ FIELDS ∪ 白名单`、额外控件带 `default`、默认值在区间内、
 12 个建造器「控件渲染写回 params 后默认 `.dat` 逐位不变」、
@@ -105,7 +105,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        C 档不借理由 —— 2026-11-10。注意：这**不等于** X20 桥型全量移植，
        下一条仍是真实能力缺口。
 - [x] **P1 能力口径可核对化 + 界面参数覆盖**：新增 `能力边界矩阵.md`
-       与 `verify_capability_matrix.py` 197/197，把「哪些有 / 哪些没有」逐格
+       与 `verify_capability_matrix.py` 201/201，把「哪些有 / 哪些没有」逐格
        钉到代码符号；据矩阵补齐 16 个只在 DEFAULTS 里、界面改不了的参数
        （`ps_beam` E/A/I/fpk/χ/1+μ、`truss_3d` 材料、`cable_stayed` panel、
        `cable_stayed_2d` 塔基与锚点、`suspension` 板厚与车道折减、
@@ -430,11 +430,25 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
       `N = −P·loss/n_lines` 全绿。**未改任何默认输出行，`dat_byte_regression`
       37/37 基线无需刷新**；能力矩阵 §4 缺口由 5 条减为 4 条并留闭环记录
       —— 2026-11-10
-- [ ] **P4** 成果层：3D 包络视图、MIDAS 双向互导（Word/DOCX 与 PDF 计算书已支持，含承载力逐项复核章）。两条边界的逐条说明见 `使用说明.md` 第十一章；`.mct` 往返自检不等于与 MIDAS 数值对拍。
+- [x] **P4 前半：3D 活载包络结构云图**（纯展示层，零内核改动、零 `.dat` 改动）。
+      新增 `envelope_3d.py` 作两套内核口径的唯一真源：线性梁格读
+      `live_beam`（My/Vz，`live beam envelope`），索承体系读 `girder_live`
+      （N/My/Vz，`[GIRDER_LIVE]` 成桥态切线刚度影响线）；`view_3d.fields()`
+      按**实际有量的分量**出 `live_*` 着色场（界面可旋转、悬停给两端 min/max），
+      `report_3d` 新增「3D 包络视图」章出同场景轴测云图 + 填充带 + 峰值表，
+      `result_3d.tables()` 出逐单元 · 逐端明细表。`status()` 五种分流
+      （ok / 全零段 / 未定义车道 / 定义了车道却缺段 / min>max）都**章节照出、
+      不出图不出表**，不补零、不静默兜底。图注、表注、章节说明统一写明
+      「**不是规范全工况最不利包络**（未枚举温度/沉降/风/人群与多可变作用组合）、
+      施工阶段过程量不相加、缺分量不补零」。`verify_envelope_3d.py` 守卫
+      （离线口径 + live 两类模型云图/报告 + 不静默兜底 + 12 格默认 `.dat`
+      黄金哈希逐位不变）。能力矩阵 §4.3 收窄为「MIDAS 数值对拍未做」，
+      §2 增加该能力行 —— 2026-11-10
+- [ ] **P4** 成果层：**3D 包络视图已闭环**（结构云图 / 沿桥长填充带 / 峰值表 / 逐端明细表，见下条）；**MIDAS 数值对拍仍未做**——本机无 MIDAS，`.mct` 往返自检不等于数值对拍。Word/DOCX 与 PDF 计算书已支持，含承载力逐项复核章。两条边界的逐条说明见 `使用说明.md` 第十一章。
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **37 个脚本全绿**，其中 32 个带汇总输出的脚本合计 **1884 项断言**；`verify_app.py` 108/108、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 197/197，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **38 个脚本全绿**，其中 33 个带汇总输出的脚本合计 **2054 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 201/201，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

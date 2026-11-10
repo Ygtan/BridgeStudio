@@ -41,6 +41,8 @@ import math
 from dataclasses import dataclass, field as dc_field
 from typing import Any, Iterable, Sequence
 
+import envelope_3d
+
 Vec3 = tuple[float, float, float]
 
 # ---------------------------------------------------------------- 配色
@@ -169,6 +171,13 @@ def fields(res: Any, model: Any) -> list[Field]:
             "combo_My", "基本组合 My（1.2G + 1.4Q）", "kN·m", True, factor=1e-3,
             note=f"配筋用的**设计内力**，按单元 × i/j 端组合{tail}。"
                  "不是承载力验算结论。"))
+
+    # ---- 活载最不利包络（结构云图）----
+    # 与上面「阶段包络」严格分开：一个是未成桥临时构型的 min/max 过程量，
+    # 一个是成桥态按本模型车道定义做影响线最不利布载的结果。数据源与
+    # 可用分量都由 envelope_3d 判定，这里不猜模型类型、不补零。
+    for spec in envelope_3d.field_specs(res):
+        out.append(Field(**spec))
 
     # ---- 索 ----
     if res.cables:
@@ -336,6 +345,10 @@ def _member_value(res: Any, fld: Field, elem: int,
         val = lo if abs(lo) >= abs(hi) else hi
         unit = "kN·m" if key == "My" else "kN"
         return val * k, f"{key} 包络 {_fmt(lo * k)} ~ {_fmt(hi * k)} {unit}"
+    if key.startswith("live_"):
+        # 活载包络场：取值口径与两端读数都由 envelope_3d 统一给，
+        # 避免界面云图与计算书明细表各写一套。
+        return envelope_3d.member_value(res, key[5:], elem, k)
     if key == "combo_My":
         if ult is None:
             return None, ""

@@ -60,14 +60,26 @@ def main() -> int:
     print("\n[场的清单由结果决定，不由模型类型硬编码]")
     fg = {f.key: f for f in V.fields(res, m)}
     fc = {f.key: f for f in V.fields(resc, mc)}
-    check("梁格场：几何/位移两个方向/My/Vz/组合",
-          set(fg) == {"geometry", "w_min", "w_max", "My", "Vz", "combo_My"},
+    # 2026-11-10：接入 3D 活载包络结构云图（见 envelope_3d.py）。
+    # 梁格 live_beam 只有 My/Vz，斜拉桥 girder_live 另有 N；场清单由
+    # **内核实际给出的分量**决定，不按桥型硬编码、不给全零分量。
+    check("梁格场：几何/位移两方向/阶段 My·Vz/组合/活载 My·Vz",
+          set(fg) == {"geometry", "w_min", "w_max", "My", "Vz", "combo_My",
+                      "live_My", "live_Vz"},
           "、".join(fg))
     check("梁格不出 N 场（梁格无纵向约束，N 恒为 0）", "N" not in fg)
-    check("斜拉桥场：几何/成桥位移/索力/预抬高",
-          set(fc) == {"geometry", "w", "T", "camber"}, "、".join(fc))
-    check("斜拉桥不出梁内力场（成桥态内核不输出梁内力）",
+    check("梁格不出 live_N（内核没给活载轴力包络）", "live_N" not in fg)
+    check("斜拉桥场：几何/成桥位移/活载 N·My·Vz/索力/预抬高",
+          set(fc) == {"geometry", "w", "live_N", "live_My", "live_Vz",
+                      "T", "camber"}, "、".join(fc))
+    check("斜拉桥不出梁内力场（成桥态内核不输出梁格式包络）",
           not ({"My", "Vz", "N", "combo_My"} & set(fc)))
+    for tag, fs in (("梁格", fg), ("斜拉桥", fc)):
+        for k, f in fs.items():
+            if k.startswith("live_"):
+                check(f"{tag} 活载场 {k} 不冒充规范最不利包络",
+                      "不是规范全工况最不利包络" in f.note
+                      and "本模型车道" in f.label)
     check("场标签与单位非空",
           all(f.label and (f.unit or f.key == "geometry") for f in list(fg.values()) + list(fc.values())))
     check("默认着色场：梁格取基本组合", V.default_field(res, m) == "combo_My")
@@ -129,6 +141,18 @@ def main() -> int:
     check("向下极值取到包络最小值",
           near(scw.vmin, min(lo for (_n, d), (lo, _hi) in res.disp.items() if d == 3) * 1000,
                1e-6))
+
+    # 活载包络结构云图：与阶段包络场是两套数据，不能读成同一条曲线。
+    scl = V.build_scene(res, m, "live_My")
+    check("活载 My 云图有值且 0 居中",
+          scl.has_values and scl.vmax > 0 and near(scl.vmin, -scl.vmax, 1e-12),
+          f"[{scl.vmin:,.1f}, {scl.vmax:,.1f}] kN·m")
+    check("活载 My 云图读数给 i/j 两端",
+          all("i 端" in mm.hover and "j 端" in mm.hover
+              for mm in scl.members if mm.value is not None))
+    check("活载场与阶段包络场峰值不同（不是同一份数据）",
+          not near(scl.vmax, scm.vmax, 1e-3),
+          f"活载 {scl.vmax:,.1f} / 阶段 {scm.vmax:,.1f}")
 
     # ---------------------------------------------------------- 节点量
     print("\n[节点量：camber 的键是节点号，不是单元号]")

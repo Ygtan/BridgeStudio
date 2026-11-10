@@ -59,6 +59,7 @@ from typing import Any, Iterable, Sequence
 import buckling_3d
 import cable_length_3d
 import cable_opt_3d
+import envelope_3d
 import modal_3d
 import newton_3d
 import view_3d
@@ -990,11 +991,126 @@ def figure_erection_H(res: SolveResult, model: Any, path: Path) -> Path:
     return _save(fig, path)
 
 
+def _deck_endpoints(model: Any) -> dict[int, tuple[float, float]]:
+    """纵向梁单元 → (i 端 x, j 端 x)。横向/竖向构件不进沿桥长曲线。"""
+    nodes = {n.id: n for n in getattr(model, "nodes", [])}
+    out: dict[int, tuple[float, float]] = {}
+    for e in getattr(model, "elements", []):
+        a, b = nodes.get(e.n1), nodes.get(e.n2)
+        if a is None or b is None:
+            continue
+        dx, dy, dz = b.x - a.x, b.y - a.y, b.z - a.z
+        if abs(dx) < 1e-9 or abs(dx) < max(abs(dy), abs(dz)):
+            continue
+        out[e.id] = (a.x, b.x)
+    return out
+
+
+def figure_live_envelope_band(res: SolveResult, model: Any,
+                              path: Path) -> tuple[Path, str]:
+    """活载内力包络沿桥长的 min/max 填充带（每个非零分量一联）。
+
+    与「梁单元弯矩包络」那张图的差别：那张是**跨施工阶段**的过程包络
+    （混着未成桥构型），这张是**成桥态车道活载**最不利布载。灰虚线是
+    成桥态恒载单值，只作量级对照，**不与包络相加**——相加没有物理意义。
+
+    数据源与可用分量由 `envelope_3d` 判定：线性梁格只出 My / Vz，
+    索承体系另有 N；缺的分量不补零，也不画一条贴着 0 的空曲线。
+    """
+    src = envelope_3d.source(res)
+    comps = envelope_3d.components(res, src)
+    if not src or not comps:
+        raise ValueError("没有可用的活载内力包络（未定义车道或包络全零）")
+    plt = _plt()
+    fig, axes = plt.subplots(len(comps), 1, figsize=(7.4, 2.05 * len(comps)),
+                             sharex=True, squeeze=False)
+    axes = list(axes.ravel())
+    ep = _deck_endpoints(model)
+    dead = res.final_beam if src == "live_beam" else res.girder_ends
+    n_skip = 0
+    for ax, comp in zip(axes, comps):
+        scale = envelope_3d.COMP_SCALE[comp]
+        byx: dict[float, list[float]] = {}
+        for elem, end, v in envelope_3d.band_rows(res, src):
+            xs = ep.get(elem)
+            if xs is None:
+                n_skip += 1
+                continue
+            x = xs[0] if end in ("i", 1) else xs[1]
+            lo = float(v.get(comp + "Min", 0.0)) / scale
+            hi = float(v.get(comp + "Max", 0.0)) / scale
+            dv = float((dead.get((elem, end)) or {}).get(comp, 0.0)) / scale
+            k = round(x, 6)
+            if k not in byx:
+                byx[k] = [lo, hi, dv]
+            else:
+                byx[k][0] = min(byx[k][0], lo)
+                byx[k][1] = max(byx[k][1], hi)
+                byx[k][2] = dv
+        xs = sorted(byx)
+        if not xs:
+            raise ValueError("活载包络没有可绘的纵向梁断面")
+        ymn = [byx[x][0] for x in xs]
+        ymx = [byx[x][1] for x in xs]
+        yd = [byx[x][2] for x in xs]
+        ax.fill_between(xs, ymn, ymx, color=C_BLUE, alpha=0.14, lw=0)
+        ax.plot(xs, ymn, "-", lw=0.9, color=C_BLUE, alpha=0.65)
+        ax.plot(xs, ymx, "-", lw=0.9, color=C_BLUE, alpha=0.65)
+        ax.plot(xs, yd, "--", lw=0.9, color=C_GRAY, alpha=0.85)
+        ax.axhline(0.0, color=C_GRAY, lw=0.8)
+        ax.set_ylabel(f"{comp} ({envelope_3d.COMP_UNIT[comp]})")
+        ax.grid(alpha=0.22, lw=0.5)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+        i = max(range(len(xs)), key=lambda j: max(abs(ymx[j]), abs(ymn[j])))
+        v = ymx[i] if abs(ymx[i]) >= abs(ymn[i]) else ymn[i]
+        allv = ymn + ymx + yd + [0.0]
+        lo, hi = min(allv), max(allv)
+        rng = max(hi - lo, 1e-9)
+        ax.annotate(f"{v:+,.0f} @ x={xs[i]:.0f} m", (xs[i], v),
+                    textcoords="offset points", xytext=(0, 10),
+                    ha="center", va="bottom", fontsize=7.5, color=C_RED)
+        ax.set_ylim(lo - 0.10 * rng, hi + 0.14 * rng)
+    for sx in support_x(model):
+        for ax in axes:
+            ax.axvline(x=sx, color=C_RED, ls="--", lw=0.7, alpha=0.45)
+    axes[-1].set_xlabel("顺桥向 x (m)　（红虚线 = 支承断面）")
+    axes[0].set_title("活载内力包络（成桥态，本模型车道定义）",
+                      fontsize=9.5, pad=6)
+    fig.tight_layout()
+    p = _save(fig, path)
+    note = ("填充带 = 活载 min/max 包络；灰虚线 = 成桥态恒载单值，"
+            "**只作量级对照、不与包络相加**。数据源："
+            + envelope_3d.SOURCE_LABEL[src] + "。")
+    if n_skip:
+        note += f" 另有 {n_skip} 个横向/竖向构件端点未绘入。"
+    return p, note
+
+
+def figure_envelope_axon(res: SolveResult, model: Any, path: Path) -> Path:
+    """活载包络的**三维结构云图**：与界面可旋转视图同一份场景。
+
+    这是 P4 里此前缺的那一块——过去活载包络只有沿桥长的二维曲线 / 三联图，
+    看不出横向哪条纵梁吃得多。这里直接复用 `view_3d.build_scene` 的单元
+    云图（不插值、0 居中），不另造一套配色或取值口径。
+    """
+    key = envelope_3d.default_field(res)
+    if not key:
+        raise ValueError("没有可用的活载包络着色场")
+    sc = view_3d.build_scene(res, model, key)
+    return view_3d.figure_axon(sc, path, title=sc.field.label)
+
+
 #: 报告正文里图的排列顺序。与 figures() 的生成顺序解耦：报告要有稳定的
 #: 叙事顺序（先简图、再变形、再内力、再索），而生成顺序由判据决定。
 _FIGURE_ORDER = ("layout", "axon", "deflection", "moment", "axial", "shear",
                  "girder", "girder_live", "live", "stage_tension", "tension",
-                 "safety", "camber")
+                 "safety", "camber", "envelope_axon", "live_envelope_band")
+
+#: 「3D 包络视图」章的峰值表跟着章节走；逐单元 · 逐端明细表仍归文末。
+ENVELOPE_PEAK_KEY = "live_envelope_peak"
+ENVELOPE_DETAIL_KEY = "live_envelope_table"
+ENVELOPE_FIGURE_KEY = "envelope_axon"
 
 #: 进「施工阶段索力」章的明细表键。与荷载组合同理：过程的**结论**要一页看完，
 #: 逐阶段原始数据才翻明细表——但这里反过来，过程表本身就是结论（每根索
@@ -1173,6 +1289,28 @@ def figures(res: SolveResult, model: Any, out_dir: str | Path,
     if res.camber:
         out["camber"] = Figure("camber", "制造线形预抬高",
                                figure_camber(res, model, d / "camber.png"))
+
+    # ---- 3D 包络视图：结构云图 + 沿桥长填充带 ----------------------------
+    # 只在内核确实回出**非零**活载包络时生成。全零段、未定义车道、段缺失
+    # 都不画「一片灰」的空云图，也不摆只有表头的明细表；原因由
+    # envelope_3d.status() 写进报告章，不静默消失。
+    if envelope_3d.source(res):
+        spec = envelope_3d.field_specs(res)[0]
+        out["envelope_axon"] = Figure(
+            "envelope_axon", f"活载包络结构云图（{spec['label']}）",
+            figure_envelope_axon(res, model, d / "envelope_axon.png"),
+            note="与界面「三维交互视图」同一份 `view_3d.build_scene` 场景："
+                 "颜色取单元值、**不在单元内插值**，有正负的分量 0 居中；"
+                 "每单元取两端中 |·| 大的一端着色，悬停读数给两端各自的 min/max。"
+                 + envelope_3d.SCOPE_NOTE)
+        # 索承体系已有 girder_live 三联图（成桥态切线刚度影响线），本章
+        # 直接引用，不再画一张内容重复的填充带。
+        if envelope_3d.source(res) == "live_beam":
+            bp, bnote = figure_live_envelope_band(
+                res, model, d / "live_envelope_band.png")
+            out["live_envelope_band"] = Figure(
+                "live_envelope_band", "活载内力包络带（沿桥长）", bp,
+                note=bnote + envelope_3d.SCOPE_NOTE)
     if res.erection and res.erection_shape:
         out["erection_shape"] = Figure(
             "erection_shape", "主缆随吊装逐级下沉的线形",
@@ -1618,6 +1756,24 @@ def _cover_facts(model: Any) -> list[tuple[str, str]]:
     return facts
 
 
+def _envelope_paragraph(res: SolveResult, status_text: str) -> str:
+    """「3D 包络视图」章的口径段：三类量分开 + 本次状态 + 冲击系数。"""
+    imp = res.meta.get("impact_factor")
+    try:
+        imp_f = float(imp)
+    except (TypeError, ValueError):
+        imp_f = 0.0
+    extra = (f" 本次内核给出的冲击系数 1+μ = {imp_f:.5f}，"
+             "已计入活载**内力**包络；位移包络不计冲击。"
+             if imp_f > 0 else "")
+    return (
+        "本章把内核已算出的成桥态活载内力包络做成**三维结构云图**与沿桥长"
+        "包络带。三类量严格分开：`beam force envelope` 是跨施工阶段的过程"
+        "包络（含未成桥临时构型），`final stage beam force` / `girder_ends` "
+        "是成桥态恒载单值，本章是成桥态车道活载最不利 min/max。"
+        + status_text + extra)
+
+
 def build_document(res: SolveResult, model: Any, *, project: str = "",
                    out_dir: str | Path | None = None,
                    params: dict[str, Any] | None = None,
@@ -1694,6 +1850,19 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     # 目标索力优化章同样只要内核给了段就出：OPTIMIZE=0 的 ERROR 段也要
     # 写明"本次未请求优化、既有链路数值不变"，不能整章消失让人以为漏算。
     opt_chapter = bool(res.cable_opt)
+    # 「3D 包络视图」章：有可用包络就把本章的两张图从通用图循环里摘出来
+    # （否则一图两处），没有可用包络时**章节照出**、只给中文说明，避免整章
+    # 消失让人以为这项根本没做——与模态/屈曲章的 ERROR 段同一纪律。
+    env_code, env_text = envelope_3d.status(res, model)
+    env_peak = envelope_3d.peak_table(res) if env_code == "ok" else None
+    env_figs: list[str] = []
+    if env_peak:
+        tabs[ENVELOPE_PEAK_KEY] = env_peak
+    if env_code == "ok":
+        env_figs.append("envelope_axon")
+        env_figs.append("live_envelope_band" if "live_envelope_band" in figs
+                        else "girder_live")
+        skip_fig.update(env_figs)
     if stage_chapter:
         skip_fig.add(STAGE_FIGURE_KEY)
     if erection_chapter:
@@ -1707,6 +1876,16 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     for key in figs:                     # 清单外的新图兜底，排在最后
         if key not in _FIGURE_ORDER and key not in skip_fig:
             blocks.append({"type": "figure", "key": key})
+
+    # ---- 3D 包络视图章 ---------------------------------------------------
+    blocks.append({"type": "h1", "text": "3D 包络视图"})
+    blocks.append({"type": "p", "text": _envelope_paragraph(res, env_text)})
+    if env_peak:
+        blocks.append({"type": "table", "key": ENVELOPE_PEAK_KEY})
+    for key in env_figs:
+        blocks.append({"type": "figure", "key": key})
+    blocks.append({"type": "note", "text":
+                   envelope_3d.SCOPE_NOTE + envelope_3d.PROCESS_NOTE})
 
     if modal_chapter:
         blocks.append({"type": "h1", "text": "模态与自振特性"})
@@ -1920,6 +2099,7 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     rest.pop("opt_round", None)
     rest.pop("prestress_loss_table", None)   # 已跟着「预应力分项损失」章走
     rest.pop("stage_prestress_table", None)  # 已跟着「施工阶段预应力」章走
+    rest.pop(ENVELOPE_PEAK_KEY, None)       # 已跟着「3D 包络视图」章走
     rest.pop(MODAL_TABLE_KEY, None)      # 已跟着「模态与自振特性」章走
     rest.pop(BUCKLING_TABLE_KEY, None)   # 已跟着「线性屈曲与稳定」章走
     rest.pop(LENGTH_TABLE_KEY, None)     # 逐轮表已跟着「索长迭代」章走

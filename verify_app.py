@@ -250,9 +250,19 @@ def main() -> int:
             check("界面出现三维交互视图", "三维交互视图" in _md)
             check("着色场选择器存在", _fld is not None,
                   "、".join(str(x) for x in (_fld.options if _fld else [])))
-            check("梁格给 6 个场（几何/位移两向/My/Vz/组合）",
-                  _fld is not None and len(_fld.options) == 6,
+            # 2026-11-10：接入 3D 活载包络结构云图后场数会随**内核实际
+            # 给出的分量**变，写死「6 个」会误报。改与 view_3d.fields()
+            # 对拍，并单独守住新增的两个活载场。
+            _want = {f.label for f in __import__("view_3d").fields(
+                _r, at.session_state["doc"].model)}
+            check("梁格场与 view_3d.fields() 同源",
+                  _fld is not None
+                  and {str(x) for x in _fld.options} == _want,
                   f"{len(_fld.options) if _fld else 0} 个")
+            check("梁格新增活载包络着色场（My / Vz 两个）",
+                  _fld is not None
+                  and sum("活载" in str(x) for x in _fld.options) == 2,
+                  "、".join(str(x) for x in (_fld.options if _fld else [])))
             check("变形开关存在",
                   any(c.key == f"v3d_deform_{_fp}" for c in at.checkbox))
             _pc = at.get("plotly_chart")
@@ -399,9 +409,15 @@ def main() -> int:
                   _fld is not None
                   and {str(x) for x in _fld.options} == _want,
                   "、".join(str(x) for x in (_fld.options if _fld else [])))
-            check("斜拉桥不提供梁内力场（成桥态内核不出）",
-                  _fld is not None and not any(
-                      "My" in str(x) for x in _fld.options),
+            # 「成桥态内核不出梁内力」指**阶段包络 / 基本组合**那几个场；
+            # 活载包络走 [GIRDER_LIVE]，是另一条链，标签里带 My 但不应被
+            # 这条断言误杀。按标签前缀精确判，并守住活载场确实出现。
+            check("斜拉桥不提供阶段/组合梁内力场，但提供活载场",
+                  _fld is not None
+                  and not any(str(x).startswith(("梁 My", "梁 Vz", "梁 N",
+                                                 "基本组合"))
+                              for x in _fld.options)
+                  and any("活载 My" in str(x) for x in _fld.options),
                   str(len(_fld.options)) + " 个场" if _fld else "—")
             _sc3 = at.session_state.get("v3d_scene")
             check("斜拉桥场景仍可建（136 构件）",

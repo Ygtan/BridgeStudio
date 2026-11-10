@@ -45,6 +45,7 @@ import cable_length_3d
 import cable_opt_3d
 import combination
 import code_material
+import envelope_3d
 import modal_3d
 import newton_3d
 import section_strength
@@ -2366,6 +2367,14 @@ class SolveResult:
                 "rows": [[k, _r(hi * 1000, 2), _r(lo * 1000, 2)]
                          for k, (hi, lo) in sorted(self.live.items())],
             }
+
+        # 活载内力包络（3D 包络视图的依据表）：只吃内核已回出的段，
+        # 全零段 / 未定义车道 / 段缺失都不给表，不补零冒充「算过了」。
+        # 结论表（峰值）跟着「3D 包络视图」章走，这张逐单元 · 逐端明细
+        # 归文末，由 report_3d 收录。
+        live_detail = envelope_3d.detail_table(self, model)
+        if live_detail:
+            out["live_envelope_table"] = live_detail
 
         if self.disp and model is not None:
             rows2 = []
