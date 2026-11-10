@@ -124,6 +124,23 @@ class StageElemLoadDef(BaseModel):
     q2: float = 0.0
 
 
+class StagePrestressDef(BaseModel):
+    """施工阶段预应力（`*STAGE_PRESTRESS`）。
+
+    内核阶段预应力**只走等效荷载法 EQUIV**：把有效预加力 Pe=P·loss 换算成
+    梁组轴向缩短、端部偏心弯矩与曲线束横向均布荷载。它不是 TENDON 的
+    筋-混凝土协同，也不含摩阻/锚固/松弛/收缩徐变分项损失——`loss` 是
+    一个总损失系数。单位：P 为 N，F/E1/E2 为 m（向下为正）。
+    """
+
+    elems: list[int] = Field(default_factory=list)
+    P: float = 0.0                 # 张拉控制力 N（未扣损失）
+    F: float = 0.0                 # 抛物线束跨中下垂量 m
+    E1: float = 0.0                # 起点偏心 m
+    E2: float = 0.0                # 终点偏心 m
+    loss: float = 1.0              # 总损失系数，有效预加力 Pe=P*loss
+
+
 class Stage2D(BaseModel):
     """施工阶段（`*STAGE`）。2D 内核用 ACTIVE=/DEACTIVE= 激活/钝化单元。
 
@@ -135,6 +152,7 @@ class Stage2D(BaseModel):
     deactivate: list[int] = Field(default_factory=list)
     loads: list[StageLoadDef] = Field(default_factory=list)
     elem_loads: list[StageElemLoadDef] = Field(default_factory=list)
+    prestresses: list[StagePrestressDef] = Field(default_factory=list)
     time: float = 0.0
 
 
@@ -446,6 +464,18 @@ class BridgeSpec(BaseModel):
                         out.append(f"{s.id} ELEM={_int_ranges(ld.elems)} "
                                    f"DIR={ld.dir} Q1={ld.q1:.6g} Q2={ld.q2:.6g}")
                 out.append("")
+            if any(s.prestresses for s in self.stages):
+                out.append("! 逐跨张拉：阶段内等效荷载法（内核强制 EQUIV），"
+                           "Pe=P*LOSS 为有效预加力")
+                out.append("*STAGE_PRESTRESS")
+                for s in self.stages:
+                    for ps in s.prestresses:
+                        out.append(
+                            f"{s.id} ELEM={_int_ranges(ps.elems)} "
+                            f"P={ps.P:.6g} F={ps.F:.6g} "
+                            f"E1={ps.E1:.6g} E2={ps.E2:.6g} "
+                            f"LOSS={ps.loss:.6g}")
+                out.append("")
 
         if self.lanes:
             out.append("! 车道荷载（JTG D60 影响线最不利布载包络）")
@@ -524,6 +554,9 @@ def build_beam_bridge(
     gravity: float = -9.81,
     staged: bool = False,
     q2_kN: float = 0.0,
+    stage_tension_kN: float = 0.0,
+    stage_tension_e: float = 0.0,
+    stage_tension_loss: float = 1.0,
     lane: bool = False,
     creep_rh: float = 0.0,
     creep_h: float = 0.0,
@@ -537,7 +570,17 @@ def build_beam_bridge(
     `staged=True`：逐跨施工（每跨一个阶段，激活该跨单元 + 施加该跨一期
     恒载 udl_kN，自重按激活单元自动计入）；`q2_kN` 为二期铺装，合拢后
     最后一个阶段全桥施加。`lane=True`：生成 JTG D60 车道荷载影响线包络。
+
+    `stage_tension_kN > 0`：每个逐跨阶段给该跨挂一条 `*STAGE_PRESTRESS`
+    （等效荷载法）。`stage_tension_e` 是钢束端部偏心（m，向下为正），
+    `stage_tension_loss` 是**总**损失系数（Pe = P·loss，默认 1.0 不扣损失）。
+    默认 0 时完全不写该段，既有 `.dat` 逐位不变。
     """
+    if stage_tension_kN > 0.0:
+        if not staged or n_spans < 2:
+            raise ValueError("逐跨张拉要求 staged=True 且 n_spans>=2")
+        if not 0.0 < stage_tension_loss <= 1.0:
+            raise ValueError("stage_tension_loss 必须在 (0, 1]")
     n_elem = n_elem or max(20, int(round(span / 1.0)))
     n_elem = max(4, n_elem)
     # 连续梁要保证中间支座落在节点上：单元数取跨数的整数倍
@@ -579,6 +622,13 @@ def build_beam_bridge(
             if udl_kN:
                 s.elem_loads.append(StageElemLoadDef(
                     elems=seg, q1=-abs(udl_kN) * 1000.0, q2=-abs(udl_kN) * 1000.0))
+            if stage_tension_kN > 0.0:
+                # 中间跨两端都不锁 dof1，内核 EQUIV 走自平衡轴力对分支：
+                # 只有本跨受压，外围阶段不承担附加轴力。
+                s.prestresses.append(StagePrestressDef(
+                    elems=seg, P=abs(stage_tension_kN) * 1000.0,
+                    E1=stage_tension_e, E2=stage_tension_e,
+                    loss=stage_tension_loss))
             stages.append(s)
         if q2_kN:
             stages.append(Stage2D(

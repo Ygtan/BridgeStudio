@@ -325,6 +325,17 @@ for _row in doc.param_rows():
     for _col, _f in zip(_cols, _row):
         _render_field(_col, _f, _p, _prefix)
 
+# 逐跨张拉是等效荷载法的施工阶段量，不是规范意义上的预应力设计验算。
+# 口径必须就地写清，否则用户会把"总损失系数"当成 JTG 3362 的分项损失。
+if (doc.builder_key == "beam_bridge" and _p.get("staged")
+        and float(_p.get("stage_tension_kN") or 0.0) > 0.0):
+    st.caption(
+        "逐跨张拉：每个施工阶段给该跨写一条 `*STAGE_PRESTRESS`，内核强制走"
+        "等效荷载法（EQUIV）。P 为张拉控制力，有效预加力 Pe = P × loss；"
+        "loss 是**总损失系数**（1.0 = 不扣损失），不是 JTG 3362 的摩阻/锚固/"
+        "松弛/收缩徐变分项损失。钢束按直线筋 + 端部偏心处理，不做筋-混凝土"
+        "协同（TENDON）；各阶段按增量累加进成桥态，过程量不构成规范合格判定。")
+
 # --- 荷载编辑（仅单梁：桥型的荷载已折进参数里）---
 if doc.kind == "beam":
     st.markdown("**荷载**")

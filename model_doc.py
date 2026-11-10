@@ -200,6 +200,11 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         # 档二：2D 施工阶段 + 车道活载（走 solve_2d 链，进 example_stage/example_influence）
         "staged": False,          # 逐跨施工（每跨一个阶段 + 二期铺装阶段）
         "q2_kN": 0.0,             # 二期铺装 (kN/m)，staged 时合拢后全桥施加
+        # 逐跨张拉：0 = 不写 *STAGE_PRESTRESS，既有 .dat 逐位不变。
+        # loss 是总损失系数（不是 JTG 3362 分项损失），1.0 = 不扣损失。
+        "stage_tension_kN": 0.0,
+        "stage_tension_e": 0.0,
+        "stage_tension_loss": 1.0,
         "lane": False,            # JTG D60 车道活载 + 影响线最不利布载包络
     },
     # ---- 三维：参数名沿用建造器（sp1/sp2 而不是 span/n_spans）----
@@ -459,6 +464,19 @@ FIELDS: dict[str, list[list[Field]]] = {
             {"key": "lane", "label": "JTG D60 车道活载", "type": "bool"},
             {"key": "q2_kN", "label": "二期铺装 (kN/m)", "type": "float",
              "min": 0.0, "max": 100.0, "step": 5.0,
+             "when": lambda p: p.get("staged")},
+        ],
+        # 逐跨张拉：每跨阶段写一条 *STAGE_PRESTRESS（等效荷载法）。
+        # 只在开了逐跨施工时显示，默认 0 不写段、不改任何既有 .dat。
+        [
+            {"key": "stage_tension_kN", "label": "逐跨张拉力 (kN/跨)", "type": "float",
+             "min": 0.0, "max": 50000.0, "step": 500.0,
+             "when": lambda p: p.get("staged")},
+            {"key": "stage_tension_e", "label": "钢束偏心 e (m，向下为正)", "type": "float",
+             "min": -5.0, "max": 5.0, "step": 0.05,
+             "when": lambda p: p.get("staged")},
+            {"key": "stage_tension_loss", "label": "总损失系数 loss", "type": "float",
+             "min": 0.1, "max": 1.0, "step": 0.05,
              "when": lambda p: p.get("staged")},
         ],
     ],
@@ -1128,6 +1146,9 @@ class ModelDoc:
             gravity=self._gravity(),
             staged=bool(p.get("staged", False)),
             q2_kN=float(p.get("q2_kN", 0.0) or 0.0),
+            stage_tension_kN=float(p.get("stage_tension_kN", 0.0) or 0.0),
+            stage_tension_e=float(p.get("stage_tension_e", 0.0) or 0.0),
+            stage_tension_loss=float(p.get("stage_tension_loss", 1.0) or 1.0),
             lane=bool(p.get("lane", False)),
             creep_rh=float(p.get("creep_rh") or 0.0),
             creep_h=float(p.get("creep_h") or 0.0),
@@ -1324,6 +1345,12 @@ class ModelDoc:
     def validate(self) -> list[str]:
         """返回中文问题列表；空列表表示可以安全求解。**不抛异常**。"""
         errs: list[str] = []
+        # 逐跨张拉的参数问题先给中文提示：建造器也会硬拦，但若等它抛出来，
+        # 界面只会看到一句「模型参数不完整或非法」，看不出是哪个控件填错了。
+        if self.builder_key == "beam_bridge":
+            early = self._bridge_param_checks()
+            if early:
+                return early
         try:
             self.build()
         except Exception as e:                       # 参数缺失/类型错
@@ -1559,6 +1586,22 @@ class ModelDoc:
             ns = p.get("n_spans") or 0
             if not 1 <= ns <= 8:
                 errs.append(f"跨数 {ns} 超出范围（1~8）")
+
+        # 逐跨张拉：建造器会硬拦"没开 staged / 单跨"，这里给界面中文提示，
+        # 顺带把"偏心超出截面半高"这种几何自洽但物理荒谬的输入拦下来。
+        if self.builder_key == "beam_bridge":
+            pt = float(p.get("stage_tension_kN") or 0.0)
+            if pt > 0:
+                if not p.get("staged") or int(p.get("n_spans") or 1) < 2:
+                    errs.append("逐跨张拉需要先开启「逐跨施工」且跨数 ≥ 2")
+                loss = float(p.get("stage_tension_loss") or 0.0)
+                if not 0.0 < loss <= 1.0:
+                    errs.append("预应力总损失系数必须在 (0, 1]")
+                h = float(p.get("h") or 0.0)
+                e = float(p.get("stage_tension_e") or 0.0)
+                if h > 0 and abs(e) > h / 2:
+                    errs.append(
+                        f"钢束偏心 |e|={abs(e):g} m 超出截面半高 {h / 2:g} m")
         return errs
 
     # ------------------------------------------------------------ 契约

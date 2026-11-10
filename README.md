@@ -329,11 +329,12 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 - [x] **P3.5** 自然语言输入文件：三个算例（悬索/斜拉/拱）的描述统一落到 `examples/*.txt`
       （唯一真源），`run_nl.py` 作命令行统一入口（`--list` / 跑全部 / 跑单个），三个
       `example_*_nl.py` 的 `DESC` 改为从 `.txt` 读 —— 2026-11-05
+- [x] **第五类工程性老坑 ①②③**：① 2D `NONLINEAR` 端部释放（静态凝聚按完整 6 自由度投影 + 一阶几何刚度；顺带修 `condenseBeamGlobal()` 只散射 nf 个自由度的同源错位，无释放路径逐位不变）；② 2D 逐跨施工张拉入口；③ AppTest 环境性超时守卫。逐跨张拉：`beam_bridge` 勾选「逐跨施工」后多出**逐跨张拉力 / 钢束偏心 / 总损失系数**三个控件，每阶段写一条 `*STAGE_PRESTRESS`；内核 `EQUIV` 补「梁组两端 `dof1` 都自由 → 自平衡轴力对 `+Pe/-Pe`」分支，连续梁中间跨终于能张拉，外围结构不背附加轴力。默认张拉力 0，既有 `.dat` 逐位不变；`loss` 是总损失系数，不是 JTG 3362 分项损失，也不做 TENDON 筋-混凝土协同。③ 的超时阈值可用 `BRIDGESTUDIO_APP_TIMEOUT` 配置，只对明确的墙钟超时单次重试并给诊断，真实功能异常原样抛出、断言一条不放宽。`verify_stage_tension_2d.py` 27/27（live 三跨成桥态轴力精确 = −P·loss）、`test_2d` 129/129、`ctest` 7/7。—— 2026-11-10
 - [ ] **P4** 成果层：3D 包络视图、MIDAS 双向互导（Word/DOCX 与 PDF 计算书已支持，含承载力逐项复核章）。两条边界的逐条说明见 `使用说明.md` 第十一章；`.mct` 往返自检不等于与 MIDAS 数值对拍。
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **32 个脚本全绿**，其中 27 个带汇总输出的脚本合计 **1384 项断言**；`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **33 个脚本全绿**，其中 28 个带汇总输出的脚本合计 **1415 项断言**；`verify_app.py` 108/108、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145、`verify_stage_tension_2d.py` 27/27，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

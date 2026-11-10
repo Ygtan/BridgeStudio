@@ -14,17 +14,100 @@ from console_utf8 import setup_console
 
 setup_console()          # 输出被重定向到管道/文件时，GBK 会崩（见模块说明）
 
+import os
 import sys
+import time
 from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
 PASS: list[tuple[str, bool, str]] = []
 
+# AppTest 的墙钟超时是**环境性**的：机器休眠、后台调度、首次冷启动都可能让
+# 一次本来几秒的 script run 撞上 180 s 上限；单独重跑 104/104 通过，说明不是
+# 功能回归。这里把阈值做成可配置，并只对"明确的超时异常"给一次带诊断的重试；
+# 任何真实功能异常原样抛出，PASS/FAIL 断言一条都不放宽。
+#   BRIDGESTUDIO_APP_TIMEOUT  超时秒数（默认 180）
+#   BRIDGESTUDIO_APP_RETRY=0  关掉单次重试（诊断真实挂起时用）
+APP_TIMEOUT = float(os.environ.get("BRIDGESTUDIO_APP_TIMEOUT", "180"))
+APP_RETRY = os.environ.get("BRIDGESTUDIO_APP_RETRY", "1") != "0"
+_T0 = time.monotonic()
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    name = type(exc).__name__.lower()
+    text = str(exc).lower()
+    # Streamlit 1.66 抛 RuntimeError("AppTest script run timed out after N(s)")，
+    # 所以不能只看异常类型，也不能把所有 RuntimeError 都当成超时。
+    return ("timeout" in name or "timed out" in text
+            or "timeout" in text or "超时" in str(exc))
+
+
+def _guard(at: AppTest) -> AppTest:
+    """给 AppTest 实例装一个带超时诊断的 run，整个脚本最多重试一次。"""
+    if getattr(at, "_bs_timeout_guard", False):
+        return at
+    orig_run = at.run
+    state = {"n": 0}
+
+    def run(*args, **kwargs):
+        try:
+            out = orig_run(*args, **kwargs)
+        except Exception as e:
+            if not _is_timeout(e) or not APP_RETRY or state["n"] >= 1:
+                raise
+            state["n"] += 1
+            print(f"  [诊断] AppTest 超时（{type(e).__name__}: {str(e)[:110]}）。"
+                  f"  多为机器休眠/后台调度造成的墙钟跳变；按同一状态重试一次，"
+                  f"  功能断言不放宽。已运行 {time.monotonic() - _T0:.0f}s，"
+                  f"  可用 BRIDGESTUDIO_APP_TIMEOUT 调大阈值。")
+            out = orig_run(*args, **kwargs)
+            print("  [诊断] 重试完成。")
+        return _guard(out) if isinstance(out, AppTest) else out
+
+    at.run = run
+    at._bs_timeout_guard = True
+    return at
+
 
 def check(name: str, ok: bool, detail: str = "") -> None:
     PASS.append((name, ok, detail))
     print(f"  {'PASS' if ok else 'FAIL'}  {name:<34} {detail}")
+
+
+def timeout_guard_checks() -> None:
+    """③ 守卫自检：只重试明确的墙钟超时，真实功能异常原样抛出。"""
+    class _FakeApp:
+        def __init__(self, fail_times: int, exc: Exception):
+            self.calls = 0
+            self.fail_times = fail_times
+            self.exc = exc
+
+        def run(self, *args, **kwargs):
+            self.calls += 1
+            if self.calls <= self.fail_times:
+                raise self.exc
+            return self
+
+    timeout = RuntimeError("AppTest script run timed out after 180(s)")
+    real = RuntimeError("真实功能异常：widget 不存在")
+    check("识别 AppTest 墙钟超时", _is_timeout(timeout))
+    check("不把普通 RuntimeError 当超时", not _is_timeout(real))
+
+    fake = _FakeApp(1, timeout)
+    check("超时按同一状态重试一次后成功",
+          _guard(fake).run() is fake and fake.calls == 2,
+          f"run 调用 {fake.calls} 次")
+
+    fake2 = _FakeApp(1, real)
+    raised = ""
+    try:
+        _guard(fake2).run()
+    except RuntimeError as e:
+        raised = str(e)
+    check("真实功能异常原样抛出且不重试",
+          raised == "真实功能异常：widget 不存在" and fake2.calls == 1,
+          f"run 调用 {fake2.calls} 次")
 
 
 def _errors(at: AppTest) -> list[str]:
@@ -45,8 +128,13 @@ def main() -> int:
     print("=" * 78)
     print("界面回归（AppTest）")
     print("=" * 78)
+    print(f"  超时阈值 {APP_TIMEOUT:g}s（BRIDGESTUDIO_APP_TIMEOUT 可调）；"
+          f"超时单次重试：{'开' if APP_RETRY else '关'}")
 
-    at = AppTest.from_file("app.py", default_timeout=180).run()
+    print("\n[超时守卫自检]")
+    timeout_guard_checks()
+
+    at = _guard(AppTest.from_file("app.py", default_timeout=APP_TIMEOUT)).run()
 
     print("\n[首次加载]")
     check("无异常", not _errors(at), _errors(at)[:1])
@@ -427,7 +515,7 @@ def main() -> int:
 
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
-    print(f"  {n_pass}/{len(PASS)} 通过")
+    print(f"  {n_pass}/{len(PASS)} 通过，总耗时 {time.monotonic() - _T0:.0f}s")
     return 0 if n_pass == len(PASS) else 1
 
 
