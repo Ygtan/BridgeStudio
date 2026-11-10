@@ -264,7 +264,12 @@ def peak_table(res: Any) -> dict[str, Any] | None:
         "title": "活载包络峰值（按分量）",
         "headers": ["分量", "包络 min", "包络 max", "控制 |·|", "出现位置", "单位"],
         "rows": rows,
-        "note": f"数据源：{SOURCE_LABEL[src]}。" + SCOPE_NOTE,
+        # 控制列按 |·| 选取但保留原符号：min / max 来自不同加载位置，
+        # 写成不带符号的绝对值会丢掉「是下缘还是上缘控制」这个信息。
+        "note": (f"数据源：{SOURCE_LABEL[src]}。"
+                 "「控制 |·|」列按绝对值选取控制值，保留 min/max 原符号；"
+                 "它不是设计值，也不与云图色标上限（取绝对值）相减。"
+                 + SCOPE_NOTE),
     }
 
 

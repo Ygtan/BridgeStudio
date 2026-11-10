@@ -24,6 +24,10 @@
 3. **缺项就说缺**。无车道时 `live_beam` 为空，`beam_combinations` 只出恒载项
    并标 `has_live=False`，界面/报告必须明说。
 
+第四条链（**opt-in，默认关闭**）：`example_modal.exe` → `<stem>.modal.txt`
+→ `modal_2d` 解析，把 2D 内核本来就在算的自振频率与线性屈曲因子接进结果/报告。
+只暴露内核输出：不重算 K/M、不造周期 T / 振型 / 参与质量，屈曲段缺失如实写明。
+
 坐标约定
 --------
 2D 内核自由度：1=u(x)、2=v(y)、3=θ。竖向位移是 dof 2（不是三维的 dof 3）。
@@ -43,6 +47,7 @@ from pathlib import Path
 from typing import Any
 
 import combination
+import modal_2d
 
 
 class SolverUnavailable2D(RuntimeError):
@@ -84,6 +89,11 @@ def static_solver_available() -> bool:
     return _find_exe("example_mixed.exe") is not None
 
 
+def modal_solver_available() -> bool:
+    """2D 自振 / 屈曲内核是否已编译（example_modal.exe）。"""
+    return _find_exe("example_modal.exe") is not None
+
+
 def solve_2d_available() -> bool:
     """2D 桥梁求解链是否可用（施工内核 + 静态内核至少其一）。"""
     return static_solver_available() or stage_solver_available()
@@ -121,6 +131,22 @@ class Solve2DResult:
     live_disp: dict[int, tuple[float, float]] = field(default_factory=dict)
     # 自动冲击的放大系数（只作用于内力包络）。未自动计算时为 1。
     impact_factor: float = 1.0
+    # 2D 自振 / 线性屈曲（opt-in）：modal_2d.parse_modal_txt 的结果。
+    # 默认 "not_requested"；不重算 K/M、缺段不补零。
+    modal: dict[str, Any] = field(
+        default_factory=lambda: {"status": "not_requested",
+                                 "source": modal_2d.SOURCE})
+
+    def modal_tables(self) -> dict[str, dict[str, Any]]:
+        """报告 / 界面同源的两张表；无可用结果时为空 dict。"""
+        out: dict[str, dict[str, Any]] = {}
+        t = modal_2d.modal_table(self.modal)
+        if t:
+            out["modal_table"] = t
+        b = modal_2d.buckling_table(self.modal)
+        if b:
+            out["buckling_table"] = b
+        return out
 
     @property
     def fingerprint(self) -> str:
@@ -315,8 +341,13 @@ def solve_2d(
     out_dir: str | Path = "out/solve2d",
     dat_name: str | None = None,
     timeout: float = 120.0,
+    modal: bool = False,
 ) -> Solve2DResult:
     """求解一个 BridgeSpec，返回 `Solve2DResult`。
+
+    `modal=True` 时额外跑 `example_modal.exe`（读同一份 .dat）并把
+    2D 自振 / 屈曲结果放进 `res.modal`。默认 False：不调该 exe、不写
+    任何新 diagnostics、HTML 计算书也一字不多，默认路径完全不变。
 
     用法::
 
@@ -423,6 +454,10 @@ def solve_2d(
                     env_text)
                 if hit:
                     res.impact_factor = float(hit.group(3))
+                    # 留一份独立的 f1 参照：opt-in 模态结果必须与它同源，
+                    # 禁止报告里出现两套频率（modal_2d.consistency）。
+                    res.stats["f1_vertical"] = float(hit.group(1))
+                    res.stats["impact_mu"] = float(hit.group(2))
                     res.diagnostics.append(
                         "汽车冲击按竖向基频计入："
                         f"f1={float(hit.group(1)):.2f} Hz，"
@@ -457,6 +492,33 @@ def solve_2d(
     else:
         res.diagnostics.append(
             "没有车道位移包络，不能做 JTG D60 表 4.3.2 的活载挠度限值。")
+
+    # ③ 2D 自振 / 线性屈曲（opt-in）：只读 example_modal.exe 写的
+    #    <stem>.modal.txt，不重算 K/M、不改 .dat。缺 exe / 缺段 / 运行失败
+    #    一律写中文状态，不摆空表、不补零、不影响①②的结果。
+    if modal:
+        exe = _find_exe("example_modal.exe")
+        if exe is None:
+            res.modal = {"status": "unavailable", "source": modal_2d.SOURCE}
+        else:
+            try:
+                stdout = _run(exe, dat_name, out, timeout)
+                modal_path = out / (dat_path.stem + ".modal.txt")
+                if not modal_path.is_file():
+                    res.modal = {"status": "no_output",
+                                 "source": modal_2d.SOURCE,
+                                 "stdout": (stdout or "")[-500:]}
+                else:
+                    res.modal = modal_2d.parse_modal_txt(
+                        modal_path.read_text(encoding="utf-8",
+                                             errors="replace"))
+            except SolverUnavailable2D as e:
+                res.modal = {"status": "solver_error",
+                             "source": modal_2d.SOURCE, "reason": str(e)}
+        res.modal["consistency"] = modal_2d.consistency(
+            res.modal, res.stats.get("f1_vertical"))
+        res.diagnostics.append(modal_2d.status_text(res.modal))
+        res.diagnostics.append(res.modal["consistency"]["note"])
     return res
 
 

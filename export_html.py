@@ -134,6 +134,36 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
             f"{html.escape(extra)}</p>"
         )
     diags = "".join(f"<li>{html.escape(str(d))}</li>" for d in res.diagnostics)
+    # 2D 自振 / 屈曲（opt-in）：默认 not_requested 时整章不出现，未请求的
+    # 计算书逐位不变；请求了却没结果也照出章节 + 中文说明，不摆空表。
+    modal_html = ""
+    _m = getattr(res, "modal", None) or {}
+    if _m.get("status") != "not_requested":
+        from modal_2d import status_text
+
+        _chunks = ["<h2>2D 自振特性与线性屈曲</h2>"]
+        _tables = res.modal_tables() if hasattr(res, "modal_tables") else {}
+        for _key in ("modal_table", "buckling_table"):
+            _t = _tables.get(_key)
+            if not _t:
+                continue
+            _chunks.append(f"<h3>{html.escape(str(_t['title']))}</h3>")
+            _chunks.append("<table><tr>" + "".join(
+                f"<th>{html.escape(str(h))}</th>" for h in _t["headers"]) + "</tr>")
+            for _row in _t["rows"]:
+                _chunks.append("<tr>" + "".join(
+                    f"<td>{html.escape(str(c))}</td>" for c in _row) + "</tr>")
+            _chunks.append("</table>")
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(str(_t['note']))}</div>")
+        if not _tables or "buckling_table" not in _tables:
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(status_text(_m))}</div>")
+        _cons = _m.get("consistency") or {}
+        if _cons.get("note"):
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(str(_cons['note']))}</div>")
+        modal_html = "".join(_chunks)
     age_rows = []
     for s in getattr(spec, "stages", []) or []:
         t = float(getattr(s, "time", 0.0) or 0.0)
@@ -249,6 +279,7 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
 <p>{html.escape(defl_txt)}</p>
 {age_html}
 {live_v}
+{modal_html}
 <h2>成桥态梁端内力</h2>
 <table>
 <tr><th>单元</th><th>端</th><th>N (kN)</th><th>My (kN·m)</th><th>Vz (kN)</th></tr>

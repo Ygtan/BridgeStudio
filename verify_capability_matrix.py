@@ -299,6 +299,23 @@ def gaps_and_process() -> None:
     check("§6 明确路线图对应且仍是未完成",
           "仍未完成" in text and "P1 X20" in text and "P4 成果层" in text)
     check("§6 写明契约 ≠ 全量移植", "不等于" in text and "全量移植" in text)
+    # 2026-11-10：2D 模态 / 屈曲两格按 FEM-Eigen 源码事实接通，防止文档漂移回 N。
+    cap_rows = [ln for ln in text.splitlines()
+                if ln.startswith("| 模态与自振特性 |")
+                or ln.startswith("| 线性屈曲因子 |")]
+    check("§2 模态 / 屈曲 2D 按内核事实标 Y",
+          len(cap_rows) == 2 and all("| Y | Y |" in ln for ln in cap_rows))
+    check("§4.2 收窄为 7 个 2D=N（不是删缺口）",
+          "7 个" in text and "已收窄" in text
+          and "2D ↔ 3D 高级能力不对齐" in text)
+    s2d = read(ROOT / "solve_2d.py")
+    m2d = read(ROOT / "modal_2d.py")
+    check("2D 模态接入链路源码级对拍",
+          "example_modal.exe" in s2d and "parse_modal_txt" in m2d
+          and "不重算 K/M" in m2d and "status_text" in m2d)
+    check("README 同步 7 项且不再写 9 项",
+          "7 项高级能力" in read(ROOT / "README.md")
+          and "9 项高级能力" not in read(ROOT / "README.md"))
     src = read(Path(__file__))
     # 拼接构造，避免「禁用词字面量本身出现在源码里」让自检自相矛盾。
     for banned in ("sub" + "process", "os." + "system", "solve_" + "3d(",

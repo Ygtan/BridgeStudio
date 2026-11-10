@@ -614,21 +614,34 @@ if doc.kind != "beam" and _cap.get("solve2d"):
     if not (doc.params.get("staged") or doc.params.get("lane")):
         st.info("当前模型未开「逐跨施工」或「车道活载」，组合只有恒载项。可在②中勾选。")
 
+    # 2D 自振 / 屈曲是 opt-in 求解选项（不是模型参数，不进 .dat）：
+    # 只读 example_modal.exe 写出的 .modal.txt，缺 exe / 缺段如实写明。
+    _modal2d_on = st.checkbox(
+        "同时输出 2D 自振频率与线性屈曲（需 example_modal.exe，默认关闭）",
+        value=False, key="modal2d_opt",
+        help="不重算 K/M；内核没给周期 T / 振型 / 参与质量就不补。"
+             "缺 exe 或缺段只在结果里写中文说明，不影响静力与活载。")
+    if not _cap.get("modal2d"):
+        st.caption("未编译 example_modal.exe；勾选也只会得到中文「做不了」说明。")
+
     _dat_now_2d = doc.to_dat()
     if st.button("运行施工阶段 + 规范组合求解", type="primary"):
         _outdir = Path("out/gui_2d")
         _outdir.mkdir(parents=True, exist_ok=True)
         with st.spinner("二维施工阶段 + 车道活载求解中…"):
             try:
-                _res2d = doc.solve(out_dir=_outdir, dat_name="gui_2d.dat")
-                st.session_state.solve2d = {"dat_text": _dat_now_2d, "res": _res2d}
+                _res2d = doc.solve(out_dir=_outdir, dat_name="gui_2d.dat",
+                                   modal_2d=_modal2d_on)
+                st.session_state.solve2d = {"dat_text": _dat_now_2d,
+                                            "modal2d": _modal2d_on, "res": _res2d}
             except Exception as _e:
                 st.session_state.solve2d = None
                 st.error(f"二维求解失败：{_e}")
 
     _s2d = st.session_state.get("solve2d")
-    if _s2d and _s2d.get("dat_text") != _dat_now_2d:
-        st.warning("模型参数已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
+    if _s2d and (_s2d.get("dat_text") != _dat_now_2d
+                 or bool(_s2d.get("modal2d", False)) != _modal2d_on):
+        st.warning("模型参数或模态开关已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
         _s2d = None
     if _s2d:
         _r2d = _s2d["res"]
@@ -658,6 +671,25 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                             for r in _rows))
         else:
             st.info("成桥态内力为空，无法组合（内核未产出）。")
+        if _modal2d_on:
+            from modal_2d import status_text
+
+            _m2 = getattr(_r2d, "modal", None) or {}
+            _mt = getattr(_r2d, "modal_tables", lambda: {})()
+            st.markdown("**2D 自振特性与线性屈曲**")
+            for _t in _mt.values():
+                st.markdown(
+                    "| " + " | ".join(_t["headers"]) + " |\n|"
+                    + "---|" * len(_t["headers"]) + "\n"
+                    + "\n".join("| " + " | ".join(r) + " |" for r in _t["rows"]))
+                st.caption(_t["note"])
+            if _m2.get("status") != "ok" or "buckling_table" not in _mt:
+                st.warning(status_text(_m2))
+            _c2 = _m2.get("consistency") or {}
+            if _c2.get("status") == "mismatch":
+                st.error(str(_c2.get("note", "")))
+            elif _c2.get("note"):
+                st.caption(str(_c2["note"]))
         for _d in _r2d.diagnostics:
             st.caption(f"· {_d}")
 

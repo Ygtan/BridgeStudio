@@ -1831,7 +1831,7 @@ class ModelDoc:
 
         fem = fem_eigen_available()
         is_beam = self.kind == "beam"
-        from solve_2d import solve_2d_available
+        from solve_2d import modal_solver_available, solve_2d_available
 
         return {
             "anastruct": is_beam,          # anastruct 只有梁单元
@@ -1842,17 +1842,24 @@ class ModelDoc:
             "solve3d": False,
             # 二维桥型（梁桥/拱桥/桁架）走 solve_2d 链：施工阶段 + 车道 + 组合
             "solve2d": (not is_beam) and solve_2d_available(),
+            # 2D 自振 / 屈曲是 opt-in 求解选项，不是 DEFAULTS 模型参数：
+            # 只表明 example_modal.exe 在不在，勾选与否由界面单独传。
+            "modal2d": (not is_beam) and modal_solver_available(),
             "cable": self.kind in ("cable_stayed", "suspension"),
             "nonlinear": str(getattr(self.model, "analysis", "LINEAR")).upper()
                          == "NONLINEAR",
         }
 
-    def solve(self, out_dir: str | Path | None = None, dat_name: str | None = None):
+    def solve(self, out_dir: str | Path | None = None, dat_name: str | None = None,
+              modal_2d: bool = False):
         """求解的唯一入口，按维度路由到对应内核。
 
         三维 → `solver_3d.solve`（SolveResult）；二维桥型 → `solve_2d.solve_2d`
         （Solve2DResult，施工阶段 + 车道活载 + 规范组合）。单梁（ModelSpec）没有
         施工阶段/车道，仍走 `fem_eigen_export.run_fem_eigen` 的一次性静力。
+
+        `modal_2d` 是 2D 侧的 opt-in **求解选项**（默认 False），不是模型参数：
+        不进 DEFAULTS / FIELDS、不写进 `.dat`；三维分支忽略它。
         """
         # 即使调用方绕过界面校验，也不允许把组合体系偷偷送进单一体系内核。
         if self.params.get("combo_system"):
@@ -1884,7 +1891,8 @@ class ModelDoc:
         from solve_2d import solve_2d
 
         out = out_dir or Path("out") / "2d"
-        return solve_2d(self.model, out_dir=out, dat_name=dat_name)
+        return solve_2d(self.model, out_dir=out, dat_name=dat_name,
+                        modal=bool(modal_2d))
 
     # ------------------------------------------------------------ 展示
 

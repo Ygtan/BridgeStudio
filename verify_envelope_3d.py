@@ -140,8 +140,10 @@ def offline() -> None:
     check("峰值表：6 列契约", pk is not None
           and pk["headers"] == ["分量", "包络 min", "包络 max", "控制 |·|",
                                 "出现位置", "单位"])
-    check("峰值表：控制 |·| = 1000.00",
-          pk is not None and pk["rows"][0][3] == "1,000.00",
+    # 控制值按 |·| 选取，但**保留 min/max 的原符号**（不同加载位置的两
+    # 个极值不能合并成一个无符号数）。fake 的控制值是 MyMin = -1000 kN·m。
+    check("峰值表：控制值按 |·| 选取且保留符号 = -1000.00",
+          pk is not None and pk["rows"][0][3] == "-1,000.00",
           str(pk["rows"][0][3]) if pk else "缺")
     check("峰值表：出现位置带单元/端",
           pk is not None and "单元 7" in pk["rows"][0][4])
@@ -230,9 +232,9 @@ def live() -> None:
           bool(hovers) and all("i 端" in h and "j 端" in h for h in hovers[:20]),
           hovers[0][:70] if hovers else "缺")
     pk = E.peak_table(r)
-    check("云图色标上限 = 峰值表控制 |·|",
+    check("云图色标上限 = 峰值表控制值的 |·|",
           pk is not None and near(sc.vmax,
-                                  float(pk["rows"][0][3].replace(",", "")), 1e-5),
+                                  abs(float(pk["rows"][0][3].replace(",", ""))), 1e-5),
           f"{sc.vmax:,.2f} vs {pk['rows'][0][3] if pk else '缺'}")
     check("云图控制构件 = 峰值表出现位置",
           pk is not None and sc.control is not None
@@ -357,7 +359,10 @@ def main() -> int:
     offline()
     live()
     no_fallback()
-    n_pass = sum(1 for ok, _, _ in PASS if ok)
+    # PASS 的元组是 (name, bool(ok), detail)：第二个元素才是布尔位。
+    # 早期写成 `for ok, _, _` 会把非空名称当成 True，2 条真实失败被
+    # 汇总成「152/152 通过」——假绿。这里按布尔位统计，不许再退化。
+    n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(PASS)} 通过")
     if n_pass != len(PASS):
