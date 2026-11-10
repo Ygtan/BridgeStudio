@@ -180,6 +180,7 @@ def _compress_element_lines(items: list[tuple[int, int, int, str]]) -> list[str]
     extra 非空（单元级 W=/L0= 覆盖）的单元不参与循环，单独成行。
     每段取"最长可拟合"的连续 id 段，与 X20 导出器的策略一致：贪心取最长，
     因为一段 *DO 的表达力只取决于首末，越长越省。
+    该策略的资产归属与档位见 ``X20_接入约定.md`` §7 A0（只借策略，不改签名）。
     """
     singles = [t for t in items if t[3]]
     loops = sorted((t[:3] for t in items if not t[3]), key=lambda t: t[0])

@@ -12,13 +12,22 @@
 | BridgeStudio（本仓库） | `D:\AI-work\BridgeStudio` | 前处理 + 界面 + 规范验算 + 成果输出 |
 | FEM-Eigen 求解内核 | `D:\AI-work\FEM-Eigen` | C++/Eigen，git 管理，独立演进 |
 | 归档（不再投入） | `D:\AI-work\前处理\fe_nl_preprocessor` | NL-FE 原型，本项目的前身 |
-| 归档（不再投入） | `D:\AI-work\前处理\explore-x20` | X20 原型，多格式导出器的来源 |
+| 归档（不再投入） | `D:\AI-work\前处理\explore-x20` | X20 原型，多格式导出器的来源；接入约定见 `X20_接入约定.md` |
 
 ## 契约
 
 前处理与求解内核**只通过 `.dat` 文件耦合**（FEM-Eigen new format），
 目录通过 `fem_eigen_export.py` 的多候选自动探测定位（可用环境变量
 `FEM_EIGEN_DIR` 覆盖），两边可以独立演进、独立提交。
+
+## X20 资产接入
+
+X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（唯一真源
+`ModelSpec3D` / 唯一转换点 `to_canonical` / 只出不进）、A/B/C 三档处理分级、
+统一字段·单位·坐标与分块编号规范、已知缺陷修正清单、资产登记表、禁止项，
+全部收敛在 **`X20_接入约定.md`**，并由 **`verify_x20_contract.py`**（77/77）
+做成可执行守卫。新增或修改 X20 资产必须先登记再实现；仓库内不得出现
+归档目录的路径常量或 `bridge_fe_modeler` 导入。
 
 ## 融合来源（两版前处理器优缺点结论）
 
@@ -27,6 +36,10 @@
 - **X20（器官库）**：5 种桥型建造器（含斜拉/悬索/组合体系）、BEAM/TRUSS/CABLE
   2D/3D 六种单元表达、组件分块编号规范（SKILL.md）、ANSYS/Abaqus/MIDAS/自研
   四格式导出器、严格 validate_model。
+
+> 上述「器官库」具体怎么用，以 `X20_接入约定.md` 为准；本段只是来源摘要。
+> 特别提醒：`bridge_spec.py` 里的「canonical model」是内部真源，与 X20 导出用的
+> 「canonical dict」同名不同物，见契约 §2。
 
 ## 架构（五层）
 
@@ -67,6 +80,13 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        现行 13/13（上一条记的 12/12 是 2026-10-28 当时的项数；中跨跨中
        挠度 -8.21 mm vs anastruct -8.11 mm，1.2%），
        并与三弯矩闭式解独立吻合 —— 2026-11-10 核销
+- [x] **P1** X20 资产接入统一约定：`X20_接入约定.md` 定死三条铁律与
+       A/B/C 三档处理，把散在 5 个建造器编号表、两处「借 / 不借」注释、
+       导出器 docstring 里的口径收口到一处；`verify_fem_eigen_link.py`
+       去掉归档目录旁路，默认用例改用 FEM-Eigen 自带 `.dat`。
+       `verify_x20_contract.py` 77/77 守卫唯一转换点、无旁路、字段映射与
+       C 档不借理由 —— 2026-11-10。注意：这**不等于** X20 桥型全量移植，
+       下一条仍是真实能力缺口。
 - [ ] **P1** X20 桥型建造器全量移植：3D 链路目前只有梁格 / 斜拉 / 悬索 /
        桁架 / 拱 5 类建造器（`grillage_3d.py`、`cable_stayed_3d.py`、
        `suspension_3d.py`、`truss_3d.py`、`arch_3d.py`），2D 链路另有独立
@@ -366,7 +386,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **34 个脚本全绿**，其中 29 个带汇总输出的脚本合计 **1493 项断言**；`verify_app.py` 108/108、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145、`verify_stage_tension_3d.py` 54/54、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **35 个脚本全绿**，其中 30 个带汇总输出的脚本合计 **1570 项断言**；`verify_app.py` 108/108、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145、`verify_stage_tension_3d.py` 54/54、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_x20_contract.py` 77/77，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

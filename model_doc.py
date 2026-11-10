@@ -2050,7 +2050,8 @@ class ModelDoc:
         from bridge_spec import extract_bridge_params
 
         # 桥梁侧也走 LLM 了，但**只出参数**（bridge_llm），几何仍由 build() 算。
-        # 这是与 explore-x20 的关键区别：那边让模型直接吐节点表，拓扑会被冻死。
+        # 这是 X20_接入约定.md §3.2 的 C2 档（刻意不借）：那边让模型直接吐
+        # 节点表，拓扑会被冻死、不可复现且无法离线。
         cfg = _as_llm_config(llm_config)
         prev_params = prev.params if (prev is not None and prev.kind == kind) else None
 

@@ -1,5 +1,9 @@
 """X20 多格式导出器（ANSYS / Abaqus / MIDAS）在 BridgeStudio 侧的落点。
 
+统一约定见 ``X20_接入约定.md``：本模块是铁律 2 的**唯一转换点**
+（``to_canonical``），资产档位 A0/A1/A2/A3 见契约 §7；字段、单位、坐标与
+已知缺陷修正清单见契约 §4 / §6；术语「canonical dict」的含义见契约 §2。
+
 上游 X20 的 ``bridge_fe_modeler.py`` 以 canonical dict 作为输入；BridgeStudio 的
 唯一数据源是 ``ModelSpec3D``。两者字段同构但命名不同，所以这里只做两件事：
 

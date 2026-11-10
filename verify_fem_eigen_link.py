@@ -1,11 +1,13 @@
 """
 verify_fem_eigen_link.py
 ========================
-验证「X20 自然语言建模 → .dat(new format) → FEM-Eigen 求解 → .svg 可视化」链路是否打通。
+验证「.dat(new format) → FEM-Eigen 求解 → .svg 可视化」链路是否打通。
 
 用途
 ----
-1. 取 explore-x20 输出的一份 .dat 计算数据文件；
+1. 取一份 FEM-Eigen new-format 的 .dat：默认用内核仓库自带的拱桥样例，
+   用户也可显式传路径。统一约定见 X20_接入约定.md §3.3（C3 刻意不借）：
+   回归**不再依赖已归档的 explore-x20 产物**；
 2. 调用 FEM-Eigen 的 example_viz.exe 求解并生成 SVG 可视化；
 3. 读回生成的 SVG，校验其为合法 XML、包含 <svg> 根节点，并统计内容；
 4. 输出链路通断结论，供 NL-FE(Streamlit 前处理) 对接 FEM-Eigen 时使用。
@@ -53,11 +55,7 @@ EXE_CANDIDATES = [p for p in _DETECTED_VIZ if p is not None] or [
     FEM_EIGEN_DIR / "build_local" / "example_viz.exe",
 ] if FEM_EIGEN_DIR else []
 
-# explore-x20 的输出目录（自然语言建模产出的 .dat）
-X20_OUTPUTS = Path(
-    r"D:\AI-work\前处理\explore-x20\outputs"
-)
-
+# 归档原型的输出目录刻意不配置：见 X20_接入约定.md §3.3 / §9。
 # example_viz 固定产出的这组图形（见 example_viz.cpp: 213-271）
 EXPECTED_SUFFIXES = [
     "_model.svg",          # 模型几何（节点/单元线框）
@@ -88,12 +86,15 @@ def find_exe(user_exe: str | None = None) -> Path:
 
 
 def default_dat() -> Path:
-    """默认的测试用 .dat：优先 X20 的拱桥样例，退回 FEM-Eigen 自带的同名文件。"""
-    for p in (X20_OUTPUTS / "arch_bridge_100m.dat",
-              FEM_EIGEN_DIR / "arch_bridge_100m.dat"):
-        if p.is_file():
-            return p
-    sys.exit("[FAIL] 找不到默认测试用的 .dat 文件")
+    """默认用例取 FEM-Eigen 仓库自带的拱桥样例，不依赖归档原型产物。
+
+    X20_接入约定.md §3.3（C3）：外部 .dat 只允许由用户显式传路径。
+    """
+    p = (FEM_EIGEN_DIR / "arch_bridge_100m.dat"
+         if FEM_EIGEN_DIR is not None else None)
+    if p is not None and p.is_file():
+        return p
+    sys.exit("[FAIL] 找不到默认测试用的 .dat 文件；请显式传入 .dat 路径")
 
 
 def validate_svg(path: Path) -> tuple[bool, str, int]:
@@ -123,7 +124,7 @@ def run_link(dat_path: Path, exe: Path, workdir: Path) -> int:
 
     base = dat_path.stem
     print("=" * 68)
-    print("链路验证：X20 .dat  →  FEM-Eigen 求解  →  SVG 可视化")
+    print("链路验证：.dat(new format)  →  FEM-Eigen 求解  →  SVG 可视化")
     print("=" * 68)
     print(f"输入 .dat : {dat_path}")
     print(f"求解器    : {exe}")
@@ -178,8 +179,8 @@ def run_link(dat_path: Path, exe: Path, workdir: Path) -> int:
         print(f"✅ 链路打通：{n_ok}/{len(EXPECTED_SUFFIXES)} 个 SVG 全部生成且合法")
         print(f"   输出目录：{workdir}")
         print("\n   这就是「前处理交接计算模块」的实证：")
-        print("   X20 的 .dat(new format) 无需任何格式转换，")
-        print("   可被 FEM-Eigen 直接求解并产出可视化图形。")
+        print("   FEM-Eigen new-format 的 .dat 无需任何格式转换，")
+        print("   可被内核直接求解并产出可视化图形。")
         return 0
     print(f"⚠️ 链路部分可用：{n_ok}/{len(EXPECTED_SUFFIXES)} 个 SVG 生成成功")
     return 1

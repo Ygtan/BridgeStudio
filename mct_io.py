@@ -149,6 +149,7 @@ def write_mct(model: ModelSpec3D, path: str | os.PathLike[str], *,
     荷载汇总（阶段荷载求和）在 ``to_canonical`` 里做，三种格式共用一份；
     这里只管 MCT 特有的几件事：工况段、自重开关、以及"带不走的那些"。
     """
+    # 唯一转换点（X20_接入约定.md 铁律 2）：本模块只消费 canonical dict，不自建。
     from export_formats import to_canonical          # 局部导入：避免环引用
 
     canonical, warns = to_canonical(model)

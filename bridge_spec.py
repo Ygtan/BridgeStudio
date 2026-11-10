@@ -8,6 +8,8 @@ FEM-Eigen 求解内核已经支持 BEAM / TRUSS / CABLE / STRUT 四类单元，�
 
 本模块定义与 `.dat`(new format) **一一对应**的规范模型（canonical model），
 并提供三个参数化建造器（梁桥 / 拱桥 / 桁架桥），把内核已有的能力暴露到前处理层。
+注意：这里的 canonical model 是**内部真源**，与 `X20_接入约定.md` §2 里
+X20 导出用的 canonical dict 同名不同物，不得混用。
 
 设计原则
 --------
