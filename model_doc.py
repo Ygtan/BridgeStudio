@@ -353,6 +353,25 @@ FIELDS: dict[str, list[list[Field]]] = {
             {"key": "lane_q_kNpm", "label": "车道均布 (kN/m，向下)", "type": "float",
              "min": 0.0, "max": 50.0, "step": 0.5},
         ],
+        # 材料 / 截面 / 规范参数原先只在 DEFAULTS 里，界面完全改不了（只能靠
+        # 自然语言解析写 params 或直接改 JSON）。补成控件后默认值不变，
+        # 既有 .dat 逐位不变；E 这类大数用小数量级参数专用的显示格式。
+        [
+            {"key": "E", "label": "弹性模量 E (Pa)", "type": "float",
+             "min": 1.0e10, "max": 4.0e11, "step": 1.0e9, "format": "%.6g"},
+            {"key": "A", "label": "截面面积 A (m²)", "type": "float",
+             "min": 1.0e-4, "max": 2.0, "step": 0.001, "format": "%.6g"},
+            {"key": "I", "label": "截面惯矩 I (m⁴)", "type": "float",
+             "min": 1.0e-6, "max": 2.0, "step": 0.001, "format": "%.6g"},
+        ],
+        [
+            {"key": "fpk_MPa", "label": "钢束 fpk (MPa)", "type": "float",
+             "min": 1000.0, "max": 2200.0, "step": 10.0},
+            {"key": "creep_chi", "label": "徐变老化系数 χ", "type": "float",
+             "min": 0.0, "max": 2.0, "step": 0.05},
+            {"key": "lane_impact", "label": "车道冲击系数 1+μ", "type": "float",
+             "min": 1.0, "max": 2.0, "step": 0.05},
+        ],
         [
             {"key": "loss_json", "label": "分项损失参数 JSON（留空 = 用上面的有效系数）",
              "type": "text", "default": "",
@@ -449,6 +468,10 @@ FIELDS: dict[str, list[list[Field]]] = {
              "min": 500.0, "max": 50000.0, "step": 500.0},
             {"key": "q_deck", "label": "桥面均布恒载 (kN/m)", "type": "float",
              "min": 0.0, "max": 500.0, "step": 10.0},
+        ],
+        [
+            {"key": "material", "label": "材料", "type": "choice",
+             "choices": MATERIAL_NAMES},
         ],
     ],
     "beam_bridge": [
@@ -575,6 +598,13 @@ FIELDS: dict[str, list[list[Field]]] = {
              "min": 2.0, "max": 12.0, "step": 0.5},
         ],
         [
+            {"key": "panel", "label": "纵向离散 / 横梁间距 (m)", "type": "float",
+             "min": 2.0, "max": 20.0, "step": 0.5,
+             "help": "主梁目标单元长度。实际段数取 max(⌈跨长/panel⌉, 每塔索数+4, "
+                     "布索覆盖所需段数)；默认参数下由布索覆盖下界主导，"
+                     "小幅调大可能不改变网格，需调小到越过下界才生效。"},
+        ],
+        [
             {"key": "staged", "label": "悬臂施工 + 张拉", "type": "bool"},
             {"key": "q2_deck", "label": "二期恒载 (kN/m)", "type": "float",
              "min": 0.0, "max": 200.0, "step": 5.0,
@@ -642,6 +672,12 @@ FIELDS: dict[str, list[list[Field]]] = {
              "min": 0.0, "max": 200.0, "step": 5.0,
              "when": lambda p: p.get("staged")},
         ],
+        [
+            {"key": "tower_below", "label": "塔基在桥面以下 (m)", "type": "float",
+             "min": 0.0, "max": 40.0, "step": 1.0},
+            {"key": "anchor_low", "label": "最低索锚点高度系数", "type": "float",
+             "min": 0.1, "max": 0.95, "step": 0.05},
+        ],
     ],
     "suspension": [
         [
@@ -694,6 +730,16 @@ FIELDS: dict[str, list[list[Field]]] = {
             {"key": "erection_panels", "label": "每次对称吊装对数", "type": "int",
              "min": 1, "max": 10, "step": 1,
              "when": lambda p: p.get("erection")},
+        ],
+        [
+            {"key": "tf", "label": "加劲梁顶/底板厚 (m)", "type": "float",
+             "min": 0.01, "max": 0.1, "step": 0.002},
+            {"key": "tw", "label": "加劲梁腹板厚 (m)", "type": "float",
+             "min": 0.01, "max": 0.1, "step": 0.002},
+            {"key": "lane_reduction", "label": "多车道横向折减系数", "type": "float",
+             "min": 0.3, "max": 1.0, "step": 0.01,
+             "help": "JTG D60 表 4.3.1-5；留默认 0.78 且改了车道数时，"
+                     "建造器会按车道数自动跟正。"},
         ],
     ],
     "suspension_2d": [
@@ -774,6 +820,12 @@ FIELDS: dict[str, list[list[Field]]] = {
              "min": 5000.0, "max": 100000.0, "step": 1000.0},
             {"key": "cable_area_mm2", "label": "扣索面积 (mm²)", "type": "float",
              "min": 1000.0, "max": 20000.0, "step": 500.0},
+        ],
+        [
+            {"key": "deck_tf", "label": "主梁翼缘厚 (m)", "type": "float",
+             "min": 0.01, "max": 0.12, "step": 0.002},
+            {"key": "deck_tw", "label": "主梁腹板厚 (m)", "type": "float",
+             "min": 0.01, "max": 0.12, "step": 0.002},
         ],
         [
             {"key": "q_deck", "label": "一期恒载 (kN/m)", "type": "float",

@@ -293,7 +293,11 @@ def _render_field(col, field: dict, params: dict, prefix: str) -> None:
         params[key] = col.number_input(
             field["label"], value=val, min_value=float(field["min"]),
             max_value=float(field["max"]), step=float(field["step"]),
-            format="%.3f", key=wkey, help=field.get("help", ""),
+            # 默认仍是 %.3f（既有控件逐位不变）；E=2e11 / A=0.01 这类跨
+            # 数量级的参数用字段自带的 %.6g，避免显示成 0.000 或长串数字，
+            # 用户一碰就静默改口径。
+            format=field.get("format", "%.3f"),
+            key=wkey, help=field.get("help", ""),
         )
     elif ftype == "int":
         # 和 float 一样支持 `default`：新增的求解控制量（荷载步 / 迭代上限）
