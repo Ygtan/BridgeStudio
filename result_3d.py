@@ -2278,6 +2278,51 @@ class SolveResult:
                 "rows": rows,
             }
 
+        # ---- 施工阶段预应力（等效荷载法）--------------------------------
+        # 只有内核确实写了 stage prestress force 段才给表。模型声明了束、
+        # 结果里没有（旧 exe）时由校核项写「没做」，这里不给空表，也不拿
+        # 0 冒充「本阶段没张拉」。
+        if self.stage_prestress:
+            declared: dict[tuple[int, int], Any] = {}
+            if model is not None:
+                for st in getattr(model, "stages", []) or []:
+                    for i, ps in enumerate(getattr(st, "prestress", []) or [], 1):
+                        declared[(int(getattr(st, "id", 0)), i)] = ps
+            rows = []
+            for (sid, pid), v in sorted(self.stage_prestress.items()):
+                ps = declared.get((sid, pid))
+                pe = _r(float(v.get("Pe", 0.0)) / 1e3, 1)
+                if ps is None:
+                    rows.append([f"{sid} / {pid}", "—", "—", "—", "—", "—", pe])
+                    continue
+                ids = list(getattr(ps, "elems", []) or [])
+                chain = (f"{min(ids)}-{max(ids)}（{len(ids)} 单元）"
+                         if ids else "—")
+                lref = int(getattr(ps, "loss_ref", 0) or 0)
+                rows.append([
+                    f"{sid} / {pid}",
+                    chain,
+                    _r(float(ps.P) / 1e3, 1),
+                    _r(float(ps.e), 3),
+                    _r(float(getattr(ps, "s", 0.0)), 3),
+                    f"LOSSREF={lref}" if lref > 0 else _r(float(ps.loss), 3),
+                    pe,
+                ])
+            out["stage_prestress_table"] = {
+                "title": "施工阶段预应力（等效荷载法）",
+                "note": "每行为一个施工阶段张拉的一束，P 为该束的张拉控制力"
+                        "（kN，不是全宽合计）；Pe 取自内核 stage prestress force "
+                        "段，只给 LOSS= 时 Pe=P·loss，走 LOSSREF= 时 "
+                        "Pe=P·(σpe/σcon)。e 为端部偏心（m，形心上方为正）、"
+                        "s 为曲线筋矢高（m，0 是直线筋）。等效荷载法只给"
+                        "轴压 + 端弯矩（+ 曲线筋的跨内均布与锚固竖向力），"
+                        "不建力筋单元、不算次内力与筋-混凝土协同；loss 是"
+                        "总损失系数，不是 JTG 3362-2018 §6.2 的分项损失。",
+                "headers": ["阶段 / 束", "张拉单元链", "P (kN)", "e (m)",
+                            "s (m)", "loss", "Pe (kN)"],
+                "rows": rows,
+            }
+
         # ---- 施工阶段：索力全过程 ----------------------------------------
         # 行 = 索，列 = 各阶段末索力。这个形状是刻意的：施工控制问的是
         # "这根索从张拉到现在怎么变的"，行是索才读得出来；反过来按阶段排，

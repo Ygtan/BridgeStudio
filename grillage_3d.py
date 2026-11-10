@@ -35,6 +35,7 @@ from model_spec_3d import (
     ModelSpec3D,
     Node3D,
     NodalLoad3D,
+    Prestress3D,
     RealConst3D,
     RebarSpec3D,
     Stage3D,
@@ -122,6 +123,10 @@ def build_box_grillage_3d(
     q_deck: float = 100e3,               # 全宽桥面均布荷载 N/m（含自重），向下
     td: float = 0.6,                     # 支承断面横隔板厚度 m
     staged: bool = False,                # True=逐跨浇筑三阶段；False=一次成桥
+    stage_tension_kN: float = 0.0,      # 逐跨张拉力 kN/跨（全宽），0=不张拉
+    stage_tension_e: float = 0.0,       # 钢束端部偏心 m（形心上方为正）
+    stage_tension_loss: float = 1.0,    # 总损失系数 Pe=P·loss
+    stage_tension_s: float = 0.0,       # 曲线筋矢高 m（0=直线筋）
     lane_code: str = "",                 # "JTG_D60"=中线车道自动荷载 + 跨中影响线
     rebar_ratio: float = 0.012,          # 跨中底板受拉纵筋配筋率（按全截面 A，验算用）
     rebar_ratio_neg: float | None = None,  # 支点顶板受拉纵筋配筋率（None=同跨中）
@@ -130,9 +135,46 @@ def build_box_grillage_3d(
     stirrup_sv: float = 150.0,           # 箍筋间距 mm
     title: str = "三跨连续箱梁 3D 梁格",
 ) -> ModelSpec3D:
-    """生成三跨连续箱梁空间梁格模型。"""
+    """生成三跨连续箱梁空间梁格模型。
+
+    ``stage_tension_kN > 0``：逐跨施工的每个阶段给该跨张拉一束/纵梁线，
+    走 3D 内核 ``*STAGE ... PRESTRESS=`` 的等效荷载法。口径：
+
+    * 张拉力是**全宽总量**，按纵梁线均分到 ``n_lines`` 条链上
+      （每束 ``P = stage_tension_kN·1000/n_lines``），这样全截面轴压合计
+      仍等于 P·loss，与 2D 单梁线的 ``*STAGE_PRESTRESS`` 同量级；
+    * ``e`` 为端部偏心（m，形心上方为正）、``s`` 为曲线筋矢高（m，
+      0 = 直线筋）、``loss`` 是**总**损失系数，不是 JTG 3362 分项损失
+      （分项要走 ``Prestress3D.loss_ref`` / ``LOSSREF=``）；
+    * 必须 ``staged=True``；参数非法一律硬报错，不静默忽略，也不拿
+      「一次成桥」兜底。默认全 0 时完全不写 ``PRESTRESS=``，既有 ``.dat``
+      逐位不变。
+    """
     if n_lines < 3 or n_lines % 2 == 0:
         raise ValueError("n_lines 必须为 ≥3 的奇数（含中梁线，对称）")
+    if stage_tension_kN > 0.0:
+        if not staged:
+            raise ValueError("3D 梁格逐跨张拉要求 staged=True")
+        # 建造器单元号是 (线号+1)*100+序号、横梁固定从 500 起（默认口径
+        # 逐位不变的前提）。n_lines≥5 或每线梁段数 ≥100 会撞号，整份模型
+        # 本来就构造不出来；这里先给准话，别让它落到下面那条含糊的
+        # 「张拉链未全部激活」上。这是既有编号容量限制，不是本功能的新约束。
+        n_seg = sum(max(int(-(-s // panel)), 1) for s in spans)
+        if n_lines > 3 or n_seg > 99:
+            raise ValueError(
+                f"3D 梁格逐跨张拉要求 n_lines=3 且总梁段数 ≤99"
+                f"（当前 n_lines={n_lines}、总梁段数={n_seg}）：单元号段"
+                "(线号+1)*100+序号 与横梁 500 起会撞号，是建造器既有编号容量限制")
+        if not 0.0 < stage_tension_loss <= 1.0:
+            raise ValueError("stage_tension_loss 必须在 (0, 1]")
+        if abs(stage_tension_e) > h / 2:
+            raise ValueError(
+                f"钢束偏心 |e|={abs(stage_tension_e):g} m 超出截面半高 {h/2:g} m")
+        if abs(stage_tension_s) > h / 2:
+            raise ValueError(
+                f"曲线筋矢高 |s|={abs(stage_tension_s):g} m 超出截面半高 {h/2:g} m")
+    elif stage_tension_kN < 0.0:
+        raise ValueError("stage_tension_kN 不能为负（0 = 不张拉）")
 
     L_tot = sum(spans)
     G = E / (2 * (1 + nu))
@@ -272,7 +314,28 @@ def build_box_grillage_3d(
                     if w > 0:
                         loads_k.append(NodalLoad3D(node=node_id(li, i), dof=3,
                                                    value=-q_line * w))
-            stages.append(Stage3D(id=k + 1, activate=act, loads=loads_k))
+            # 逐跨张拉：本跨每条纵梁线各挂一束直线/曲线筋。链的单元号是
+            # (li+1)*100 + i + 1，i 从本跨左支承断面到前一格；这些单元在
+            # 同一阶段激活、首尾相接成开链，内核的 PRESTRESS= 链校验才过。
+            ps_list = []
+            if stage_tension_kN > 0.0:
+                act_set = set(act)
+                i0, i1 = support_idx[k], support_idx[k + 1]
+                for li in range(n_lines):
+                    chain = [(li + 1) * 100 + i + 1 for i in range(i0, i1)]
+                    missing = [eid for eid in chain if eid not in act_set]
+                    if missing or len(chain) < 1:
+                        raise ValueError(
+                            f"第 {k + 1} 跨纵梁线 {li} 的张拉链未全部激活：{missing}")
+                    ps_list.append(Prestress3D(
+                        elems=chain,
+                        P=stage_tension_kN * 1e3 / n_lines,
+                        e=stage_tension_e,
+                        s=stage_tension_s,
+                        loss=stage_tension_loss,
+                    ))
+            stages.append(Stage3D(id=k + 1, activate=act,
+                                  loads=loads_k, prestress=ps_list))
     else:
         loads = []
         for li in range(n_lines):

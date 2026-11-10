@@ -1847,6 +1847,20 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
         for key in cap_keys:
             blocks.append({"type": "table", "key": key})
 
+    # 施工阶段预应力单列一章：只有内核确实输出了 stage prestress force
+    # 段才出现。没张拉的桥型不写空章，也不把「没做」写成一张全 0 表。
+    if "stage_prestress_table" in tabs:
+        blocks.append({"type": "h1", "text": "施工阶段预应力"})
+        blocks.append({"type": "p", "text": (
+            "本章逐束列出施工阶段张拉控制力、端部偏心、曲线筋矢高与内核回传的"
+            "有效预加力 Pe。预应力按等效荷载法施加：直线筋给一对外压轴力与"
+            "端部偏心弯矩，曲线筋另加跨内均布荷载与两端锚固切线竖向力。"
+            "施工阶段按增量法累计进成桥态；本章是张拉记录，不是预应力设计"
+            "验算，也不构成规范合格判定。")})
+        blocks.append({"type": "table", "key": "stage_prestress_table"})
+        blocks.append({"type": "note",
+                       "text": tabs["stage_prestress_table"]["note"]})
+
     # 预应力分项损失单列一章：只在 LOSSREF 路径有结果时出现。
     # 只给 LOSS= 的束内核没有算过分项，不给空表也不给一章空话。
     if "prestress_loss_table" in tabs:
@@ -1905,6 +1919,7 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
     rest.pop("monitor_plan", None)
     rest.pop("opt_round", None)
     rest.pop("prestress_loss_table", None)   # 已跟着「预应力分项损失」章走
+    rest.pop("stage_prestress_table", None)  # 已跟着「施工阶段预应力」章走
     rest.pop(MODAL_TABLE_KEY, None)      # 已跟着「模态与自振特性」章走
     rest.pop(BUCKLING_TABLE_KEY, None)   # 已跟着「线性屈曲与稳定」章走
     rest.pop(LENGTH_TABLE_KEY, None)     # 逐轮表已跟着「索长迭代」章走

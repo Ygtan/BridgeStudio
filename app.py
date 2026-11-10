@@ -293,7 +293,7 @@ def _render_field(col, field: dict, params: dict, prefix: str) -> None:
         params[key] = col.number_input(
             field["label"], value=val, min_value=float(field["min"]),
             max_value=float(field["max"]), step=float(field["step"]),
-            format="%.3f", key=wkey,
+            format="%.3f", key=wkey, help=field.get("help", ""),
         )
     elif ftype == "int":
         # 和 float 一样支持 `default`：新增的求解控制量（荷载步 / 迭代上限）
@@ -342,6 +342,19 @@ if (doc.builder_key == "beam_bridge" and _p.get("staged")
         "loss 是**总损失系数**（1.0 = 不扣损失），不是 JTG 3362 的摩阻/锚固/"
         "松弛/收缩徐变分项损失。钢束按直线筋 + 端部偏心处理，不做筋-混凝土"
         "协同（TENDON）；各阶段按增量累加进成桥态，过程量不构成规范合格判定。")
+
+# 3D 梁格逐跨张拉走的是 *STAGE 行内 PRESTRESS=，与 2D 的 *STAGE_PRESTRESS
+# 不是同一个段；口径同样要就地写清，避免把「全宽张拉力」当成每根束的力，
+# 或把总损失系数当成规范分项损失。
+if (doc.builder_key == "grillage3d" and _p.get("staged")
+        and float(_p.get("stage_tension_kN") or 0.0) > 0.0):
+    st.caption(
+        "3D 梁格逐跨张拉：每个施工阶段给该跨的每条纵梁线各写一条 "
+        "`*STAGE ... PRESTRESS=`（等效荷载法）。「逐跨张拉力」是**全宽总量**，"
+        "按纵梁线条数均分到各束；有效预加力 Pe = P × loss，loss 是总损失系数"
+        "（1.0 = 不扣损失），不是 JTG 3362 的 σl1~σl6 分项损失。矢高 s=0 是"
+        "直线筋，s≠0 走曲线筋（跨内上拱）。不做筋-混凝土协同、次内力与"
+        "截面应力验算，过程量不构成规范合格判定。")
 
 # --- 荷载编辑（仅单梁：桥型的荷载已折进参数里）---
 if doc.kind == "beam":

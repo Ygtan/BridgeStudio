@@ -348,11 +348,25 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
       回到原 `loss` 路径。`test_3d` 88 → 115/115（[27] 27 项）、
       `verify_stage_prestress.py` 64 → 88/88（新增 24 项）、`ctest` 7/7、
       `dat_byte_regression` 37/37 无需刷新基线。—— 2026-11-10
+- [x] **P2 真缺口收口：3D 梁格逐跨施工张拉**：内核 3D 的
+      `*STAGE ... PRESTRESS=`（等效荷载法）、`stage prestress force` 段与
+      结果校核本来就齐，缺的是建造器不生成束、界面没有控件。现
+      `grillage_3d.build_box_grillage_3d()` 增 `stage_tension_kN/e/loss/s`，
+      逐跨每阶段给每条纵梁线各挂一束首尾相接的开链，**全宽张拉力按纵梁线
+      均分**（每束 P=P_total/n_lines，全截面轴压合计仍为 P·loss）；
+      `ps_beam` 的 `LOSSREF` 分项损失路径不变。界面勾选「逐跨施工」后多
+      四个控件、就地写明口径；`ModelDoc.to_dat()` 顺带改为按维度分流
+      （3D ps_beam 原先会掉进 2D `spec_to_dat` 并抛 `AttributeError`）。
+      结果层新增 `stage_prestress_table`、报告「施工阶段预应力」专章与
+      四出口同源；默认张拉力 0 时 `.dat` 逐位不变。
+      `verify_stage_tension_3d.py` **54/54**（live 无外荷载时每条纵梁成桥态
+      轴力精确 = −P·loss，loss / e / s 各自对拍；并把建造器既有的
+      「单元号段容量」限制写成明确中文硬报错）—— 2026-11-10
 - [ ] **P4** 成果层：3D 包络视图、MIDAS 双向互导（Word/DOCX 与 PDF 计算书已支持，含承载力逐项复核章）。两条边界的逐条说明见 `使用说明.md` 第十一章；`.mct` 往返自检不等于与 MIDAS 数值对拍。
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **33 个脚本全绿**，其中 28 个带汇总输出的脚本合计 **1439 项断言**；`verify_app.py` 108/108、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **34 个脚本全绿**，其中 29 个带汇总输出的脚本合计 **1493 项断言**；`verify_app.py` 108/108、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145、`verify_stage_tension_3d.py` 54/54、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

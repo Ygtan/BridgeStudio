@@ -221,6 +221,11 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "n_lines": 3,                       # 纵梁线条数（奇数，含中梁线）
         "staged": True,                     # 逐跨浇筑三阶段
         "lane": True,                       # JTG D60 车道活载 + 影响线
+        # 逐跨张拉（3D *STAGE PRESTRESS=）：默认 0 完全不写段、.dat 逐位不变。
+        "stage_tension_kN": 0.0,            # 全宽张拉力 kN/跨，按纵梁线均分
+        "stage_tension_e": 0.0,             # 端部偏心 m，形心上方为正
+        "stage_tension_loss": 1.0,          # 总损失系数（非规范分项损失）
+        "stage_tension_s": 0.0,             # 曲线筋矢高 m，0 = 直线筋
     },
     "cable_stayed": {
         "Lm": 200.0, "Ls": 80.0, "Ht": 60.0,
@@ -515,6 +520,25 @@ FIELDS: dict[str, list[list[Field]]] = {
              "min": 3, "max": 9, "step": 2},
             {"key": "staged", "label": "逐跨施工（3 阶段）", "type": "bool"},
             {"key": "lane", "label": "JTG D60 车道活载", "type": "bool"},
+        ],
+        # 3D 梁格逐跨张拉：只在开了逐跨施工时出现。默认张拉力 0 不写
+        # PRESTRESS=，不改任何既有 .dat；loss 是总损失系数，分项损失要另走
+        # ps_beam 的 loss_json，这里不假装做了规范分项。
+        [
+            {"key": "stage_tension_kN", "label": "逐跨张拉力 (kN/跨，全宽)",
+             "type": "float", "min": 0.0, "max": 50000.0, "step": 500.0,
+             "when": lambda p: p.get("staged"),
+             "help": "3D *STAGE PRESTRESS= 等效荷载法；按纵梁线条数均分到每跨每线。"
+                     "0 = 不张拉。总损失系数不是 JTG 3362 分项损失。"},
+            {"key": "stage_tension_e", "label": "钢束偏心 e (m，形心上方为正)",
+             "type": "float", "min": -2.5, "max": 2.5, "step": 0.05,
+             "when": lambda p: p.get("staged")},
+            {"key": "stage_tension_loss", "label": "总损失系数 loss",
+             "type": "float", "min": 0.1, "max": 1.0, "step": 0.05,
+             "when": lambda p: p.get("staged")},
+            {"key": "stage_tension_s", "label": "曲线筋矢高 s (m，0 = 直线筋)",
+             "type": "float", "min": -2.0, "max": 2.0, "step": 0.05,
+             "when": lambda p: p.get("staged")},
         ],
     ],
     "cable_stayed": [
@@ -1190,6 +1214,10 @@ class ModelDoc:
             panel=float(p["panel"]),
             q_deck=float(p["q"]) * 1e3,
             staged=bool(p.get("staged", True)),
+            stage_tension_kN=float(p.get("stage_tension_kN") or 0.0),
+            stage_tension_e=float(p.get("stage_tension_e") or 0.0),
+            stage_tension_loss=float(p.get("stage_tension_loss") or 1.0),
+            stage_tension_s=float(p.get("stage_tension_s") or 0.0),
             lane_code="JTG_D60" if p.get("lane", True) else "",
         )
 
@@ -1369,6 +1397,10 @@ class ModelDoc:
         # 界面只会看到一句「模型参数不完整或非法」，看不出是哪个控件填错了。
         if self.builder_key == "beam_bridge":
             early = self._bridge_param_checks()
+            if early:
+                return early
+        if self.builder_key == "grillage3d":
+            early = self._grillage3d_tension_checks()
             if early:
                 return early
         # 分项损失 JSON 先给中文诊断：等建造器抛出来，界面只会看到一句
@@ -1588,6 +1620,33 @@ class ModelDoc:
                 e.append(f"单索面积 {A:g} mm² 过小，请核对是否写成 cm²")
         return e
 
+    def _grillage3d_tension_checks(self) -> list[str]:
+        """3D 梁格逐跨张拉：建造器会硬拦，这里先给界面中文提示。
+
+        与 2D 的 ``_bridge_param_checks()`` 分开，是因为 3D 梁格参数里没有
+        ``span`` / ``n_spans``，套 2D 的量级检查会先报「跨度必须是正数」。
+        """
+        p = self.params
+        pt = float(p.get("stage_tension_kN") or 0.0)
+        if pt <= 0.0:
+            return []
+        errs: list[str] = []
+        if not p.get("staged"):
+            errs.append("3D 梁格逐跨张拉需要先开启「逐跨施工（3 阶段）」")
+        loss = float(p.get("stage_tension_loss") or 0.0)
+        if not 0.0 < loss <= 1.0:
+            errs.append("预应力总损失系数必须在 (0, 1]")
+        h = float(p.get("h") or 0.0)
+        if h > 0:
+            e = float(p.get("stage_tension_e") or 0.0)
+            if abs(e) > h / 2:
+                errs.append(
+                    f"钢束偏心 |e|={abs(e):g} m 超出截面半高 {h / 2:g} m")
+            s = float(p.get("stage_tension_s") or 0.0)
+            if abs(s) > h / 2:
+                errs.append(
+                    f"曲线筋矢高 |s|={abs(s):g} m 超出截面半高 {h / 2:g} m")
+        return errs
 
     def _bridge_param_checks(self) -> list[str]:
         """桥型的参数量级检查。
@@ -1648,8 +1707,15 @@ class ModelDoc:
     # ------------------------------------------------------------ 契约
 
     def to_dat(self) -> str:
-        """导出 FEM-Eigen `.dat` 文本——唯一对外求解契约。"""
-        if self.kind == "beam":
+        """导出 FEM-Eigen `.dat` 文本——唯一对外求解契约。
+
+        维度优先于 kind：``ModelDoc("beam", dimension="3d")`` 的 builder_key
+        是 ``ps_beam``、模型是 ``ModelSpec3D``，若按 kind 判成单梁会掉进
+        ``fem_eigen_export.spec_to_dat`` 并抛 "ModelSpec3D 没有 length"。
+        界面 ``ui_3d`` 的 ``is_stale(doc.to_dat())`` 正是这条路径。与
+        :meth:`solve` 一样先按 ``is_3d`` 分流，2D 单梁才用 target_len 展开。
+        """
+        if self.kind == "beam" and not self.is_3d:
             from fem_eigen_export import spec_to_dat
 
             return spec_to_dat(
