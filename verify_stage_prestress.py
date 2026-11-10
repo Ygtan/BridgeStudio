@@ -28,10 +28,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from fem_eigen_3d import fem_eigen_3d_available, solve_3d
+from fem_eigen_3d import fem_eigen_3d_available, parse_summary, solve_3d
 from model_spec_3d import (Boundary3D, Element3D, ElemTypeDef3D, Influence3D,
                            Lane3D, Material3D, ModelSpec3D, Node3D, NodalLoad3D,
-                           Prestress3D, RealConst3D, Stage3D)
+                           Prestress3D, PrestressLoss3D, RealConst3D, Stage3D)
 
 RESULTS: list[tuple[bool, str, str]] = []
 
@@ -169,6 +169,164 @@ def offline() -> None:
     stress_logic()
 
 
+LOSS_KEYS = ("SIGMA_CON", "EP", "EC", "FPK", "MU", "K", "THETA", "X",
+             "DELTA_L", "L", "T1", "T2", "SIGMA_PC4", "SIGMA_PC6", "PSI",
+             "ZETA", "ECS", "PHI", "RHO", "RHOPS", "POST", "REBAR")
+
+
+def _loss_table() -> PrestressLoss3D:
+    """与 input_format.md §6.4 算例同一组参数（SI 单位）。"""
+    return PrestressLoss3D(
+        sigma_con=1395e6, Ep=1.95e11, Ec=3.45e10, fpk=1860e6,
+        mu=0.25, k=0.0015, theta=0.2, x=10.0, delta_l=0.006, l=10.0,
+        t1=15.0, t2=35.0, sigma_pc4=8e6, sigma_pc6=8e6, psi=1.0, zeta=0.3,
+        eps_cs=2e-4, phi=2.0, rho=0.005, rho_ps=1.0, post=True, rebar=False)
+
+
+def _loss_model() -> ModelSpec3D:
+    m = _beam_model()
+    m.prestress_losses = {1: _loss_table()}
+    m.stages = [Stage3D(id=1, activate=[1],
+                        prestress=[Prestress3D(elems=[1], P=1.0e6, e=-0.5,
+                                               loss_ref=1)])]
+    return m
+
+
+def _loss_oracle() -> dict[str, float]:
+    """JTG 3362-2018 §6.2 的独立闭式解（不调用内核）。"""
+    import math
+    sc, ep, ec, fpk = 1395e6, 1.95e11, 3.45e10, 1860e6
+    a = ep / ec
+    l1 = sc * (1.0 - math.exp(-(0.25 * 0.2 + 0.0015 * 10.0)))
+    l2 = 0.006 / 10.0 * ep
+    l3 = 2.0 * (35.0 - 15.0) * 1e6
+    l4 = a * 8e6
+    spe = sc - l1 - l2 - l4                      # 后张法 σpe
+    l5 = 1.0 * 0.3 * (0.52 * spe / fpk - 0.26) * spe
+    l6 = 0.9 * (ep * 2e-4 + a * 8e6 * 2.0) / (1.0 + 15.0 * 0.005 * 1.0)
+    return {"SL1": l1, "SL2": l2, "SL3": l3, "SL4": l4,
+            "SL5": l5, "SL6": l6, "SPE": spe, "RATIO": spe / sc}
+
+
+def _revalidate(m: ModelSpec3D) -> bool:
+    """重新走一遍 pydantic 校验；返回 False 表示被明确拒绝。"""
+    try:
+        ModelSpec3D.model_validate(m.model_dump())
+        return True
+    except Exception:
+        return False
+
+
+def offline_loss() -> None:
+    print("[离线] *PRESTRESS_LOSS / LOSSREF")
+    text = _loss_model().to_dat()
+    check("opt-in 才写 *PRESTRESS_LOSS 段", "*PRESTRESS_LOSS" in text, "")
+    check("表行 22 个键齐全",
+          all(k + "=" in text for k in LOSS_KEYS),
+          "、".join(k for k in LOSS_KEYS if k + "=" not in text))
+    check("LOSSREF 走关键字模式且不写 LOSS=",
+          "PRESTRESS=1:P=1000000:E=-0.5:LOSSREF=1" in text
+          and ":LOSS=" not in text, "")
+    check("默认模型不写表、不写 LOSSREF",
+          "*PRESTRESS_LOSS" not in _beam_model().to_dat()
+          and "LOSSREF" not in _beam_model().to_dat(), "")
+
+    # 数据契约负例：做不到就报错，不许静默拿 loss=1.0 兜底。
+    bad_ref = _loss_model()
+    bad_ref.prestress_losses = {}
+    check("LOSSREF 引用不存在的表 → 拒绝", not _revalidate(bad_ref), "")
+    bad_both = _loss_model()
+    bad_both.stages[0].prestress[0].loss = 0.8
+    check("loss 与 LOSSREF 同时给 → 拒绝", not _revalidate(bad_both), "")
+
+    # 段头必须登记：不登记时新段的行会被上一个 section 的正则收走。
+    tmp = Path("out/verify_prestress/_loss_summary.txt")
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    tmp.write_text(
+        "stage prestress force\n"
+        "STAGE1 P1 Pe=820782.595\n"
+        "stage prestress loss\n"
+        "STAGE1 P1 SIGMA_CON=1395000000 SL1=87790889 SL2=117000000 "
+        "SL3=40000000 SL4=45217391 SL5=20645991 SL6=108364000 "
+        "SPE=1144991719 RATIO=0.820782595\n", encoding="utf-8")
+    d = parse_summary(tmp)
+    check("新段不污染 stage prestress force",
+          d.get("stage_prestress") == {(1, 1): {"Pe": 820782.595}},
+          str(d.get("stage_prestress")))
+    got = d.get("stage_prestress_loss", {}).get((1, 1), {})
+    check("新段解析出六项损失与有效比",
+          all(f"SL{i}" in got for i in range(1, 7))
+          and abs(got.get("RATIO", 0) - 0.820782595) < 1e-9,
+          str(got))
+
+    # ModelDoc 的界面入口（JSON），留空时默认 .dat 逐位不变。
+    import json
+    import model_doc
+    from model_doc import ModelDoc
+    base = dict(model_doc.DEFAULTS["ps_beam"])
+    plain = ModelDoc("beam", base, dimension="3d").build().model.to_dat()
+    check("界面默认不写分项表", "*PRESTRESS_LOSS" not in plain, "")
+    p = dict(base)
+    p["loss_json"] = json.dumps(_loss_table().model_dump())
+    doc = ModelDoc("beam", p, dimension="3d")
+    t = doc.build().model.to_dat()
+    check("界面 JSON 生成表 + LOSSREF",
+          "*PRESTRESS_LOSS" in t and "LOSSREF=1" in t, "")
+    check("界面 JSON 参数校验通过", doc.validate() == [], str(doc.validate()))
+    p2 = dict(p); p2["loss_json"] = "{bad"
+    check("界面非法 JSON 给中文提示",
+          "解析失败" in ModelDoc("beam", p2, dimension="3d").validate()[0], "")
+    p3 = dict(p); p3["loss"] = 0.8
+    check("界面互斥给中文提示",
+          any("互斥" in e for e in ModelDoc("beam", p3, dimension="3d").validate()), "")
+
+
+def online_loss() -> None:
+    print("[在线] 3D 分项预应力损失（JTG 3362-2018 §6.2）")
+    m = _loss_model()
+    raw = solve_3d(m, out_dir="out/verify_prestress", dat_name="loss3d.dat")
+    got = raw.get("stage_prestress_loss", {}).get((1, 1), {})
+    want = _loss_oracle()
+    check("内核输出六项损失明细",
+          all(f"SL{i}" in got for i in range(1, 7)), str(got))
+    check("σl1~σl6 与规范闭式解一致",
+          all(abs(got.get(k, 0.0) - want[k]) <= max(1.0, abs(want[k]) * 1e-8)
+              for k in ("SL1", "SL2", "SL3", "SL4", "SL5", "SL6")),
+          f"got={got}")
+    check("σpe 与 σpe/σcon 与闭式解一致",
+          abs(got.get("SPE", 0.0) - want["SPE"]) < 1.0
+          and abs(got.get("RATIO", 0.0) - want["RATIO"]) < 1e-9,
+          f"SPE={got.get('SPE')} RATIO={got.get('RATIO')}")
+    pe = raw.get("stage_prestress", {}).get((1, 1), {}).get("Pe", 0.0)
+    check("Pe = P·(σpe/σcon)",
+          abs(pe - 1.0e6 * want["RATIO"]) < 1.0, f"Pe={pe}")
+
+    import solver_3d
+    res = solver_3d.solve(m, out_dir="out/verify_prestress", kind="grillage3d")
+    check("SolveResult 承接分项明细",
+          (1, 1) in res.stage_prestress_loss, str(res.stage_prestress_loss))
+    tab = res.tables(m).get("prestress_loss_table")
+    check("报告明细表出「预应力分项损失」",
+          tab is not None and "σl1" in tab["headers"] and len(tab["rows"]) == 1,
+          "" if tab is None else str(tab["headers"]))
+    names = [c.name for c in res.checks(m)]
+    check("checks 出「分项预应力损失结果」",
+          any("分项预应力损失结果" in n for n in names), "")
+    check("checks 出「有效预加力与分项损失同源」",
+          any("有效预加力与分项损失同源" in n for n in names), "")
+
+    from report_3d import build_document, render_html
+    rep = build_document(res, m)
+    check("报告出「预应力分项损失」章与其表",
+          any(b.get("type") == "h1" and b.get("text") == "预应力分项损失"
+              for b in rep.blocks)
+          and any(b.get("type") == "table" and b.get("key") == "prestress_loss_table"
+                  for b in rep.blocks), "")
+    html = render_html(rep)
+    check("HTML 出口含分项损失表且无 ** 残留",
+          "预应力分项损失" in html and "σl1" in html and "**" not in html, "")
+
+
 def online() -> None:
     print("[在线] FEM-Eigen 3D")
     raw = solve_3d(_beam_model(), out_dir="out/verify_prestress",
@@ -178,6 +336,8 @@ def online() -> None:
           str(sp))
     check("Pe = P·loss = 850 kN", sp.get((1, 1), {}).get("Pe", 0.0) == 850000.0,
           f"{sp.get((1, 1), {})}")
+    check("默认 LOSS= 路径不写分项损失段",
+          not raw.get("stage_prestress_loss"), str(raw.get("stage_prestress_loss")))
 
     import solver_3d
     from result_3d import SolveResult
@@ -970,6 +1130,7 @@ def online() -> None:
 
 def main() -> int:
     offline()
+    offline_loss()
     if "--offline" in sys.argv:
         n = sum(1 for r in RESULTS if r[0])
         print(f"\n离线部分: {n}/{len(RESULTS)} 通过")
@@ -978,6 +1139,7 @@ def main() -> int:
         print("\n[跳过在线部分] FEM-Eigen 3D 不可用")
         return 1
     online()
+    online_loss()
     n = sum(1 for r in RESULTS if r[0])
     print("=" * 60)
     print(f"  {n}/{len(RESULTS)} 通过")

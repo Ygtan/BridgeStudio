@@ -75,6 +75,7 @@ def parse_summary(path: Path) -> dict:
     lane_impact: dict = {}
     stage_cables: dict = {}
     stage_prestress: dict = {}
+    stage_prestress_loss: dict = {}   # LOSSREF 路径的分项损失明细
     modal_lines: list[str] | None = None      # None = 内核根本没写 modal 段
     buckling_lines: list[str] | None = None   # None = 内核根本没写 buckling 段
 
@@ -92,6 +93,9 @@ def parse_summary(path: Path) -> dict:
         "live beam envelope",
         "stage cable tension",
         "stage prestress force",
+        # 新段必须登记：不登记的段头会留在上一个 section 里，
+        # STAGE/P 行会被 stage prestress force 的正则收走，污染旧段。
+        "stage prestress loss",
         "modal",
         "buckling",
     )
@@ -179,6 +183,14 @@ def parse_summary(path: Path) -> dict:
                 vals = _beam_row(m.group(3))
                 if vals:
                     stage_prestress[(int(m.group(1)), int(m.group(2)))] = vals
+        elif section == "stage prestress loss":
+            # JTG 3362-2018 §6.2 的 σl1~σl6 明细。键与 stage_prestress 同构：
+            # (阶段号, 束号) → {SIGMA_CON, SL1..SL6, SPE, RATIO}。
+            m = re_stage_prestress.match(line)
+            if m:
+                vals = _beam_row(m.group(3))
+                if vals:
+                    stage_prestress_loss[(int(m.group(1)), int(m.group(2)))] = vals
         elif section == "modal" and modal_lines is not None:
             # 模态段的行格式由 modal_3d.py 统一解析（与 cable_solver 共用），
             # 这里只负责收行——两个求解器不各写一套正则。
@@ -197,6 +209,7 @@ def parse_summary(path: Path) -> dict:
             "live_beam": live_beam, "lane_impact": lane_impact,
             "stage_cables": stage_cables,
             "stage_prestress": stage_prestress,
+            "stage_prestress_loss": stage_prestress_loss,
             "modal": modal, "buckling": buckling}
 
 

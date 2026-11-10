@@ -317,6 +317,13 @@ def _render_field(col, field: dict, params: dict, prefix: str) -> None:
     elif ftype == "bool":
         params[key] = col.checkbox(field["label"], value=bool(params.get(key, False)),
                                    key=wkey)
+    elif ftype == "text":
+        # 一整组规范参数（分项预应力损失表）用一行 JSON 表达，比铺 22 个
+        # number_input 更可读；空串 = 不启用，既有 .dat 口径逐位不变。
+        params[key] = col.text_input(
+            field["label"],
+            value=str(params.get(key, field.get("default", "")) or ""),
+            key=wkey, help=field.get("help", ""))
 
 
 _prefix = f"p{doc.kind}{ver}"

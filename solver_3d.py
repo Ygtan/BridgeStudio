@@ -112,6 +112,8 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
                         for (s, e), v in (raw.get("stage_cables") or {}).items()}
     res.stage_prestress = {(int(s), int(p)): dict(v)
                            for (s, p), v in (raw.get("stage_prestress") or {}).items()}
+    res.stage_prestress_loss = {(int(s), int(p)): dict(v)
+                                for (s, p), v in (raw.get("stage_prestress_loss") or {}).items()}
     impact = raw.get("lane_impact") or {}
     if impact.get("f1_vertical"):
         res.meta = {

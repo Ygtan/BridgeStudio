@@ -1847,6 +1847,23 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
         for key in cap_keys:
             blocks.append({"type": "table", "key": key})
 
+    # 预应力分项损失单列一章：只在 LOSSREF 路径有结果时出现。
+    # 只给 LOSS= 的束内核没有算过分项，不给空表也不给一章空话。
+    if "prestress_loss_table" in tabs:
+        blocks.append({"type": "h1", "text": "预应力分项损失"})
+        blocks.append({"type": "p", "text": (
+            "本章按 JTG 3362-2018 第 6.2 条逐项列出摩阻、锚具变形、温差、"
+            "弹性压缩、钢筋松弛与收缩徐变六项损失。σpe 是传力锚固应力，"
+            "按张拉方式取 σcon−σl1−σl2−σl4（后张）或 σcon−σl2（先张）；"
+            "σl3/σl5/σl6 属后期损失，不进 σpe，也不参与等效荷载的"
+            "有效预加力 Pe = P·(σpe/σcon)。表中 Pe 取自同一次求解的"
+            "阶段预加力段，可据此逐束复核。σl2 目前只按直线筋计算，"
+            "εcs 与 φ 由输入给定，程序不自动按龄期发展——这些边界不因"
+            "表里有数就被当成已覆盖。")})
+        blocks.append({"type": "table", "key": "prestress_loss_table"})
+        blocks.append({"type": "note",
+                       "text": tabs["prestress_loss_table"]["note"]})
+
     if opt:
         from cable_opt import opt_table
 
@@ -1887,6 +1904,7 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
         rest.pop("erection_table", None)
     rest.pop("monitor_plan", None)
     rest.pop("opt_round", None)
+    rest.pop("prestress_loss_table", None)   # 已跟着「预应力分项损失」章走
     rest.pop(MODAL_TABLE_KEY, None)      # 已跟着「模态与自振特性」章走
     rest.pop(BUCKLING_TABLE_KEY, None)   # 已跟着「线性屈曲与稳定」章走
     rest.pop(LENGTH_TABLE_KEY, None)     # 逐轮表已跟着「索长迭代」章走

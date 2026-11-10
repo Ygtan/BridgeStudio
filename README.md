@@ -79,11 +79,17 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        内核 → 解析 → 结果 → 报告 → 四出口；`combination.py` 按
        JTG D60-2015 表 4.1.5 / 4.1.7 给基本 / 频遇 / 准永久三组合。
        **边界**：组合只计恒载 + 汽车，多可变作用的组合值系数未做；
-       3D 施工阶段预应力只给 `loss` 有效/张拉比 —— 2026-11-10 核销
-- [ ] **P2** 3D 预应力分项损失（JTG 3362-2018 §6.2）：`*PRESTRESS_LOSS`
-       分项损失表（σl5 松弛等）目前是 **2D 内核** `fem_2d.cpp` 的能力，
-       `fem_3d.hpp` 只按 `loss` 一个比值直接乘，不做分项损失。
-       **这是真实能力缺口、不是文档滞后**。详见 `使用说明.md` 第十一章。
+       3D 预应力的分项损失不含筋-混凝土协同、次内力与截面应力验算
+       —— 2026-11-10 核销
+- [x] **P2** 3D 预应力分项损失（JTG 3362-2018 §6.2）：3D 新增
+       `*PRESTRESS_LOSS` 表 + `*STAGE ... :LOSSREF=<编号>`，与 2D **共用**
+       `prestress_loss.hpp` 的键名解析与 σl1~σl6 公式；内核新增
+       `stage prestress loss` 结果段（12 位有效数字）。前端贯通
+       `PrestressLoss3D` → `to_dat()` → `fem_eigen_3d` 段解析 →
+       `result_3d` 明细表与两条同源校核 → `report_3d` 专章 → 四出口；
+       `ps_beam` 参数面板有「分项损失参数 JSON」入口，留空时 `.dat`
+       逐位不变。**边界**：σl3/σl5/σl6 是后期损失，不进 σpe 与 Pe；
+       σl2 只按直线筋，εcs/φ 需按附录 C 查表输入 —— 2026-11-10
 - [x] **P3** 内核攻坚：共转列式非线性 + 索长迭代 → 斜拉桥成桥态 —— 2026-10-30
 - [x] **P3** 悬索桥成桥态（自锚式 / 地锚式）：主缆索多边形找形（对 H 二分命中
        矢高）→ 平衡态弦长反算 L₀ → 索长迭代；两体系共用同一套内核，只差边界。
@@ -256,7 +262,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        （`APPLIED=0` 时属原方案）。新增 `SYSGUARD/SYSDECKMIN/
        SYSDECKMAX/SYSADJMAX`，默认开启，`SYSGUARD=0` 仅供诊断。
        前端新增体系守卫表与中文结论，`verify_cable_opt_3d.py` 119/119
-       （离线 72 / live 47）；全套 32 脚本 1384 项断言、内核 ctest 7/7。
+       （离线 72 / live 47）；**当时**全套 32 脚本 1384 项断言、内核 ctest 7/7。
        实测原示例被拦下后工程校核表两处不通过消失，`MINMAXM+MINT=0.30`
        三条全过正常放行。—— 2026-11-10
 - [x] **P3** 负弯矩区双向验算 + 非对称配筋（JTG 3362 §5.2.2/5.2.3、
@@ -330,11 +336,23 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
       （唯一真源），`run_nl.py` 作命令行统一入口（`--list` / 跑全部 / 跑单个），三个
       `example_*_nl.py` 的 `DESC` 改为从 `.txt` 读 —— 2026-11-05
 - [x] **第五类工程性老坑 ①②③**：① 2D `NONLINEAR` 端部释放（静态凝聚按完整 6 自由度投影 + 一阶几何刚度；顺带修 `condenseBeamGlobal()` 只散射 nf 个自由度的同源错位，无释放路径逐位不变）；② 2D 逐跨施工张拉入口；③ AppTest 环境性超时守卫。逐跨张拉：`beam_bridge` 勾选「逐跨施工」后多出**逐跨张拉力 / 钢束偏心 / 总损失系数**三个控件，每阶段写一条 `*STAGE_PRESTRESS`；内核 `EQUIV` 补「梁组两端 `dof1` 都自由 → 自平衡轴力对 `+Pe/-Pe`」分支，连续梁中间跨终于能张拉，外围结构不背附加轴力。默认张拉力 0，既有 `.dat` 逐位不变；`loss` 是总损失系数，不是 JTG 3362 分项损失，也不做 TENDON 筋-混凝土协同。③ 的超时阈值可用 `BRIDGESTUDIO_APP_TIMEOUT` 配置，只对明确的墙钟超时单次重试并给诊断，真实功能异常原样抛出、断言一条不放宽。`verify_stage_tension_2d.py` 27/27（live 三跨成桥态轴力精确 = −P·loss）、`test_2d` 129/129、`ctest` 7/7。—— 2026-11-10
+- [x] **P2 真缺口收口：3D 分项预应力损失**：内核 2D/3D 共用
+      `parsePrestressLossLine()` 与 `computePrestressLosses()`；3D
+      `resolvePrestressLosses3D()` 把 `σpe/σcon` 写回 `loss`，`LOSSREF` 与
+      `LOSS` 互斥，引用缺失、有效比越界、未解析就求解全部硬报错。
+      `example_3d_grillage` 新增 `stage prestress loss` 段（仅 LOSSREF
+      路径有，12 位有效数字；`stage prestress force` 段逐位不变）。
+      BridgeStudio 在 `fem_eigen_3d.sections` 登记新段防串段，新增
+      `PrestressLoss3D` 契约、`prestress_loss_table` 明细表、两条同源校核
+      与报告专章；`ps_beam` 界面用一行 JSON 表达 22 个规范参数，留空即
+      回到原 `loss` 路径。`test_3d` 88 → 115/115（[27] 27 项）、
+      `verify_stage_prestress.py` 64 → 88/88（新增 24 项）、`ctest` 7/7、
+      `dat_byte_regression` 37/37 无需刷新基线。—— 2026-11-10
 - [ ] **P4** 成果层：3D 包络视图、MIDAS 双向互导（Word/DOCX 与 PDF 计算书已支持，含承载力逐项复核章）。两条边界的逐条说明见 `使用说明.md` 第十一章；`.mct` 往返自检不等于与 MIDAS 数值对拍。
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **33 个脚本全绿**，其中 28 个带汇总输出的脚本合计 **1415 项断言**；`verify_app.py` 108/108、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145、`verify_stage_tension_2d.py` 27/27，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **33 个脚本全绿**，其中 28 个带汇总输出的脚本合计 **1439 项断言**；`verify_app.py` 108/108、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 145/145、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 

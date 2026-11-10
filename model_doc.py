@@ -155,6 +155,9 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "support": "simple",
         "Ap_mm2": 0.0,
         "fpk_MPa": 1860.0,
+        # 空 = 用上面的 loss（总损失比）。非空 = 一组 JTG 3362-2018 §6.2
+        # 分项损失参数，写成 JSON 对象，见 PrestressLoss3D。
+        "loss_json": "",
         "lane_q_kNpm": 0.0,
         "lane_code": "",
         "lane_impact": 1.0,
@@ -344,6 +347,12 @@ FIELDS: dict[str, list[list[Field]]] = {
              "min": 0.0, "max": 0.002, "step": 0.00005},
             {"key": "lane_q_kNpm", "label": "车道均布 (kN/m，向下)", "type": "float",
              "min": 0.0, "max": 50.0, "step": 0.5},
+        ],
+        [
+            {"key": "loss_json", "label": "分项损失参数 JSON（留空 = 用上面的有效系数）",
+             "type": "text", "default": "",
+             "help": "JTG 3362-2018 §6.2 的 σl1~σl6 参数，键名见使用说明；"
+                     "填了就把「有效系数」留在 1.0，两者互斥。"},
         ],
     ],
     "beam": [
@@ -969,7 +978,7 @@ class ModelDoc:
         """一跨梁加一束预应力。简支曲线束的跨中上拱、悬臂直线束的自由端挠度各对得上闭式解。"""
         from model_spec_3d import (
             Boundary3D, Element3D, ElemTypeDef3D, Material3D, ModelSpec3D,
-            Lane3D, Node3D, Prestress3D, RealConst3D, Stage3D,
+            Lane3D, Node3D, Prestress3D, PrestressLoss3D, RealConst3D, Stage3D,
         )
 
         p = self.params
@@ -1001,13 +1010,23 @@ class ModelDoc:
                 bounds.append(Boundary3D(node=i, dofs=(2, 2)))
                 bounds.append(Boundary3D(node=i, dofs=(4, 4)))
                 bounds.append(Boundary3D(node=i, dofs=(6, 6)))
+        # 分项损失表是 opt-in：留空就走原来的「一个 loss 打包总损失」路径，
+        # to_dat() 一个字节都不多写。填了才把束改成 LOSSREF=1，并挂上表。
+        loss_json = str(p.get("loss_json") or "").strip()
+        loss_table = None
+        if loss_json:
+            data = json.loads(loss_json)
+            if not isinstance(data, dict):
+                raise ValueError("分项损失参数 JSON 必须是一个键值对象")
+            loss_table = PrestressLoss3D(**data)
         ap_mm2 = float(p.get("Ap_mm2") or 0.0)
         tendon = Prestress3D(
             elems=list(range(1, n + 1)),
             P=float(p["P_kN"]) * 1e3,
             e=float(p.get("e") or 0.0),
             s=float(p.get("s") or 0.0),
-            loss=float(p.get("loss") or 1.0),
+            loss=1.0 if loss_table else float(p.get("loss") or 1.0),
+            loss_ref=1 if loss_table else 0,
             Ap=ap_mm2 * 1e-6,
             fpk=float(p.get("fpk_MPa") or 1860.0) * 1e6,
         )
@@ -1046,6 +1065,7 @@ class ModelDoc:
             elements=elements,
             boundaries=bounds,
             stages=stages,
+            prestress_losses={1: loss_table} if loss_table else {},
             creep_phi=float(p.get("creep_phi") or 0.0),
             creep_chi=float(p.get("creep_chi") or 0.8),
             creep_t0=float(p.get("creep_t0") or 7.0),
@@ -1351,6 +1371,24 @@ class ModelDoc:
             early = self._bridge_param_checks()
             if early:
                 return early
+        # 分项损失 JSON 先给中文诊断：等建造器抛出来，界面只会看到一句
+        # 「模型参数不完整或非法」，看不出是哪个键写错了。
+        if self.builder_key == "ps_beam":
+            raw = str(self.params.get("loss_json") or "").strip()
+            if raw:
+                try:
+                    obj = json.loads(raw)
+                except Exception as e:
+                    return [f"分项损失参数 JSON 解析失败：{e}"]
+                if not isinstance(obj, dict):
+                    return ["分项损失参数 JSON 必须是一个键值对象"]
+                from model_spec_3d import PrestressLoss3D
+                unknown = sorted(set(obj) - set(PrestressLoss3D.model_fields))
+                if unknown:
+                    return ["分项损失参数有未知键：" + "、".join(unknown)
+                            + f"；可用键：{'、'.join(PrestressLoss3D.model_fields)}"]
+                if not obj.get("sigma_con"):
+                    return ["分项损失参数缺少 sigma_con（张拉控制应力，Pa）"]
         try:
             self.build()
         except Exception as e:                       # 参数缺失/类型错
@@ -1365,6 +1403,9 @@ class ModelDoc:
             loss = float(p.get("loss") or 0)
             if not 0 < loss <= 1:
                 errs.append("预应力有效系数必须在 (0, 1]")
+            if str(p.get("loss_json") or "").strip() and loss != 1.0:
+                errs.append("启用分项损失表时，「有效系数」必须留 1.0"
+                            "（LOSS 与 LOSSREF 互斥）")
             errs.extend(self.warnings_3d())
         elif self.kind == "beam":
             m: ModelSpec = self._model

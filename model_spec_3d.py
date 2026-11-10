@@ -344,7 +344,10 @@ class Prestress3D(BaseModel):
     - ``P``：张拉控制力 N（正）；``e``：**端部**偏心 m（形心上方为正）
     - ``s``：矢高 = 跨中偏心 − 端部偏心（m，向上为正）。``s=0`` 是直线筋；
       ``s<0`` 跨中筋更低 → 跨内向上均布力 → **上拱**。
-    - ``loss``：有效/张拉比（0 < loss ≤ 1）
+    - ``loss``：有效/张拉比（0 < loss ≤ 1），「总损失打包成一个数」的简化写法
+    - ``loss_ref``：>0 时引用 ``ModelSpec3D.prestress_losses[loss_ref]``，由内核按
+      JTG 3362-2018 §6.2 分项算 σl1~σl6 后取 σpe/σcon。**与 loss 互斥**；
+      给了 loss_ref 就不写 ``LOSS=``，且强制走关键字模式（LOSSREF 只在那里支持）。
 
     直线筋（s=0）的等效荷载只有「两端一对轴压 + 两端一对偏心弯矩」，**不产生
     上拱**；上拱来自曲线筋（s≠0）的跨内反向均布力（q = −8Pe·s/L²）+ 两端锚固
@@ -356,10 +359,60 @@ class Prestress3D(BaseModel):
     e: float = 0.0
     s: float = 0.0
     loss: float = Field(default=1.0, gt=0.0, le=1.0)
+    # 分项损失表编号。0 = 用上面的 loss（默认路径，.dat 逐位不变）。
+    loss_ref: int = Field(default=0, ge=0)
     # 束面积 m²。0 表示没给：校核不得用缺省面积去判 σpe ≤ 0.75 fpk。
     Ap: float = 0.0
     # 抗拉强度标准值 Pa。0 表示校核时用 1860 MPa。
     fpk: float = 0.0
+
+
+class PrestressLoss3D(BaseModel):
+    """一张分项预应力损失参数表（JTG 3362-2018 §6.2），对应内核 `*PRESTRESS_LOSS`。
+
+    单位一律 SI：应力 Pa、长度 m、角度 rad、温度 °C。字段名与内核键名的映射
+    见 :meth:`to_dat`。σl2 目前只支持直线筋（ΣΔl/l·Ep）；σl6 的 ``eps_cs`` 与
+    ``phi`` 需要按规范附录 C 查表后填入，程序不自动按龄期发展。
+
+    默认值不是「规范推荐值」，只是让算例能跑起来的常见量级；工程使用必须
+    逐项按实际管道、锚具、材料与龄期填写。
+    """
+    sigma_con: float = Field(gt=0)          # σcon，Pa
+    Ep: float = 1.95e11                     # 预应力筋弹模 Pa
+    Ec: float = 3.45e10                     # 混凝土弹模 Pa
+    fpk: float = 1.86e9                     # 抗拉强度标准值 Pa
+    mu: float = 0.25                        # σl1 摩擦系数 μ
+    k: float = 0.0015                       # σl1 局部偏差系数 k，1/m
+    theta: float = 0.0                      # σl1 切线夹角和 θ，rad
+    x: float = 0.0                          # σl1 张拉端至截面管道长 m
+    delta_l: float = 0.0                    # σl2 ΣΔl，m
+    l: float = Field(default=10.0, gt=0)     # σl2 张拉端至锚固端长 m
+    t1: float = 0.0                         # σl3 张拉时场地温度 °C
+    t2: float = 0.0                         # σl3 养护最高温度 °C
+    sigma_pc4: float = 0.0                  # σl4 混凝土法向压应力 Pa
+    sigma_pc6: float = 0.0                  # σl6 同上 Pa
+    psi: float = 1.0                        # σl5 张拉系数 Ψ（1.0 一次 / 0.9 超张拉）
+    zeta: float = 0.3                       # σl5 松弛系数 ζ
+    eps_cs: float = 0.0                     # σl6 收缩应变
+    phi: float = 0.0                        # σl6 徐变系数
+    rho: float = 0.0                        # σl6 配筋率 ρ
+    rho_ps: float = 1.0                     # σl6 ρps
+    post: bool = True                       # True 后张 / False 先张
+    rebar: bool = False                     # True 预应力螺纹钢筋的 σl5 口径
+
+    def to_dat(self, table_id: int) -> str:
+        """输出内核 `*PRESTRESS_LOSS` 的一行。"""
+        kv = [
+            ("SIGMA_CON", self.sigma_con), ("EP", self.Ep), ("EC", self.Ec),
+            ("FPK", self.fpk), ("MU", self.mu), ("K", self.k),
+            ("THETA", self.theta), ("X", self.x), ("DELTA_L", self.delta_l),
+            ("L", self.l), ("T1", self.t1), ("T2", self.t2),
+            ("SIGMA_PC4", self.sigma_pc4), ("SIGMA_PC6", self.sigma_pc6),
+            ("PSI", self.psi), ("ZETA", self.zeta), ("ECS", self.eps_cs),
+            ("PHI", self.phi), ("RHO", self.rho), ("RHOPS", self.rho_ps),
+            ("POST", 1 if self.post else 0), ("REBAR", 1 if self.rebar else 0),
+        ]
+        return f"{table_id} " + " ".join(f"{k}={fmt(v)}" for k, v in kv)
 
 
 class Stage3D(BaseModel):
@@ -486,6 +539,9 @@ class ModelSpec3D(BaseModel):
     boundaries: list[Boundary3D] = Field(default_factory=list)
     loads: list[NodalLoad3D] = Field(default_factory=list)  # 仅静力求解用
     stages: list[Stage3D] = Field(default_factory=list)
+    # 分项预应力损失表：编号 → 参数。只有束写了 `loss_ref` 才会被引用；
+    # 空表不输出任何内容，既有 .dat 逐位不变。
+    prestress_losses: dict[int, PrestressLoss3D] = Field(default_factory=dict)
     influences: list[Influence3D] = Field(default_factory=list)
     lanes: list[Lane3D] = Field(default_factory=list)
     cable_bridge: "CableBridge3D | None" = None
@@ -562,6 +618,21 @@ class ModelSpec3D(BaseModel):
                 raise ValueError(f"节点荷载引用了不存在的节点 {ld.node}")
             if not (1 <= ld.dof <= 6):
                 raise ValueError(f"节点荷载自由度非法: {ld.dof}")
+
+        # LOSSREF 必须指向真实存在的表：做不到就在这里报错，不让内核用
+        # 「找不到编号」的兜底值把有效比悄悄改成 1.0。
+        for s in self.stages:
+            for ps in s.prestress:
+                if ps.loss_ref <= 0:
+                    continue
+                if ps.loss_ref not in self.prestress_losses:
+                    raise ValueError(
+                        f"阶段 {s.id} 的预应力束 LOSSREF={ps.loss_ref} "
+                        "引用了不存在的 *PRESTRESS_LOSS 表编号")
+                if ps.loss != 1.0:
+                    raise ValueError(
+                        f"阶段 {s.id} 的预应力束同时给了 loss={ps.loss} 与 "
+                        f"LOSSREF={ps.loss_ref}；两者只能指定一个")
 
         stage_ids = [s.id for s in self.stages]
         if len(set(stage_ids)) != len(stage_ids):
@@ -765,6 +836,13 @@ class ModelSpec3D(BaseModel):
             for ld in self.loads:
                 L.append(f"{ld.node} {ld.dof} {fmt(ld.value)}")
 
+        # 分项损失表写在 *STAGE 之前（内核读完整份文件后才解析 LOSSREF，
+        # 写在后面也能引用）；空表时这一段完全不出现。
+        if self.prestress_losses:
+            L.append("*PRESTRESS_LOSS")
+            for tid in sorted(self.prestress_losses):
+                L.append(self.prestress_losses[tid].to_dat(tid))
+
         for s in self.stages:
             L.append("*STAGE")
             parts = [f"{s.id}"]
@@ -785,15 +863,20 @@ class ModelSpec3D(BaseModel):
                 parts.append("L0=" + ",".join(
                     f"{k}:{fmt(s.unstrained[k])}" for k in sorted(s.unstrained)))
             for ps in s.prestress:
-                if ps.s == 0.0:
+                elems = _int_list_ranges(sorted(ps.elems))
+                if ps.loss_ref > 0:
+                    # LOSSREF 只在关键字模式可用；省略 S= 即直线筋（内核默认 0）。
+                    # 这里不写 LOSS=，否则内核会判「两者只能给一个」。
+                    body = (elems + f":P={fmt(ps.P)}:E={fmt(ps.e)}"
+                            + (f":S={fmt(ps.s)}" if ps.s != 0.0 else "")
+                            + f":LOSSREF={ps.loss_ref}")
+                elif ps.s == 0.0:
                     # 直线筋：位置模式（向后兼容，旧 .dat 与测试都认这个）
-                    body = (_int_list_ranges(sorted(ps.elems))
-                            + f":{fmt(ps.P)}:{fmt(ps.e)}"
+                    body = (elems + f":{fmt(ps.P)}:{fmt(ps.e)}"
                             + (f":{fmt(ps.loss)}" if ps.loss != 1.0 else ""))
                 else:
                     # 曲线筋：关键字模式（矢高 S 必须命名，否则与 loss 位置冲突）
-                    body = (_int_list_ranges(sorted(ps.elems))
-                            + f":P={fmt(ps.P)}:E={fmt(ps.e)}:S={fmt(ps.s)}"
+                    body = (elems + f":P={fmt(ps.P)}:E={fmt(ps.e)}:S={fmt(ps.s)}"
                             + (f":LOSS={fmt(ps.loss)}" if ps.loss != 1.0 else ""))
                 parts.append("PRESTRESS=" + body)
             L.append(" ".join(parts))

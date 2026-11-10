@@ -238,6 +238,9 @@ class SolveResult:
     # 与索力同性质：**状态量**，只在张拉那一阶段出现，不累加。Pe = P·loss，
     # 校核"有效预加力 vs 张拉控制应力"用它（张拉控制应力 = P / 束面积）。
     stage_prestress: dict[tuple[int, int], dict[str, float]] = field(default_factory=dict)
+    # LOSSREF 路径的分项损失明细：{(阶段号, 束号): {SIGMA_CON, SL1..SL6, SPE, RATIO}}。
+    # 只给 LOSS= 的束没有这份数据；内核也不会输出零值冒充「各项损失为 0」。
+    stage_prestress_loss: dict[tuple[int, int], dict[str, float]] = field(default_factory=dict)
     # 成桥态专用
     cables: list[dict[str, Any]] = field(default_factory=list)
     camber: dict[int, tuple[float, float, float]] = field(default_factory=dict)
@@ -1209,9 +1212,26 @@ class SolveResult:
         """
         out: list[Check] = []
         declared = 0
+        loss_refs: list[tuple[int, int, Any]] = []
         if model is not None:
             for s in getattr(model, "stages", []) or []:
                 declared += len(getattr(s, "prestress", []) or [])
+                for i, ps in enumerate(getattr(s, "prestress", []) or [], 1):
+                    if int(getattr(ps, "loss_ref", 0) or 0) > 0:
+                        loss_refs.append((int(getattr(s, "id", 0)), i, ps))
+        # 模型声明了 LOSSREF 而内核没输出分项段 = 旧版 exe 或段解析漏了。
+        # 这是「没做」，不是「通过」，更不能拿默认的 loss=1.0 悄悄算过去。
+        if loss_refs:
+            missing = [(sid, i) for sid, i, _ in loss_refs
+                       if (sid, i) not in self.stage_prestress_loss]
+            out.append(Check(
+                "分项预应力损失结果", not missing,
+                (f"模型声明 {len(loss_refs)} 束 LOSSREF，但结果里没有 stage "
+                 "prestress loss 段——多半是旧版 example_3d_grillage.exe，"
+                 "重新编译内核。本次没做分项损失校核，这不是「通过」，是「没做」。"
+                 if missing else
+                 f"{len(loss_refs)} 束 LOSSREF 全部有分项损失结果"),
+                level="info"))
         if not self.stage_prestress:
             if declared:
                 out.append(Check(
@@ -1239,6 +1259,28 @@ class SolveResult:
             f"阶段 {last} 有效预加力合计", True,
             f"{len(last_pe)} 束，ΣPe = {sum(last_pe)/1e3:,.0f} kN（损失后）",
             value=sum(last_pe), unit="N", level="info"))
+        # 同源校验：Pe 必须等于 P·(σpe/σcon)。分项段与有效预加力段是内核
+        # 同一次求解写的两行，对不上说明其中一处被改写或串段。
+        if loss_refs and self.stage_prestress_loss:
+            bad = []
+            for sid, i, ps in loss_refs:
+                d = self.stage_prestress_loss.get((sid, i))
+                pe = self.stage_prestress.get((sid, i), {}).get("Pe")
+                if not d or pe is None:
+                    continue
+                want = float(ps.P) * float(d.get("RATIO", 0.0))
+                # stage prestress force 段的 Pe 仍是 6 位有效数字，分项段的
+                # RATIO 是 12 位；按 6 位输出精度给容差，否则张拉力一大，
+                # 纯打印舍入（几十牛）会被误报成「两处结果不同源」。
+                if abs(want - pe) > max(1e-6, abs(want) * 1e-5):
+                    bad.append((sid, i, want, pe))
+            out.append(Check(
+                "有效预加力与分项损失同源",
+                not bad,
+                (f"阶段 {bad[0][0]} 束 {bad[0][1]}：P·σpe/σcon="
+                 f"{bad[0][2]:.1f} N，但结果段 Pe={bad[0][3]:.1f} N" if bad else
+                 f"{len(loss_refs)} 束 Pe = P·(σpe/σcon) 全部对齐"),
+                level="error" if bad else "info"))
         out.extend(self._checks_strand_stress(model))
         return out
 
@@ -2202,6 +2244,37 @@ class SolveResult:
                 "title": "施工阶段龄期",
                 "note": stage_time_effect_note(model, self.solver),
                 "headers": ["阶段", "末龄期 (天)", "新激活单元", "本段张拉索"],
+                "rows": rows,
+            }
+
+        # ---- 预应力分项损失（JTG 3362-2018 §6.2）---------------------------
+        # 只在 LOSSREF 路径出现：内核确实按 σl1~σl6 算过才给表。
+        # 只给 LOSS= 的束不给空表，也不拿 0 冒充「分项损失为零」。
+        if self.stage_prestress_loss:
+            rows = []
+            for (sid, pid), v in sorted(self.stage_prestress_loss.items()):
+                pe = self.stage_prestress.get((sid, pid), {}).get("Pe")
+                rows.append([
+                    f"{sid} / {pid}",
+                    _r(float(v.get("SIGMA_CON", 0.0)) / 1e6, 2),
+                    *[_r(float(v.get(f"SL{i}", 0.0)) / 1e6, 2) for i in range(1, 7)],
+                    _r(float(v.get("SPE", 0.0)) / 1e6, 2),
+                    _r(float(v.get("RATIO", 0.0)), 4),
+                    _r(pe / 1e3, 1) if pe is not None else "—",
+                ])
+            out["prestress_loss_table"] = {
+                "title": "预应力分项损失（JTG 3362-2018 §6.2）",
+                "note": "σl1 摩擦（6.2.2）、σl2 锚具变形/回缩（6.2.3）、"
+                        "σl3 温差（6.2.4）、σl4 弹性压缩（6.2.5）、"
+                        "σl5 松弛（6.2.6）、σl6 收缩徐变（6.2.7），单位 MPa。"
+                        "σpe 是传力锚固应力：后张法 = σcon−σl1−σl2−σl4，"
+                        "先张法 = σcon−σl2；σl3/σl5/σl6 是后期损失，不进 σpe，"
+                        "也不参与有效预加力 Pe = P·(σpe/σcon)。"
+                        "σl2 只按直线筋 ΣΔl/l·Ep 计算（曲线筋反摩擦长度未实现）；"
+                        "εcs 与 φ 由用户按附录 C 查表输入，程序不按龄期自动发展。"
+                        "Pe 列取自同一阶段的 stage prestress force 段，与分项结果同源。",
+                "headers": ["阶段 / 束", "σcon (MPa)", "σl1", "σl2", "σl3",
+                            "σl4", "σl5", "σl6", "σpe (MPa)", "σpe/σcon", "Pe (kN)"],
                 "rows": rows,
             }
 
