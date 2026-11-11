@@ -320,11 +320,13 @@ def offline_docs() -> None:
           and "solve_2d.py::strength_tables" in mat)
     check("能力矩阵写明 P 口径边界",
           "2D=P" in mat and "配筋契约" in mat)
-    check("§4.2 写 6 个 N + 1 个 P 且仍标已收窄",
-          "6 个" in mat and "1 个 `2D=P`" in mat and "已收窄" in mat)
+    check("§4.2 写 5 个 N + 2 个 P 且仍标已收窄",
+          "5 个" in mat and "2 个 `2D=P`" in mat and "已收窄" in mat)
     check("能力矩阵登记第六次闭环记录", "第六次闭环记录" in mat)
     rd = (ROOT / "README.md").read_text(encoding="utf-8")
-    check("README 同步 P 口径", "1 项部分接入" in rd and "截面应力" in rd)
+    check("README 同步 P 口径（截面应力 + 引用完整性共 2 项）",
+          "2 项部分接入" in rd and "截面应力" in rd
+          and "引用完整性" in rd)
     guide = (ROOT / "开发使用手册.md").read_text(encoding="utf-8")
     check("开发手册登记 2D 应力守卫", "verify_strength_2d.py" in guide)
     check("使用说明登记 2D 应力口径层",

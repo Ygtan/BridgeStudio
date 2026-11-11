@@ -317,6 +317,72 @@ class BridgeSpec(BaseModel):
                 errs.append(f"单元荷载区间 {ld.e_from}-{hi} 内没有任何单元")
         if not mat_ids:
             errs.append("没有材料定义")
+
+        # ------------------------------------------------------------
+        # 2026-11-11 补齐：2D 引用完整性，与 3D validate_model_3d 逐项对拍。
+        # 只补「2D 维度确实存在」的引用：3D 专属的 6 dof / 翘曲常数 /
+        # 索两端等高 / LOSSREF 表 / 成桥态工况不在这里造一个 2D 版本。
+        # 2D 仍是单一中文 error 列表，不引入 3D 的 (errors, warnings)
+        # 二元组——改返回结构会动到三个调用方，属另一件事。
+        # 这里只读模型、不写任何字段，默认 .dat 逐位不变。
+        # ------------------------------------------------------------
+        elem_ids = {e.id for e in self.elements}
+        if len(mat_ids) != len(self.materials):
+            errs.append("存在重复材料 id")
+        for t in self.elem_types:
+            if t.mat not in mat_ids:
+                errs.append(f"单元类型 {t.id} 引用了不存在的材料 {t.mat}")
+
+        stage_ids = [st.id for st in self.stages]
+        if len(set(stage_ids)) != len(stage_ids):
+            errs.append("存在重复施工阶段 id")
+        for st in self.stages:
+            for eid in st.activate:
+                if eid not in elem_ids:
+                    errs.append(
+                        f"施工阶段 {st.id} ACTIVE 引用了不存在的单元 {eid}")
+            for eid in st.deactivate:
+                if eid not in elem_ids:
+                    errs.append(
+                        f"施工阶段 {st.id} DEACTIVE 引用了不存在的单元 {eid}")
+            for ld in st.loads:
+                if ld.node not in node_ids:
+                    errs.append(
+                        f"施工阶段 {st.id} 荷载引用了不存在的节点 {ld.node}")
+                if ld.dof not in (1, 2, 3):
+                    errs.append(
+                        f"施工阶段 {st.id} 荷载 dof={ld.dof} 越界（2D 只允许 1~3）")
+            for el in st.elem_loads:
+                for eid in el.elems:
+                    if eid not in elem_ids:
+                        errs.append(
+                            f"施工阶段 {st.id} 单元荷载引用了不存在的单元 {eid}")
+            for ps in st.prestresses:
+                for eid in ps.elems:
+                    if eid not in elem_ids:
+                        errs.append(
+                            f"施工阶段 {st.id} 预应力引用了不存在的单元 {eid}")
+
+        for lane in self.lanes:
+            for nid in lane.nodes:
+                if nid not in node_ids:
+                    errs.append(f"车道荷载引用了不存在的节点 {nid}")
+
+        for ld in self.nodal_loads:
+            if ld.dof not in (1, 2, 3):
+                errs.append(f"节点荷载 dof={ld.dof} 越界（2D 只允许 1~3）")
+        for b in self.boundaries:
+            ds = _dof_set(b.dofs)
+            if not ds or any(d not in (1, 2, 3) for d in ds):
+                errs.append(
+                    f"边界约束 dofs='{b.dofs}' 非法或越界（2D 只允许 1~3）")
+
+        nmap = {n.id: n for n in self.nodes}
+        for e in self.elements:
+            a, b = nmap.get(e.n1), nmap.get(e.n2)
+            if (a is not None and b is not None
+                    and abs(a.x - b.x) < 1e-12 and abs(a.y - b.y) < 1e-12):
+                errs.append(f"单元 {e.id} 两端节点坐标重合（零长度单元）")
         return errs
 
     # ------------------------------------------------------------ 摘要

@@ -324,17 +324,30 @@ def gaps_and_process() -> None:
     check("§2 登记 2D 应力的真实依据符号",
           "strength_2d.py::evaluate" in text
           and "solve_2d.py::strength_tables" in text)
-    check("§4.2 写 6 个 N + 1 个 P 且保留历史 7 个计数",
-          "6 个" in text and "1 个 `2D=P`" in text and "7 个" in text)
+    check("§4.2 写 5 个 N + 2 个 P 且保留历史 7 个计数",
+          "5 个" in text and "2 个 `2D=P`" in text and "7 个" in text)
     st_src = read(ROOT / "strength_2d.py")
     check("2D 应力口径层不消费内核应力段",
           "不解析内核「单元应力 (Pa)」段" in st_src
           and "parse_result" not in st_src)
     check("2D 应力口径层写明承载力本次未做",
           "承载力验算（Mu / Vu / 压弯 / 轴压）本次未做" in st_src)
-    check("README 同步 1 项部分接入",
-          "1 项部分接入" in read(ROOT / "README.md"))
+    check("README 同步 2 项部分接入",
+          "2 项部分接入" in read(ROOT / "README.md"))
     check("能力矩阵登记第六次闭环记录", "第六次闭环记录" in text)
+    val_rows = [ln for ln in text.splitlines()
+                if ln.startswith("| 引用完整性中文校验 |")]
+    check("§2 引用完整性按源码纠正为 2D=P（不虚报 Y）",
+          len(val_rows) == 1 and "| P | Y |" in val_rows[0], str(val_rows))
+    check("§2 登记 2D 校验真实符号且写明覆盖窄于 3D",
+          "bridge_spec.py::validate_model" in text
+          and "2D 仍窄于 3D" in text)
+    check("能力矩阵登记第七次闭环记录", "第七次闭环记录" in text)
+    bs_src = read(ROOT / "bridge_spec.py")
+    s2d_src = read(ROOT / "solve_2d.py")
+    check("防漂移：2D 校验符号真实存在且求解入口调用",
+          "def validate_model(self)" in bs_src
+          and "errs = spec.validate_model()" in s2d_src)
     src = read(Path(__file__))
     # 拼接构造，避免「禁用词字面量本身出现在源码里」让自检自相矛盾。
     for banned in ("sub" + "process", "os." + "system", "solve_" + "3d(",
