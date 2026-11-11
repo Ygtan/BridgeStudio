@@ -61,6 +61,16 @@ LOSS_BOUNDARY_NOTE = (
     "σl2 只按直线筋；εcs / φ 需按附录 C 查表输入。分项损失是复核明细，"
     "不是规范合格判定，也不是 3D 阶段分项损失。"
 )
+NEWTON_BOUNDARY_NOTE = (
+    "本次 opt-in 的 [NEWTON2D] 明细段由 2D 内核写出方案C 几何非线性 "
+    "Newton 的逐迭代过程量；字段名与单位同 3D [NEWTON] 段，但 2D 用直接"
+    "求解、没有符号分解重建（不写 REFACT），只有一个容差同时管残差与位移"
+    "增量（写 TOL 不拆 TOLF/TOLD），也没有阶段维度（不设阶段占位）。"
+    "2D 内核没有索长/几何闭合迭代 [LENGTH] 与带约束索力优化 [OPT] 两层"
+    "力学，本明细只覆盖内层 Newton，不等于 3D 三层迭代过程量已移植；"
+    "缺的两层不补零、不造占位。过程量只说明数值如何收敛，规范没有 Newton "
+    "迭代轮数的合格限值，不是规范意义上的设计合格判定。"
+)
 NO_LIVE_NOTE = (
     "没有车道活载包络，组合里只有恒载项。这不是完整的正常使用验算。"
 )
@@ -350,7 +360,22 @@ def build_2d_document(res: Any, spec: Any) -> R.Report:
                            "text": str(loss_status_text(pl))})
         blocks.append({"type": "note", "text": LOSS_BOUNDARY_NOTE})
 
-    # ⑧ 诊断与能力边界
+    # ⑧ 2D 内层 Newton 逐迭代过程量（第十一次 opt-in）：只覆盖内层 Newton，
+    #    2D 内核没有 [LENGTH] / [OPT] 两层力学，不造占位、不冒充 3D 三层迭代。
+    nt = getattr(res, "newton", None) or {}
+    if nt.get("status") != "not_requested":
+        blocks.append({"type": "h1", "text": "2D 内层 Newton 逐迭代过程量"})
+        nts = res.newton_tables() if hasattr(res, "newton_tables") else {}
+        for key, tb in nts.items():
+            add(key, tb)
+        if not nts:
+            from newton_2d import status_text as newton_status_text
+
+            blocks.append({"type": "note",
+                           "text": str(newton_status_text(nt))})
+        blocks.append({"type": "note", "text": NEWTON_BOUNDARY_NOTE})
+
+    # ⑨ 诊断与能力边界
     blocks.append({"type": "h1", "text": "诊断与能力边界"})
     diags = [str(d) for d in (getattr(res, "diagnostics", None) or [])]
     if diags:

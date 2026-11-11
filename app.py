@@ -700,6 +700,16 @@ if doc.kind != "beam" and _cap.get("solve2d"):
             doc.model.prestresses = []
             st.error(f"2D 分项损失参数无效：{_le}")
 
+    # 2D 内层 Newton 逐迭代过程量（第十一次 opt-in）：不需要新模型参数，
+    # 但必须模型本身显式声明 *ANALYSIS TYPE=NONLINEAR；线性模型只给中文
+    # 「不做」，绝不为了出表而把分析类型偷偷改成非线性。
+    _newton2d_on = st.checkbox(
+        "同时输出 2D 内层 Newton 逐迭代过程量（默认关闭，需 NONLINEAR 模型）",
+        value=False, key="newton2ddetail_opt",
+        help="[NEWTON2D] 段由 FE 内核留痕写出，Python 只解析、不重算 "
+             "K·ΔU=R。2D 没有 REFACT、没有 TOLF/TOLD 拆分、没有阶段占位；"
+             "2D 内核也没有 [LENGTH] 索长迭代与 [OPT] 索力优化两层力学，"
+             "本开关只覆盖内层 Newton。线性模型只会得到中文「不做」说明。")
     _dat_now_2d = doc.to_dat()
     if st.button("运行施工阶段 + 规范组合求解", type="primary"):
         _outdir = Path("out/gui_2d")
@@ -710,13 +720,15 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                                    modal_2d=_modal2d_on,
                                    strength_2d=_strength2d_on,
                                    modal_2d_detail=_modal2d_detail_on,
-                                   loss_2d_detail=_loss2d_on)
+                                   loss_2d_detail=_loss2d_on,
+                                   newton_2d_detail=_newton2d_on)
                 st.session_state.solve2d = {"dat_text": _dat_now_2d,
                                             "modal2d": _modal2d_on,
                                             "modal2ddetail": _modal2d_detail_on,
                                             "strength2d": _strength2d_on,
                                             "loss2ddetail": _loss2d_on,
                                             "loss2dcfg": _loss2d_cfg,
+                                            "newton2ddetail": _newton2d_on,
                                             "res": _res2d}
             except Exception as _e:
                 st.session_state.solve2d = None
@@ -728,7 +740,8 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                  or bool(_s2d.get("modal2ddetail", False)) != _modal2d_detail_on
                  or bool(_s2d.get("strength2d", False)) != _strength2d_on
                  or bool(_s2d.get("loss2ddetail", False)) != _loss2d_on
-                 or str(_s2d.get("loss2dcfg", "")) != _loss2d_cfg):
+                 or str(_s2d.get("loss2dcfg", "")) != _loss2d_cfg
+                 or bool(_s2d.get("newton2ddetail", False)) != _newton2d_on):
         st.warning("模型参数或求解开关已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
         _s2d = None
     if _s2d:
@@ -818,6 +831,22 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                 st.warning(loss2d_status_text(_l2))
             else:
                 st.caption(loss2d_status_text(_l2))
+        if _newton2d_on:
+            from newton_2d import status_text as newton2d_status_text
+
+            _nt2 = getattr(_r2d, "newton", None) or {}
+            _ntt = getattr(_r2d, "newton_tables", lambda: {})()
+            st.markdown("**2D 内层 Newton 逐迭代过程量**")
+            for _t in _ntt.values():
+                st.markdown(
+                    "| " + " | ".join(_t["headers"]) + " |\n|"
+                    + "---|" * len(_t["headers"]) + "\n"
+                    + "\n".join("| " + " | ".join(r) + " |" for r in _t["rows"]))
+                st.caption(_t["note"])
+            if _nt2.get("status") != "ok":
+                st.warning(newton2d_status_text(_nt2))
+            else:
+                st.caption(newton2d_status_text(_nt2))
         for _d in _r2d.diagnostics:
             st.caption(f"· {_d}")
 

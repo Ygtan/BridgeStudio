@@ -216,6 +216,30 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
             _chunks.append(
                 f"<div class=\"note\">{html.escape(loss_status_text(_l))}</div>")
         loss_html = "".join(_chunks)
+    # 2D 内层 Newton 逐迭代过程量（第十一次 opt-in）：默认 not_requested 时
+    # 整章不出现，请求了却没结果也照出章节 + 中文说明，不摆空表、不补零。
+    newton_html = ""
+    _n = getattr(res, "newton", None) or {}
+    if _n.get("status") != "not_requested":
+        from newton_2d import status_text as newton_status_text
+
+        _chunks = ["<h2>2D 内层 Newton 逐迭代过程量</h2>"]
+        _tables = (res.newton_tables()
+                   if hasattr(res, "newton_tables") else {})
+        for _t in _tables.values():
+            _chunks.append(f"<h3>{html.escape(str(_t['title']))}</h3>")
+            _chunks.append("<table><tr>" + "".join(
+                f"<th>{html.escape(str(h))}</th>" for h in _t["headers"]) + "</tr>")
+            for _row in _t["rows"]:
+                _chunks.append("<tr>" + "".join(
+                    f"<td>{html.escape(str(c))}</td>" for c in _row) + "</tr>")
+            _chunks.append("</table>")
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(str(_t['note']))}</div>")
+        if not _tables:
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(newton_status_text(_n))}</div>")
+        newton_html = "".join(_chunks)
     age_rows = []
     for s in getattr(spec, "stages", []) or []:
         t = float(getattr(s, "time", 0.0) or 0.0)
@@ -334,6 +358,7 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
 {modal_html}
 {strength_html}
 {loss_html}
+{newton_html}
 <h2>成桥态梁端内力</h2>
 <table>
 <tr><th>单元</th><th>端</th><th>N (kN)</th><th>My (kN·m)</th><th>Vz (kN)</th></tr>

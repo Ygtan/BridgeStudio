@@ -34,7 +34,7 @@ X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（
 `X20_接入约定.md` 管「X20 资产怎么接」，**`能力边界矩阵.md` 管「接到之后到底有哪些能力、哪些还没有」**：
 6 桥型 × 2 维度主矩阵（建造器键 / 求解入口 / 阶段·活载·预应力参数逐格对拍）、
 20 项维度级能力的 `文件::符号` 依据、参数覆盖契约与刻意隐藏白名单、
-3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（232/232）纯离线守卫：
+3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（244/244）纯离线守卫：
 主矩阵与 `BUILDERS` / `SOLVER_OF` 对拍、依据符号真实存在、
 `DEFAULTS ⊆ FIELDS ∪ 白名单`、额外控件带 `default`、默认值在区间内、
 12 个建造器「控件渲染写回 params 后默认 `.dat` 逐位不变」、
@@ -127,7 +127,12 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        §2 备注。2D 模态 / 屈曲已按内核事实接通（opt-in）；第九次由 FE
        `--modal-detail` 追加 `[MODAL2D]` 段（`BASIS=xy`）补出周期 T / X·Y
        两向参与质量 / 节点振型，其余 2D ↔ 3D 仍不对齐（**B2 剩余 2 项**）。
-       逐条依据见 `能力边界矩阵.md` §4.1 / §4.2。
+       第十一次由 FE opt-in 留痕补 `[NEWTON2D]` 段，只把「内层 Newton /
+       共转列式过程量」一格由 `N` 改 `P`（现为 2 项只在 3D 链路、
+       **5 项部分接入**）；`[LENGTH]` / `[OPT]` 两层经只读调研确认 2D
+       内核没有对应力学，两格继续标 `N`、不造占位，**B2 剩余 2 项**
+       但内容收窄为「两层力学 + 多格式导出」。逐条依据见
+       `能力边界矩阵.md` §4.1 / §4.2。
        **这是真实能力缺口、不是文档滞后**，与 P4 一起排期。
        内核侧尚无协作体系求解键（注册表 4 键、`detect_kind` 二选一），
        分阶段规格与验收断言见 `组合体系接入规格.md`；未实现期输入这类描述
@@ -498,9 +503,37 @@ BS 侧 `bridge_spec.py` 补 22 键 `*PRESTRESS_LOSS` 表与非阶段
 矩阵该格 `2D=P` 不是 `Y`；**B2 剩余 2 项**（三层迭代过程量 / 被 X20
 契约锁死的多格式导出与 `.mct` 反向导入）继续写「没有」。
 
+### 2D 内层 Newton 逐迭代过程量（`[NEWTON2D]`，第十一次）
+
+只读调研先纠偏：2D 内核全文无 `[OPT]` / `[LENGTH]` / `[NEWTON]` 三个段头，
+也没有 `std::cout` 过程量打印（「只打控制台」是 3D CHANGELOG 历史描述被
+误套）。2D 有方案C 几何非线性 Newton-Raphson，但逐迭代的 `dU` / `alpha` /
+`lamTarget` / `Fint` / `Fext` 全是局部变量用完即丢。**第十一次只闭环内层
+Newton 一层**：FE `fem_2d.hpp` 新增 `NewtonStep2D` / `NewtonTrace2D` 挂进
+`ModelResult`，`fem_2d.cpp` 循环里只 `push_back` 留痕，残差判据 / 位移
+增量判据 / 线搜索 / 收敛与荷载步细分**一字未改**；
+`newton_output_2d.hpp` 写 opt-in 的 `[NEWTON2D]` 段
+（`BASIS=2d_global`、头部 10 键、逐迭代 `S` 行、`setprecision(10)` 与 3D
+`[NEWTON]` 同源）。字段按 2D 事实取舍：直接求解故**不写 `REFACT`**，
+只有一个 tol 故**写 `TOL` 不拆 `TOLF`/`TOLD`**，没有阶段维度故**不设
+阶段占位**；`|du|=0` 是「残差已达标、本步未解增量」的事实值，不是补零。
+`example_mixed.exe <dat> --newton-detail` 把段写进 `<stem>.newton.txt`；
+`--newton-detail-only` 求解后只写明细、不写 `.result`（过程量必须求解后
+才有，与 `--loss-detail-only` 的「不求解」不同），避让施工阶段主路径。
+默认 `.result` / 控制台 / 12 格默认 `.dat` 逐位不变，FE 黄金基线不刷新；
+线性模型写 `ERROR=no_newton_solution`，不摆空表。BS 侧 `newton_2d.py`
+唯一口径层只解析、不重算 `K·ΔU=R`、不补零；`solve_2d(newton_detail=True)`
+/ `ModelDoc.solve(newton_2d_detail=True)` / 界面 `newton2ddetail_opt`
+双层 opt-in 默认全关且只对显式 `*ANALYSIS TYPE=NONLINEAR` 生效，HTML 与
+四出口 `Report` 用同两张表。`verify_newton_2d.py` 守卫 FE 源码契约、
+端到端 oracle、20 类负例、默认 HTML 零污染、12 格黄金哈希与四出口同源。
+矩阵该格 `2D=P` 不是 `Y`；**`[LENGTH]` / `[OPT]` 两层 2D 内核没有对应
+力学，两格继续标 `N`、不造占位、不写不适用段冒充闭环**，本项不等于
+3D 三层迭代已移植。过程量只说明数值如何收敛，不是规范合格判定。
+
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **45 个脚本全绿**，其中 40 个带汇总输出的脚本合计 **3047 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_strength_2d.py` 162/162、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 134/134、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 126/126、`verify_prestress_loss_2d.py` 213/213、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 232/232，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **46 个脚本全绿**，其中 41 个带汇总输出的脚本合计 **3293 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_strength_2d.py` 162/162、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 136/136、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 136/136、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 222/222、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 244/244，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
@@ -509,7 +542,10 @@ BS 侧 `bridge_spec.py` 补 22 键 `*PRESTRESS_LOSS` 表与非阶段
 2D 模态 / 线性屈曲已按内核事实接通（opt-in，见 `能力边界矩阵.md` §2 备注）；
 B2 的「截面应力」半部随后按 `P` 口径接入（`strength_2d.py`，承载力仍显式拒绝），
 第十次由 FE opt-in 补 `[PRESTRESSLOSS2D]` 段闭环「2D 分项预应力损失
-明细」后 **B2 剩余 2 项**；这两项与组合体系（B1，用户本轮暂缓）、
+明细」后曾 **B2 剩余 2 项**；第十一次只闭环三层迭代中的内层 Newton 一层
+（`[NEWTON2D]`，该格 `2D=P`），`[LENGTH]` / `[OPT]` 两层 2D 内核没有对应
+力学、两格仍标 `N`，**B2 剩余仍 2 项**但内容收窄为「两层力学 +
+多格式导出」；这两项与组合体系（B1，用户本轮暂缓）、
 B3 非线性稳定全过程、B4 预应力损失两处规范口径、B5 无应力曲率的
 **现状、两阶段规格与验收断言**统一写在
 `B类后续项接入规格.md`，由 `verify_b_class_spec.py` 纯离线守卫。这些项目

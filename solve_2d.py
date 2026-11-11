@@ -40,6 +40,15 @@
 已算出的结果，不重算、不补零；`--loss-detail-only` 只写明细、不求解、
 不覆盖 `.result`，故施工阶段路径也能单独取明细。
 
+第七条链（**opt-in，默认关闭**）：`example_mixed.exe --newton-detail-only` →
+`<stem>.newton.txt` 的 `[NEWTON2D]` 段 → `newton_2d` 解析，出 2D 方案C
+几何非线性 Newton 的逐迭代过程量（荷载步 / λ / |R| / |Δu| / |Fext| / α /
+线搜索折半 / 步收敛）。只对显式 `*ANALYSIS TYPE=NONLINEAR` 的模型生效；
+内核留痕字段不参与判据与步长计算，Python 只解析、不重算、不补零。
+`--newton-detail-only` 求解后只写明细、不写 `.result`、不覆盖主结果。
+**2D 内核没有索长迭代 `[LENGTH]` 与带约束索力优化 `[OPT]` 两层力学，
+本链只覆盖内层 Newton，不等于 3D 三层迭代过程量已移植。**
+
 坐标约定
 --------
 2D 内核自由度：1=u(x)、2=v(y)、3=θ。竖向位移是 dof 2（不是三维的 dof 3）。
@@ -60,6 +69,7 @@ from typing import Any
 
 import combination
 import modal_2d
+import newton_2d
 import prestress_loss_2d as loss2d
 import strength_2d
 
@@ -160,6 +170,11 @@ class Solve2DResult:
     prestress_loss: dict[str, Any] = field(
         default_factory=lambda: {"status": "not_requested",
                                  "source": loss2d.SOURCE})
+    # 2D 内层 Newton 逐迭代过程量（opt-in）：newton_2d.parse_newton_txt 的结果。
+    # 默认 "not_requested"；不重算 K·ΔU=R、不由位移反推残差、缺段不补零。
+    newton: dict[str, Any] = field(
+        default_factory=lambda: {"status": "not_requested",
+                                 "source": newton_2d.SOURCE})
 
     def modal_tables(self) -> dict[str, dict[str, Any]]:
         """报告 / 界面同源的表；无可用结果时为空 dict。
@@ -193,6 +208,10 @@ class Solve2DResult:
         """2D 分项损失明细表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
         t = loss2d.loss_table(self.prestress_loss)
         return {"prestress_loss_table": t} if t else {}
+
+    def newton_tables(self) -> dict[str, dict[str, Any]]:
+        """2D 内层 Newton 过程量表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
+        return newton_2d.tables(self.newton)
 
     @property
     def fingerprint(self) -> str:
@@ -396,6 +415,7 @@ def solve_2d(
     strength: bool = False,
     modal_detail: bool = False,
     loss_detail: bool = False,
+    newton_detail: bool = False,
 ) -> Solve2DResult:
     """求解一个 BridgeSpec，返回 `Solve2DResult`。
 
@@ -422,6 +442,15 @@ def solve_2d(
     Python 只解析 `[PRESTRESSLOSS2D]` 段，不重算 σl1~σl6 / σpe / RATIO。
     默认 False：不调该 exe、不写新 diagnostics、计算书一字不变；模型没有
     LOSSREF 束时写中文「不做」，不补零。
+
+    `newton_detail=True` 时，只对显式 `analysis="NONLINEAR"` 的模型追加一次
+    `example_mixed.exe --newton-detail-only`，只读它写出的
+    `<stem>.newton.txt` 里的 `[NEWTON2D]` 段，出逐迭代过程量表（表由
+    `res.newton_tables()` 取）。该开关求解后只写明细、不写 `.result`、不覆盖
+    主结果；Python 只解析、不重算 Newton 过程、不补零。默认 False：不调该
+    exe、不写新 diagnostics、计算书一字不变；线性模型写中文「不做」，
+    不强制把分析类型改成非线性。2D 没有 `[LENGTH]` / `[OPT]` 两层力学，
+    本链只覆盖内层 Newton。
 
     用法::
 
@@ -646,6 +675,39 @@ def solve_2d(
                         "status": "solver_error", "source": _loss_src,
                         "reason": str(e)}
         res.diagnostics.append(loss2d.status_text(res.prestress_loss))
+
+    # ⑥ 2D 内层 Newton 逐迭代过程量（opt-in）：只读内核写出的
+    #    <stem>.newton.txt，不解 K·ΔU=R、不由位移反推残差、不改 .dat / .result。
+    if newton_detail:
+        _nt_src = newton_2d.SOURCE
+        _analysis = str(getattr(spec, "analysis", "LINEAR")).upper()
+        if _analysis != "NONLINEAR":
+            # 不强制把模型改成非线性：那会改变求解数值路径，属于新造工况。
+            res.newton = {"status": "no_nonlinear_model", "source": _nt_src}
+        else:
+            exe = _find_exe("example_mixed.exe")
+            if exe is None:
+                res.newton = {"status": "unavailable", "source": _nt_src}
+            else:
+                nt_path = out / (dat_path.stem + ".newton.txt")
+                if nt_path.exists():
+                    nt_path.unlink()   # 不读上一次求解的残留
+                try:
+                    stdout = _run(exe, dat_name, out, timeout,
+                                  extra_args=["--newton-detail-only"])
+                    if not nt_path.is_file():
+                        res.newton = {
+                            "status": "no_output", "source": _nt_src,
+                            "stdout": (stdout or "")[-500:]}
+                    else:
+                        res.newton = newton_2d.parse_newton_txt(
+                            nt_path.read_text(encoding="utf-8",
+                                              errors="replace"))
+                except SolverUnavailable2D as e:
+                    res.newton = {
+                        "status": "solver_error", "source": _nt_src,
+                        "reason": str(e)}
+        res.diagnostics.append(newton_2d.status_text(res.newton))
     return res
 
 

@@ -356,6 +356,40 @@ def gaps_and_process() -> None:
     check("能力矩阵登记第十次闭环记录", "第十次闭环记录" in text)
     check("§4.2 收窄为 3 个 2D=N + 4 个 2D=P",
           "3 个 `2D=N`" in text and "4 个 `2D=P`" in text)
+    # 2026-11-11 第十一次：只闭环三层迭代中的内层 Newton 一层，仍标 P；
+    # [LENGTH] / [OPT] 两层 2D 内核没有对应力学，两格继续标 N、不造占位。
+    nt_rows = [ln for ln in text.splitlines()
+               if ln.startswith("| 内层 Newton")]
+    check("§2 内层 Newton 格标 2D=P（不虚报 Y）",
+          len(nt_rows) == 1 and "| P | Y |" in nt_rows[0], str(nt_rows))
+    lg_rows = [ln for ln in text.splitlines()
+               if ln.startswith("| 索长迭代")]
+    op_rows = [ln for ln in text.splitlines()
+               if ln.startswith("| 目标索力优化")]
+    check("§2 索长迭代 / 几何闭合格仍标 2D=N",
+          len(lg_rows) == 1 and "| N | Y |" in lg_rows[0], str(lg_rows))
+    check("§2 目标索力优化 [OPT] 格仍标 2D=N",
+          len(op_rows) == 1 and "| N | Y |" in op_rows[0], str(op_rows))
+    check("§2 登记 [NEWTON2D] / BASIS=2d_global 防漂移",
+          "[NEWTON2D]" in text and "BASIS=2d_global" in text)
+    check("§2 写明两层没有对应力学、不造占位",
+          "没有对应力学" in text and "不造占位" in text)
+    check("§2 写明 2D 不写 REFACT / TOLF / TOLD",
+          "不写 REFACT" in text and "不拆 TOLF/TOLD" in text)
+    check("§2 写明过程量不构成规范判定",
+          "不构成规范合格判定" in text or "不是规范合格判定" in text)
+    check("能力矩阵登记第十一次闭环记录", "第十一次闭环记录" in text)
+    check("§4.2 当前为 2 个 2D=N + 5 个 2D=P",
+          "2 个 `2D=N`" in text and "5 个 `2D=P`" in text)
+    check("§4.2 写明 B2 剩余 2 项且内容收窄",
+          "B2 剩余 2 项" in text and "内容已收窄" in text)
+    check("§2 依据列登记 2D Newton 真实符号",
+          "newton_2d.py::parse_newton_txt" in text
+          and "solve_2d.py::newton_tables" in text)
+    nt_src = read(ROOT / "newton_2d.py")
+    check("2D Newton 口径层写明不重算 / 两层缺席",
+          "不重算" in nt_src and "[LENGTH]" in nt_src
+          and "[OPT]" in nt_src and "没有对应力学" in nt_src)
     check("§2 写明 [MODAL2D] / BASIS=xy / Z 向不存在",
           "[MODAL2D]" in text and "BASIS=xy" in text
           and "不存在（不是 0）" in text)

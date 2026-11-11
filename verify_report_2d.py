@@ -506,6 +506,12 @@ def docs() -> None:
           "4 个 `2D=N`" in mat and "3 个 `2D=P`" in mat
           and "7 个" in mat and "已收窄" in mat)
     check("能力矩阵登记第八次闭环记录", "第八次闭环记录" in mat)
+    # 第十一次：2D 内层 Newton 过程量章与四出口同源，两层力学仍标 N。
+    check("能力矩阵登记第十一次 [NEWTON2D] 闭环",
+          "[NEWTON2D]" in mat and "第十一次闭环记录" in mat)
+    check("report_2d 有 2D Newton 边界 note",
+          "NEWTON_BOUNDARY_NOTE" in
+          (ROOT / "report_2d.py").read_text(encoding="utf-8"))
     check("能力矩阵仍写前端默认出口不变",
           "一个字节不改" in mat and "`write_2d_html`" in mat
           and "默认 `.dat` 与 12 格黄金哈希" in mat)

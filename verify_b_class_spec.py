@@ -322,6 +322,35 @@ def b2_loss_detail() -> None:
           "verify_prestress_loss_2d.py" in read(ROOT / "开发使用手册.md"))
 
 
+def b2_newton_detail() -> None:
+    """第十一次：只闭环内层 Newton 一层，两层力学仍标 N，规格须写明如实边界."""
+    t = read(SPEC)
+    mat = read(ROOT / "能力边界矩阵.md")
+    check("规格登记第十一次 [NEWTON2D] 明细闭环",
+          "第十一次" in t and "[NEWTON2D]" in t)
+    check("规格写明 BASIS=2d_global / 不写 REFACT",
+          "BASIS=2d_global" in t and "不写 `REFACT`" in t)
+    check("规格写明 FE 判据 / 步长 / 线搜索 / 收敛零改动",
+          "一字不改" in t and "留痕" in t)
+    check("规格写明该项仍标 P 不标 Y", "标 `P` 不标 `Y`" in t)
+    check("规格写明两层仍标 N / 不造占位",
+          "两层仍标 `N`" in t and "不造占位" in t)
+    check("规格写明 B2 剩余仍 2 项且内容收窄",
+          "B2 剩余仍 2 项" in t and "内容" in t)
+    check("矩阵该格 2D=P、另两格 2D=N",
+          "| 内层 Newton / 共转列式过程量 | P | Y |" in mat
+          and "| 索长迭代 / 几何闭合过程量 | N | Y |" in mat
+          and "| 目标索力优化 `[OPT]` + 体系守卫 | N | Y |" in mat)
+    p = ROOT / "verify_newton_2d.py"
+    check("2D Newton 守卫在位", p.is_file())
+    g = read(p)
+    check("2D Newton 守卫汇总按布尔位统计",
+          "PASS.append((name, bool(ok), detail))" in g
+          and "sum(1 for _, ok, _ in PASS if ok)" in g)
+    check("开发手册登记 2D Newton 守卫",
+          "verify_newton_2d.py" in read(ROOT / "开发使用手册.md"))
+
+
 def main() -> int:
     print("=" * 78)
     print("B 类后续项接入规格守卫（纯离线）")
@@ -334,6 +363,7 @@ def main() -> int:
     b2_report()
     b2_modal_detail()
     b2_loss_detail()
+    b2_newton_detail()
     spec_rules()
     no_new_capability()
     dat_invariant()
