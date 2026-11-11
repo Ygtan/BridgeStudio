@@ -470,6 +470,9 @@ def main() -> int:
     ap.add_argument("-o", "--output", default="nl_fe_report.html")
     ap.add_argument("--no-fem", action="store_true", help="不调用 FEM-Eigen（仅单梁）")
     ap.add_argument("--self-weight", action="store_true", help="计入自重（仅单梁）")
+    # 2D 同源四出口是 opt-in：默认仍只写原来的单份 HTML，一个字节不改。
+    ap.add_argument("--four-exports", action="store_true",
+                    help="二维模型额外出同源四出口（HTML / DOCX / CSV / PDF），默认关闭")
     args = ap.parse_args()
 
     doc, source, _diag = ModelDoc.from_text(args.text)
@@ -485,6 +488,26 @@ def main() -> int:
         print(getattr(doc.model, "title", doc.kind))
         res = doc.solve(out_dir=Path(args.output).parent / "solve2d")
         out = write_2d_html(res, doc.model, args.output)
+        if args.four_exports:
+            import sys
+
+            from report_2d import build_and_write
+            from report_3d import PDFExportError, write_pdf
+
+            rdir = Path(args.output).parent / "report2d"
+            # 三件套先落盘，PDF 单独打印：一次浏览器失败只降级这一个出口，
+            # 不吞掉另外三份，也不生成占位 PDF。
+            rep, paths = build_and_write(res, doc.model, rdir,
+                                         stem="report2d", pdf=False)
+            try:
+                paths["pdf"] = write_pdf(rep, rdir / "report2d.pdf")
+            except PDFExportError as e:
+                print(f"PDF 计算书未生成：{e}", file=sys.stderr)
+                print("HTML / DOCX / CSV 三份已保留，没有生成占位 PDF。",
+                      file=sys.stderr)
+                return 1
+            for k, p in paths.items():
+                print(f"  {k}: {p.resolve()}")
     print(f"\n已生成：{out.resolve()}")
     print(f"大小：{out.stat().st_size/1024:.1f} KB（双击即可用浏览器打开）")
     return 0

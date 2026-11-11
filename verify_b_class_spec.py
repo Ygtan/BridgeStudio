@@ -139,9 +139,9 @@ def bs_boundaries() -> None:
     # 第六次 A 档：B2「截面应力」半部接入，但该格只能标 P，不能涂成 Y。
     check("能力矩阵该格 2D 标 P（不是 Y）",
           "| 截面应力 / 承载力验算 | P | Y |" in mat)
-    check("能力矩阵 §4.2 写 5 个 N + 2 个 P",
-          "5 个" in mat and "2 个 `2D=P`" in mat)
-    check("README 同步 2 项部分接入", "2 项部分接入" in rd)
+    check("能力矩阵 §4.2 写 4 个 N + 3 个 P",
+          "4 个" in mat and "3 个 `2D=P`" in mat)
+    check("README 同步 3 项部分接入", "3 项部分接入" in rd)
 
 
 def b2_strength() -> None:
@@ -265,6 +265,24 @@ def b2_validation() -> None:
           "verify_validate_2d.py" in read(ROOT / "开发使用手册.md"))
 
 
+def b2_report() -> None:
+    """第八次：2D 同源计算书四出口接通导出机制，但规格仍写「内容窄、标 P」."""
+    t = read(SPEC)
+    check("规格写明四出口已接通导出机制且仍标 P",
+          "四出口" in t and "已接通" in t and "仍标 `P` 不标 `Y`" in t)
+    check("规格写明不另写渲染器、不改 BKSEC 书签机制",
+          "不另写渲染器" in t and "BKSEC" in t)
+    check("规格写明 PDF 失败不生成占位文件", "占位" in t)
+    p = ROOT / "verify_report_2d.py"
+    check("2D 四出口守卫在位", p.is_file())
+    g = read(p)
+    check("2D 四出口守卫汇总按布尔位统计",
+          "PASS.append((name, bool(ok), detail))" in g
+          and "sum(1 for _, ok, _ in PASS if ok)" in g)
+    check("开发手册登记 2D 四出口守卫",
+          "verify_report_2d.py" in read(ROOT / "开发使用手册.md"))
+
+
 def main() -> int:
     print("=" * 78)
     print("B 类后续项接入规格守卫（纯离线）")
@@ -274,6 +292,7 @@ def main() -> int:
     bs_boundaries()
     b2_strength()
     b2_validation()
+    b2_report()
     spec_rules()
     no_new_capability()
     dat_invariant()

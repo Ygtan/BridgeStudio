@@ -34,7 +34,7 @@ X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（
 `X20_接入约定.md` 管「X20 资产怎么接」，**`能力边界矩阵.md` 管「接到之后到底有哪些能力、哪些还没有」**：
 6 桥型 × 2 维度主矩阵（建造器键 / 求解入口 / 阶段·活载·预应力参数逐格对拍）、
 20 项维度级能力的 `文件::符号` 依据、参数覆盖契约与刻意隐藏白名单、
-3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（217/217）纯离线守卫：
+3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（223/223）纯离线守卫：
 主矩阵与 `BUILDERS` / `SOLVER_OF` 对拍、依据符号真实存在、
 `DEFAULTS ⊆ FIELDS ∪ 白名单`、额外控件带 `default`、默认值在区间内、
 12 个建造器「控件渲染写回 params 后默认 `.dat` 逐位不变」、
@@ -105,7 +105,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        C 档不借理由 —— 2026-11-10。注意：这**不等于** X20 桥型全量移植，
        下一条仍是真实能力缺口。
 - [x] **P1 能力口径可核对化 + 界面参数覆盖**：新增 `能力边界矩阵.md`
-       与 `verify_capability_matrix.py` 217/217，把「哪些有 / 哪些没有」逐格
+       与 `verify_capability_matrix.py` 223/223，把「哪些有 / 哪些没有」逐格
        钉到代码符号；据矩阵补齐 16 个只在 DEFAULTS 里、界面改不了的参数
        （`ps_beam` E/A/I/fpk/χ/1+μ、`truss_3d` 材料、`cable_stayed` panel、
        `cable_stayed_2d` 塔基与锚点、`suspension` 板厚与车道折减、
@@ -113,11 +113,14 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        主导、小幅调大不改网格」的边界。默认 `.dat` 逐位不变 —— 2026-11-10
 - [ ] **P1** X20 桥型建造器全量移植：`BUILDERS` 的 6 kind × 2 维度 12 格
        都有建造器键，但**没有「斜拉-悬索协作 / 梁拱组合」这类组合体系的
-       独立建造器**；且 7 项高级能力（分项损失、索长/Newton/`[OPT]`、
-       承载力、四出口计算书、多格式导出、严格校验）仍不对齐：其中 5 项
-       只在 3D 链路，**2 项部分接入**（`2D=P`）：截面应力只出组合内力的
+       独立建造器**；且原 7 项高级能力（分项损失、索长/Newton/`[OPT]`、
+       承载力、四出口计算书、多格式导出、严格校验）仍不对齐：其中 4 项
+       只在 3D 链路，**3 项部分接入**（`2D=P`）：截面应力只出组合内力的
        应力表、承载力 Mu/Vu 因 2D 无配筋契约显式拒绝；引用完整性中文校验
-       按源码事实纠正并补齐，但 2D 仍窄于 3D。均见 `能力边界矩阵.md`
+       按源码事实纠正并补齐，但 2D 仍窄于 3D；同源计算书四出口接通了
+       `report_2d.py` 的 `Report` 旁路与原样复用的 HTML/DOCX/CSV/PDF
+       写出器，但 2D 计算书内容仍窄于 3D、且 opt-in 默认关闭。
+       均见 `能力边界矩阵.md`
        §2 备注。2D 模态 / 屈曲已按内核事实接通
        （opt-in，只有频率与 λ），其余 2D ↔ 3D 仍不对齐。
        逐条依据见 `能力边界矩阵.md` §4.1 / §4.2。
@@ -453,7 +456,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **42 个脚本全绿**，其中 37 个带汇总输出的脚本合计 **2532 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_strength_2d.py` 162/162、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_b_class_spec.py` 106/106、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 217/217，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **43 个脚本全绿**，其中 38 个带汇总输出的脚本合计 **2678 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_strength_2d.py` 162/162、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 134/134、`verify_b_class_spec.py` 112/112、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 223/223，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
@@ -492,6 +495,21 @@ dof 与边界自由度范围、零长度单元；仍是单一中文 error 列表
 warnings 两级，`beam` 走旧 `ModelSpec` 契约，故标 `P` 不标 `Y`。
 `verify_validate_2d.py` 守卫逐类断引用负例、合法模型不误报、12 格默认
 `.dat` 黄金哈希与三入口同源；校验只读模型，默认 `.dat` 逐位不变。
+
+### 2D 同源计算书四出口（`P` 口径）
+
+`report_2d.py::build_2d_document(res, spec)` 把同一份 `Solve2DResult`
+装成 `report_3d.Report`，`write_2d_all` 原样复用 3D 的四个写出器
+（**没有第二个渲染器**），PDF 由 HTML 打印并补页码 / 章节书签。数值与
+`write_2d_html` 逐格同源（N→kN 除 1e3、位移 m→mm 乘 1e3），不重算力学、
+不解析内核「单元应力 (Pa)」段、不补零。CLI `--four-exports` 与界面
+`report2d_opt` 都是 **opt-in 默认关闭**；PDF 失败抛 `PDFExportError` 并
+只降级这一个出口，中文告警后保留另外三份，绝不生成占位 PDF。
+`verify_report_2d.py` 守卫四出口落盘、CSV / DOCX / PDF 读回、页码书签
+对拍、缺数据不补零、opt-in 章条件出现、12 格默认 `.dat` 黄金哈希与
+默认 HTML 逐字节不变。**能力矩阵仍标 `P` 不标 `Y`**：2D 计算书没有
+figures、没有振型 / 参与质量 / 承载力 Mu、Vu / 结构云图，默认 2D 出口
+仍是单份 `write_2d_html`；导出机制对齐不等于 2D 力学能力对齐。
 
 ### 回归守卫自身的「假绿」修复（2026-11-10）
 

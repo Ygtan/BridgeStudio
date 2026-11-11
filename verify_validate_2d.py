@@ -228,16 +228,16 @@ def source_contract() -> None:
           len(rows) == 1 and "| P | Y |" in rows[0], str(rows))
     check("§2 登记 2D 侧真实符号", "bridge_spec.py::validate_model" in mat)
     check("§2 写明 2D 仍窄于 3D 的边界", "2D 仍窄于 3D" in mat)
-    check("§4.2 计数改为 5 个 N + 2 个 P",
-          "5 个" in mat and "2 个 `2D=P`" in mat)
+    check("§4.2 计数改为 4 个 N + 3 个 P",
+          "4 个" in mat and "3 个 `2D=P`" in mat)
     check("能力矩阵登记第七次闭环记录", "第七次闭环记录" in mat)
     spec = read(ROOT / "B类后续项接入规格.md")
     check("规格写明这一格主体是文档漂移", "文档漂移" in spec)
     check("规格写明多格式导出被 X20 契约锁死",
           "X20 契约" in spec and "唯一转换点" in spec)
     check("规格写明 2D 校验标 P 不标 Y", "标 `P` 不标 `Y`" in spec)
-    check("README 同步 2 项部分接入",
-          "2 项部分接入" in read(ROOT / "README.md"))
+    check("README 同步 3 项部分接入",
+          "3 项部分接入" in read(ROOT / "README.md"))
     for f in ("使用说明.md", "开发使用手册.md"):
         check(f"{f} 登记新守卫", "verify_validate_2d.py" in read(ROOT / f))
     g = read(Path(__file__))

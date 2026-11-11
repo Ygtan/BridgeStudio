@@ -324,16 +324,16 @@ def gaps_and_process() -> None:
     check("§2 登记 2D 应力的真实依据符号",
           "strength_2d.py::evaluate" in text
           and "solve_2d.py::strength_tables" in text)
-    check("§4.2 写 5 个 N + 2 个 P 且保留历史 7 个计数",
-          "5 个" in text and "2 个 `2D=P`" in text and "7 个" in text)
+    check("§4.2 写 4 个 N + 3 个 P 且保留历史 7 个计数",
+          "4 个" in text and "3 个 `2D=P`" in text and "7 个" in text)
     st_src = read(ROOT / "strength_2d.py")
     check("2D 应力口径层不消费内核应力段",
           "不解析内核「单元应力 (Pa)」段" in st_src
           and "parse_result" not in st_src)
     check("2D 应力口径层写明承载力本次未做",
           "承载力验算（Mu / Vu / 压弯 / 轴压）本次未做" in st_src)
-    check("README 同步 2 项部分接入",
-          "2 项部分接入" in read(ROOT / "README.md"))
+    check("README 同步 3 项部分接入",
+          "3 项部分接入" in read(ROOT / "README.md"))
     check("能力矩阵登记第六次闭环记录", "第六次闭环记录" in text)
     val_rows = [ln for ln in text.splitlines()
                 if ln.startswith("| 引用完整性中文校验 |")]
@@ -348,6 +348,25 @@ def gaps_and_process() -> None:
     check("防漂移：2D 校验符号真实存在且求解入口调用",
           "def validate_model(self)" in bs_src
           and "errs = spec.validate_model()" in s2d_src)
+    # 2026-11-11 第八次：2D 同源计算书四出口接通「导出机制」，仍标 P。
+    rpt_rows = [ln for ln in text.splitlines()
+                if ln.startswith("| 同源计算书四出口")]
+    check("§2 四出口格标 2D=P（导出机制对齐不虚报 Y）",
+          len(rpt_rows) == 1 and "| P | Y |" in rpt_rows[0], str(rpt_rows))
+    check("§2 登记 report_2d 两个真实依据符号",
+          "report_2d.py::build_2d_document" in text
+          and "report_2d.py::write_2d_all" in text)
+    check("§2 写明导出机制对齐但内容仍窄、默认出口不变",
+          "导出机制" in text and "不标 `Y`" in text
+          and "opt-in" in text and "一个字节不改" in text)
+    check("能力矩阵登记第八次闭环记录", "第八次闭环记录" in text)
+    rp_src = read(ROOT / "report_2d.py")
+    check("防漂移：report_2d 真实存在且原样复用 write_all",
+          "def build_2d_document(res" in rp_src
+          and "return R.write_all(rep, out_dir, stem=stem, pdf=pdf)" in rp_src)
+    check("防漂移：默认 write_2d_html 不接 Report 旁路",
+          "build_2d_document" not in read(ROOT / "export_html.py")
+          and "def write_2d_html" in read(ROOT / "export_html.py"))
     src = read(Path(__file__))
     # 拼接构造，避免「禁用词字面量本身出现在源码里」让自检自相矛盾。
     for banned in ("sub" + "process", "os." + "system", "solve_" + "3d(",

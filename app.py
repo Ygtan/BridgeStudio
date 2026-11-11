@@ -724,4 +724,57 @@ if doc.kind != "beam" and _cap.get("solve2d"):
         for _d in _r2d.diagnostics:
             st.caption(f"· {_d}")
 
+        # 2D 同源四出口计算书（opt-in）：默认不勾，勾选后才出现按钮。
+        # 与 3D 的 _report_block 同一套降级方式：pdf=False 出三件套，
+        # PDF 单独打印，失败显式中文告警且保留另外三个下载按钮。
+        _report2d_on = st.checkbox(
+            "生成 2D 同源计算书四出口（HTML / DOCX / CSV / PDF，默认关闭）",
+            value=False, key="report2d_opt",
+            help="同一份 Report 中间结构出四种格式，数值与上方结果同源；"
+                 "PDF 需本机 Edge / Chrome，失败只降级 PDF 这一个出口。"
+                 "2D 报告不含振型 / 承载力 Mu、Vu / 结构云图。")
+        if _report2d_on and st.button("生成 2D 四出口计算书",
+                                      key="report2d_btn"):
+            from report_2d import build_and_write
+            from report_3d import PDFExportError, write_pdf
+
+            _rdir2 = Path("out/gui_2d/report2d")
+            try:
+                _rep2, _paths2 = build_and_write(
+                    _r2d, doc.model, _rdir2, stem="report2d", pdf=False)
+                _pdf_err2 = None
+                try:
+                    _paths2["pdf"] = write_pdf(_rep2, _rdir2 / "report2d.pdf")
+                except PermissionError:
+                    _paths2["pdf"] = write_pdf(
+                        _rep2, _rdir2 / f"report2d_{_r2d.fingerprint}.pdf")
+                except PDFExportError as _e:
+                    _pdf_err2 = str(_e)
+                st.session_state["report2d"] = {
+                    "fingerprint": _r2d.fingerprint,
+                    "paths": {k: str(v) for k, v in _paths2.items()},
+                    "pdf_error": _pdf_err2,
+                }
+            except Exception as _e:
+                st.session_state.pop("report2d", None)
+                st.error(f"2D 计算书生成失败：{_e}")
+        _got2 = st.session_state.get("report2d")
+        if _got2:
+            if _got2.get("fingerprint") != _r2d.fingerprint:
+                st.warning("2D 计算书是上一次求解的结果，模型已变，请重新生成。")
+            else:
+                _dl_cols = st.columns(4)
+                for _i, (_k2, _lbl2) in enumerate(
+                        (("html", "HTML"), ("docx", "Word"),
+                         ("zip", "CSV 数据包"), ("pdf", "PDF 计算书"))):
+                    _p2 = Path(_got2["paths"].get(_k2, ""))
+                    if _p2.is_file():
+                        _dl_cols[_i].download_button(
+                            f"下载 {_lbl2}", data=_p2.read_bytes(),
+                            file_name=_p2.name, key=f"report2d_dl_{_k2}")
+                if _got2.get("pdf_error"):
+                    st.warning(
+                        f"PDF 计算书未生成：{_got2['pdf_error']}；"
+                        "其余三份可下载，没有生成占位 PDF。")
+
 
