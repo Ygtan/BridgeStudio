@@ -7,10 +7,13 @@
 - **做**：截面**应力**验算。效应侧只取 `Solve2DResult.final_beam` 经
   `combination.beam_combinations` 得到的三种组合内力，截面与材料取同一份
   `BridgeSpec`，交给 `section_strength.check` / `result_table` 出表。
-- **不做**：**承载力** Mu / Vu / 压弯 / 轴压。2D 的 `ElemTypeDef` /
-  `MaterialDef` 没有配筋契约（`RebarSpec3D` 是 3D 的），
-  `section_strength.py` 明确要求「模型里没有配筋信息时明确跳过并说明，
-  不编一个配筋出来」。不新增 opt-in 的 2D 配筋契约之前只能显式拒绝。
+- **本表不做**：**承载力** Mu / Vu / 压弯 / 轴压。本表只是截面边缘应力
+  与强度设计值之比，不是承载力利用率。承载力 Mu / Vu 由第十二次新增的
+  **独立 opt-in 口径层** `capacity_2d.py` 单独出章（需 `ElemTypeDef.rebar`
+  的 `RebarSpec2D` 配筋契约）；未请求或模型无配筋时该章整章拒绝，
+  不编一个配筋出来。压弯 / 轴压在 2D 仍不做（组合轴力 N 只有恒载单值、
+  无活载轴力包络）。两章的边界措辞由 `capacity_note_for()` 按实际状态
+  选择，不得新旧章自相矛盾；能力矩阵这一格仍标 P，不标 Y。
 
 三条铁律
 --------
@@ -45,15 +48,39 @@ import section_strength
 SOURCE = ("Solve2DResult.final_beam + combination.beam_combinations → "
           "section_strength.check")
 
-CAPACITY_NOTE = (
-    "承载力验算（Mu / Vu / 压弯 / 轴压）本次未做：2D BridgeSpec 没有配筋契约，"
-    "ElemTypeDef / MaterialDef 只给 A、I、WT、WB 与 E，没有 RebarSpec；"
+CAPACITY_REFUSED_NOTE = (
+    "承载力验算（Mu / Vu / 压弯 / 轴压）本次未做：本次未请求 2D 承载力章，"
+    "或模型没有 opt-in 的 `ElemTypeDef.rebar`（`RebarSpec2D`）配筋契约，"
     "section_strength.py 明确要求「模型里没有配筋信息时明确跳过并说明，"
     "不编一个配筋出来」。本表只是截面边缘应力与强度设计值之比，"
     "不是正截面 / 斜截面承载力利用率，不得拿它冒充配筋设计的验算结论；"
-    "不出 Mu / Vu 表、不补零。在新增 opt-in 的 2D 配筋契约之前，"
-    "能力矩阵这一格只能标 P。"
+    "本应力表不出 Mu / Vu 表、不补零。压弯 / 轴压在 2D 仍不做"
+    "（组合轴力 N 只有恒载单值、无活载轴力包络）。"
+    "能力矩阵这一格只能标 P，不标 Y。"
 )
+
+CAPACITY_LINK_NOTE = (
+    "本表只是截面边缘应力与强度设计值之比，不是正截面 / 斜截面承载力利用率，"
+    "不得拿它冒充配筋设计的验算结论；本应力表本身不出 Mu / Vu 表、不补零。"
+    "承载力 Mu / Vu 见同源计算书里 opt-in 的「2D 正截面抗弯 / 斜截面抗剪"
+    "承载力」章（`capacity_2d.py`，复用 `section_strength.check_capacity`）；"
+    "压弯 / 轴压在 2D 仍不做，能力矩阵这一格只能标 P，不标 Y。"
+)
+
+#: 兼容旧调用方：默认是「未请求 / 无配筋」的拒绝口径。报告、界面与表注
+#: 一律改用 `capacity_note_for(res.capacity)` 按实际状态选择，别直接读它。
+CAPACITY_NOTE = CAPACITY_REFUSED_NOTE
+
+
+def capacity_note_for(cap: dict[str, Any] | None) -> str:
+    """应力章唯一的承载力边界措辞选择器。
+
+    `Solve2DResult.capacity.status == "ok"` 时指向新章；否则（默认
+    `not_requested` / 缺配筋 `refused` / 任何非 ok 状态）维持显式拒绝。
+    """
+    return (CAPACITY_LINK_NOTE
+            if (cap or {}).get("status") == "ok"
+            else CAPACITY_REFUSED_NOTE)
 
 STRESS_NOTE_EXTRA = (
     "效应侧只取成桥态内力经 JTG D60 三种组合后的设计值，不解析内核"
@@ -135,17 +162,17 @@ def status_text(s: dict[str, Any] | None) -> str:
                 f"（共枚举 {s.get('cases', 0)} 个角点，γ₀={s.get('gamma0', 1.0):g}）。"
                 + ("组合含活载。" if s.get("has_live") else
                    "模型无活载包络，组合只有恒载项，不是完整的正常使用验算。")
-                + CAPACITY_NOTE)
+                + capacity_note_for(s.get("capacity")))
     if st == "refused":
         reasons = list(s.get("reasons") or [])
         head = "本次未做 2D 截面应力验算：模型缺少显式声明的验算参数，整章拒绝，不补零、不回落。"
         shown = "；".join(reasons[:3])
         more = f"；另有 {len(reasons) - 3} 条同类问题" if len(reasons) > 3 else ""
-        return head + shown + more + "。" + CAPACITY_NOTE
+        return head + shown + more + "。" + capacity_note_for(s.get("capacity"))
     if st == "no_beam_section":
         return ("本次未做 2D 截面应力验算：成桥态内力里没有可验算的梁单元"
                 "（TRUSS / CABLE / STRUT 等轴向杆不做截面应力验算）。"
-                + CAPACITY_NOTE)
+                + capacity_note_for(s.get("capacity")))
     return {
         "not_requested": ("本次未请求 2D 截面应力验算（默认关闭，勾选后由同一份"
                           "成桥态内力与 BridgeSpec 出表，不写进 .dat）。"),
@@ -162,12 +189,19 @@ def evaluate(res: Any, spec: Any, gamma0: float = 1.0,
     """从一次 2D 求解结果产出应力验算结论与表字典。
 
     只由 `solve_2d(..., strength=True)` 调用；返回 ``{status, source, note,
-    reasons, tables, capacity_note, gamma0, limit, cases, has_live,
-    skipped_axial, beam_sections}``。`tables` 非空当且仅当 `status == "ok"`。
+    reasons, tables, capacity, capacity_note, gamma0, limit, cases, has_live,
+    skipped_axial, beam_sections}``。`capacity` 只记 2D 承载力章的状态，
+    供 `capacity_note_for()` 挑措辞；`tables` 非空当且仅当 `status == "ok"`。
     """
+    # capacity 先于 strength 计算（见 solve_2d）：按实际状态挑措辞，避免
+    # 应力章与承载力章一个说「做了」、一个说「没做」。
+    cap = getattr(res, "capacity", None) or {}
+    cap_state = {"status": str(cap.get("status", "not_requested"))}
     out: dict[str, Any] = {
         "status": "unavailable", "source": SOURCE, "note": "",
-        "reasons": [], "tables": {}, "capacity_note": CAPACITY_NOTE,
+        "reasons": [], "tables": {},
+        "capacity": cap_state,
+        "capacity_note": capacity_note_for(cap_state),
         "gamma0": float(gamma0), "limit": int(limit), "cases": 0,
         "has_live": False, "skipped_axial": 0, "beam_sections": 0,
     }
@@ -246,7 +280,8 @@ def evaluate(res: Any, spec: Any, gamma0: float = 1.0,
     table["note"] = (table["note"] + " "
                      + STRESS_NOTE_EXTRA.format(limit=out["limit"],
                                                 gamma0=out["gamma0"])
-                     + " " + CAPACITY_NOTE + " 来源：" + SOURCE + "。")
+                     + " " + capacity_note_for(out["capacity"])
+                     + " 来源：" + SOURCE + "。")
     out.update(status="ok", tables={"stress_table": table},
                cases=len(cases))
     out["note"] = status_text(out)

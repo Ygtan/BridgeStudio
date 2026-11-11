@@ -637,10 +637,11 @@ if doc.kind != "beam" and _cap.get("solve2d"):
     else:
         st.caption("2D 模态明细需先勾选上方「2D 自振频率与线性屈曲」。")
 
-    # 2D 截面应力验算同为 opt-in：只做应力，承载力因 2D 无配筋契约
-    # 一律写「做不了」；模型未显式给 grade/kind/AW/板厚时整章拒绝。
+    # 2D 截面应力验算同为 opt-in：只做应力；承载力 Mu / Vu 由下方
+    # 另一个独立 opt-in 开关负责，两者边界措辞按 res.capacity 状态选择。
+    # 模型未显式给 grade/kind/AW/板厚时应力章整章拒绝。
     _strength2d_on = st.checkbox(
-        "同时输出 2D 截面应力验算（默认关闭，承载力不做）",
+        "同时输出 2D 截面应力验算（默认关闭，承载力另有开关）",
         value=False, key="strength2d_opt",
         help="只从成桥态内力与 JTG D60 组合取值，不解析内核「单元应力」段。"
              "需模型显式给出材料等级 grade、构件类型 kind、腹板面积 AW"
@@ -710,6 +711,62 @@ if doc.kind != "beam" and _cap.get("solve2d"):
              "K·ΔU=R。2D 没有 REFACT、没有 TOLF/TOLD 拆分、没有阶段占位；"
              "2D 内核也没有 [LENGTH] 索长迭代与 [OPT] 索力优化两层力学，"
              "本开关只覆盖内层 Newton。线性模型只会得到中文「不做」说明。")
+
+    # 2D 承载力 Mu / Vu（第十二次 opt-in，纯 BS 侧）：配筋是
+    # Python-only 契约，不写进 .dat、不进 DEFAULTS / FIELDS；doc.build()
+    # 每次 rerun 重建 model，故先清空再按本次控件值重挂，绝不猜配筋。
+    _capacity2d_on = st.checkbox(
+        "同时输出 2D 正截面抗弯 / 斜截面抗剪承载力 Mu、Vu（默认关闭，需填配筋）",
+        value=False, key="capacity2d_opt",
+        help="只走 flex 链：效应取基本组合逐端最不利 M_pos / M_neg / Vd，"
+             "复用 section_strength.check_capacity。压弯 / 轴压在 2D 仍不做"
+             "（组合轴力 N 只有恒载单值、无活载轴力包络）。"
+             "参数留空或模型无混凝土 grade 时整章中文拒绝，不补零。")
+    _capacity2d_cfg = ""
+    if _capacity2d_on:
+        _capacity2d_cfg = st.text_area(
+            "2D 配筋 JSON（按实常数类型 id 给 RebarSpec2D；留空 = 不启用）",
+            value="", key="capacity2d_cfg", height=150,
+            help='格式：{"1": {"h": 2000, "b": 300, "As": 4000, '
+                 '"bf": 1200, "hf": 200, "as_": 60, "Asp": 0, '
+                 '"asp": 40, "Asv": 200, "sv": 150, '
+                 '"grade_rebar": "HRB400", "grade_stirrup": "HRB400"}}。'
+                 '尺寸 mm、面积 mm²，几何与配筋全部必填；不写进 .dat。')
+    _cap2d_supported = hasattr(doc.model, "elem_types")
+    if _cap2d_supported:
+        for _t2 in doc.model.elem_types:
+            if hasattr(_t2, "rebar"):
+                _t2.rebar = None
+    if _capacity2d_on and not _cap2d_supported:
+        st.info("当前模型不是 BridgeSpec，2D 承载力不可用；"
+                "本次只给中文「不做」说明。")
+    elif _capacity2d_on and not (_capacity2d_cfg or "").strip():
+        st.info("未填 2D 配筋参数；本次求解只给中文「不做」说明，不补零。")
+    elif _capacity2d_on:
+        try:
+            import json
+            from bridge_spec import RebarSpec2D
+
+            _cfg2 = json.loads(_capacity2d_cfg)
+            if not isinstance(_cfg2, dict):
+                raise ValueError("JSON 必须是 {实常数类型 id: RebarSpec2D} 对象")
+            _by_id2 = {int(t.id): t for t in doc.model.elem_types}
+            for _k2, _v2 in _cfg2.items():
+                _tid2 = int(_k2)
+                if _tid2 not in _by_id2:
+                    raise ValueError(f"实常数类型 {_tid2} 不存在")
+                if not isinstance(_v2, dict):
+                    raise ValueError(f"类型 {_tid2} 的配筋必须是对象")
+                _by_id2[_tid2].rebar = RebarSpec2D(**_v2)
+            _cap2d_errs = [e for e in doc.model.validate_model()
+                           if "RebarSpec2D" in e]
+            if _cap2d_errs:
+                raise ValueError("；".join(_cap2d_errs))
+        except Exception as _ce:
+            for _t2 in doc.model.elem_types:
+                if hasattr(_t2, "rebar"):
+                    _t2.rebar = None
+            st.error(f"2D 配筋参数无效：{_ce}")
     _dat_now_2d = doc.to_dat()
     if st.button("运行施工阶段 + 规范组合求解", type="primary"):
         _outdir = Path("out/gui_2d")
@@ -721,7 +778,8 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                                    strength_2d=_strength2d_on,
                                    modal_2d_detail=_modal2d_detail_on,
                                    loss_2d_detail=_loss2d_on,
-                                   newton_2d_detail=_newton2d_on)
+                                   newton_2d_detail=_newton2d_on,
+                                   capacity_2d=_capacity2d_on)
                 st.session_state.solve2d = {"dat_text": _dat_now_2d,
                                             "modal2d": _modal2d_on,
                                             "modal2ddetail": _modal2d_detail_on,
@@ -729,6 +787,8 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                                             "loss2ddetail": _loss2d_on,
                                             "loss2dcfg": _loss2d_cfg,
                                             "newton2ddetail": _newton2d_on,
+                                            "capacity2d": _capacity2d_on,
+                                            "capacity2dcfg": _capacity2d_cfg,
                                             "res": _res2d}
             except Exception as _e:
                 st.session_state.solve2d = None
@@ -741,7 +801,9 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                  or bool(_s2d.get("strength2d", False)) != _strength2d_on
                  or bool(_s2d.get("loss2ddetail", False)) != _loss2d_on
                  or str(_s2d.get("loss2dcfg", "")) != _loss2d_cfg
-                 or bool(_s2d.get("newton2ddetail", False)) != _newton2d_on):
+                 or bool(_s2d.get("newton2ddetail", False)) != _newton2d_on
+                 or bool(_s2d.get("capacity2d", False)) != _capacity2d_on
+                 or str(_s2d.get("capacity2dcfg", "")) != _capacity2d_cfg):
         st.warning("模型参数或求解开关已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
         _s2d = None
     if _s2d:
@@ -800,7 +862,7 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                 else:
                     st.caption(detail_status_text(_d2))
         if _strength2d_on:
-            from strength_2d import CAPACITY_NOTE
+            from strength_2d import capacity_note_for
             from strength_2d import status_text as strength_status_text
 
             _s2 = getattr(_r2d, "strength", None) or {}
@@ -814,7 +876,7 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                 st.caption(_t["note"])
             if _s2.get("status") != "ok" or not _st:
                 st.warning(strength_status_text(_s2))
-            st.caption(CAPACITY_NOTE)
+            st.caption(capacity_note_for(getattr(_r2d, "capacity", None)))
         if _loss2d_on:
             from prestress_loss_2d import status_text as loss2d_status_text
 
@@ -847,6 +909,22 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                 st.warning(newton2d_status_text(_nt2))
             else:
                 st.caption(newton2d_status_text(_nt2))
+        if _capacity2d_on:
+            from capacity_2d import status_text as capacity2d_status_text
+
+            _cap2 = getattr(_r2d, "capacity", None) or {}
+            _capt = getattr(_r2d, "capacity_tables", lambda: {})()
+            st.markdown("**2D 正截面抗弯 / 斜截面抗剪承载力**")
+            for _t in _capt.values():
+                st.markdown(
+                    "| " + " | ".join(_t["headers"]) + " |\n|"
+                    + "---|" * len(_t["headers"]) + "\n"
+                    + "\n".join("| " + " | ".join(r) + " |" for r in _t["rows"]))
+                st.caption(_t["note"])
+            if _cap2.get("status") != "ok":
+                st.warning(capacity2d_status_text(_cap2))
+            else:
+                st.caption(capacity2d_status_text(_cap2))
         for _d in _r2d.diagnostics:
             st.caption(f"· {_d}")
 
@@ -858,7 +936,9 @@ if doc.kind != "beam" and _cap.get("solve2d"):
             value=False, key="report2d_opt",
             help="同一份 Report 中间结构出四种格式，数值与上方结果同源；"
                  "PDF 需本机 Edge / Chrome，失败只降级 PDF 这一个出口。"
-                 "2D 报告不含振型 / 承载力 Mu、Vu / 结构云图。")
+                 "2D 报告不含振型与结构云图；承载力 Mu / Vu 只在勾选"
+                 "「2D 正截面抗弯 / 斜截面抗剪承载力」并填了配筋后出现，"
+                 "压弯 / 轴压仍不做。")
         if _report2d_on and st.button("生成 2D 四出口计算书",
                                       key="report2d_btn"):
             from report_2d import build_and_write

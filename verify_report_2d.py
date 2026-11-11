@@ -531,6 +531,19 @@ def docs() -> None:
           "X20 契约" in spec and "唯一转换点" in spec)
     check("B 类规格写明 B2 剩余 3 项", "B2 剩余 3 项" in spec
           or "其余 3 项" in spec)
+    # 第十二次：2D 承载力 Mu / Vu 章与四出口同源，压弯 / 轴压仍不做。
+    check("能力矩阵登记第十二次闭环记录", "第十二次闭环记录" in mat)
+    r2src = (ROOT / "report_2d.py").read_text(encoding="utf-8")
+    check("report_2d 有承载力章、边界 note 与唯一取数口",
+          "CAPACITY_BOUNDARY_NOTE" in r2src
+          and "import capacity_2d" in r2src
+          and "res.capacity_tables()" in r2src)
+    check("report_2d 应力章按状态挑措辞，不无条件写没做",
+          "capacity_note_for(" in r2src)
+    check("B 类规格登记 verify_capacity_2d.py",
+          "verify_capacity_2d.py" in spec)
+    check("开发手册登记 verify_capacity_2d.py",
+          "verify_capacity_2d.py" in guide)
     for name, expr in (
             ("verify_capability_matrix.py", "sum(1 for ok, _, _ in RESULTS if ok)"),
             ("verify_b_class_spec.py", "sum(1 for ok, _, _ in RESULTS if ok)"),

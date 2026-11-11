@@ -67,6 +67,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import capacity_2d
 import combination
 import modal_2d
 import newton_2d
@@ -175,6 +176,12 @@ class Solve2DResult:
     newton: dict[str, Any] = field(
         default_factory=lambda: {"status": "not_requested",
                                  "source": newton_2d.SOURCE})
+    # 2D 正截面抗弯 Mu / 斜截面抗剪 Vu（opt-in）：capacity_2d.evaluate 的结果。
+    # 默认 "not_requested"；纯 Python 校核，不调内核、不写 .dat、缺配筋整章
+    # 拒绝。压弯 / 轴压在 2D 仍不做（组合轴力 N 只有恒载单值）。
+    capacity: dict[str, Any] = field(
+        default_factory=lambda: {"status": "not_requested",
+                                 "source": capacity_2d.SOURCE, "tables": {}})
 
     def modal_tables(self) -> dict[str, dict[str, Any]]:
         """报告 / 界面同源的表；无可用结果时为空 dict。
@@ -212,6 +219,10 @@ class Solve2DResult:
     def newton_tables(self) -> dict[str, dict[str, Any]]:
         """2D 内层 Newton 过程量表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
         return newton_2d.tables(self.newton)
+
+    def capacity_tables(self) -> dict[str, dict[str, Any]]:
+        """2D 承载力 Mu / Vu 表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
+        return capacity_2d.tables(self.capacity)
 
     @property
     def fingerprint(self) -> str:
@@ -416,6 +427,7 @@ def solve_2d(
     modal_detail: bool = False,
     loss_detail: bool = False,
     newton_detail: bool = False,
+    capacity: bool = False,
 ) -> Solve2DResult:
     """求解一个 BridgeSpec，返回 `Solve2DResult`。
 
@@ -451,6 +463,17 @@ def solve_2d(
     exe、不写新 diagnostics、计算书一字不变；线性模型写中文「不做」，
     不强制把分析类型改成非线性。2D 没有 `[LENGTH]` / `[OPT]` 两层力学，
     本链只覆盖内层 Newton。
+
+    `capacity=True` 时做 2D **正截面抗弯 Mu / 斜截面抗剪 Vu** 验算，结果进
+    `res.capacity`（表由 `res.capacity_tables()` 取）。这是纯 Python 校核：
+    效应只取基本组合（key=ultimate）按实常数类型分组的逐端最不利
+    M_pos / M_neg / Vd；配筋取 opt-in 的 `ElemTypeDef.rebar`
+    （`RebarSpec2D`，Python-only，不写进 .dat）；公式唯一来源
+    `section_strength.check_capacity`，不重写规范公式。缺配筋 / 缺材料等级
+    整章 `refused`，不补零、不编配筋。压弯 / 轴压在 2D 仍不做（组合轴力 N
+    只有恒载单值、无活载轴力包络），不照搬 3D 的 5% / 1% 分派阈值。
+    该分支先于 `strength` 执行，让应力章的承载力边界措辞能按实际状态选择；
+    默认 False 时不新增 diagnostics、不新增表、计算书一字不变。
 
     用法::
 
@@ -636,9 +659,17 @@ def solve_2d(
             "已请求 2D 模态明细，但未请求 2D 自振分析（modal=False）；"
             "本次不做模态明细，不补零、不由 Python 现算。")
 
+    # ③′ 2D 承载力 Mu / Vu（opt-in，纯 Python）：先于应力章执行，让
+    #    strength_2d.capacity_note_for(res.capacity) 按实际状态挑措辞。
+    #    只走 flex 链，不做压弯 / 轴压分派；不调内核、不写 .dat。
+    if capacity:
+        res.capacity = capacity_2d.evaluate(res, spec)
+        res.diagnostics.append(capacity_2d.status_text(res.capacity))
+
     # ④ 2D 截面应力验算（opt-in）：只用成桥态内力 + 同一份 spec 的显式
     #    截面/材料参数，不跑新内核、不解析「单元应力 (Pa)」段、不写 .dat。
-    #    承载力因 2D 无配筋契约一律显式拒绝（CAPACITY_NOTE）。
+    #    承载力 Mu / Vu 由 ③′ 的独立 opt-in 章负责；本表按
+    #    capacity_note_for(res.capacity) 写明边界，不拿应力利用率冒充。
     if strength:
         res.strength = strength_2d.evaluate(res, spec)
         res.diagnostics.append(strength_2d.status_text(res.strength))

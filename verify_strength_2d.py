@@ -2,8 +2,9 @@
 
 `能力边界矩阵.md` §2 把「截面应力 / 承载力验算」的 2D 格从 `N` 改成 `P`：
 本轮接通的是**应力**这一半（成桥态内力 + JTG D60 组合 → `section_strength.check`），
-**承载力 Mu/Vu 因 2D 无配筋契约一律显式拒绝**。守卫锁住这个不对称，防止
-下一次有人把 `P` 悄悄涂成 `Y`。
+**承载力 Mu/Vu 在第十二次才由独立 opt-in 的 `RebarSpec2D` 配筋契约接通**；
+未请求或缺配筋时仍整章显式拒绝，应力章按 `res.capacity` 状态挑措辞。
+守卫锁住这个不对称，防止下一次有人把 `P` 悄悄涂成 `Y`。
 
 离线：混凝土 / 钢两套闭式解 oracle、γ₀ 口径、limit、八类缺参拒绝负例、
 状态文案、表契约、默认路径源码级断言、新字段不写进 `.dat` 的逐位对拍。
@@ -273,8 +274,31 @@ def offline_defaults() -> None:
           'bool(_s2d.get("strength2d", False)) != _strength2d_on' in src_app)
     check("界面把开关传给 doc.solve",
           "strength_2d=_strength2d_on" in src_app)
-    check("界面与 HTML 都渲染承载力拒绝说明",
-          "CAPACITY_NOTE" in src_app and "CAPACITY_NOTE" in src_html)
+    # 第十二次：Mu / Vu 改由独立 opt-in 口径层出表，应力章按
+    # res.capacity 的实际状态挑措辞，不再无条件写「本次未做」。
+    check("界面与 HTML 都按 res.capacity 状态渲染承载力边界措辞",
+          "capacity_note_for(" in src_app and "capacity_note_for(" in src_html
+          and 'getattr(res, \'capacity\', None)' in src_html)
+    src_cap = (ROOT / "capacity_2d.py").read_text(encoding="utf-8")
+    check("承载力有独立唯一口径层且复用同一批纯函数",
+          "def evaluate(" in src_cap
+          and "section_strength.check_capacity" in src_cap)
+    check("未请求时仍显式拒绝、不编配筋",
+          "承载力验算（Mu / Vu / 压弯 / 轴压）本次未做"
+          in strength_2d.CAPACITY_REFUSED_NOTE
+          and "不编一个配筋出来" in strength_2d.CAPACITY_REFUSED_NOTE)
+    check("已出表时应力章指向新章且不再说没做",
+          "本次未做" not in strength_2d.CAPACITY_LINK_NOTE
+          and "capacity_2d.py" in strength_2d.CAPACITY_LINK_NOTE
+          and strength_2d.capacity_note_for({"status": "ok"})
+          == strength_2d.CAPACITY_LINK_NOTE)
+    check("not_requested / refused 都走拒绝措辞",
+          strength_2d.capacity_note_for({"status": "not_requested"})
+          == strength_2d.CAPACITY_REFUSED_NOTE
+          and strength_2d.capacity_note_for({"status": "refused"})
+          == strength_2d.CAPACITY_REFUSED_NOTE)
+    check("默认结果 capacity 为 not_requested",
+          Solve2DResult().capacity["status"] == "not_requested")
 
     # 默认 HTML 逐位不变：空结果不出章，且没有 Markdown 星号印进计算书。
     spec = _spec()
@@ -284,6 +308,8 @@ def offline_defaults() -> None:
           "2D 截面应力验算" not in h0)
     check("默认 HTML 不出现承载力说明",
           "承载力验算（Mu / Vu" not in h0)
+    check("默认 HTML 不出 2D 承载力章",
+          "2D 正截面抗弯 / 斜截面抗剪承载力" not in h0)
     check("默认 HTML 无 Markdown 星号残留", "**" not in h0)
 
 

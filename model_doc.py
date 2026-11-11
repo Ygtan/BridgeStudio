@@ -1848,6 +1848,9 @@ class ModelDoc:
             # 2D 截面应力验算是纯 Python 校核，不依赖额外 exe；但仍需模型
             # 显式给出 grade/kind/AW/板厚，否则 strength_2d 会整章拒绝。
             "strength2d": (not is_beam) and solve_2d_available(),
+            # 2D 承载力 Mu/Vu 也是纯 Python 校核，但还需模型显式挂
+            # ElemTypeDef.rebar（RebarSpec2D）与混凝土 grade，否则整章拒绝。
+            "capacity2d": (not is_beam) and solve_2d_available(),
             "cable": self.kind in ("cable_stayed", "suspension"),
             "nonlinear": str(getattr(self.model, "analysis", "LINEAR")).upper()
                          == "NONLINEAR",
@@ -1856,16 +1859,22 @@ class ModelDoc:
     def solve(self, out_dir: str | Path | None = None, dat_name: str | None = None,
               modal_2d: bool = False, strength_2d: bool = False,
               modal_2d_detail: bool = False, loss_2d_detail: bool = False,
-              newton_2d_detail: bool = False):
+              newton_2d_detail: bool = False, capacity_2d: bool = False):
         """求解的唯一入口，按维度路由到对应内核。
 
         三维 → `solver_3d.solve`（SolveResult）；二维桥型 → `solve_2d.solve_2d`
         （Solve2DResult，施工阶段 + 车道活载 + 规范组合）。单梁（ModelSpec）没有
         施工阶段/车道，仍走 `fem_eigen_export.run_fem_eigen` 的一次性静力。
 
-        `modal_2d` / `strength_2d` 是 2D 侧的 opt-in **求解选项**（默认
-        False），不是模型参数：不进 DEFAULTS / FIELDS、不写进 `.dat`；
-        三维分支忽略它们。`strength_2d` 只做截面应力，承载力显式拒绝。
+        `modal_2d` / `strength_2d` / `capacity_2d` 是 2D 侧的 opt-in
+        **求解选项**（默认 False），不是模型参数：不进 DEFAULTS / FIELDS、
+        不写进 `.dat`；三维分支忽略它们。`strength_2d` 只做截面应力。
+        `capacity_2d` 是第十二次新增的 2D 正截面抗弯 Mu / 斜截面抗剪 Vu
+        章（独立口径层 `capacity_2d.py`）：需要模型显式挂
+        `ElemTypeDef.rebar` 的 `RebarSpec2D` 与混凝土 `grade`，缺一整章
+        `refused`；效应只取基本组合的逐端最不利值，压弯 / 轴压仍不做。
+        该章的边界措辞由 `strength_2d.capacity_note_for()` 按
+        `res.capacity` 状态选择，不拿应力利用率冒充承载力利用率。
         `modal_2d_detail` 是 `modal_2d` 之上的第二层 opt-in（默认 False）：
         给 `example_modal.exe` 追加 `--modal-detail`，让内核写出 `[MODAL2D]`
         明细段（周期 T / X·Y 两向参与质量 / 节点振型）；不勾时命令行、
@@ -1918,7 +1927,8 @@ class ModelDoc:
                         modal=bool(modal_2d), strength=bool(strength_2d),
                         modal_detail=bool(modal_2d_detail),
                         loss_detail=bool(loss_2d_detail),
-                        newton_detail=bool(newton_2d_detail))
+                        newton_detail=bool(newton_2d_detail),
+                        capacity=bool(capacity_2d))
 
     # ------------------------------------------------------------ 展示
 

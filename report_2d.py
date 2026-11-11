@@ -14,8 +14,10 @@
 - 数值与 `write_2d_html` 取同一批字段、用同一套换算表达式
   （N / N·m → kN / kN·m 除 1e3，位移 m → mm 乘 1e3，均保留 1 位小数），
   由 `verify_report_2d.py` 逐项对拍；这里不另立第二套口径。
-- opt-in 的模态 / 截面应力章按 `status != "not_requested"` 出现，与旧
-  HTML 完全同一判据；承载力 Mu / Vu 仍按 2D 无配筋契约显式写「做不了」。
+- opt-in 的模态 / 截面应力 / 承载力章按 `status != "not_requested"` 出现，
+  与旧 HTML 完全同一判据；第十二次新增的承载力章只出 Mu / Vu
+  （需 `RebarSpec2D` 配筋契约），压弯 / 轴压仍显式写「做不了」。
+  应力章的边界措辞按 `res.capacity` 状态选择，不与承载力章互相矛盾。
 - `write_2d_html` 一个字节不改，默认 `.dat` 一个字节不改。
 """
 
@@ -25,6 +27,7 @@ import datetime as _dt
 from pathlib import Path
 from typing import Any
 
+import capacity_2d
 import report_3d as R
 from result_3d import Check, Metric
 
@@ -42,12 +45,16 @@ BOUNDARY_NOTE = (
     "JTG D60 三种组合，以及 opt-in 的 2D 频率 / 线性屈曲因子与截面应力；"
     "除 opt-in 的 [MODAL2D] 明细段（BASIS=xy，只给 X/Y 两向参与质量与"
     "节点振型）、第十次 opt-in 的 [PRESTRESSLOSS2D] 明细段（2D 非阶段"
-    "LOSSREF 束的 σl1~σl6 / σpe）外，2D 报告没有振型 / 参与质量 / "
-    "承载力 Mu / Vu / 结构云图，缺的字段不补零，不拿应力利用率冒充"
-    "承载力利用率。2D 没有出平面自由度，Z 向参与质量不存在（不是 0）；"
-    "2D 没有阶段维度，分项损失明细不等于 3D 阶段分项损失；"
+    "LOSSREF 束的 σl1~σl6 / σpe）、第十一次 opt-in 的 [NEWTON2D] 明细段"
+    "（内层 Newton 逐迭代过程量）外，2D 报告没有振型 / 参与质量 / "
+    "结构云图。第十二次新增的 opt-in 承载力章只出 Mu / Vu（正截面抗弯 / "
+    "斜截面抗剪，需 RebarSpec2D 配筋契约），压弯 / 轴压仍不做；缺的字段不补零，"
+    "不拿应力利用率冒充承载力利用率。2D 没有出平面自由度，Z 向参与质量"
+    "不存在（不是 0）；2D 没有阶段维度，分项损失明细不等于 3D 阶段分项损失；"
     "四出口机制对齐不等于 2D 力学能力与 3D 对齐。"
 )
+#: 承载力章边界文案的唯一来源是 capacity_2d.py（唯一口径层），不另写一套。
+CAPACITY_BOUNDARY_NOTE = capacity_2d.BOUNDARY_NOTE
 DETAIL_BOUNDARY_NOTE = (
     "本次 opt-in 的 [MODAL2D] 明细段由 2D 内核写出周期 T、X/Y 两向有效"
     "参与质量与节点振型；这是 2D 的 BASIS=xy 口径，没有 3D 的 Z 向参与质量，"
@@ -328,7 +335,8 @@ def build_2d_document(res: Any, spec: Any) -> R.Report:
         if cons.get("note"):
             blocks.append({"type": "note", "text": str(cons["note"])})
 
-    # ⑥ 2D 截面应力验算（opt-in）：承载力永远单独写「做不了」
+    # ⑥ 2D 截面应力验算（opt-in）：承载力 Mu/Vu 由 ⑨ 的独立 opt-in 章出表；
+    #    本应力章按 res.capacity 状态写明边界，不拿应力利用率冒充。
     s = getattr(res, "strength", None) or {}
     if s.get("status") != "not_requested":
         blocks.append({"type": "h1", "text": "2D 截面应力验算"})
@@ -340,9 +348,11 @@ def build_2d_document(res: Any, spec: Any) -> R.Report:
 
             blocks.append({"type": "note",
                            "text": str(strength_status_text(s))})
-        from strength_2d import CAPACITY_NOTE
+        from strength_2d import capacity_note_for
 
-        blocks.append({"type": "note", "text": str(CAPACITY_NOTE)})
+        blocks.append({"type": "note",
+                       "text": str(capacity_note_for(
+                           getattr(res, "capacity", None)))})
 
     # ⑦ 2D 分项预应力损失明细（第十次 opt-in）：2D 非阶段束，
     #    不冒充 3D 的阶段分项损失口径。
@@ -375,7 +385,22 @@ def build_2d_document(res: Any, spec: Any) -> R.Report:
                            "text": str(newton_status_text(nt))})
         blocks.append({"type": "note", "text": NEWTON_BOUNDARY_NOTE})
 
-    # ⑨ 诊断与能力边界
+    # ⑨ 2D 正截面抗弯 / 斜截面抗剪承载力（第十二次 opt-in，纯 BS 侧）：
+    #    只走 flex 链；缺 RebarSpec2D 配筋时整章拒绝，不摆空表、不补零。
+    #    三张表由 capacity_2d.tables 唯一给出，CSV 数据包自动收表。
+    cap = getattr(res, "capacity", None) or {}
+    if cap.get("status") != "not_requested":
+        blocks.append({"type": "h1",
+                       "text": "2D 正截面抗弯 / 斜截面抗剪承载力"})
+        ct = res.capacity_tables() if hasattr(res, "capacity_tables") else {}
+        for key, tb in ct.items():
+            add(key, tb)
+        if not ct:
+            blocks.append({"type": "note",
+                           "text": str(capacity_2d.status_text(cap))})
+        blocks.append({"type": "note", "text": CAPACITY_BOUNDARY_NOTE})
+
+    # ⑩ 诊断与能力边界
     blocks.append({"type": "h1", "text": "诊断与能力边界"})
     diags = [str(d) for d in (getattr(res, "diagnostics", None) or [])]
     if diags:

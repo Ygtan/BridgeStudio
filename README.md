@@ -34,7 +34,7 @@ X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（
 `X20_接入约定.md` 管「X20 资产怎么接」，**`能力边界矩阵.md` 管「接到之后到底有哪些能力、哪些还没有」**：
 6 桥型 × 2 维度主矩阵（建造器键 / 求解入口 / 阶段·活载·预应力参数逐格对拍）、
 20 项维度级能力的 `文件::符号` 依据、参数覆盖契约与刻意隐藏白名单、
-3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（244/244）纯离线守卫：
+3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（249/249）纯离线守卫：
 主矩阵与 `BUILDERS` / `SOLVER_OF` 对拍、依据符号真实存在、
 `DEFAULTS ⊆ FIELDS ∪ 白名单`、额外控件带 `default`、默认值在区间内、
 12 个建造器「控件渲染写回 params 后默认 `.dat` 逐位不变」、
@@ -533,14 +533,14 @@ Newton 一层**：FE `fem_2d.hpp` 新增 `NewtonStep2D` / `NewtonTrace2D` 挂进
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **46 个脚本全绿**，其中 41 个带汇总输出的脚本合计 **3293 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_strength_2d.py` 162/162、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 136/136、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 136/136、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 222/222、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 244/244，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **47 个脚本全绿**，其中 42 个带汇总输出的脚本合计 **3589 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 141/141、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 145/145、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 222/222、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 249/249，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
 ### B 类后续项的口径文档
 
 2D 模态 / 线性屈曲已按内核事实接通（opt-in，见 `能力边界矩阵.md` §2 备注）；
-B2 的「截面应力」半部随后按 `P` 口径接入（`strength_2d.py`，承载力仍显式拒绝），
+B2 的「截面应力」半部随后按 `P` 口径接入（`strength_2d.py`，承载力当时显式拒绝；第十二次另由 opt-in `RebarSpec2D` 接通 Mu / Vu 半部，见下文），
 第十次由 FE opt-in 补 `[PRESTRESSLOSS2D]` 段闭环「2D 分项预应力损失
 明细」后曾 **B2 剩余 2 项**；第十一次只闭环三层迭代中的内层 Newton 一层
 （`[NEWTON2D]`，该格 `2D=P`），`[LENGTH]` / `[OPT]` 两层 2D 内核没有对应
@@ -563,10 +563,35 @@ B3 非线性稳定全过程、B4 预应力损失两处规范口径、B5 无应�
 `ElemTypeDef.AW` / `t_plate` 与 `MaterialDef.grade` / `kind` 是 opt-in
 Python-only 契约，不写进 `.dat`；缺任一项整章 `refused` 并逐条列原因
 （缺 AW 让 τ 静默取 0、缺板厚让 `steel(grade, 0)` 落最薄板档偏不安全）。
-**承载力 Mu/Vu 本次未做**：2D 没有配筋契约，`RebarSpec3D` 是 3D 的，
-新增 opt-in 的 `RebarSpec2D` 之前不出 Mu/Vu 表、不拿应力利用率冒充承载力。
+承载力 Mu / Vu 见下一节：第十二次按 opt-in 的 `RebarSpec2D` 配筋契约接通；
+未请求或缺配筋时整章拒绝，不拿应力利用率冒充承载力。
 默认关闭（`strength_2d=False`），默认 `.dat` / 默认 HTML 逐位不变；
-`verify_strength_2d.py` 162/162 含混凝土 / 钢闭式解 oracle 与缺参拒绝负例。
+`verify_strength_2d.py` 168/168 含混凝土 / 钢闭式解 oracle 与缺参拒绝负例。
+
+### 2D 承载力 Mu / Vu 的 opt-in 半部（2026-11-11，第十二次）
+
+纯 BridgeStudio 侧闭环，**不改 FE 内核、不改 `to_dat()`**。新增
+`bridge_spec.py::RebarSpec2D`（挂在 `ElemTypeDef.rebar`，Python-only，
+几何与配筋全部必填）与 `capacity_2d.py`（唯一口径层）：
+
+- **只走 flex 链**：正截面抗弯 Mu（JTG 3362-2018 §5.2.2 / §5.2.3）+
+  斜截面抗剪 Vu（§5.2.9，仅配箍筋）；My 正 / 负两面各算 Mu、缺筋 `util=∞`。
+  压弯 / 轴压不做 —— 2D 组合轴力 N 只有恒载单值、无活载轴力包络，
+  不照搬 3D 的 5% / 1% 分派阈值。
+- **效应只取 `ultimate` 基本组合的逐端最不利** M_pos / M_neg / Vd，
+  与 3D `result_3d._capacity_cases` 同源；不用 2D 应力的 12 角点相乘。
+  `γ0=1.0 / α1=1.0 / α3=1.1` 与 3D 分派同源硬编码，不猜参数。
+- **公式与三张表唯一来源** `section_strength.check_capacity` /
+  `capacity_table` / `capacity_faces_table` / `capacity_calculation_sheet`，
+  不重写规范公式；缺配筋 / 缺混凝土 grade 整章 `refused`，不补零、不编配筋。
+- 链路 `solve_2d(capacity=)` → `ModelDoc.solve(capacity_2d=)` → 界面
+  `capacity2d_opt` + 显式配筋 JSON → HTML 与四出口同源章，双层 opt-in
+  默认全关；`strength_2d.capacity_note_for()` 让应力章按 `res.capacity`
+  状态挑措辞，不与新章自相矛盾。`verify_capacity_2d.py` 独立守卫。
+
+能力矩阵「截面应力 / 承载力验算」2D **仍标 `P`、不标 `Y`**：压弯 / 轴压、
+预应力、受扭、Mz / Vy 与 3D 全套承载力仍未覆盖；§4.2 计数与
+**B2 剩余 2 项**均不变。
 
 ### 2D 引用完整性校验（`P` 口径）
 

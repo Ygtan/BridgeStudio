@@ -383,6 +383,20 @@ def gaps_and_process() -> None:
           "2 个 `2D=N`" in text and "5 个 `2D=P`" in text)
     check("§4.2 写明 B2 剩余 2 项且内容收窄",
           "B2 剩余 2 项" in text and "内容已收窄" in text)
+    # 2026-11-11 第十二次：Mu / Vu 半部按 opt-in 接通，但该格仍标 P。
+    check("能力矩阵登记第十二次闭环记录", "第十二次闭环记录" in text)
+    check("§2 该格仍标 P 且依据列登记 capacity_2d",
+          "| 截面应力 / 承载力验算 | P | Y |" in text
+          and "capacity_2d.py::evaluate" in text
+          and "bridge_spec.py::RebarSpec2D" in text)
+    check("§4.2 第十二次不改计数、B2 剩余仍 2 项",
+          "2 个 `2D=N`" in text and "5 个 `2D=P`" in text
+          and "B2 剩余仍 2 项" in text)
+    check("矩阵写明压弯 / 轴压不做与无活载轴力包络",
+          "压弯 / 轴压" in text and "无活载轴力包络" in text)
+    check("独立守卫 verify_capacity_2d.py 在位且手册登记",
+          (ROOT / "verify_capacity_2d.py").is_file()
+          and "verify_capacity_2d.py" in read(ROOT / "开发使用手册.md"))
     check("§2 依据列登记 2D Newton 真实符号",
           "newton_2d.py::parse_newton_txt" in text
           and "solve_2d.py::newton_tables" in text)

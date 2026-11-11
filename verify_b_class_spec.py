@@ -351,6 +351,32 @@ def b2_newton_detail() -> None:
           "verify_newton_2d.py" in read(ROOT / "开发使用手册.md"))
 
 
+def b2_capacity_2d() -> None:
+    """第十二次：只闭环 Mu / Vu 一条 flex 链，压弯 / 轴压仍缺，仍标 P。"""
+    t = read(SPEC)
+    mat = read(ROOT / "能力边界矩阵.md")
+    check("规格登记第十二次 Mu / Vu 半部",
+          "第十二次" in t and "Mu / Vu" in t)
+    check("规格写明 RebarSpec2D 与 capacity_2d 口径层",
+          "RebarSpec2D" in t and "capacity_2d.py" in t)
+    check("规格写明压弯 / 轴压不做、不照搬 3D 阈值",
+          "压弯 / 轴压" in t and "5% / 1%" in t)
+    check("规格写明仍标 P 不标 Y", "标 `P` 不标 `Y`" in t)
+    check("规格写明 §4.2 计数与 B2 剩余不变",
+          "2 个 `2D=N`" in t and "B2 剩余仍 2 项" in t)
+    check("矩阵该格仍 P、§4.2 仍 2N+5P",
+          "| 截面应力 / 承载力验算 | P | Y |" in mat
+          and "5 个 `2D=P`" in mat)
+    p = ROOT / "verify_capacity_2d.py"
+    check("2D 承载力守卫在位", p.is_file())
+    g = read(p)
+    check("2D 承载力守卫汇总按布尔位统计",
+          "PASS.append((name, bool(ok), detail))" in g
+          and "sum(1 for _, ok, _ in PASS if ok)" in g)
+    check("开发手册登记 2D 承载力守卫",
+          "verify_capacity_2d.py" in read(ROOT / "开发使用手册.md"))
+
+
 def main() -> int:
     print("=" * 78)
     print("B 类后续项接入规格守卫（纯离线）")
@@ -364,6 +390,7 @@ def main() -> int:
     b2_modal_detail()
     b2_loss_detail()
     b2_newton_detail()
+    b2_capacity_2d()
     spec_rules()
     no_new_capability()
     dat_invariant()

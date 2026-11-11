@@ -54,6 +54,49 @@ class MaterialDef(BaseModel):
     kind: str = ""              # "steel" | "concrete"
 
 
+class RebarSpec2D(BaseModel):
+    """2D opt-in 配筋契约（`ElemTypeDef.rebar`），只给承载力验算用。
+
+    这是 **Python-only** 契约：`to_dat()` 的 `*R` 段一个字节都不写它，
+    不进 `model_doc.DEFAULTS` / `FIELDS`，不影响 12 格默认 `.dat` 黄金哈希。
+    尺寸一律 mm、面积 mm²、钢筋牌号照 `code_material`；字段与 3D 的
+    `model_spec_3d.RebarSpec3D` 同源，最终都转成同一份
+    `section_strength.CapacitySection`，不另写一套承载力公式。
+
+    **几何与配筋全部必填**：不设默认值、不从 `ElemTypeDef.A/I/WT/WB`
+    反推（那是 m 制的应力口径）、不从 `MaterialDef.name` 猜牌号。
+    `bf=0 / hf=0` 表示矩形截面，`Asp=0` 表示单筋，`Asv=0` 表示未配箍 ——
+    这些 0 是显式给出的**事实值**，不是「未提供」。
+    `negative_given=False` 表示未登记负弯矩面，验算层按正弯矩面对称近似
+    并写明，不静默。混凝土等级不在这里，取自 `MaterialDef.grade`（与 3D
+    的 `Material3D.grade → CapacitySection.concrete_grade` 同源）。
+    """
+
+    h: float = Field(gt=0)              # 截面全高 mm
+    b: float = Field(gt=0)              # 腹板宽 mm
+    As: float = Field(ge=0)             # 受拉纵筋 mm²
+    bf: float = Field(ge=0)             # 受压翼缘宽 mm（0=矩形）
+    hf: float = Field(ge=0)             # 受压翼缘厚 mm（0=矩形）
+    as_: float = Field(gt=0)            # 受拉筋合力点至受拉边缘 mm
+    Asp: float = Field(ge=0)            # 受压纵筋 mm²（0=单筋）
+    asp: float = Field(gt=0)            # 受压筋合力点至受压边缘 mm
+    Asv: float = Field(ge=0)            # 箍筋各肢总面积 mm²（0=未配箍）
+    sv: float = Field(gt=0)             # 箍筋间距 mm
+    grade_rebar: str                    # 纵筋牌号，如 HRB400
+    grade_stirrup: str                  # 箍筋牌号，如 HRB400
+    Asp_given: bool = False             # False=对称配筋 A's=As；True=按 Asp 字面值
+    negative_given: bool = False        # 是否登记负弯矩面
+    bf_neg: float | None = None         # None=沿用正弯矩面；0/显式值=覆盖
+    hf_neg: float | None = None
+    As_neg: float | None = None
+    Asp_neg: float | None = None
+    as_neg: float | None = None
+    asp_neg: float | None = None
+    l0: float = 0.0                    # 计算长度 mm（0=未提供；本轮不做压弯/轴压）
+    hollow: bool = False                # 空心箱形（毛面积/回转半径用）
+    outer_bf: float = 0.0              # 外轮廓宽 mm（0=按 bf 取）
+
+
 class ElemTypeDef(BaseModel):
     """实常数（`*R`）。BEAM 必须有 I；TRUSS/CABLE/STRUT 必须有 A。
 
@@ -78,6 +121,10 @@ class ElemTypeDef(BaseModel):
     # 缺 AW 会让 τ 静默取 0，缺板厚会让 steel(grade, 0) 落到最薄板档。
     AW: float = 0.0             # 腹板总面积 m²（剪应力 τ 用）
     t_plate: float = 0.0        # 控制板厚 mm（仅钢，查 D64 表 3.2.1 强度档）
+    # 2D 承载力 Mu/Vu 的 opt-in Python-only 配筋契约，同样不是 .dat 字段：
+    # to_dat() 的 *R 绝不写 rebar，默认 .dat 逐位不变。None = 未声明，
+    # capacity_2d.evaluate() 整章显式拒绝，不编一个配筋出来。
+    rebar: RebarSpec2D | None = None
 
 
 class NodeDef(BaseModel):
@@ -438,6 +485,13 @@ class BridgeSpec(BaseModel):
         for t in self.elem_types:
             if t.mat not in mat_ids:
                 errs.append(f"单元类型 {t.id} 引用了不存在的材料 {t.mat}")
+            # 第十二次 opt-in 的 RebarSpec2D 只给 BEAM 截面；轴向杆没有配筋
+            # 概念。默认 rebar=None 时零命中，不误伤既有 12 格模型。
+            if t.rebar is not None and \
+                    str(getattr(t.kind, "value", t.kind)).upper() != "BEAM":
+                errs.append(
+                    f"单元类型 {t.id} 是 {str(getattr(t.kind, 'value', t.kind)).upper()} "
+                    "轴向杆，不能挂 RebarSpec2D 配筋（只有 BEAM 做截面承载力验算）")
 
         stage_ids = [st.id for st in self.stages]
         if len(set(stage_ids)) != len(stage_ids):
