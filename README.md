@@ -34,7 +34,7 @@ X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（
 `X20_接入约定.md` 管「X20 资产怎么接」，**`能力边界矩阵.md` 管「接到之后到底有哪些能力、哪些还没有」**：
 6 桥型 × 2 维度主矩阵（建造器键 / 求解入口 / 阶段·活载·预应力参数逐格对拍）、
 20 项维度级能力的 `文件::符号` 依据、参数覆盖契约与刻意隐藏白名单、
-3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（249/249）纯离线守卫：
+3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（258/258）纯离线守卫：
 主矩阵与 `BUILDERS` / `SOLVER_OF` 对拍、依据符号真实存在、
 `DEFAULTS ⊆ FIELDS ∪ 白名单`、额外控件带 `default`、默认值在区间内、
 12 个建造器「控件渲染写回 params 后默认 `.dat` 逐位不变」、
@@ -527,13 +527,15 @@ Newton 一层**：FE `fem_2d.hpp` 新增 `NewtonStep2D` / `NewtonTrace2D` 挂进
 双层 opt-in 默认全关且只对显式 `*ANALYSIS TYPE=NONLINEAR` 生效，HTML 与
 四出口 `Report` 用同两张表。`verify_newton_2d.py` 守卫 FE 源码契约、
 端到端 oracle、20 类负例、默认 HTML 零污染、12 格黄金哈希与四出口同源。
-矩阵该格 `2D=P` 不是 `Y`；**`[LENGTH]` / `[OPT]` 两层 2D 内核没有对应
-力学，两格继续标 `N`、不造占位、不写不适用段冒充闭环**，本项不等于
-3D 三层迭代已移植。过程量只说明数值如何收敛，不是规范合格判定。
+矩阵该格 `2D=P` 不是 `Y`；**第十三次已按 opt-in 首次真正新造 2D 力学、
+接通 `[LENGTH2D]` 平面索长闭合一层（该格 `N→P`、仍 `P` 不 `Y`），`[OPT]`
+仍没有对应力学、仍标 `N`、不造占位、不写不适用段冒充闭环**；2D 版不等于
+3D 的垂度 / Ernst / 共转成桥态 / 闭式影响矩阵，本项不等于 3D 三层迭代
+已移植。过程量只说明数值如何收敛，不是规范合格判定。
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **47 个脚本全绿**，其中 42 个带汇总输出的脚本合计 **3589 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 141/141、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 145/145、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 222/222、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 249/249，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **48 个脚本全绿**，其中 43 个带汇总输出的脚本合计 **3875 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 150/150、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 159/159、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 230/230、`verify_length_2d.py` 246/246、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 258/258，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
@@ -543,13 +545,17 @@ Newton 一层**：FE `fem_2d.hpp` 新增 `NewtonStep2D` / `NewtonTrace2D` 挂进
 B2 的「截面应力」半部随后按 `P` 口径接入（`strength_2d.py`，承载力当时显式拒绝；第十二次另由 opt-in `RebarSpec2D` 接通 Mu / Vu 半部，见下文），
 第十次由 FE opt-in 补 `[PRESTRESSLOSS2D]` 段闭环「2D 分项预应力损失
 明细」后曾 **B2 剩余 2 项**；第十一次只闭环三层迭代中的内层 Newton 一层
-（`[NEWTON2D]`，该格 `2D=P`），`[LENGTH]` / `[OPT]` 两层 2D 内核没有对应
-力学、两格仍标 `N`，**B2 剩余仍 2 项**但内容收窄为「两层力学 +
-多格式导出」；这两项与组合体系（B1，用户本轮暂缓）、
+（`[NEWTON2D]`，该格 `2D=P`），当时 `[LENGTH]` / `[OPT]` 两层 2D 内核
+没有对应力学、两格仍标 `N`；第十三次首次真正新造 2D 力学、按 opt-in
+接通 `[LENGTH2D]` 平面索长闭合一层（该格 `N→P`、仍 `P` 不 `Y`），
+`[OPT]` 仍标 `N`，**B2 剩余仍 2 项**但内容再收窄为「`[OPT]` 一层力学 +
+多格式导出 / `.mct` 反向导入」；这两项与组合体系（B1，用户本轮暂缓）、
 B3 非线性稳定全过程、B4 预应力损失两处规范口径、B5 无应力曲率的
 **现状、两阶段规格与验收断言**统一写在
-`B类后续项接入规格.md`，由 `verify_b_class_spec.py` 纯离线守卫。这些项目
-**只立规格、未实现力学**；未实现期 `[BUCKLING] ERROR=nonlinear_state_not_supported`
+`B类后续项接入规格.md`，由 `verify_b_class_spec.py` 纯离线守卫。这些项目里
+B3 / B4 / B5 仍**只立规格、未实现力学**；B2 的 `[LENGTH2D]` 一层自第十三次
+起已按 opt-in 首次真正新造 2D 力学接通（该格 `N→P`、仍 `P` 不 `Y`），
+`[OPT]` 仍只立规格、未实现力学；未实现期 `[BUCKLING] ERROR=nonlinear_state_not_supported`
 与「σl2 只按直线筋 / εcs·φ 需查表输入」等如实边界一律保留，不虚报能力。
 
 ### 2D 截面应力验算的 P 口径（2026-11-10）
@@ -591,7 +597,42 @@ Python-only 契约，不写进 `.dat`；缺任一项整章 `refused` 并逐条�
 
 能力矩阵「截面应力 / 承载力验算」2D **仍标 `P`、不标 `Y`**：压弯 / 轴压、
 预应力、受扭、Mz / Vy 与 3D 全套承载力仍未覆盖；§4.2 计数与
-**B2 剩余 2 项**均不变。
+**B2 剩余 2 项**当时均不变；第十三次 `[LENGTH2D]` 一层按 opt-in 首次真正
+新造 2D 力学接通后 §4.2 现为 **1 个 `2D=N` + 6 个 `2D=P`**、`[OPT]` 仍标 `N`，
+**B2 剩余仍 2 项**但内容再收窄为「`[OPT]` 一层力学 + 多格式导出」。
+
+### 2D 平面索长闭合 `[LENGTH2D]`（2026-11-11，第十三次）
+
+B2 里**首次真正新造 2D 力学**：此前 2D 连索长输入契约都没有。用户拍板只做
+`[LENGTH2D]` **一层**（无垂度线性杆本构 `N=EA·((L-Lu)/Lu+istrn)`、闭式
+初值 `Lu0=L*/(1+T*/EA)`、中心有限差分 Jacobian + LM 阻尼最小二乘、唯一
+判据 `max|N/T*-1| <= TOLT` 即 `ERRKIND=tension_rel`），`[OPT]` 带约束目标
+索力优化**仍不做、仍标 `N`、不造占位**。FE 侧新增 `*CABLE_LENGTH2D`
+段（`LENGTH2D=1 TOLT= MAXLENITER=` + 逐行 `<CABLE单元号> <T*_N>`）、
+`Model2D::Element::Lu` 独立无应力下料长度（`Lu<=0` 时本构逐位不变）、
+`fem_2d.cpp::iterateCableLength2D()` 与
+`cable_length_output_2d.hpp::formatCableLengthSection2D()`；
+`example_mixed.exe --length-detail[-only]` 写 `<stem>.length.txt` 的
+`[LENGTH2D]` 段（`--length-detail-only` 求解后返回、不写 `.result`），
+无契约写 `KIND=none STATUS=not_applicable` + `ERROR=no_length_request`
+不摆空表；`[LENGTH2D]` 段按 2D 事实取舍，不写 sag / Ernst / SENS /
+NJ / J / geomErr / STAGE 占位。BS 侧 `length_2d.py` 唯一口径层只解析、
+不重算、不补零（三张表），`bridge_spec.py::LengthSpec2D` +
+`BridgeSpec.length_2d` 默认 None、`to_dat()` 一个字节不多写、
+12 格 `DEFAULT_DAT_SHA` 不变；`solve_2d(length_detail=)` /
+`Solve2DResult.length` / `length_tables()` /
+`ModelDoc.solve(length_2d_detail=)` / `capability()["length2d"]` /
+界面 `length2ddetail_opt` + `length2d_cfg` 双层 opt-in 默认全关，
+`export_html.py` 新章、`report_2d.py` 新章 ⑩（诊断顺延 ⑪）。
+闭式解 oracle：`verify_length_2d.dat` 两端固定单根 CABLE + 非零 `ISTRN`
+使闭式初值不直接命中，真实迭代 3 轮收敛到 `3.83e-13`、
+`Lu=9.952229299 m = 10/(1+T*/EA−istrn)`、`N=T*=1e6 N`；不进
+`compare_regression.py` 的 `CASES`、不刷新基线。`ctest` 7/7（含
+`dat_byte_regression` 37/37），默认不带开关时 `.result` / 控制台 /
+37 个黄金基线逐位不变。该格 `2D=N` → `2D=P`、**仍 `P` 不 `Y`**（opt-in
+默认全关，不等于 3D 的垂度 / Ernst / 共转成桥态 / 闭式影响矩阵 /
+`[OPT]`→`[LENGTH]`→`[NEWTON]` 三层迭代），`[OPT]` 仍 N，§4.2 变
+**1 个 `2D=N` + 6 个 `2D=P`**，**B2 剩余仍 2 项**。
 
 ### 2D 引用完整性校验（`P` 口径）
 

@@ -1851,6 +1851,9 @@ class ModelDoc:
             # 2D 承载力 Mu/Vu 也是纯 Python 校核，但还需模型显式挂
             # ElemTypeDef.rebar（RebarSpec2D）与混凝土 grade，否则整章拒绝。
             "capacity2d": (not is_beam) and solve_2d_available(),
+            # 2D 平面索长闭合需要 example_mixed.exe 支持 --length-detail-only，
+            # 且模型必须显式挂 BridgeSpec.length_2d 契约；这里只报 exe 可用性。
+            "length2d": (not is_beam) and solve_2d_available(),
             "cable": self.kind in ("cable_stayed", "suspension"),
             "nonlinear": str(getattr(self.model, "analysis", "LINEAR")).upper()
                          == "NONLINEAR",
@@ -1859,7 +1862,8 @@ class ModelDoc:
     def solve(self, out_dir: str | Path | None = None, dat_name: str | None = None,
               modal_2d: bool = False, strength_2d: bool = False,
               modal_2d_detail: bool = False, loss_2d_detail: bool = False,
-              newton_2d_detail: bool = False, capacity_2d: bool = False):
+              newton_2d_detail: bool = False, capacity_2d: bool = False,
+              length_2d_detail: bool = False):
         """求解的唯一入口，按维度路由到对应内核。
 
         三维 → `solver_3d.solve`（SolveResult）；二维桥型 → `solve_2d.solve_2d`
@@ -1890,8 +1894,17 @@ class ModelDoc:
         False）：只对显式 `analysis="NONLINEAR"` 的模型追加一次
         `example_mixed.exe --newton-detail-only` 读 `[NEWTON2D]` 段；
         Python 只解析、不重算。线性模型写中文「不做」，不强制改分析类型。
-        2D 没有 `[LENGTH]` / `[OPT]` 两层力学，本开关只覆盖内层 Newton。
+        第十三次起 `[LENGTH2D]` 平面索长闭合由 `length_2d_detail` 单独
+        接入，`[OPT]` 仍没有对应力学；本开关只覆盖内层 Newton。
         不勾时命令行、输出文件、diagnostics 与计算书逐位不变。
+
+        `length_2d_detail` 是 2D 平面索长闭合 `[LENGTH2D]` 的 opt-in（默认
+        False）：只有模型显式挂了 `BridgeSpec.length_2d`（逐索目标索力 T*）
+        才写 `*CABLE_LENGTH2D` 并追加一次
+        `example_mixed.exe --length-detail-only` 读 `[LENGTH2D]` 段；
+        没挂契约写中文「不做」，不调内核、不猜 T*、不改分析类型。
+        Python 只解析内核段，不重算 Lu、不由位移反推索力、不补零。
+        不勾时 `.dat` / `.result` / 默认 HTML 逐位不变。
         """
         # 即使调用方绕过界面校验，也不允许把组合体系偷偷送进单一体系内核。
         if self.params.get("combo_system"):
@@ -1928,7 +1941,8 @@ class ModelDoc:
                         modal_detail=bool(modal_2d_detail),
                         loss_detail=bool(loss_2d_detail),
                         newton_detail=bool(newton_2d_detail),
-                        capacity=bool(capacity_2d))
+                        capacity=bool(capacity_2d),
+                        length_detail=bool(length_2d_detail))
 
     # ------------------------------------------------------------ 展示
 

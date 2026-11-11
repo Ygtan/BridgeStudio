@@ -1,12 +1,14 @@
 """verify_newton_2d.py —— 2D 内层 Newton 逐迭代过程量（第十一次）独立守卫。
 
 背景（2026-11-11 第十一次，B2「三层迭代过程量」）：
-只读调研确认 2D 内核**只有**方案C 几何非线性 Newton 一层，`[LENGTH]` 索长/
-几何闭合迭代与 `[OPT]` 带约束索力优化在 2D 连输入契约都没有、内核根本没算。
+只读调研确认 2D 内核**只有**方案C 几何非线性 Newton 一层；第十三次起
+`[LENGTH2D]` 平面索长闭合一层已按 opt-in 首次真正新造 2D 力学接通（索长格
+`2D=N` → `2D=P`、仍标 `P` 不标 `Y`），`[OPT]` 带约束目标索力优化仍没有
+对应力学、仍标 `2D=N`、不造占位。
 用户拍板「只闭环 NEWTON」：新增 `NewtonStep2D` / `NewtonTrace2D` 把循环里
 已经算出的量留痕（判据 / 步长 / 线搜索 / 收敛计算一字不改），由
 `example_mixed.exe --newton-detail[-only]` 写独立 `[NEWTON2D]` 段；
-BridgeStudio 只解析、不重算；两格 `[LENGTH]` / `[OPT]` 继续如实标 `N`。
+BridgeStudio 只解析、不重算；本格仍标 `P` 不标 `Y`。
 
 本守卫锁住：
 - FE 源码契约（独立 2D 段 / BASIS=2d_global / 不写 REFACT 与阶段占位 /
@@ -17,7 +19,7 @@ BridgeStudio 只解析、不重算；两格 `[LENGTH]` / `[OPT]` 继续如实标
 - 解析层正例与 20 类负例，一律显式中文状态、不摆空表、不补零；
 - 零污染（默认开关全关、默认 HTML 不出章、diagnostics 无新条目）；
 - 接线与四出口同源（HTML / CSV 与表字典同一份数字）；
-- 两仓文档口径对拍，含「只闭环 NEWTON、两层仍标 N」不虚报。
+- 两仓文档口径对拍，含「索长格已标 P、`[OPT]` 仍标 N」不虚报。
 
 铁律：逐迭代过程量只能来自内核段，Python 不解 K·ΔU=R、不由位移反推残差、
 不补零；汇总按布尔位统计防「假绿」。
@@ -308,8 +310,14 @@ def bs_contract() -> None:
     check("口径层 SECTION 是 [NEWTON2D]", N.SECTION == "[NEWTON2D]")
     check("口径层 BASIS 是 2d_global", N.BASIS == "2d_global")
     check("口径层写明不重算", "不重算" in src_n)
-    check("口径层写明 [LENGTH]/[OPT] 两层 2D 没有",
-          "[LENGTH]" in src_n and "[OPT]" in src_n and "没有对应力学" in src_n)
+    check("口径层写明 [LENGTH2D] 已独立接入、[OPT] 仍没有对应力学",
+          "[LENGTH2D]" in src_n and "[OPT]" in src_n
+          and "没有对应力学" in src_n and "不重算" in src_n)
+    check("第十三次口径：[LENGTH2D] 一层已接通、[OPT] 仍缺",
+          "第十三次起 `[LENGTH2D]` 平面索长闭合一层已按 opt-in 新造接入" in src_s
+          and "带约束目标索力优化仍没有对应力学" in src_s
+          and "第十三次起 [LENGTH2D] 平面索长闭合一层已由独立 opt-in 章接入" in src_r
+          and "仍没有对应力学" in src_r)
     check("口径层写明过程量不构成规范判定",
           "不是规范意义上的设计合格判定" in src_n)
     check("口径层有 tables() 唯一取数口", "def tables(" in src_n)
@@ -332,8 +340,10 @@ def bs_contract() -> None:
           "不强制把模型改成非线性" in src_s)
     check("solve_2d 先清残留 .newton.txt",
           'nt_path.unlink()' in src_s)
-    check("solve_2d 第七条链写明两层力学缺席",
-          "没有索长迭代 `[LENGTH]` 与带约束索力优化 `[OPT]` 两层力学" in src_s)
+    check("solve_2d 第七条链写明 [LENGTH2D] 已按 opt-in 新造接入 / [OPT] 仍缺",
+          "第十三次起 `[LENGTH2D]` 平面索长闭合一层已按 opt-in 新造接入" in src_s
+          and "带约束目标索力优化仍没有对应力学" in src_s
+          and "不等于 3D 三层迭代过程量已移植" in src_s)
 
     sig = inspect.signature(solve_2d)
     check("solve_2d 四个 opt-in 默认全 False",
@@ -366,8 +376,9 @@ def bs_contract() -> None:
           "NEWTON_BOUNDARY_NOTE" in src_r)
     check("report_2d 有 ⑧ Newton 章",
           "2D 内层 Newton 逐迭代过程量" in src_r)
-    check("report_2d 边界写明两层仍缺",
-          "不等于 3D 三层迭代过程量已移植" in src_r)
+    check("report_2d 边界写明不等于 3D 三层迭代、[OPT] 仍缺",
+          "不等于 3D 三层迭代过程量已移植" in src_r
+          and "[OPT]" in src_r)
     check("report_2d 不另写渲染器",
           "R.write_all(rep, out_dir, stem=stem, pdf=pdf)" in src_r)
 
@@ -403,8 +414,10 @@ def parser_cases() -> None:
     check("汇总表含 CONVERGED=1",
           any(r[0].startswith("整体收敛") and r[1] == "1"
               for r in sm.get("rows") or []))
-    check("表注写明两层力学缺席",
-          "[LENGTH]" in (st.get("note") or ""))
+    check("表注写明 2D 段不等于 3D 三层迭代、[LENGTH2D] 已接入、[OPT] 仍缺",
+          "[LENGTH2D]" in (st.get("note") or "")
+          and "[OPT]" in (st.get("note") or "")
+          and "不等于 3D 三层迭代过程量已移植" in (st.get("note") or ""))
     check("status_text(ok) 是中文且带步数",
           "2 步" not in N.status_text(d) and "3 步" in N.status_text(d))
 
@@ -578,8 +591,12 @@ def docs() -> None:
           "--newton-detail-only" in fe_man)
     check("FE 文档写明默认输出逐位不变",
           "逐位不变" in fe_log or "逐位不变" in fe_man)
-    check("FE 文档写明两层力学仍缺",
-          "[LENGTH]" in fe_log and "[OPT]" in fe_log)
+    check("FE 文档写明 [LENGTH2D] 已接入 / [OPT] 仍缺（第十一条历史原文仍在）",
+          "新增：2D 平面索长闭合 [LENGTH2D] 段" in fe_log
+          and "[LENGTH2D]" in fe_log and "[OPT]" in fe_log
+          and "仍标 `2D=N`" in fe_log and "不造占位" in fe_log
+          and "本轮不新造力学" in fe_log
+          and "一字不改、仍为当时的事实记录" in fe_log)
 
     mat = read(ROOT / "能力边界矩阵.md")
     spec_doc = read(ROOT / "B类后续项接入规格.md")
@@ -597,22 +614,25 @@ def docs() -> None:
                    if ln.startswith("| 索长迭代")]
     opt_rows = [ln for ln in mat.splitlines()
                 if ln.startswith("| 目标索力优化")]
-    check("矩阵 LENGTH 格仍标 2D=N",
-          len(length_rows) == 1 and "| N | Y |" in length_rows[0],
+    check("矩阵索长格按第十三次标 2D=P（不虚报 Y）",
+          len(length_rows) == 1 and "| P | Y |" in length_rows[0],
           str(length_rows))
     check("矩阵 OPT 格仍标 2D=N",
           len(opt_rows) == 1 and "| N | Y |" in opt_rows[0], str(opt_rows))
-    check("矩阵写明两层没有对应力学、不造占位",
-          "没有对应力学" in mat and "不造占位" in mat)
-    check("矩阵 §4.2 为 2 个 2D=N + 5 个 2D=P",
-          "2 个 `2D=N`" in mat and "5 个 `2D=P`" in mat)
+    check("矩阵写明 [LENGTH2D] 一层已接通、[OPT] 仍缺、不造占位",
+          "[LENGTH2D]" in mat and "[OPT]" in mat
+          and "不造占位" in mat and "没有对应力学" in mat)
+    check("矩阵 §4.2 为 1 个 2D=N + 6 个 2D=P",
+          "1 个 `2D=N`" in mat and "6 个 `2D=P`" in mat)
     check("矩阵仍写 B2 剩余 2 项（措辞收窄）",
           "B2 剩余 2 项" in mat)
     check("B 类规格登记第十一次与段名",
           "第十一次" in spec_doc and "[NEWTON2D]" in spec_doc)
     check("B 类规格写明 B2 剩余 2 项", "B2 剩余 2 项" in spec_doc)
-    check("B 类规格写明两层仍标 N",
-          "两层" in spec_doc and "不造占位" in spec_doc)
+    check("B 类规格写明索长格 P、[OPT] 仍 N、不造占位",
+          "`[OPT]` 格仍 `2D=N`" in spec_doc
+          and "不造占位" in spec_doc
+          and "[LENGTH2D]" in spec_doc)
     for name, text in (("README", rd), ("使用说明", use), ("开发手册", guide)):
         check(f"{name} 登记 verify_newton_2d.py",
               "verify_newton_2d.py" in text)
@@ -625,6 +645,28 @@ def docs() -> None:
           "[NEWTON2D]" in read(ROOT / "verify_b_class_spec.py"))
     check("四出口守卫有第十一次断言",
           "[NEWTON2D]" in read(ROOT / "verify_report_2d.py"))
+    # 2026-11-11 第十三次：[LENGTH2D] 一层按 opt-in 首次真正新造 2D 力学接通，
+    # 索长格 N→P（仍 P 不 Y）；[OPT] 仍 N、不造占位。第十一次既有断言全部保留。
+    check("能力矩阵登记第十三次闭环记录",
+          "第十三次闭环记录" in mat)
+    check("矩阵 [OPT] 格仍 | N | Y |（不虚报）",
+          "| 目标索力优化 `[OPT]` + 体系守卫 | N | Y |" in mat)
+    check("B 类规格 §6 第 11 条登记 [LENGTH2D] 一层不虚报",
+          "11. 第十三次 `[LENGTH2D]` 一层不虚报" in spec_doc)
+    check("独立守卫 verify_length_2d.py 在位且手册登记",
+          (ROOT / "verify_length_2d.py").is_file()
+          and "verify_length_2d.py" in guide)
+    check("FE cable_length_output_2d.hpp 段名带 2D 后缀",
+          "段名带 2D 后缀" in read(FE / "cable_length_output_2d.hpp")
+          and "[LENGTH2D]" in read(FE / "cable_length_output_2d.hpp"))
+    check("2D 段不等于 3D 三层迭代、[OPT] 不造占位",
+          "三层迭代" in mat and "不等于 3D" in mat
+          and "不造占位" in mat
+          and "无垂度线性杆" in mat and "J=M·D" in mat)
+    check("矩阵 / B 类规格 / 四出口守卫有第十三次防漂移断言",
+          "[LENGTH2D]" in read(ROOT / "verify_capability_matrix.py")
+          and "[LENGTH2D]" in read(ROOT / "verify_b_class_spec.py")
+          and "[LENGTH2D]" in read(ROOT / "verify_report_2d.py"))
 
 
 def main() -> int:

@@ -350,6 +350,33 @@ def _dof_set(dofs: str) -> set[int]:
     return out
 
 
+class LengthSpec2D(BaseModel):
+    """2D 平面索长闭合 [LENGTH2D] 的 opt-in 输入契约（第十三次）。
+
+    这是**首次真正新造 2D 力学**的输入面：2D 的 CABLE 原本只是「只受拉
+    桁架 + 初应变」，没有可独立于几何弦长被指定的无应力下料长度自由度。
+    本契约只显式给出「哪根索、目标成桥索力 T* 是多少」，不给也不猜任何
+    力学参数；下料长度 Lu 由 FEM-Eigen 内核迭代求出，Python 不算。
+
+    Python-only 语义与 `RebarSpec2D` 不同：本契约**必须**写进 `.dat`，
+    否则内核没有输入。但只有显式挂到 `BridgeSpec.length_2d` 时才写，
+    默认 None 时 `to_dat()` 一个字节不多写，12 格 `DEFAULT_DAT_SHA` 不变。
+    """
+
+    targets: dict[int, float] = Field(default_factory=dict)  # 单元号 -> T* (N)
+    tol_t: float = Field(default=1e-6, gt=0.0)
+    max_iter: int = Field(default=20, ge=1)
+
+    def to_dat(self) -> str:
+        lines = [
+            "*CABLE_LENGTH2D",
+            f"LENGTH2D=1 TOLT={self.tol_t:.6g} MAXLENITER={self.max_iter}",
+        ]
+        for eid in sorted(self.targets):
+            lines.append(f"{eid} {self.targets[eid]:.10g}")
+        return "\n".join(lines)
+
+
 class BridgeSpec(BaseModel):
     title: str = "bridge"
     nodes: list[NodeDef] = Field(default_factory=list)
@@ -374,6 +401,9 @@ class BridgeSpec(BaseModel):
     # 真源仍在本 BridgeSpec，X20 / ModelSpec3D 不参与，不造第二套 canonical。
     prestress_losses: dict[int, PrestressLoss2D] = Field(default_factory=dict)
     prestresses: list[Prestress2D] = Field(default_factory=list)
+    # 2D 平面索长闭合（第十三次 opt-in）：默认 None，to_dat() 一个字节不多写。
+    # 真源在本 BridgeSpec，不进 model_doc.DEFAULTS / FIELDS，X20 不参与。
+    length_2d: LengthSpec2D | None = None
 
     # ------------------------------------------------------------ 校验
 
@@ -543,6 +573,28 @@ class BridgeSpec(BaseModel):
             if (a is not None and b is not None
                     and abs(a.x - b.x) < 1e-12 and abs(a.y - b.y) < 1e-12):
                 errs.append(f"单元 {e.id} 两端节点坐标重合（零长度单元）")
+
+        # 2D 平面索长闭合契约（第十三次 opt-in）：默认 None 时零校验成本。
+        # 目标单元必须存在、是 CABLE、T*>0；做不到就显式中文报错，不静默
+        # 跳过、不拿 TRUSS/BEAM 冒充索、不替设计猜目标索力。
+        if self.length_2d is not None:
+            lsp = self.length_2d
+            if not lsp.targets:
+                errs.append("2D 索长闭合契约 *CABLE_LENGTH2D 没有给任何目标索力 T*")
+            kinds = {t.id: str(getattr(t.kind, "value", t.kind)).upper()
+                     for t in self.elem_types}
+            emap = {e.id: e for e in self.elements}
+            for eid, target in sorted(lsp.targets.items()):
+                e = emap.get(eid)
+                if e is None:
+                    errs.append(f"2D 索长闭合目标单元 {eid} 不存在")
+                    continue
+                kind = kinds.get(e.type_id, "")
+                if kind != "CABLE":
+                    errs.append(f"2D 索长闭合目标单元 {eid} 必须是 CABLE"
+                                f"（当前 {kind or '未知'}）")
+                if target <= 0.0:
+                    errs.append(f"2D 索长闭合目标单元 {eid} 的目标索力 T* 必须大于 0")
         return errs
 
     # ------------------------------------------------------------ 摘要
@@ -690,6 +742,14 @@ class BridgeSpec(BaseModel):
             out.append("*PRESTRESS")
             for ps in self.prestresses:
                 out.append(ps.to_dat())
+            out.append("")
+
+        # 2D 平面索长闭合（第十三次 opt-in）：默认 length_2d=None 时一个字节
+        # 都不多写；只有用户显式给出「哪根 CABLE、目标索力 T*」才写契约段。
+        # 内核在整份 .dat 读完后才解析，出现在施工阶段之前不影响解析。
+        if self.length_2d is not None and self.length_2d.targets:
+            out.append("! 2D 平面索长闭合目标索力契约（opt-in，默认不写）")
+            out.append(self.length_2d.to_dat())
             out.append("")
 
         if self.stages:

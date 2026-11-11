@@ -506,7 +506,7 @@ def docs() -> None:
           "4 个 `2D=N`" in mat and "3 个 `2D=P`" in mat
           and "7 个" in mat and "已收窄" in mat)
     check("能力矩阵登记第八次闭环记录", "第八次闭环记录" in mat)
-    # 第十一次：2D 内层 Newton 过程量章与四出口同源，两层力学仍标 N。
+    # 第十一次：2D 内层 Newton 过程量章与四出口同源；第十三次索长格改 P、[OPT] 仍 N。
     check("能力矩阵登记第十一次 [NEWTON2D] 闭环",
           "[NEWTON2D]" in mat and "第十一次闭环记录" in mat)
     check("report_2d 有 2D Newton 边界 note",
@@ -553,6 +553,73 @@ def docs() -> None:
         check(f"既有守卫 {name} 汇总按布尔位统计（不假绿）", expr in t)
 
 
+def length_2d_wiring() -> None:
+    """第十三次：2D 平面索长闭合 [LENGTH2D] 章与四出口同源、默认零污染."""
+    mat = (ROOT / "能力边界矩阵.md").read_text(encoding="utf-8")
+    spec = (ROOT / "B类后续项接入规格.md").read_text(encoding="utf-8")
+    guide = (ROOT / "开发使用手册.md").read_text(encoding="utf-8")
+    r2src = (ROOT / "report_2d.py").read_text(encoding="utf-8")
+    cli = (ROOT / "export_html.py").read_text(encoding="utf-8")
+    check("report_2d 有 import length_2d / LENGTH_BOUNDARY_NOTE",
+          "import length_2d" in r2src
+          and "LENGTH_BOUNDARY_NOTE" in r2src)
+    check("report_2d 有 ⑩ 索长章、诊断顺延 ⑪ 与 res.length_tables()",
+          "2D 平面索长闭合（无应力下料长度）" in r2src
+          and "⑩" in r2src and "⑪" in r2src
+          and "res.length_tables()" in r2src)
+    check("export_html 有 length_html 章并接入 body",
+          "length_html" in cli and "{length_html}" in cli)
+    check("B 类规格 / 开发手册登记 verify_length_2d.py",
+          "verify_length_2d.py" in spec
+          and "verify_length_2d.py" in guide)
+    check("能力矩阵登记第十三次闭环记录",
+          "第十三次闭环记录" in mat)
+
+    # 直接构造 Solve2DResult 实测：status=="ok" 时三张表进 rep.tables，
+    # 默认 not_requested 时无索长章、无索长表。
+    res = _sample_res()
+    res.length = {"status": "ok"}
+    res.length_tables = lambda: {
+        "length_2d_summary_table": {"title": "索长摘要",
+                                    "headers": ["项", "值"],
+                                    "rows": [["NCABLES", "1"]], "note": "n"},
+        "length_2d_iter_table": {"title": "逐轮残差",
+                                 "headers": ["轮次"],
+                                 "rows": [["1"]], "note": "n"},
+        "length_2d_cable_table": {"title": "逐索下料长度",
+                                  "headers": ["单元"],
+                                  "rows": [["1"]], "note": "n"},
+    }
+    rep = build_2d_document(res, _sample_spec())
+    check("res.length=ok 时 Report 出三张索长表",
+          all(k in rep.tables for k in ("length_2d_summary_table",
+                                        "length_2d_iter_table",
+                                        "length_2d_cable_table")))
+    check("res.length=ok 时 Report 出 ⑩ 索长 h1 章与边界 note",
+          any(b.get("type") == "h1"
+              and "平面索长闭合" in str(b.get("text"))
+              for b in rep.blocks)
+          and any("不等于 3D" in str(b.get("text"))
+                  for b in rep.blocks))
+    rep0 = build_2d_document(Solve2DResult(), BridgeSpec())
+    check("默认 not_requested 时 Report 无索长章无索长表",
+          not any("length_2d" in k for k in rep0.tables)
+          and not any(b.get("type") == "h1"
+                      and "平面索长闭合" in str(b.get("text"))
+                      for b in rep0.blocks))
+    OUT.mkdir(parents=True, exist_ok=True)
+    d4 = OUT / "four_length2d"
+    d4.mkdir(parents=True, exist_ok=True)
+    paths = write_2d_all(rep, d4, stem="lg", pdf=False)
+    with zipfile.ZipFile(paths["zip"]) as z:
+        names = z.namelist()
+        check("write_csv() 自动收三张索长表",
+              all(any(k + ".csv" in n for n in names)
+                  for k in ("length_2d_summary_table",
+                            "length_2d_iter_table",
+                            "length_2d_cable_table")))
+
+
 def main() -> int:
     print("=" * 78)
     print("  verify_report_2d：2D 同源计算书四出口（机制对齐，不虚报内容）")
@@ -566,6 +633,7 @@ def main() -> int:
     pdf_failure()
     invariants()
     docs()
+    length_2d_wiring()
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("-" * 78)
     print(f"  {n_pass}/{len(PASS)} 通过")

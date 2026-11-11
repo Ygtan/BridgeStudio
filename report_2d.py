@@ -16,7 +16,9 @@
   由 `verify_report_2d.py` 逐项对拍；这里不另立第二套口径。
 - opt-in 的模态 / 截面应力 / 承载力章按 `status != "not_requested"` 出现，
   与旧 HTML 完全同一判据；第十二次新增的承载力章只出 Mu / Vu
-  （需 `RebarSpec2D` 配筋契约），压弯 / 轴压仍显式写「做不了」。
+  （需 `RebarSpec2D` 配筋契约），压弯 / 轴压仍显式写「做不了」；
+  第十三次新增的平面索长闭合章只出 2D 无垂度线性杆的 Lu 命中 T* 过程量
+  （需 `BridgeSpec.length_2d` 契约），`[OPT]` 仍不做。
   应力章的边界措辞按 `res.capacity` 状态选择，不与承载力章互相矛盾。
 - `write_2d_html` 一个字节不改，默认 `.dat` 一个字节不改。
 """
@@ -28,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 import capacity_2d
+import length_2d
 import report_3d as R
 from result_3d import Check, Metric
 
@@ -48,13 +51,18 @@ BOUNDARY_NOTE = (
     "LOSSREF 束的 σl1~σl6 / σpe）、第十一次 opt-in 的 [NEWTON2D] 明细段"
     "（内层 Newton 逐迭代过程量）外，2D 报告没有振型 / 参与质量 / "
     "结构云图。第十二次新增的 opt-in 承载力章只出 Mu / Vu（正截面抗弯 / "
-    "斜截面抗剪，需 RebarSpec2D 配筋契约），压弯 / 轴压仍不做；缺的字段不补零，"
+    "斜截面抗剪，需 RebarSpec2D 配筋契约），压弯 / 轴压仍不做；第十三次"
+    "新增的 opt-in [LENGTH2D] 章只出 2D 无垂度线性杆的平面索长闭合过程量"
+    "（需 BridgeSpec.length_2d 目标索力契约），[OPT] 带约束目标索力优化"
+    "仍没有对应力学、不造占位；缺的字段不补零，"
     "不拿应力利用率冒充承载力利用率。2D 没有出平面自由度，Z 向参与质量"
     "不存在（不是 0）；2D 没有阶段维度，分项损失明细不等于 3D 阶段分项损失；"
     "四出口机制对齐不等于 2D 力学能力与 3D 对齐。"
 )
 #: 承载力章边界文案的唯一来源是 capacity_2d.py（唯一口径层），不另写一套。
 CAPACITY_BOUNDARY_NOTE = capacity_2d.BOUNDARY_NOTE
+#: 平面索长闭合章边界文案的唯一来源是 length_2d.py（唯一口径层）。
+LENGTH_BOUNDARY_NOTE = length_2d.BOUNDARY_NOTE
 DETAIL_BOUNDARY_NOTE = (
     "本次 opt-in 的 [MODAL2D] 明细段由 2D 内核写出周期 T、X/Y 两向有效"
     "参与质量与节点振型；这是 2D 的 BASIS=xy 口径，没有 3D 的 Z 向参与质量，"
@@ -73,9 +81,10 @@ NEWTON_BOUNDARY_NOTE = (
     "Newton 的逐迭代过程量；字段名与单位同 3D [NEWTON] 段，但 2D 用直接"
     "求解、没有符号分解重建（不写 REFACT），只有一个容差同时管残差与位移"
     "增量（写 TOL 不拆 TOLF/TOLD），也没有阶段维度（不设阶段占位）。"
-    "2D 内核没有索长/几何闭合迭代 [LENGTH] 与带约束索力优化 [OPT] 两层"
-    "力学，本明细只覆盖内层 Newton，不等于 3D 三层迭代过程量已移植；"
-    "缺的两层不补零、不造占位。过程量只说明数值如何收敛，规范没有 Newton "
+    "第十三次起 [LENGTH2D] 平面索长闭合一层已由独立 opt-in 章接入，但"
+    "[OPT] 带约束目标索力优化仍没有对应力学；本明细只覆盖内层 Newton，"
+    "不等于 3D 三层迭代过程量已移植；缺的那一层不补零、不造占位。"
+    "过程量只说明数值如何收敛，规范没有 Newton "
     "迭代轮数的合格限值，不是规范意义上的设计合格判定。"
 )
 NO_LIVE_NOTE = (
@@ -400,7 +409,23 @@ def build_2d_document(res: Any, spec: Any) -> R.Report:
                            "text": str(capacity_2d.status_text(cap))})
         blocks.append({"type": "note", "text": CAPACITY_BOUNDARY_NOTE})
 
-    # ⑩ 诊断与能力边界
+    # ⑩ 2D 平面索长闭合 [LENGTH2D]（第十三次 opt-in，FE 内核新造力学）：
+    #    只走「无垂度线性杆 Lu 命中 T*」一层；无契约 / 内核 ERROR / 解析
+    #    拒绝时整章只出中文说明，不摆空表、不补零。[OPT] 仍不做。
+    #    三张表由 length_2d.tables 唯一给出，CSV 数据包自动收表。
+    lg = getattr(res, "length", None) or {}
+    if lg.get("status") != "not_requested":
+        blocks.append({"type": "h1",
+                       "text": "2D 平面索长闭合（无应力下料长度）"})
+        lt = res.length_tables() if hasattr(res, "length_tables") else {}
+        for key, tb in lt.items():
+            add(key, tb)
+        if not lt:
+            blocks.append({"type": "note",
+                           "text": str(length_2d.status_text(lg))})
+        blocks.append({"type": "note", "text": LENGTH_BOUNDARY_NOTE})
+
+    # ⑪ 诊断与能力边界
     blocks.append({"type": "h1", "text": "诊断与能力边界"})
     diags = [str(d) for d in (getattr(res, "diagnostics", None) or [])]
     if diags:

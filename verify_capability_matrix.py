@@ -356,8 +356,9 @@ def gaps_and_process() -> None:
     check("能力矩阵登记第十次闭环记录", "第十次闭环记录" in text)
     check("§4.2 收窄为 3 个 2D=N + 4 个 2D=P",
           "3 个 `2D=N`" in text and "4 个 `2D=P`" in text)
-    # 2026-11-11 第十一次：只闭环三层迭代中的内层 Newton 一层，仍标 P；
-    # [LENGTH] / [OPT] 两层 2D 内核没有对应力学，两格继续标 N、不造占位。
+    # 2026-11-11 第十一次只闭环三层迭代中的内层 Newton 一层；第十三次按
+    # opt-in 首次真正新造 [LENGTH2D] 平面索长闭合一层，索长格 N→P（仍 P 不 Y），
+    # [OPT] 带约束目标索力优化仍没有对应力学、仍标 N、不造占位。
     nt_rows = [ln for ln in text.splitlines()
                if ln.startswith("| 内层 Newton")]
     check("§2 内层 Newton 格标 2D=P（不虚报 Y）",
@@ -366,21 +367,22 @@ def gaps_and_process() -> None:
                if ln.startswith("| 索长迭代")]
     op_rows = [ln for ln in text.splitlines()
                if ln.startswith("| 目标索力优化")]
-    check("§2 索长迭代 / 几何闭合格仍标 2D=N",
-          len(lg_rows) == 1 and "| N | Y |" in lg_rows[0], str(lg_rows))
+    check("§2 索长迭代 / 几何闭合格按第十三次标 2D=P（仍 P 不 Y）",
+          len(lg_rows) == 1 and "| P | Y |" in lg_rows[0], str(lg_rows))
     check("§2 目标索力优化 [OPT] 格仍标 2D=N",
           len(op_rows) == 1 and "| N | Y |" in op_rows[0], str(op_rows))
     check("§2 登记 [NEWTON2D] / BASIS=2d_global 防漂移",
           "[NEWTON2D]" in text and "BASIS=2d_global" in text)
-    check("§2 写明两层没有对应力学、不造占位",
-          "没有对应力学" in text and "不造占位" in text)
+    check("§2 写明 [LENGTH2D] 一层已接通、[OPT] 仍缺、不造占位",
+          "[LENGTH2D]" in text and "[OPT]" in text
+          and "不造占位" in text and "没有对应力学" in text)
     check("§2 写明 2D 不写 REFACT / TOLF / TOLD",
           "不写 REFACT" in text and "不拆 TOLF/TOLD" in text)
     check("§2 写明过程量不构成规范判定",
           "不构成规范合格判定" in text or "不是规范合格判定" in text)
     check("能力矩阵登记第十一次闭环记录", "第十一次闭环记录" in text)
-    check("§4.2 当前为 2 个 2D=N + 5 个 2D=P",
-          "2 个 `2D=N`" in text and "5 个 `2D=P`" in text)
+    check("§4.2 当前为 1 个 2D=N + 6 个 2D=P",
+          "1 个 `2D=N`" in text and "6 个 `2D=P`" in text)
     check("§4.2 写明 B2 剩余 2 项且内容收窄",
           "B2 剩余 2 项" in text and "内容已收窄" in text)
     # 2026-11-11 第十二次：Mu / Vu 半部按 opt-in 接通，但该格仍标 P。
@@ -389,21 +391,52 @@ def gaps_and_process() -> None:
           "| 截面应力 / 承载力验算 | P | Y |" in text
           and "capacity_2d.py::evaluate" in text
           and "bridge_spec.py::RebarSpec2D" in text)
-    check("§4.2 第十二次不改计数、B2 剩余仍 2 项",
-          "2 个 `2D=N`" in text and "5 个 `2D=P`" in text
+    check("§4.2 当前计数 1 个 2D=N + 6 个 2D=P、B2 剩余仍 2 项",
+          "1 个 `2D=N`" in text and "6 个 `2D=P`" in text
           and "B2 剩余仍 2 项" in text)
     check("矩阵写明压弯 / 轴压不做与无活载轴力包络",
           "压弯 / 轴压" in text and "无活载轴力包络" in text)
     check("独立守卫 verify_capacity_2d.py 在位且手册登记",
           (ROOT / "verify_capacity_2d.py").is_file()
           and "verify_capacity_2d.py" in read(ROOT / "开发使用手册.md"))
+    # 2026-11-11 第十三次：[LENGTH2D] 平面索长闭合一层按 opt-in 首次真正
+    # 新造 2D 力学接通，索长格 2D=N → 2D=P（仍 P 不 Y）；[OPT] 仍 N、不造占位。
+    check("能力矩阵登记第十三次闭环记录", "第十三次闭环记录" in text)
+    check("§2 索长格依据列登记 length_2d.py / LengthSpec2D 真实符号",
+          "length_2d.py::parse_length_txt" in text
+          and "bridge_spec.py::LengthSpec2D" in text
+          and "verify_length_2d.py::main" in text)
+    check("§2 [OPT] 格仍 | N | Y |（不虚报、不造占位）",
+          "| 目标索力优化 `[OPT]` + 体系守卫 | N | Y |" in text
+          and "不造占位" in text)
+    check("矩阵写明 2D 是无垂度线性杆 + 有限差分 J + LM、不等于 3D 三层迭代",
+          "无垂度线性杆" in text and "中心有限差分 Jacobian" in text
+          and "LM 阻尼最小二乘" in text and "J=M·D" in text
+          and "不等于 3D" in text and "三层迭代" in text)
+    check("独立守卫 verify_length_2d.py 在位且开发手册登记",
+          (ROOT / "verify_length_2d.py").is_file()
+          and "verify_length_2d.py" in read(ROOT / "开发使用手册.md"))
+    check("矩阵写明该格仍标 P 不标 Y",
+          "仍标 `P` 不标 `Y`" in text)
+    check("§4.2 现为 1 个 2D=N + 6 个 2D=P 且 B2 剩余仍 2 项",
+          "1 个 `2D=N`" in text and "6 个 `2D=P`" in text
+          and "B2 剩余仍 2 项" in text)
+    check("§4.2 写明 B2 剩余 2 项内容再收窄为 [OPT] 一层 + 多格式导出 / .mct",
+          "内容再收窄为" in text and "`[OPT]` 一层力学" in text
+          and "`.mct` 反向导入" in text)
+    check("§2 写明 [OPT] 仍没有对应力学、不造占位、不写不适用段",
+          "仍没有对应力学" in text and "不造占位" in text
+          and "[OPT]" in text)
     check("§2 依据列登记 2D Newton 真实符号",
           "newton_2d.py::parse_newton_txt" in text
           and "solve_2d.py::newton_tables" in text)
     nt_src = read(ROOT / "newton_2d.py")
-    check("2D Newton 口径层写明不重算 / 两层缺席",
-          "不重算" in nt_src and "[LENGTH]" in nt_src
-          and "[OPT]" in nt_src and "没有对应力学" in nt_src)
+    s2d_new = read(ROOT / "solve_2d.py")
+    check("2D Newton 口径层写明不重算 / [LENGTH2D] 已接入 / [OPT] 仍缺",
+          "不重算" in nt_src and "[LENGTH2D]" in nt_src
+          and "[OPT]" in nt_src and "没有对应力学" in nt_src
+          and "第十三次起 `[LENGTH2D]` 平面索长闭合一层已按 opt-in 新造接入" in s2d_new
+          and "带约束目标索力优化仍没有对应力学" in s2d_new)
     check("§2 写明 [MODAL2D] / BASIS=xy / Z 向不存在",
           "[MODAL2D]" in text and "BASIS=xy" in text
           and "不存在（不是 0）" in text)

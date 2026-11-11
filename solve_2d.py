@@ -46,8 +46,18 @@
 线搜索折半 / 步收敛）。只对显式 `*ANALYSIS TYPE=NONLINEAR` 的模型生效；
 内核留痕字段不参与判据与步长计算，Python 只解析、不重算、不补零。
 `--newton-detail-only` 求解后只写明细、不写 `.result`、不覆盖主结果。
-**2D 内核没有索长迭代 `[LENGTH]` 与带约束索力优化 `[OPT]` 两层力学，
-本链只覆盖内层 Newton，不等于 3D 三层迭代过程量已移植。**
+**第十三次起 `[LENGTH2D]` 平面索长闭合一层已按 opt-in 新造接入（见第八条
+链），但 `[OPT]` 带约束目标索力优化仍没有对应力学；本链只覆盖内层 Newton，
+不等于 3D 三层迭代过程量已移植。**
+
+第八条链（**opt-in，默认关闭**）：`BridgeSpec.length_2d` 显式给出每根
+CABLE 的目标索力 T* → `to_dat()` 写 `*CABLE_LENGTH2D` →
+`example_mixed.exe --length-detail-only` → `<stem>.length.txt` 的
+`[LENGTH2D]` 段 → `length_2d` 解析，出逐轮残差与逐索下料长度表。
+这是**首次真正新造的 2D 力学**（无垂度线性杆本构 + 中心有限差分
+Jacobian + LM 阻尼最小二乘），不是「内核已算、只补留痕」；Python 只解析
+内核段，不重算、不补零、不由位移反推索力、不猜 T*、不改分析类型。
+`[OPT]` 仍标 `N`、不造占位。
 
 坐标约定
 --------
@@ -69,6 +79,7 @@ from typing import Any
 
 import capacity_2d
 import combination
+import length_2d
 import modal_2d
 import newton_2d
 import prestress_loss_2d as loss2d
@@ -182,6 +193,11 @@ class Solve2DResult:
     capacity: dict[str, Any] = field(
         default_factory=lambda: {"status": "not_requested",
                                  "source": capacity_2d.SOURCE, "tables": {}})
+    # 2D 平面索长闭合 [LENGTH2D]（opt-in）：length_2d.parse_length_txt 的结果。
+    # 默认 "not_requested"；只解析内核段，不另求一组 Lu、不由位移反推索力。
+    length: dict[str, Any] = field(
+        default_factory=lambda: {"status": "not_requested",
+                                 "source": length_2d.SOURCE})
 
     def modal_tables(self) -> dict[str, dict[str, Any]]:
         """报告 / 界面同源的表；无可用结果时为空 dict。
@@ -223,6 +239,10 @@ class Solve2DResult:
     def capacity_tables(self) -> dict[str, dict[str, Any]]:
         """2D 承载力 Mu / Vu 表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
         return capacity_2d.tables(self.capacity)
+
+    def length_tables(self) -> dict[str, dict[str, Any]]:
+        """2D 平面索长闭合表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
+        return length_2d.tables(self.length)
 
     @property
     def fingerprint(self) -> str:
@@ -428,6 +448,7 @@ def solve_2d(
     loss_detail: bool = False,
     newton_detail: bool = False,
     capacity: bool = False,
+    length_detail: bool = False,
 ) -> Solve2DResult:
     """求解一个 BridgeSpec，返回 `Solve2DResult`。
 
@@ -461,8 +482,8 @@ def solve_2d(
     `res.newton_tables()` 取）。该开关求解后只写明细、不写 `.result`、不覆盖
     主结果；Python 只解析、不重算 Newton 过程、不补零。默认 False：不调该
     exe、不写新 diagnostics、计算书一字不变；线性模型写中文「不做」，
-    不强制把分析类型改成非线性。2D 没有 `[LENGTH]` / `[OPT]` 两层力学，
-    本链只覆盖内层 Newton。
+    不强制把分析类型改成非线性。第十三次起 `[LENGTH2D]` 平面索长闭合由
+    第八条链单独接入，`[OPT]` 仍没有对应力学；本链只覆盖内层 Newton。
 
     `capacity=True` 时做 2D **正截面抗弯 Mu / 斜截面抗剪 Vu** 验算，结果进
     `res.capacity`（表由 `res.capacity_tables()` 取）。这是纯 Python 校核：
@@ -474,6 +495,16 @@ def solve_2d(
     只有恒载单值、无活载轴力包络），不照搬 3D 的 5% / 1% 分派阈值。
     该分支先于 `strength` 执行，让应力章的承载力边界措辞能按实际状态选择；
     默认 False 时不新增 diagnostics、不新增表、计算书一字不变。
+
+    `length_detail=True` 时做 2D **平面索长闭合 `[LENGTH2D]`**：要求模型
+    显式挂了 `BridgeSpec.length_2d`（`LengthSpec2D`：逐索目标索力 T*），
+    `to_dat()` 才会写 `*CABLE_LENGTH2D`；随后追加一次
+    `example_mixed.exe --length-detail-only`，只读它写出的
+    `<stem>.length.txt` 里的 `[LENGTH2D]` 段（表由 `res.length_tables()` 取）。
+    没挂契约就写中文「不做」，不调内核、不猜 T*、不改分析类型、不偷写段；
+    内核无契约段（`ERROR=no_length_request`）也如实给 `no_contract` 状态。
+    Python 只解析内核段：不重算 `Lu`、不另求一组下料长度、不由位移反推
+    索力、不补零。默认 False 时 `.dat` / `.result` / 默认 HTML 逐位不变。
 
     用法::
 
@@ -739,6 +770,40 @@ def solve_2d(
                         "status": "solver_error", "source": _nt_src,
                         "reason": str(e)}
         res.diagnostics.append(newton_2d.status_text(res.newton))
+
+    # ⑦ 2D 平面索长闭合 [LENGTH2D]（opt-in）：只读内核写出的
+    #    <stem>.length.txt，不重算 Lu、不由位移反推索力、不猜目标索力 T*、
+    #    不改分析类型。没有显式契约就不调内核、不偷写 *CABLE_LENGTH2D。
+    if length_detail:
+        _lg_src = length_2d.SOURCE
+        _lsp = getattr(spec, "length_2d", None)
+        _targets = getattr(_lsp, "targets", None) if _lsp is not None else None
+        if not _targets:
+            res.length = {"status": "no_contract", "source": _lg_src}
+        else:
+            exe = _find_exe("example_mixed.exe")
+            if exe is None:
+                res.length = {"status": "unavailable", "source": _lg_src}
+            else:
+                lg_path = out / (dat_path.stem + ".length.txt")
+                if lg_path.exists():
+                    lg_path.unlink()   # 不读上一次求解的残留
+                try:
+                    stdout = _run(exe, dat_name, out, timeout,
+                                  extra_args=["--length-detail-only"])
+                    if not lg_path.is_file():
+                        res.length = {
+                            "status": "no_output", "source": _lg_src,
+                            "stdout": (stdout or "")[-500:]}
+                    else:
+                        res.length = length_2d.parse_length_txt(
+                            lg_path.read_text(encoding="utf-8",
+                                              errors="replace"))
+                except SolverUnavailable2D as e:
+                    res.length = {
+                        "status": "solver_error", "source": _lg_src,
+                        "reason": str(e)}
+        res.diagnostics.append(length_2d.status_text(res.length))
     return res
 
 

@@ -709,8 +709,9 @@ if doc.kind != "beam" and _cap.get("solve2d"):
         value=False, key="newton2ddetail_opt",
         help="[NEWTON2D] 段由 FE 内核留痕写出，Python 只解析、不重算 "
              "K·ΔU=R。2D 没有 REFACT、没有 TOLF/TOLD 拆分、没有阶段占位；"
-             "2D 内核也没有 [LENGTH] 索长迭代与 [OPT] 索力优化两层力学，"
-             "本开关只覆盖内层 Newton。线性模型只会得到中文「不做」说明。")
+             "第十三次起 [LENGTH2D] 平面索长闭合由单独开关接入，[OPT] "
+             "带约束目标索力优化仍没有对应力学；本开关只覆盖内层 Newton。"
+             "线性模型只会得到中文「不做」说明。")
 
     # 2D 承载力 Mu / Vu（第十二次 opt-in，纯 BS 侧）：配筋是
     # Python-only 契约，不写进 .dat、不进 DEFAULTS / FIELDS；doc.build()
@@ -767,6 +768,58 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                 if hasattr(_t2, "rebar"):
                     _t2.rebar = None
             st.error(f"2D 配筋参数无效：{_ce}")
+
+    # 2D 平面索长闭合 [LENGTH2D]（第十三次 opt-in，FE 内核新造力学）：
+    # 目标索力 T* 必须由用户显式给出，程序不猜、不改分析类型、不偷写段。
+    # 契约挂上后 to_dat() 才会写 *CABLE_LENGTH2D，默认路径逐位不变。
+    _length2d_on = st.checkbox(
+        "同时输出 2D 平面索长闭合过程量（默认关闭，需填逐索目标索力 T*）",
+        value=False, key="length2ddetail_opt",
+        help="[LENGTH2D] 段由 FE 内核新造的 2D 力学写出（无垂度线性杆 + "
+             "中心有限差分 Jacobian + LM），Python 只解析、不重算。"
+             "需模型显式挂 BridgeSpec.length_2d；[OPT] 带约束目标索力优化"
+             "仍不做、不造占位。留空或目标单元不是 CABLE 时只给中文"
+             "「不做」说明，不补零。")
+    _length2d_cfg = ""
+    if _length2d_on:
+        _length2d_cfg = st.text_area(
+            "2D 索长闭合 JSON（目标索力 T*，单位 N；留空 = 不启用）",
+            value="", key="length2d_cfg", height=110,
+            help='格式：{"targets": {"<CABLE 单元号>": 1000000.0}, '
+                 '"tol_t": 1e-6, "max_iter": 20}。'
+                 '目标索力 T* 受拉为正、必须 > 0。只有显式填写才在 .dat '
+                 '写 *CABLE_LENGTH2D，默认 .dat 逐位不变。')
+    if hasattr(doc.model, "length_2d"):
+        doc.model.length_2d = None   # 每次 rerun 先清空，绝不沿用上次契约
+    if _length2d_on and not (_length2d_cfg or "").strip():
+        st.info("未填 2D 索长闭合目标索力；本次求解只给中文「不做」说明，"
+                "不猜 T*、不补零。")
+    elif _length2d_on and not hasattr(doc.model, "length_2d"):
+        st.info("当前模型不是 BridgeSpec，2D 索长闭合不可用；"
+                "本次只给中文「不做」说明。")
+    elif _length2d_on:
+        try:
+            import json
+            from bridge_spec import LengthSpec2D
+
+            _lcfg = json.loads(_length2d_cfg)
+            if not isinstance(_lcfg, dict):
+                raise ValueError("JSON 必须是对象")
+            _tg = _lcfg.get("targets")
+            if not isinstance(_tg, dict) or not _tg:
+                raise ValueError("targets 必须是非空的 {单元号: T*} 对象")
+            _tg2 = {int(k): float(v) for k, v in _tg.items()}
+            doc.model.length_2d = LengthSpec2D(
+                targets=_tg2,
+                tol_t=float(_lcfg.get("tol_t", 1e-6)),
+                max_iter=int(_lcfg.get("max_iter", 20)))
+            _lgerrs = [e for e in doc.model.validate_model()
+                       if "2D 索长闭合" in e]
+            if _lgerrs:
+                raise ValueError("；".join(_lgerrs))
+        except Exception as _le:
+            doc.model.length_2d = None
+            st.error(f"2D 索长闭合契约无效：{_le}")
     _dat_now_2d = doc.to_dat()
     if st.button("运行施工阶段 + 规范组合求解", type="primary"):
         _outdir = Path("out/gui_2d")
@@ -779,7 +832,8 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                                    modal_2d_detail=_modal2d_detail_on,
                                    loss_2d_detail=_loss2d_on,
                                    newton_2d_detail=_newton2d_on,
-                                   capacity_2d=_capacity2d_on)
+                                   capacity_2d=_capacity2d_on,
+                                   length_2d_detail=_length2d_on)
                 st.session_state.solve2d = {"dat_text": _dat_now_2d,
                                             "modal2d": _modal2d_on,
                                             "modal2ddetail": _modal2d_detail_on,
@@ -789,6 +843,8 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                                             "newton2ddetail": _newton2d_on,
                                             "capacity2d": _capacity2d_on,
                                             "capacity2dcfg": _capacity2d_cfg,
+                                            "length2ddetail": _length2d_on,
+                                            "length2dcfg": _length2d_cfg,
                                             "res": _res2d}
             except Exception as _e:
                 st.session_state.solve2d = None
@@ -803,7 +859,9 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                  or str(_s2d.get("loss2dcfg", "")) != _loss2d_cfg
                  or bool(_s2d.get("newton2ddetail", False)) != _newton2d_on
                  or bool(_s2d.get("capacity2d", False)) != _capacity2d_on
-                 or str(_s2d.get("capacity2dcfg", "")) != _capacity2d_cfg):
+                 or str(_s2d.get("capacity2dcfg", "")) != _capacity2d_cfg
+                 or bool(_s2d.get("length2ddetail", False)) != _length2d_on
+                 or str(_s2d.get("length2dcfg", "")) != _length2d_cfg):
         st.warning("模型参数或求解开关已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
         _s2d = None
     if _s2d:
@@ -925,6 +983,22 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                 st.warning(capacity2d_status_text(_cap2))
             else:
                 st.caption(capacity2d_status_text(_cap2))
+        if _length2d_on:
+            from length_2d import status_text as length2d_status_text
+
+            _lg2 = getattr(_r2d, "length", None) or {}
+            _lgt = getattr(_r2d, "length_tables", lambda: {})()
+            st.markdown("**2D 平面索长闭合（无应力下料长度）**")
+            for _t in _lgt.values():
+                st.markdown(
+                    "| " + " | ".join(_t["headers"]) + " |\n|"
+                    + "---|" * len(_t["headers"]) + "\n"
+                    + "\n".join("| " + " | ".join(r) + " |" for r in _t["rows"]))
+                st.caption(_t["note"])
+            if _lg2.get("status") != "ok":
+                st.warning(length2d_status_text(_lg2))
+            else:
+                st.caption(length2d_status_text(_lg2))
         for _d in _r2d.diagnostics:
             st.caption(f"· {_d}")
 
@@ -938,7 +1012,8 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                  "PDF 需本机 Edge / Chrome，失败只降级 PDF 这一个出口。"
                  "2D 报告不含振型与结构云图；承载力 Mu / Vu 只在勾选"
                  "「2D 正截面抗弯 / 斜截面抗剪承载力」并填了配筋后出现，"
-                 "压弯 / 轴压仍不做。")
+                 "压弯 / 轴压仍不做；平面索长闭合章只在勾选并填了逐索"
+                 "目标索力 T* 后出现，[OPT] 仍不做。")
         if _report2d_on and st.button("生成 2D 四出口计算书",
                                       key="report2d_btn"):
             from report_2d import build_and_write
