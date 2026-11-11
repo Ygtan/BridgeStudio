@@ -9,12 +9,12 @@
 | 项 | 本轮状态 | 依据 |
 | --- | --- | --- |
 | B1 组合体系 | **暂缓**（用户指定） | `组合体系接入规格.md`、`verify_combo_system.py` 86/86 显式拒绝 |
-| B2 2D ↔ 3D 能力对齐 | **部分实现（四轮）**：先按源码事实接通 2D 模态 / 线性屈曲；第六次 A 档按 `P` 口径接通 2D **截面应力**半部（承载力仍显式拒绝）；第七次把「引用完整性中文校验」按源码事实由 `N` 纠正为 `P` 并补齐；第八次接通「同源计算书四出口」的**导出机制**（仍标 `P`）；其余 4 项逐项评估写入 §1 | `modal_2d.py`、`verify_modal_2d.py` 111/111、`strength_2d.py`、`verify_strength_2d.py` 162/162、`bridge_spec.py::validate_model`、`verify_validate_2d.py` 83/83、`report_2d.py`、`verify_report_2d.py` |
+| B2 2D ↔ 3D 能力对齐 | **部分实现（五轮）**：先按源码事实接通 2D 模态 / 线性屈曲；第六次 A 档按 `P` 口径接通 2D **截面应力**半部（承载力仍显式拒绝）；第七次把「引用完整性中文校验」按源码事实由 `N` 纠正为 `P` 并补齐；第八次接通「同源计算书四出口」的**导出机制**（仍标 `P`）；第九次由 FE opt-in 补 `[MODAL2D]` 段闭环「模态周期 T / 振型 / 参与质量」（`BASIS=xy`，用户拍板方向口径）；**B2 剩余 3 项**逐项评估写入 §1 | `modal_2d.py`、`verify_modal_2d.py` 111/111、`strength_2d.py`、`verify_strength_2d.py` 162/162、`bridge_spec.py::validate_model`、`verify_validate_2d.py` 83/83、`report_2d.py`、`verify_report_2d.py`、`modal_2d.py::parse_modal_detail`、`verify_modal_detail_2d.py` |
 | B3 非线性稳定全过程 | **只写规格**（无代码基础、无解析锚点） | §2 |
 | B4 预应力损失两处规范口径 | **只写规格**（σl2 有条文但口径待决；σl6 缺规范表值） | §3 |
 | B5 成桥态无应力曲率 | **只写规格**（研究性扩展） | §4 |
 
-**本轮没有做的事**（逐条可核对）：不新增 kind、不新增求解键、不新增 `*CABLE_BRIDGE` 关键字、不新增结果段、不改任何内核数值路径、不刷新 `dat_byte_regression` 黄金基线。新增的只有 BridgeStudio 侧的 2D 解析 / 报告 / 界面接入层与四份守卫，默认 `.dat` 逐位不变。
+**本轮没有做的事**（逐条可核对）：不新增 kind、不新增求解键、不新增 `*CABLE_BRIDGE` 关键字、不改任何内核数值路径、不刷新 `dat_byte_regression` 黄金基线。第九次是用户明确授权的唯一破例：只在 FE 侧新增 opt-in 的 `[MODAL2D]` 结果段（默认关闭、不动既有四段与任何数值路径），BS 侧新增解析 / 报告 / 界面接入层与守卫，默认 `.dat` 与默认 `.modal.txt` 逐位不变。
 
 > 2026-11-10 第六次（A 档）追加：用户选 A、B1 组合体系仍暂缓。本档只把 §1 表格里
 > 「截面应力 / 承载力验算」的**应力半部已接入**（`strength_2d.py`，`verify_strength_2d.py`
@@ -52,14 +52,25 @@
 
 原 §4.2 写「9 个 `2D=N` 都只在 3D」。以源码复核后发现**其中 2 格是文档与内核事实漂移**：`fem_2d.cpp:2344 computeNaturalFrequencies2D`、`:2415 computeBucklingFactors2D` 早就能算，`example_modal.exe`（`CMakeLists.txt:215`）会写 `<stem>.modal.txt`；BridgeStudio 只是从未读它。本轮已接通并把能力矩阵 §2 两格改 `Y`，§4.2 收窄为 **7 个** `2D=N`。
 第六次 A 档又把「截面应力 / 承载力验算」一格由 `N` 改 `P`（只接通应力半部、承载力显式拒绝），
-第七次又把「引用完整性中文校验」由 `N` 改 `P`，第八次把「同源计算书四出口」由 `N` 改 `P`，故 §4.2 现为 4 个 `2D=N` + 3 个 `2D=P`；**「7 个」是上一轮的历史计数，不代表当前仍全是 `N`**。
+第七次又把「引用完整性中文校验」由 `N` 改 `P`，第八次把「同源计算书四出口」由 `N` 改 `P`，故 §4.2 现为 4 个 `2D=N` + 3 个 `2D=P`；**「7 个」是上一轮的历史计数，不代表当前仍全是 `N`**。第九次闭环「模态周期 T / 振型 / 参与质量」——该项不是 §2 的一格，故 `4N+3P` 不变，只把 B2 剩余由 4 项收窄为 3 项。
+
+> 2026-11-11 第九次追加：**破例改 FE 内核**（用户明确授权）。`ModalResult2D.modes`
+> 早有全阶振型、`assembleMassMatrix2D()` 可重建同一份 M，缺的只是写出。
+> FE 新增 `modal_output_2d.hpp::formatModalSection2D`（与 3D oracle 同构、
+> 不求解新特征值），`example_modal.exe <dat> --modal-detail` 才追加
+> `[MODAL2D]` 段；不加开关时 `.modal.txt` 逐字节不变、黄金基线不刷新。
+> 用户拍板 `BASIS=xy`：只给水平 X / 竖向 Y 两向平动参与质量，
+> 2D 无出平面自由度，**Z 向参与质量不存在（不是 0，不补零）**，θz 只作
+> 振型展示；`T=1/f` 由内核写出，Python 只解析、不得现算。BS 侧
+> `modal_2d.parse_modal_detail` 与两张同源表接进 HTML / 四出口 / 界面，
+> 双层 opt-in 默认全关，`verify_modal_detail_2d.py` 守卫。
 
 | 能力 | 2D 内核事实（源码依据） | 分类 | 落地条件 |
 | --- | --- | --- | --- |
 | 分项预应力损失 | `fem_2d.cpp:1188-1192 / 523-527` 能读 `*PRESTRESS_LOSS`、能算 σl1~σl6 并取 `effectivePrestressRatio`；**没有** `SL1…SL6` 明细结果段（3D 才有，`example_3d_grillage.cpp:104-122`） | ① 契约 + 公式已有 / 明细段缺 | 若要出明细表须 FE 2D 先补段；Python 侧 `StagePrestressDef` 只有总 `loss`，契约也要补，且必须 opt-in |
 | 截面应力 / 承载力验算 | `fem_2d.cpp:3831-3846` 有「单元应力 (Pa)」段；`fem_eigen_export.py:341` 段头已登记却无消费分支；`section_strength.py::check` 是纯规范校核（不重算力学）。**复核补充**：该段是内核用 WT/WB 从内力换算的第二套 σ，且 `example_stage.cpp` 的阶段结果文件根本没有它；2D `BridgeSpec` 也没有配筋契约 | ① 接入层缺口（**仅应力；已接入**）/ 承载力需新 `RebarSpec2D` 契约 | 应力半部已由 `strength_2d.py` 接入：唯一效应源 `final_beam` + 三种组合，与 `write_2d_html` / 界面同源，**不消费「单元应力」段**；N 单值 × My/Vz 两侧 × 三种组合共 12 个角点枚举，缺 AW / WT / WB / grade / kind / 板厚整章 `refused`。**承载力 Mu/Vu 显式拒绝**，故矩阵标 `P` 不标 `Y`；要出 Mu/Vu 须先新增 opt-in 的 `RebarSpec2D` 配筋契约 |
 | 索长迭代 `[LENGTH]` / Newton `[NEWTON]` / `[OPT]` | `fem_2d.cpp` 全文无 `[OPT]`；有 Newton 迭代（`:1988/:2071`）但过程量只打控制台，`writeResult()`（`:3799-3860`）只写 4 段 | ② 内核确实没有 | 须 FE 2D 先补对应结果段，**Python 不得从位移反推过程量、不得自己造目标索力** |
-| 模态周期 T / 振型 / 参与质量 | `example_modal.cpp:25-39` 只有 `f<i>` / `基频 f1` / `μ`；3D 的 `F … T …` / `S` 在 `modal_output_3d.hpp:82,91` | ② 内核确实没有 | 须 FE 2D 在 `.modal.txt` 补字段；`T=1/f` 也不得由 Python 现算（本轮 `modal_2d.py` 明确不补） |
+| 模态周期 T / 振型 / 参与质量 | **第九次已闭环**：FE 新增 `modal_output_2d.hpp::formatModalSection2D`，`example_modal.exe --modal-detail` 追加 `[MODAL2D]`（`BASIS=xy`）；`ModalResult2D.modes` 早已算出振型、`assembleMassMatrix2D` 重建同一份 M | ② 内核算了没写出 → **已补段** | `T=1/f` 由内核写出，Python 只解析；2D 无出平面自由度，Z 向参与质量不存在（不是 0）；`verify_modal_detail_2d.py` 守卫 FE 源码契约 / 12 类负例 / 零污染 / 四出口同源 |
 | 3D 活载包络结构云图 | `solve_2d.py:194-222` 已接 2D 活载包络**数值**；云图是 `view_3d.py` / `envelope_3d.py` 的空间展示层 | ③ 维度不适用 | 矩阵须写「数值 Y / 3D 云图不适用」，不是移植 |
 | 同源计算书四出口（§2 标 `P`） | `Solve2DResult` 无 `tables()` / `metrics()` / `report()`；`write_2d_html` 是默认 2D 计算书 | ③ Python 适配层（**第八次已接通导出机制**） | `report_2d.py::build_2d_document` 装成 `report_3d.Report`，`write_2d_all` 原样复用四写出器；`verify_report_2d.py` 守卫。内容仍窄于 3D，故标 `P` |
 | 多格式导出 / `.mct` 反向导入 | `export_formats.py::to_canonical` 只吃
@@ -159,4 +170,4 @@ error 列表，没有 3D 的 `(errors, warnings)` 两级与 LOSSREF / 成桥态�
 6. B2 已接通部分不虚报：能力矩阵 §2 两格 `Y`、§4.2 收窄为 7 个、README 同步「7 项」、§4 仍保留组合体系与 MIDAS 两条真缺口；
 7. 规格文档与能力矩阵 / README / 使用说明 / 开发手册的登记计数同步。
 
-**明确未闭环**：B3 全过程曲线、B4 两项公式 / 表值接入、B5 无应力曲率、B2 其余 4 项（含被 X20 契约锁死的多格式导出 / `.mct` 反向导入）、2D 承载力半部（当前 `P`，需 `RebarSpec2D`）、四出口计算书内容补齐（导出机制已闭环，仍标 `P`）、MIDAS 数值对拍、组合体系建造器。任何一项真正落地前，能力矩阵与计算书都必须继续写「没有」，不得靠改写文档提前打勾；`P` 不是 `Y`，应力利用率不得冒充 Mu/Vu 承载力验算。
+**明确未闭环**：B3 全过程曲线、B4 两项公式 / 表值接入、B5 无应力曲率、B2 其余 3 项（分项损失明细 / 三层迭代过程量 / 含被 X20 契约锁死的多格式导出与 `.mct` 反向导入）、2D 承载力半部（当前 `P`，需 `RebarSpec2D`）、四出口计算书内容补齐（导出机制已闭环，仍标 `P`）、MIDAS 数值对拍、组合体系建造器。任何一项真正落地前，能力矩阵与计算书都必须继续写「没有」，不得靠改写文档提前打勾；`P` 不是 `Y`，应力利用率不得冒充 Mu/Vu 承载力验算。

@@ -1854,7 +1854,8 @@ class ModelDoc:
         }
 
     def solve(self, out_dir: str | Path | None = None, dat_name: str | None = None,
-              modal_2d: bool = False, strength_2d: bool = False):
+              modal_2d: bool = False, strength_2d: bool = False,
+              modal_2d_detail: bool = False):
         """求解的唯一入口，按维度路由到对应内核。
 
         三维 → `solver_3d.solve`（SolveResult）；二维桥型 → `solve_2d.solve_2d`
@@ -1864,6 +1865,10 @@ class ModelDoc:
         `modal_2d` / `strength_2d` 是 2D 侧的 opt-in **求解选项**（默认
         False），不是模型参数：不进 DEFAULTS / FIELDS、不写进 `.dat`；
         三维分支忽略它们。`strength_2d` 只做截面应力，承载力显式拒绝。
+        `modal_2d_detail` 是 `modal_2d` 之上的第二层 opt-in（默认 False）：
+        给 `example_modal.exe` 追加 `--modal-detail`，让内核写出 `[MODAL2D]`
+        明细段（周期 T / X·Y 两向参与质量 / 节点振型）；不勾时命令行、
+        `.modal.txt` 与默认计算书逐位不变。
         """
         # 即使调用方绕过界面校验，也不允许把组合体系偷偷送进单一体系内核。
         if self.params.get("combo_system"):
@@ -1896,7 +1901,8 @@ class ModelDoc:
 
         out = out_dir or Path("out") / "2d"
         return solve_2d(self.model, out_dir=out, dat_name=dat_name,
-                        modal=bool(modal_2d), strength=bool(strength_2d))
+                        modal=bool(modal_2d), strength=bool(strength_2d),
+                        modal_detail=bool(modal_2d_detail))
 
     # ------------------------------------------------------------ 展示
 

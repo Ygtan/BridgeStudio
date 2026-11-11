@@ -10,7 +10,9 @@ f1 自相矛盾 / 屈曲段空 / 3D 段串入）、f1 同源对拍、表格契�
 live（`example_modal.exe` 存在时）：`solve_2d` 默认与开启对照、`.dat` 逐位不变、
 HTML 计算书同源章节、f1 与 `f1_vertical` 一致、Euler 支柱 λ 闭式解。
 
-铁律：不重算 K/M、不造周期 T / 振型 / 参与质量；缺段不补零、不静默兜底。
+铁律：不重算 K/M、不自己造频率或 λ；周期 T / 振型 / 参与质量只能来自
+FE opt-in 的 `[MODAL2D]` 段（见 `verify_modal_detail_2d.py`）；缺段不补零、
+不静默兜底。
 """
 
 from __future__ import annotations

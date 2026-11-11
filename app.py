@@ -619,10 +619,23 @@ if doc.kind != "beam" and _cap.get("solve2d"):
     _modal2d_on = st.checkbox(
         "同时输出 2D 自振频率与线性屈曲（需 example_modal.exe，默认关闭）",
         value=False, key="modal2d_opt",
-        help="不重算 K/M；内核没给周期 T / 振型 / 参与质量就不补。"
+        help="不重算 K/M；默认只给频率与 λ。若要周期 T / 振型 / 两向参与质量，"
+             "另勾下方「2D 模态明细」；内核没写出的字段一律不补。"
              "缺 exe 或缺段只在结果里写中文说明，不影响静力与活载。")
     if not _cap.get("modal2d"):
         st.caption("未编译 example_modal.exe；勾选也只会得到中文「做不了」说明。")
+    # 第二层 opt-in：必须叠在 2D 自振开关之上，不单独跑内核。
+    _modal2d_detail_on = False
+    if _modal2d_on:
+        _modal2d_detail_on = st.checkbox(
+            "同时输出 2D 模态明细：周期 T / X·Y 两向参与质量 / 节点振型（默认关闭）",
+            value=False, key="modal2ddetail_opt",
+            help="给 example_modal.exe 追加 --modal-detail，由 FE 内核写出 "
+                 "[MODAL2D] 段；Python 只解析、不现算 T、不重算 K/M。"
+                 "BASIS=xy：2D 没有出平面自由度，Z 向参与质量不存在（不是 0），"
+                 "θz 只作振型展示、不设参与质量。")
+    else:
+        st.caption("2D 模态明细需先勾选上方「2D 自振频率与线性屈曲」。")
 
     # 2D 截面应力验算同为 opt-in：只做应力，承载力因 2D 无配筋契约
     # 一律写「做不了」；模型未显式给 grade/kind/AW/板厚时整章拒绝。
@@ -643,9 +656,11 @@ if doc.kind != "beam" and _cap.get("solve2d"):
             try:
                 _res2d = doc.solve(out_dir=_outdir, dat_name="gui_2d.dat",
                                    modal_2d=_modal2d_on,
-                                   strength_2d=_strength2d_on)
+                                   strength_2d=_strength2d_on,
+                                   modal_2d_detail=_modal2d_detail_on)
                 st.session_state.solve2d = {"dat_text": _dat_now_2d,
                                             "modal2d": _modal2d_on,
+                                            "modal2ddetail": _modal2d_detail_on,
                                             "strength2d": _strength2d_on,
                                             "res": _res2d}
             except Exception as _e:
@@ -655,6 +670,7 @@ if doc.kind != "beam" and _cap.get("solve2d"):
     _s2d = st.session_state.get("solve2d")
     if _s2d and (_s2d.get("dat_text") != _dat_now_2d
                  or bool(_s2d.get("modal2d", False)) != _modal2d_on
+                 or bool(_s2d.get("modal2ddetail", False)) != _modal2d_detail_on
                  or bool(_s2d.get("strength2d", False)) != _strength2d_on):
         st.warning("模型参数或求解开关已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
         _s2d = None
@@ -705,6 +721,14 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                 st.error(str(_c2.get("note", "")))
             elif _c2.get("note"):
                 st.caption(str(_c2["note"]))
+            if _modal2d_detail_on:
+                from modal_2d import detail_status_text
+
+                _d2 = _m2.get("detail") or {"status": "no_detail_section"}
+                if _d2.get("status") != "ok":
+                    st.warning(detail_status_text(_d2))
+                else:
+                    st.caption(detail_status_text(_d2))
         if _strength2d_on:
             from strength_2d import CAPACITY_NOTE
             from strength_2d import status_text as strength_status_text

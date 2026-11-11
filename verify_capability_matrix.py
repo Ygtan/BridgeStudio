@@ -343,6 +343,15 @@ def gaps_and_process() -> None:
           "bridge_spec.py::validate_model" in text
           and "2D 仍窄于 3D" in text)
     check("能力矩阵登记第七次闭环记录", "第七次闭环记录" in text)
+    check("能力矩阵登记第九次闭环记录", "第九次闭环记录" in text)
+    check("§2 写明 [MODAL2D] / BASIS=xy / Z 向不存在",
+          "[MODAL2D]" in text and "BASIS=xy" in text
+          and "不存在（不是 0）" in text)
+    check("§2 依据列登记 parse_modal_detail 与 FE 新符号",
+          "modal_2d.py::parse_modal_detail" in text
+          and "formatModalSection2D" in text)
+    check("防漂移：FE 默认回归不带开关、黄金基线不刷新",
+          "--modal-detail" in text and "黄金基线不刷新" in text)
     bs_src = read(ROOT / "bridge_spec.py")
     s2d_src = read(ROOT / "solve_2d.py")
     check("防漂移：2D 校验符号真实存在且求解入口调用",

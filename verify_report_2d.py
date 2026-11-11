@@ -14,7 +14,7 @@
 * 默认不改：默认 HTML 两次写出逐位一致、12 格 `.dat` 黄金哈希、源码级防重算。
 
 能力矩阵该格仍标 `P`：**导出机制对齐 ≠ 2D 力学能力与 3D 对齐**，2D 报告
-没有 figures、没有振型 / 参与质量 / 承载力 Mu、Vu / 结构云图，且四出口是
+除 opt-in `[MODAL2D]` 明细段外没有振型 / 参与质量 / 承载力 Mu、Vu / 结构云图，且四出口是
 opt-in 旁路。汇总按布尔位统计，杜绝「假绿」。
 
 纯离线（除 PDF 打印外不调内核）；本目录不写任何仓库文件，产物都在
@@ -523,8 +523,8 @@ def docs() -> None:
           "四出口" in spec and "已接通" in spec and "仍标 `P`" in spec)
     check("B 类规格写明 X20 契约仍锁死多格式导出",
           "X20 契约" in spec and "唯一转换点" in spec)
-    check("B 类规格写明 B2 剩余 4 项", "B2 剩余 4 项" in spec
-          or "其余 4 项" in spec)
+    check("B 类规格写明 B2 剩余 3 项", "B2 剩余 3 项" in spec
+          or "其余 3 项" in spec)
     for name, expr in (
             ("verify_capability_matrix.py", "sum(1 for ok, _, _ in RESULTS if ok)"),
             ("verify_b_class_spec.py", "sum(1 for ok, _, _ in RESULTS if ok)"),

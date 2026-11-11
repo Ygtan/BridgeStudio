@@ -143,7 +143,8 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
 
         _chunks = ["<h2>2D 自振特性与线性屈曲</h2>"]
         _tables = res.modal_tables() if hasattr(res, "modal_tables") else {}
-        for _key in ("modal_table", "buckling_table"):
+        for _key in ("modal_table", "buckling_table",
+                     "modal_detail_table", "modal_shape_table"):
             _t = _tables.get(_key)
             if not _t:
                 continue

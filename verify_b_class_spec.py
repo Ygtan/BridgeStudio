@@ -282,6 +282,24 @@ def b2_report() -> None:
     check("开发手册登记 2D 四出口守卫",
           "verify_report_2d.py" in read(ROOT / "开发使用手册.md"))
 
+def b2_modal_detail() -> None:
+    """第九次：FE opt-in 补 [MODAL2D] 段，规格须写明口径与如实边界."""
+    t = read(SPEC)
+    check("规格登记第九次 [MODAL2D] 明细闭环",
+          "第九次" in t and "[MODAL2D]" in t)
+    check("规格写明用户拍板 BASIS=xy / Z 向不存在",
+          "BASIS=xy" in t and "不存在（不是 0）" in t)
+    check("规格写明 T 由内核写出、Python 不得现算",
+          "由内核写出" in t and "不得现算" in t)
+    p = ROOT / "verify_modal_detail_2d.py"
+    check("2D 模态明细守卫在位", p.is_file())
+    g = read(p)
+    check("2D 模态明细守卫汇总按布尔位统计",
+          "PASS.append((name, bool(ok), detail))" in g
+          and "sum(1 for _, ok, _ in PASS if ok)" in g)
+    check("开发手册登记 2D 模态明细守卫",
+          "verify_modal_detail_2d.py" in read(ROOT / "开发使用手册.md"))
+
 
 def main() -> int:
     print("=" * 78)
@@ -293,6 +311,7 @@ def main() -> int:
     b2_strength()
     b2_validation()
     b2_report()
+    b2_modal_detail()
     spec_rules()
     no_new_capability()
     dat_invariant()

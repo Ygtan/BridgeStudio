@@ -34,7 +34,7 @@ X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（
 `X20_接入约定.md` 管「X20 资产怎么接」，**`能力边界矩阵.md` 管「接到之后到底有哪些能力、哪些还没有」**：
 6 桥型 × 2 维度主矩阵（建造器键 / 求解入口 / 阶段·活载·预应力参数逐格对拍）、
 20 项维度级能力的 `文件::符号` 依据、参数覆盖契约与刻意隐藏白名单、
-3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（223/223）纯离线守卫：
+3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（227/227）纯离线守卫：
 主矩阵与 `BUILDERS` / `SOLVER_OF` 对拍、依据符号真实存在、
 `DEFAULTS ⊆ FIELDS ∪ 白名单`、额外控件带 `default`、默认值在区间内、
 12 个建造器「控件渲染写回 params 后默认 `.dat` 逐位不变」、
@@ -105,7 +105,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        C 档不借理由 —— 2026-11-10。注意：这**不等于** X20 桥型全量移植，
        下一条仍是真实能力缺口。
 - [x] **P1 能力口径可核对化 + 界面参数覆盖**：新增 `能力边界矩阵.md`
-       与 `verify_capability_matrix.py` 223/223，把「哪些有 / 哪些没有」逐格
+       与 `verify_capability_matrix.py` 227/227，把「哪些有 / 哪些没有」逐格
        钉到代码符号；据矩阵补齐 16 个只在 DEFAULTS 里、界面改不了的参数
        （`ps_beam` E/A/I/fpk/χ/1+μ、`truss_3d` 材料、`cable_stayed` panel、
        `cable_stayed_2d` 塔基与锚点、`suspension` 板厚与车道折减、
@@ -121,8 +121,9 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        `report_2d.py` 的 `Report` 旁路与原样复用的 HTML/DOCX/CSV/PDF
        写出器，但 2D 计算书内容仍窄于 3D、且 opt-in 默认关闭。
        均见 `能力边界矩阵.md`
-       §2 备注。2D 模态 / 屈曲已按内核事实接通
-       （opt-in，只有频率与 λ），其余 2D ↔ 3D 仍不对齐。
+       §2 备注。2D 模态 / 屈曲已按内核事实接通（opt-in）；第九次由 FE
+       `--modal-detail` 追加 `[MODAL2D]` 段（`BASIS=xy`）补出周期 T / X·Y
+       两向参与质量 / 节点振型，其余 2D ↔ 3D 仍不对齐（**B2 剩余 3 项**）。
        逐条依据见 `能力边界矩阵.md` §4.1 / §4.2。
        **这是真实能力缺口、不是文档滞后**，与 P4 一起排期。
        内核侧尚无协作体系求解键（注册表 4 键、`detect_kind` 二选一），
@@ -454,9 +455,25 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
       §2 增加该能力行 —— 2026-11-10
 - [ ] **P4** 成果层：**3D 包络视图已闭环**（结构云图 / 沿桥长填充带 / 峰值表 / 逐端明细表，见下条）；**MIDAS 数值对拍仍未做**——本机无 MIDAS，`.mct` 往返自检不等于数值对拍。Word/DOCX 与 PDF 计算书已支持，含承载力逐项复核章。两条边界的逐条说明见 `使用说明.md` 第十一章。
 
+### 2D 模态明细（`BASIS=xy`，第九次）
+
+FE 2D 内核本来就算出了全阶振型与一致质量矩阵，只是 `example_modal.exe`
+只写频率 / λ / μ。第九次由 `modal_output_2d.hpp::formatModalSection2D`
+把同一份结果写成 opt-in 的 `[MODAL2D]` 段：`--modal-detail` 才追加，
+不加开关时 `.modal.txt` 与默认 `.dat` 逐字节不变、回归黄金基线不刷新。
+`modal_2d.py::parse_modal_detail` 只解析，出「周期 / 参与质量」与
+「节点振型（全阶）」两张表，同步进 `write_2d_html` / 四出口 `Report` /
+界面 ⑥；CLI `solve_2d(modal=True, modal_detail=True)` 与界面第二层开关
+都是 opt-in 默认关闭。`verify_modal_detail_2d.py` 守卫 FE 源码契约、
+12 类负例、零污染、12 格黄金哈希与四出口同源。**用户拍板的方向口径**：
+2D 每节点 3 dof（水平 u / 竖向 v / 转角 θz），没有出平面自由度，
+Z 向参与质量**不存在（不是 0，不补零）**，θz 只作振型展示；
+`T=1/f` 由内核写出，Python 不得现算。参与质量是模态截断判据，
+不是规范合格判定。
+
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **43 个脚本全绿**，其中 38 个带汇总输出的脚本合计 **2678 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_strength_2d.py` 162/162、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 134/134、`verify_b_class_spec.py` 112/112、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 223/223，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **44 个脚本全绿**，其中 39 个带汇总输出的脚本合计 **2821 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_strength_2d.py` 162/162、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 134/134、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 118/118、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 227/227，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
@@ -464,7 +481,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 
 2D 模态 / 线性屈曲已按内核事实接通（opt-in，见 `能力边界矩阵.md` §2 备注）；
 B2 的「截面应力」半部随后按 `P` 口径接入（`strength_2d.py`，承载力仍显式拒绝），
-B2 剩余 6 项、组合体系（B1，用户本轮暂缓）、B3 非线性稳定全过程、B4 预应力
+B2 剩余 3 项、组合体系（B1，用户本轮暂缓）、B3 非线性稳定全过程、B4 预应力
 损失两处规范口径、B5 无应力曲率的**现状、两阶段规格与验收断言**统一写在
 `B类后续项接入规格.md`，由 `verify_b_class_spec.py` 纯离线守卫。这些项目
 **只立规格、未实现力学**；未实现期 `[BUCKLING] ERROR=nonlinear_state_not_supported`

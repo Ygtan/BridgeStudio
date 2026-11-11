@@ -150,7 +150,12 @@ class Solve2DResult:
                                  "source": strength_2d.SOURCE, "tables": {}})
 
     def modal_tables(self) -> dict[str, dict[str, Any]]:
-        """报告 / 界面同源的两张表；无可用结果时为空 dict。"""
+        """报告 / 界面同源的表；无可用结果时为空 dict。
+
+        前两张是频率 / 线性屈曲，后两张只在 opt-in `[MODAL2D]` 明细段
+        可用时出现（周期·参与质量表 + 节点振型表），表由 `modal_2d` 的
+        同一份解析结果生成，不另立第二套口径。
+        """
         out: dict[str, dict[str, Any]] = {}
         t = modal_2d.modal_table(self.modal)
         if t:
@@ -158,6 +163,14 @@ class Solve2DResult:
         b = modal_2d.buckling_table(self.modal)
         if b:
             out["buckling_table"] = b
+        d = self.modal.get("detail")
+        if d:
+            dt = modal_2d.detail_table(d)
+            if dt:
+                out["modal_detail_table"] = dt
+            st = modal_2d.shape_table(d)
+            if st:
+                out["modal_shape_table"] = st
         return out
 
     def strength_tables(self) -> dict[str, dict[str, Any]]:
@@ -333,10 +346,15 @@ def _stage_envelope(stages: list[dict[str, Any]]) -> dict[int, dict[str, float]]
 
 # ---------------------------------------------------------------- 调用内核
 
-def _run(exe: Path, dat_name: str, workdir: Path, timeout: float) -> str:
-    """跑一个内核；超时抛 SolverUnavailable2D，返回 stdout。"""
+def _run(exe: Path, dat_name: str, workdir: Path, timeout: float,
+         extra_args: list[str] | None = None) -> str:
+    """跑一个内核；超时抛 SolverUnavailable2D，返回 stdout。
+
+    `extra_args` 只由 opt-in 开关使用；默认 None 时命令行与历史逐位相同。
+    """
     try:
-        p = subprocess.run([str(exe), dat_name], cwd=str(workdir),
+        p = subprocess.run([str(exe), dat_name] + list(extra_args or []),
+                           cwd=str(workdir),
                            capture_output=True, text=True,
                            encoding="utf-8", errors="replace",
                            timeout=timeout)
@@ -359,12 +377,20 @@ def solve_2d(
     timeout: float = 120.0,
     modal: bool = False,
     strength: bool = False,
+    modal_detail: bool = False,
 ) -> Solve2DResult:
     """求解一个 BridgeSpec，返回 `Solve2DResult`。
 
     `modal=True` 时额外跑 `example_modal.exe`（读同一份 .dat）并把
     2D 自振 / 屈曲结果放进 `res.modal`。默认 False：不调该 exe、不写
     任何新 diagnostics、HTML 计算书也一字不多，默认路径完全不变。
+
+    `modal_detail=True` 只在 `modal=True` 时生效：给 `example_modal.exe` 追加
+    `--modal-detail`，让它把内核已算出的周期 T / X·Y 两向参与质量 / 节点振型
+    写进同一个 `.modal.txt` 的 `[MODAL2D]` 段，再由 `modal_2d.parse_modal_detail`
+    解析（不重算 K/M、不由 Python 现算 T）。不带此开关时命令行、输出文件、
+    diagnostics 与 HTML 计算书逐位不变；单独传 True 而 `modal=False` 会写一句
+    中文说明「本次不做」，不静默跳过。
 
     `strength=True` 时用同一份成桥态内力与 spec 做 2D **截面应力**验算，
     结果进 `res.strength`（表由 `res.strength_tables()` 取）。这是纯 Python
@@ -524,16 +550,21 @@ def solve_2d(
             res.modal = {"status": "unavailable", "source": modal_2d.SOURCE}
         else:
             try:
-                stdout = _run(exe, dat_name, out, timeout)
+                _extra = ["--modal-detail"] if modal_detail else None
+                stdout = _run(exe, dat_name, out, timeout, extra_args=_extra)
                 modal_path = out / (dat_path.stem + ".modal.txt")
                 if not modal_path.is_file():
                     res.modal = {"status": "no_output",
                                  "source": modal_2d.SOURCE,
                                  "stdout": (stdout or "")[-500:]}
                 else:
-                    res.modal = modal_2d.parse_modal_txt(
-                        modal_path.read_text(encoding="utf-8",
-                                             errors="replace"))
+                    txt = modal_path.read_text(encoding="utf-8",
+                                               errors="replace")
+                    res.modal = modal_2d.parse_modal_txt(txt)
+                    if modal_detail:
+                        # 同一份文本、同一批频率：禁止报告里出现两套频率。
+                        res.modal["detail"] = modal_2d.parse_modal_detail(
+                            txt, frequencies=res.modal["frequencies"])
             except SolverUnavailable2D as e:
                 res.modal = {"status": "solver_error",
                              "source": modal_2d.SOURCE, "reason": str(e)}
@@ -541,6 +572,14 @@ def solve_2d(
             res.modal, res.stats.get("f1_vertical"))
         res.diagnostics.append(modal_2d.status_text(res.modal))
         res.diagnostics.append(res.modal["consistency"]["note"])
+        if modal_detail:
+            det = res.modal.get("detail") or {"status": "no_detail_section"}
+            res.modal["detail"] = det
+            res.diagnostics.append(modal_2d.detail_status_text(det))
+    elif modal_detail:
+        res.diagnostics.append(
+            "已请求 2D 模态明细，但未请求 2D 自振分析（modal=False）；"
+            "本次不做模态明细，不补零、不由 Python 现算。")
 
     # ④ 2D 截面应力验算（opt-in）：只用成桥态内力 + 同一份 spec 的显式
     #    截面/材料参数，不跑新内核、不解析「单元应力 (Pa)」段、不写 .dat。
