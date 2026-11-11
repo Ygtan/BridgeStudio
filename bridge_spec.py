@@ -154,6 +154,83 @@ class StagePrestressDef(BaseModel):
     loss: float = 1.0              # 总损失系数，有效预加力 Pe=P*loss
 
 
+class PrestressLoss2D(BaseModel):
+    """2D opt-in 分项预应力损失参数表（`*PRESTRESS_LOSS`），JTG 3362-2018 §6.2。
+
+    字段与 FEM-Eigen `prestress_loss.hpp::parsePrestressLossLine` 的键名一一对应，
+    也与 3D `model_spec_3d.PrestressLoss3D` 的 22 键同源；两边共用内核唯一公式
+    `computePrestressLosses()`，这里不另立一套计算。单位一律 SI：应力 Pa、长度 m、
+    角度 rad、温度 °C。
+
+    这是 2D **非阶段** `*PRESTRESS` 束专用的 opt-in 契约，默认不写进 `.dat`。
+    σl2 只按直线筋（曲线筋反摩擦未实现），σl6 的 eps_cs / phi 需按附录 C 查表
+    输入，程序不自动按龄期发展；σl3 / σl5 / σl6 是后期损失，不进 σpe 与 Pe。
+    """
+
+    sigma_con: float = Field(gt=0)
+    Ep: float = 1.95e11
+    Ec: float = 3.45e10
+    fpk: float = 1.86e9
+    mu: float = 0.25
+    k: float = 0.0015
+    theta: float = 0.0
+    x: float = 0.0
+    delta_l: float = 0.0
+    l: float = Field(default=10.0, gt=0)
+    t1: float = 0.0
+    t2: float = 0.0
+    sigma_pc4: float = 0.0
+    sigma_pc6: float = 0.0
+    psi: float = 1.0
+    zeta: float = 0.3
+    eps_cs: float = 0.0
+    phi: float = 0.0
+    rho: float = 0.0
+    rho_ps: float = 1.0
+    post: bool = True
+    rebar: bool = False
+
+    def to_dat(self, table_id: int) -> str:
+        """输出 `*PRESTRESS_LOSS` 的一行；键名与 2D / 3D 共用解析器一致。"""
+        kv = [
+            ("SIGMA_CON", self.sigma_con), ("EP", self.Ep), ("EC", self.Ec),
+            ("FPK", self.fpk), ("MU", self.mu), ("K", self.k),
+            ("THETA", self.theta), ("X", self.x), ("DELTA_L", self.delta_l),
+            ("L", self.l), ("T1", self.t1), ("T2", self.t2),
+            ("SIGMA_PC4", self.sigma_pc4), ("SIGMA_PC6", self.sigma_pc6),
+            ("PSI", self.psi), ("ZETA", self.zeta), ("ECS", self.eps_cs),
+            ("PHI", self.phi), ("RHO", self.rho), ("RHOPS", self.rho_ps),
+            ("POST", 1 if self.post else 0), ("REBAR", 1 if self.rebar else 0),
+        ]
+        return f"{table_id} " + " ".join(
+            f"{key}={value:.6g}" if isinstance(value, float) else f"{key}={value}"
+            for key, value in kv)
+
+
+class Prestress2D(BaseModel):
+    """2D opt-in 非阶段预应力束（`*PRESTRESS ... LOSSREF=`）。
+
+    与阶段专用的 `StagePrestressDef` 不同：这束不属于任何施工阶段，只用于引用
+    `PrestressLoss2D` 表让内核写出 `[PRESTRESSLOSS2D]` 明细段。FE 要求 `LOSS`
+    与 `LOSSREF` 必须且只能给一个，故本契约只给 `LOSSREF`，不造总损失系数。
+    """
+
+    id: int = 1
+    elems: list[int] = Field(default_factory=list)
+    P: float = 0.0
+    F: float = 0.0
+    E1: float = 0.0
+    E2: float = 0.0
+    loss_ref: int = 1
+    method: str = "EQUIV"
+
+    def to_dat(self) -> str:
+        return (
+            f"{self.id} ELEM={_int_ranges(self.elems)} "
+            f"P={self.P:.6g} F={self.F:.6g} E1={self.E1:.6g} E2={self.E2:.6g} "
+            f"LOSSREF={self.loss_ref} METHOD={self.method}")
+
+
 class Stage2D(BaseModel):
     """施工阶段（`*STAGE`）。2D 内核用 ACTIVE=/DEACTIVE= 激活/钝化单元。
 
@@ -246,6 +323,10 @@ class BridgeSpec(BaseModel):
     gravity: float = -9.81       # 0.0 表示不计自重
     analysis: str = "LINEAR"     # LINEAR | NONLINEAR（轴向单元几何非线性 + 索开关）
     note: str = ""
+    # 2D 分项预应力损失（第十次 opt-in）：默认全空，to_dat() 一个字节不多写。
+    # 真源仍在本 BridgeSpec，X20 / ModelSpec3D 不参与，不造第二套 canonical。
+    prestress_losses: dict[int, PrestressLoss2D] = Field(default_factory=dict)
+    prestresses: list[Prestress2D] = Field(default_factory=list)
 
     # ------------------------------------------------------------ 校验
 
@@ -321,12 +402,37 @@ class BridgeSpec(BaseModel):
         # ------------------------------------------------------------
         # 2026-11-11 补齐：2D 引用完整性，与 3D validate_model_3d 逐项对拍。
         # 只补「2D 维度确实存在」的引用：3D 专属的 6 dof / 翘曲常数 /
-        # 索两端等高 / LOSSREF 表 / 成桥态工况不在这里造一个 2D 版本。
+        # 索两端等高 / 成桥态工况不在这里造一个 2D 版本。
+        # 第十次起 2D 有了 opt-in 的 *PRESTRESS_LOSS 表与 LOSSREF 束，
+        # 但它们是「非阶段」契约，不把 3D 的阶段分项损失口径搬过来；
+        # 其引用校验在下面单独补，默认全空时零命中、不误伤既有模型。
         # 2D 仍是单一中文 error 列表，不引入 3D 的 (errors, warnings)
         # 二元组——改返回结构会动到三个调用方，属另一件事。
         # 这里只读模型、不写任何字段，默认 .dat 逐位不变。
         # ------------------------------------------------------------
         elem_ids = {e.id for e in self.elements}
+        for tid, tb in self.prestress_losses.items():
+            if tid <= 0:
+                errs.append(f"*PRESTRESS_LOSS 表编号 {tid} 必须为正整数")
+            if tb.sigma_con <= 0.0 or tb.l <= 0.0:
+                errs.append(f"*PRESTRESS_LOSS 表 {tid} 的 sigma_con / l 必须 > 0")
+        seen_tendon: set[int] = set()
+        for ps in self.prestresses:
+            if ps.id in seen_tendon:
+                errs.append(f"*PRESTRESS 束号 {ps.id} 重复")
+            seen_tendon.add(ps.id)
+            if ps.loss_ref not in self.prestress_losses:
+                errs.append(
+                    f"*PRESTRESS 束 {ps.id} 引用了不存在的 *PRESTRESS_LOSS 表 {ps.loss_ref}")
+            if not ps.elems:
+                errs.append(f"*PRESTRESS 束 {ps.id} 的 ELEM 列表为空")
+            for eid in ps.elems:
+                if eid not in elem_ids:
+                    errs.append(f"*PRESTRESS 束 {ps.id} 引用了不存在的单元 {eid}")
+            if ps.P <= 0.0:
+                errs.append(f"*PRESTRESS 束 {ps.id} 的张拉控制力 P 必须 > 0")
+            if ps.method.upper() not in ("EQUIV", "AUTO", "TENDON"):
+                errs.append(f"*PRESTRESS 束 {ps.id} 的 METHOD={ps.method} 不受支持")
         if len(mat_ids) != len(self.materials):
             errs.append("存在重复材料 id")
         for t in self.elem_types:
@@ -515,6 +621,22 @@ class BridgeSpec(BaseModel):
         out.append("*GRAVITY")
         out.append(f"0 {self.gravity:.6g}")
         out.append("")
+
+        # 2D 分项预应力损失（第十次 opt-in）：默认空表时一个字节都不多写。
+        # 内核在整份 .dat 读完后才解析 LOSSREF，故表与束出现在施工阶段之前
+        # 不影响解析；这一段只在用户显式填了参数时才出现。
+        if self.prestress_losses:
+            out.append("! 2D 非阶段预应力分项损失（JTG 3362 §6.2，opt-in）")
+            out.append("*PRESTRESS_LOSS")
+            for tid in sorted(self.prestress_losses):
+                out.append(self.prestress_losses[tid].to_dat(tid))
+            out.append("")
+        if self.prestresses:
+            out.append("! 2D 非阶段预应力束（LOSSREF 引用上表，opt-in）")
+            out.append("*PRESTRESS")
+            for ps in self.prestresses:
+                out.append(ps.to_dat())
+            out.append("")
 
         if self.stages:
             out.append("! 施工阶段：ACTIVE=/DEACTIVE= 激活/钝化单元")

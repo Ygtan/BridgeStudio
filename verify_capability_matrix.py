@@ -344,6 +344,18 @@ def gaps_and_process() -> None:
           and "2D 仍窄于 3D" in text)
     check("能力矩阵登记第七次闭环记录", "第七次闭环记录" in text)
     check("能力矩阵登记第九次闭环记录", "第九次闭环记录" in text)
+    # 2026-11-11 第十次：2D 分项损失明细按 FE opt-in 补段闭环，仍标 P。
+    loss_rows = [ln for ln in text.splitlines()
+                 if ln.startswith("| 分项预应力损失")]
+    check("§2 分项损失格标 2D=P（不虚报 Y）",
+          len(loss_rows) == 1 and "| P | Y |" in loss_rows[0], str(loss_rows))
+    check("§2 登记 [PRESTRESSLOSS2D] / BASIS=2d_global 防漂移",
+          "[PRESTRESSLOSS2D]" in text and "BASIS=2d_global" in text)
+    check("§2 不设 STAGE 占位且不等于 3D 阶段维度",
+          "不设 STAGE 占位" in text and "不等于 3D 的阶段" in text)
+    check("能力矩阵登记第十次闭环记录", "第十次闭环记录" in text)
+    check("§4.2 收窄为 3 个 2D=N + 4 个 2D=P",
+          "3 个 `2D=N`" in text and "4 个 `2D=P`" in text)
     check("§2 写明 [MODAL2D] / BASIS=xy / Z 向不存在",
           "[MODAL2D]" in text and "BASIS=xy" in text
           and "不存在（不是 0）" in text)

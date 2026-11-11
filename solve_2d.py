@@ -34,6 +34,12 @@
 **不解析内核「单元应力 (Pa)」段**（那是第二套 σ，且阶段结果文件没有该段）；
 截面参数缺 AW / WT / WB / grade / kind / 板厚时整章拒绝，不静默兜底。
 
+第六条链（**opt-in，默认关闭**）：`example_mixed.exe --loss-detail-only` →
+`<stem>.loss.txt` 的 `[PRESTRESSLOSS2D]` 段 → `prestress_loss_2d` 解析，
+出 2D 非阶段 `LOSSREF` 束的 σl1~σl6 / σpe / RATIO 明细表。只解析内核
+已算出的结果，不重算、不补零；`--loss-detail-only` 只写明细、不求解、
+不覆盖 `.result`，故施工阶段路径也能单独取明细。
+
 坐标约定
 --------
 2D 内核自由度：1=u(x)、2=v(y)、3=θ。竖向位移是 dof 2（不是三维的 dof 3）。
@@ -54,6 +60,7 @@ from typing import Any
 
 import combination
 import modal_2d
+import prestress_loss_2d as loss2d
 import strength_2d
 
 
@@ -148,6 +155,11 @@ class Solve2DResult:
     strength: dict[str, Any] = field(
         default_factory=lambda: {"status": "not_requested",
                                  "source": strength_2d.SOURCE, "tables": {}})
+    # 2D 分项预应力损失明细（opt-in）：loss2d.parse_loss_txt 的结果。
+    # 默认 "not_requested"；不重算 σl、不由 Python 反算 σpe、缺段不补零。
+    prestress_loss: dict[str, Any] = field(
+        default_factory=lambda: {"status": "not_requested",
+                                 "source": loss2d.SOURCE})
 
     def modal_tables(self) -> dict[str, dict[str, Any]]:
         """报告 / 界面同源的表；无可用结果时为空 dict。
@@ -176,6 +188,11 @@ class Solve2DResult:
     def strength_tables(self) -> dict[str, dict[str, Any]]:
         """2D 截面应力验算表：报告 / 界面唯一取数口，拒绝时为空 dict。"""
         return dict((self.strength or {}).get("tables") or {})
+
+    def prestress_loss_tables(self) -> dict[str, dict[str, Any]]:
+        """2D 分项损失明细表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
+        t = loss2d.loss_table(self.prestress_loss)
+        return {"prestress_loss_table": t} if t else {}
 
     @property
     def fingerprint(self) -> str:
@@ -378,6 +395,7 @@ def solve_2d(
     modal: bool = False,
     strength: bool = False,
     modal_detail: bool = False,
+    loss_detail: bool = False,
 ) -> Solve2DResult:
     """求解一个 BridgeSpec，返回 `Solve2DResult`。
 
@@ -396,6 +414,14 @@ def solve_2d(
     结果进 `res.strength`（表由 `res.strength_tables()` 取）。这是纯 Python
     校核，不跑新内核、不解析「单元应力」段、不写进 `.dat`；缺验算参数或
     2D 无配筋契约时按 `strength_2d.status_text()` 显式写中文，不静默兜底。
+
+    `loss_detail=True` 时，对模型显式填的 `*PRESTRESS_LOSS` 表 +
+    `*PRESTRESS ... LOSSREF=` 束追加一次
+    `example_mixed.exe --loss-detail-only`，只读它写出的 `<stem>.loss.txt`。
+    该开关只写明细、不求解、不覆盖 `.result`，所以有施工阶段时也能取明细；
+    Python 只解析 `[PRESTRESSLOSS2D]` 段，不重算 σl1~σl6 / σpe / RATIO。
+    默认 False：不调该 exe、不写新 diagnostics、计算书一字不变；模型没有
+    LOSSREF 束时写中文「不做」，不补零。
 
     用法::
 
@@ -587,6 +613,39 @@ def solve_2d(
     if strength:
         res.strength = strength_2d.evaluate(res, spec)
         res.diagnostics.append(strength_2d.status_text(res.strength))
+
+    # ⑤ 2D 分项预应力损失明细（opt-in）：只读内核写出的
+    #    <stem>.loss.txt，不重算 σl、不补零、不改 .dat / .result。
+    if loss_detail:
+        _loss_src = loss2d.SOURCE
+        if not (getattr(spec, "prestress_losses", None)
+                and getattr(spec, "prestresses", None)):
+            res.prestress_loss = {"status": "no_model", "source": _loss_src}
+        else:
+            exe = _find_exe("example_mixed.exe")
+            if exe is None:
+                res.prestress_loss = {"status": "unavailable",
+                                      "source": _loss_src}
+            else:
+                loss_path = out / (dat_path.stem + ".loss.txt")
+                if loss_path.exists():
+                    loss_path.unlink()   # 不读上一次求解的残留
+                try:
+                    stdout = _run(exe, dat_name, out, timeout,
+                                  extra_args=["--loss-detail-only"])
+                    if not loss_path.is_file():
+                        res.prestress_loss = {
+                            "status": "no_output", "source": _loss_src,
+                            "stdout": (stdout or "")[-500:]}
+                    else:
+                        res.prestress_loss = loss2d.parse_loss_txt(
+                            loss_path.read_text(encoding="utf-8",
+                                                errors="replace"))
+                except SolverUnavailable2D as e:
+                    res.prestress_loss = {
+                        "status": "solver_error", "source": _loss_src,
+                        "reason": str(e)}
+        res.diagnostics.append(loss2d.status_text(res.prestress_loss))
     return res
 
 

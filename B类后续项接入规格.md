@@ -9,7 +9,7 @@
 | 项 | 本轮状态 | 依据 |
 | --- | --- | --- |
 | B1 组合体系 | **暂缓**（用户指定） | `组合体系接入规格.md`、`verify_combo_system.py` 86/86 显式拒绝 |
-| B2 2D ↔ 3D 能力对齐 | **部分实现（五轮）**：先按源码事实接通 2D 模态 / 线性屈曲；第六次 A 档按 `P` 口径接通 2D **截面应力**半部（承载力仍显式拒绝）；第七次把「引用完整性中文校验」按源码事实由 `N` 纠正为 `P` 并补齐；第八次接通「同源计算书四出口」的**导出机制**（仍标 `P`）；第九次由 FE opt-in 补 `[MODAL2D]` 段闭环「模态周期 T / 振型 / 参与质量」（`BASIS=xy`，用户拍板方向口径）；**B2 剩余 3 项**逐项评估写入 §1 | `modal_2d.py`、`verify_modal_2d.py` 111/111、`strength_2d.py`、`verify_strength_2d.py` 162/162、`bridge_spec.py::validate_model`、`verify_validate_2d.py` 83/83、`report_2d.py`、`verify_report_2d.py`、`modal_2d.py::parse_modal_detail`、`verify_modal_detail_2d.py` |
+| B2 2D ↔ 3D 能力对齐 | **部分实现（六轮）**：先按源码事实接通 2D 模态 / 线性屈曲；第六次 A 档按 `P` 口径接通 2D **截面应力**半部（承载力仍显式拒绝）；第七次把「引用完整性中文校验」按源码事实由 `N` 纠正为 `P` 并补齐；第八次接通「同源计算书四出口」的**导出机制**（仍标 `P`）；第九次由 FE opt-in 补 `[MODAL2D]` 段闭环「模态周期 T / 振型 / 参与质量」（`BASIS=xy`，用户拍板方向口径，收官时 **B2 剩余 3 项**）；第十次由 FE opt-in 补 `[PRESTRESSLOSS2D]` 段闭环「2D 分项预应力损失明细」（`BASIS=2d_global`，仍标 `P` 不标 `Y`），**B2 剩余 2 项**逐项评估写入 §1 | `modal_2d.py`、`verify_modal_2d.py` 111/111、`strength_2d.py`、`verify_strength_2d.py` 162/162、`bridge_spec.py::validate_model`、`verify_validate_2d.py` 83/83、`report_2d.py`、`verify_report_2d.py`、`modal_2d.py::parse_modal_detail`、`verify_modal_detail_2d.py`、`prestress_loss_2d.py`、`verify_prestress_loss_2d.py` |
 | B3 非线性稳定全过程 | **只写规格**（无代码基础、无解析锚点） | §2 |
 | B4 预应力损失两处规范口径 | **只写规格**（σl2 有条文但口径待决；σl6 缺规范表值） | §3 |
 | B5 成桥态无应力曲率 | **只写规格**（研究性扩展） | §4 |
@@ -46,13 +46,40 @@
 > 多格式导出 / `.mct` 反向导入仍被 **X20 契约**锁死，继续写「没有」。
 > FE 内核零改动。
 
+> 2026-11-11 第十次追加：**破例改 FE 内核**（用户明确授权并拍板段形态）。
+> 与第九次同构但更硬：`computePrestressLosses()` 六项公式 2D / 3D 同源，
+> 可 2D 入口 `fem_2d.cpp::processPrestress` 只取 `effectivePrestressRatio`
+> 标量，六项当场丢弃，状态层连容器都没有。本轮 `loss` 行一字不动，另取
+> 一份同源明细存进 `Model2D::prestressLossDetails`，
+> `prestress_loss_output_2d.hpp::formatPrestressLossSection2D` 写
+> `[PRESTRESSLOSS2D]` 段（`BASIS=2d_global` / `P<id> SIGMA_CON= SL1=..SL6=
+> SPE= RATIO=`，12 位有效数字、单位 Pa，字段与 3D `stage prestress loss`
+> 同源）。段形状按用户拍板：**独立段、不设 STAGE 占位**（2D 没有阶段维度，
+> `P<id>` 是输入行首显式束号），不等于 3D 的阶段分项损失；只收录
+> `LOSSREF` 束，缺束写 `ERROR=no_lossref_prestress` 不摆空表。
+> `example_mixed.exe --loss-detail` 写 `<stem>.loss.txt`，
+> `--loss-detail-only` **只取明细、不求解、不写 `.result`**，避让
+> `example_stage.exe` 主路径；默认 `.result` / 控制台 / 12 格默认 `.dat`
+> 逐位不变，黄金基线不刷新，σl1~σl6 / σpe / RATIO **由内核写出**，
+> Python **只解析**、不得现算或反算。BS 侧补 22 键 `*PRESTRESS_LOSS` 表
+> 与非阶段 `*PRESTRESS ... LOSSREF=` 束的 opt-in 契约（显式挂
+> `BridgeSpec`，不进 `DEFAULTS` / `FIELDS`）、`bridge_spec.validate_model`
+> 的 LOSSREF 引用中文校验、`prestress_loss_2d.py` 唯一口径层、
+> HTML / 四出口同源表与界面第二层开关；双层 opt-in 默认全关，
+> `verify_prestress_loss_2d.py` 守卫 FE 源码契约 / 独立闭式解 /
+> 12 类负例 / 零污染 / 四出口同源。矩阵该格由 `N` 改 `P`，**标 `P` 不标 `Y`**：
+> opt-in 默认关闭，且没有 3D 的阶段维度与阶段预应力写回。
+> B1 组合体系仍暂缓，B3 / B4 / B5 仍只立规格；**B2 剩余 2 项**
+> （三层迭代过程量 / 被 X20 契约锁死的多格式导出与 `.mct` 反向导入）
+> 继续写「没有」。
+
 三条铁律（与 `能力边界矩阵.md` §0 同源）：**不静默兜底**（做不到写「做不了」+ error/warn）、**只暴露内核已有能力**（Python 不重算 K/M、不造频率或 λ、不编规范表值）、**结论与计算书同源**（报告表与界面读同一份数据）。
 
 ## 1. B2 剩余 7 项：按源码逐项评估（不按旧文档）
 
 原 §4.2 写「9 个 `2D=N` 都只在 3D」。以源码复核后发现**其中 2 格是文档与内核事实漂移**：`fem_2d.cpp:2344 computeNaturalFrequencies2D`、`:2415 computeBucklingFactors2D` 早就能算，`example_modal.exe`（`CMakeLists.txt:215`）会写 `<stem>.modal.txt`；BridgeStudio 只是从未读它。本轮已接通并把能力矩阵 §2 两格改 `Y`，§4.2 收窄为 **7 个** `2D=N`。
 第六次 A 档又把「截面应力 / 承载力验算」一格由 `N` 改 `P`（只接通应力半部、承载力显式拒绝），
-第七次又把「引用完整性中文校验」由 `N` 改 `P`，第八次把「同源计算书四出口」由 `N` 改 `P`，故 §4.2 现为 4 个 `2D=N` + 3 个 `2D=P`；**「7 个」是上一轮的历史计数，不代表当前仍全是 `N`**。第九次闭环「模态周期 T / 振型 / 参与质量」——该项不是 §2 的一格，故 `4N+3P` 不变，只把 B2 剩余由 4 项收窄为 3 项。
+第七次又把「引用完整性中文校验」由 `N` 改 `P`，第八次把「同源计算书四出口」由 `N` 改 `P`，故第九次收官时 §4.2 为 4 个 `2D=N` + 3 个 `2D=P`；**「7 个」是上一轮的历史计数，不代表当前仍全是 `N`**。第九次闭环「模态周期 T / 振型 / 参与质量」——该项不是 §2 的一格，故 `4N+3P` 不变，只把 B2 剩余由 4 项收窄为 3 项。第十次闭环「2D 分项预应力损失明细」——该项是 §2 的一格，故 §4.2 现为 3 个 `2D=N` + 4 个 `2D=P`，**B2 剩余 2 项**（由 3 项收窄）。
 
 > 2026-11-11 第九次追加：**破例改 FE 内核**（用户明确授权）。`ModalResult2D.modes`
 > 早有全阶振型、`assembleMassMatrix2D()` 可重建同一份 M，缺的只是写出。
@@ -67,7 +94,7 @@
 
 | 能力 | 2D 内核事实（源码依据） | 分类 | 落地条件 |
 | --- | --- | --- | --- |
-| 分项预应力损失 | `fem_2d.cpp:1188-1192 / 523-527` 能读 `*PRESTRESS_LOSS`、能算 σl1~σl6 并取 `effectivePrestressRatio`；**没有** `SL1…SL6` 明细结果段（3D 才有，`example_3d_grillage.cpp:104-122`） | ① 契约 + 公式已有 / 明细段缺 | 若要出明细表须 FE 2D 先补段；Python 侧 `StagePrestressDef` 只有总 `loss`，契约也要补，且必须 opt-in |
+| 分项预应力损失 | `fem_2d.cpp:1188-1192 / 523-527` 能读 `*PRESTRESS_LOSS`、能算 σl1~σl6 并取 `effectivePrestressRatio`；**第十次已闭环**：`prestress_loss_output_2d.hpp` 新增 `[PRESTRESSLOSS2D]` 段（此前六项算完当场丢弃，3D 才写 `stage prestress loss`） | ① 契约 + 公式已有 / 明细段缺 → **已补段** | FE `example_mixed.exe --loss-detail[-only]` 写 `<stem>.loss.txt`，`BASIS=2d_global`、**不设 STAGE 占位**、不等于 3D 的阶段分项损失；σl1~σl6 / σpe / RATIO 由内核写出，`prestress_loss_2d.py` 只解析、不现算、不补零。BS 侧 22 键 `*PRESTRESS_LOSS` 表与非阶段 `LOSSREF` 束显式挂 `BridgeSpec`，双层 opt-in 默认全关；`verify_prestress_loss_2d.py` 守卫独立闭式解 / 12 类负例 / 12 格默认 `.dat` 哈希 / 四出口同源。矩阵标 `P` 不标 `Y` |
 | 截面应力 / 承载力验算 | `fem_2d.cpp:3831-3846` 有「单元应力 (Pa)」段；`fem_eigen_export.py:341` 段头已登记却无消费分支；`section_strength.py::check` 是纯规范校核（不重算力学）。**复核补充**：该段是内核用 WT/WB 从内力换算的第二套 σ，且 `example_stage.cpp` 的阶段结果文件根本没有它；2D `BridgeSpec` 也没有配筋契约 | ① 接入层缺口（**仅应力；已接入**）/ 承载力需新 `RebarSpec2D` 契约 | 应力半部已由 `strength_2d.py` 接入：唯一效应源 `final_beam` + 三种组合，与 `write_2d_html` / 界面同源，**不消费「单元应力」段**；N 单值 × My/Vz 两侧 × 三种组合共 12 个角点枚举，缺 AW / WT / WB / grade / kind / 板厚整章 `refused`。**承载力 Mu/Vu 显式拒绝**，故矩阵标 `P` 不标 `Y`；要出 Mu/Vu 须先新增 opt-in 的 `RebarSpec2D` 配筋契约 |
 | 索长迭代 `[LENGTH]` / Newton `[NEWTON]` / `[OPT]` | `fem_2d.cpp` 全文无 `[OPT]`；有 Newton 迭代（`:1988/:2071`）但过程量只打控制台，`writeResult()`（`:3799-3860`）只写 4 段 | ② 内核确实没有 | 须 FE 2D 先补对应结果段，**Python 不得从位移反推过程量、不得自己造目标索力** |
 | 模态周期 T / 振型 / 参与质量 | **第九次已闭环**：FE 新增 `modal_output_2d.hpp::formatModalSection2D`，`example_modal.exe --modal-detail` 追加 `[MODAL2D]`（`BASIS=xy`）；`ModalResult2D.modes` 早已算出振型、`assembleMassMatrix2D` 重建同一份 M | ② 内核算了没写出 → **已补段** | `T=1/f` 由内核写出，Python 只解析；2D 无出平面自由度，Z 向参与质量不存在（不是 0）；`verify_modal_detail_2d.py` 守卫 FE 源码契约 / 12 类负例 / 零污染 / 四出口同源 |
@@ -169,5 +196,9 @@ error 列表，没有 3D 的 `(errors, warnings)` 两级与 LOSSREF / 成桥态�
 5. 默认 `.dat` 逐位不变：12 格 `DEFAULT_DAT_SHA` 黄金哈希 + `PrestressLoss3D` 22 键表行不变；
 6. B2 已接通部分不虚报：能力矩阵 §2 两格 `Y`、§4.2 收窄为 7 个、README 同步「7 项」、§4 仍保留组合体系与 MIDAS 两条真缺口；
 7. 规格文档与能力矩阵 / README / 使用说明 / 开发手册的登记计数同步。
+8. 第十次 `[PRESTRESSLOSS2D]` 明细闭环不虚报：矩阵该格 `2D=P` 不是 `Y`、
+   `BASIS=2d_global` / 不设 `STAGE` 占位 / 缺束 `ERROR=` 在位、
+   `verify_prestress_loss_2d.py` 汇总按布尔位统计、开发手册登记该守卫、
+   B2 剩余项由 3 项如实收窄为 2 项。
 
-**明确未闭环**：B3 全过程曲线、B4 两项公式 / 表值接入、B5 无应力曲率、B2 其余 3 项（分项损失明细 / 三层迭代过程量 / 含被 X20 契约锁死的多格式导出与 `.mct` 反向导入）、2D 承载力半部（当前 `P`，需 `RebarSpec2D`）、四出口计算书内容补齐（导出机制已闭环，仍标 `P`）、MIDAS 数值对拍、组合体系建造器。任何一项真正落地前，能力矩阵与计算书都必须继续写「没有」，不得靠改写文档提前打勾；`P` 不是 `Y`，应力利用率不得冒充 Mu/Vu 承载力验算。
+**明确未闭环**：B3 全过程曲线、B4 两项公式 / 表值接入、B5 无应力曲率、**B2 剩余 2 项**（`[LENGTH]`·`[NEWTON]`·`[OPT]` 三层迭代过程量 / 含被 X20 契约锁死的多格式导出与 `.mct` 反向导入）、2D 承载力半部（当前 `P`，需 `RebarSpec2D`）、四出口计算书内容补齐（导出机制已闭环，仍标 `P`）、2D 分项损失明细的 3D 阶段维度（第十次只接通非阶段束明细，仍标 `P`）、MIDAS 数值对拍、组合体系建造器。任何一项真正落地前，能力矩阵与计算书都必须继续写「没有」，不得靠改写文档提前打勾；`P` 不是 `Y`，应力利用率不得冒充 Mu/Vu 承载力验算。

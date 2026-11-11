@@ -192,6 +192,30 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
         _chunks.append(
             f"<div class=\"note\">{html.escape(CAPACITY_NOTE)}</div>")
         strength_html = "".join(_chunks)
+    # 2D 分项预应力损失明细（第十次 opt-in）：默认 not_requested 时整章不出现，
+    # 请求了却没结果也照出章节 + 中文说明，不摆空表、不补零。
+    loss_html = ""
+    _l = getattr(res, "prestress_loss", None) or {}
+    if _l.get("status") != "not_requested":
+        from prestress_loss_2d import status_text as loss_status_text
+
+        _chunks = ["<h2>2D 分项预应力损失明细</h2>"]
+        _tables = (res.prestress_loss_tables()
+                   if hasattr(res, "prestress_loss_tables") else {})
+        for _t in _tables.values():
+            _chunks.append(f"<h3>{html.escape(str(_t['title']))}</h3>")
+            _chunks.append("<table><tr>" + "".join(
+                f"<th>{html.escape(str(h))}</th>" for h in _t["headers"]) + "</tr>")
+            for _row in _t["rows"]:
+                _chunks.append("<tr>" + "".join(
+                    f"<td>{html.escape(str(c))}</td>" for c in _row) + "</tr>")
+            _chunks.append("</table>")
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(str(_t['note']))}</div>")
+        if not _tables:
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(loss_status_text(_l))}</div>")
+        loss_html = "".join(_chunks)
     age_rows = []
     for s in getattr(spec, "stages", []) or []:
         t = float(getattr(s, "time", 0.0) or 0.0)
@@ -309,6 +333,7 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
 {live_v}
 {modal_html}
 {strength_html}
+{loss_html}
 <h2>成桥态梁端内力</h2>
 <table>
 <tr><th>单元</th><th>端</th><th>N (kN)</th><th>My (kN·m)</th><th>Vz (kN)</th></tr>

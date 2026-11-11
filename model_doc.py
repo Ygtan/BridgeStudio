@@ -1855,7 +1855,7 @@ class ModelDoc:
 
     def solve(self, out_dir: str | Path | None = None, dat_name: str | None = None,
               modal_2d: bool = False, strength_2d: bool = False,
-              modal_2d_detail: bool = False):
+              modal_2d_detail: bool = False, loss_2d_detail: bool = False):
         """求解的唯一入口，按维度路由到对应内核。
 
         三维 → `solver_3d.solve`（SolveResult）；二维桥型 → `solve_2d.solve_2d`
@@ -1869,6 +1869,12 @@ class ModelDoc:
         给 `example_modal.exe` 追加 `--modal-detail`，让内核写出 `[MODAL2D]`
         明细段（周期 T / X·Y 两向参与质量 / 节点振型）；不勾时命令行、
         `.modal.txt` 与默认计算书逐位不变。
+
+        `loss_2d_detail` 是 2D 分项预应力损失明细的 opt-in（默认 False）：
+        只有模型显式挂了 `*PRESTRESS_LOSS` 表 + 非阶段 `LOSSREF` 束时，
+        才追加一次 `example_mixed.exe --loss-detail-only` 读
+        `[PRESTRESSLOSS2D]` 段；Python 只解析、不重算 σl1~σl6 / σpe。
+        不勾时命令行、输出文件、diagnostics 与计算书逐位不变。
         """
         # 即使调用方绕过界面校验，也不允许把组合体系偷偷送进单一体系内核。
         if self.params.get("combo_system"):
@@ -1902,7 +1908,8 @@ class ModelDoc:
         out = out_dir or Path("out") / "2d"
         return solve_2d(self.model, out_dir=out, dat_name=dat_name,
                         modal=bool(modal_2d), strength=bool(strength_2d),
-                        modal_detail=bool(modal_2d_detail))
+                        modal_detail=bool(modal_2d_detail),
+                        loss_detail=bool(loss_2d_detail))
 
     # ------------------------------------------------------------ 展示
 

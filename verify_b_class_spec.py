@@ -301,6 +301,27 @@ def b2_modal_detail() -> None:
           "verify_modal_detail_2d.py" in read(ROOT / "开发使用手册.md"))
 
 
+def b2_loss_detail() -> None:
+    """第十次：FE opt-in 补 [PRESTRESSLOSS2D] 段，规格须写明口径与如实边界."""
+    t = read(SPEC)
+    check("规格登记第十次 [PRESTRESSLOSS2D] 明细闭环",
+          "第十次" in t and "[PRESTRESSLOSS2D]" in t)
+    check("规格写明 BASIS=2d_global / 不设 STAGE 占位",
+          "BASIS=2d_global" in t and "不设 STAGE 占位" in t)
+    check("规格写明数值由内核写出、Python 只解析",
+          "由内核写出" in t and "只解析" in t)
+    check("规格写明该项仍标 P 不标 Y", "标 `P` 不标 `Y`" in t)
+    check("规格写明 B2 剩余 2 项", "B2 剩余 2 项" in t)
+    p = ROOT / "verify_prestress_loss_2d.py"
+    check("2D 分项损失守卫在位", p.is_file())
+    g = read(p)
+    check("2D 分项损失守卫汇总按布尔位统计",
+          "PASS.append((name, bool(ok), detail))" in g
+          and "sum(1 for _, ok, _ in PASS if ok)" in g)
+    check("开发手册登记 2D 分项损失守卫",
+          "verify_prestress_loss_2d.py" in read(ROOT / "开发使用手册.md"))
+
+
 def main() -> int:
     print("=" * 78)
     print("B 类后续项接入规格守卫（纯离线）")
@@ -312,6 +333,7 @@ def main() -> int:
     b2_validation()
     b2_report()
     b2_modal_detail()
+    b2_loss_detail()
     spec_rules()
     no_new_capability()
     dat_invariant()

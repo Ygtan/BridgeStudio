@@ -34,7 +34,7 @@ X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（
 `X20_接入约定.md` 管「X20 资产怎么接」，**`能力边界矩阵.md` 管「接到之后到底有哪些能力、哪些还没有」**：
 6 桥型 × 2 维度主矩阵（建造器键 / 求解入口 / 阶段·活载·预应力参数逐格对拍）、
 20 项维度级能力的 `文件::符号` 依据、参数覆盖契约与刻意隐藏白名单、
-3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（227/227）纯离线守卫：
+3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（232/232）纯离线守卫：
 主矩阵与 `BUILDERS` / `SOLVER_OF` 对拍、依据符号真实存在、
 `DEFAULTS ⊆ FIELDS ∪ 白名单`、额外控件带 `default`、默认值在区间内、
 12 个建造器「控件渲染写回 params 后默认 `.dat` 逐位不变」、
@@ -105,7 +105,7 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
        C 档不借理由 —— 2026-11-10。注意：这**不等于** X20 桥型全量移植，
        下一条仍是真实能力缺口。
 - [x] **P1 能力口径可核对化 + 界面参数覆盖**：新增 `能力边界矩阵.md`
-       与 `verify_capability_matrix.py` 227/227，把「哪些有 / 哪些没有」逐格
+       与 `verify_capability_matrix.py` 232/232，把「哪些有 / 哪些没有」逐格
        钉到代码符号；据矩阵补齐 16 个只在 DEFAULTS 里、界面改不了的参数
        （`ps_beam` E/A/I/fpk/χ/1+μ、`truss_3d` 材料、`cable_stayed` panel、
        `cable_stayed_2d` 塔基与锚点、`suspension` 板厚与车道折减、
@@ -114,16 +114,19 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
 - [ ] **P1** X20 桥型建造器全量移植：`BUILDERS` 的 6 kind × 2 维度 12 格
        都有建造器键，但**没有「斜拉-悬索协作 / 梁拱组合」这类组合体系的
        独立建造器**；且原 7 项高级能力（分项损失、索长/Newton/`[OPT]`、
-       承载力、四出口计算书、多格式导出、严格校验）仍不对齐：其中 4 项
-       只在 3D 链路，**3 项部分接入**（`2D=P`）：截面应力只出组合内力的
+       承载力、四出口计算书、多格式导出、严格校验）仍不对齐：第九次收官时
+       其中 4 项只在 3D 链路，**3 项部分接入**（`2D=P`）：截面应力只出组合内力的
        应力表、承载力 Mu/Vu 因 2D 无配筋契约显式拒绝；引用完整性中文校验
        按源码事实纠正并补齐，但 2D 仍窄于 3D；同源计算书四出口接通了
        `report_2d.py` 的 `Report` 旁路与原样复用的 HTML/DOCX/CSV/PDF
        写出器，但 2D 计算书内容仍窄于 3D、且 opt-in 默认关闭。
+       第十次由 FE opt-in 补 `[PRESTRESSLOSS2D]` 段把「分项预应力损失」
+       由 `N` 改 `P`（只出非阶段 `LOSSREF` 束明细，**不等于 3D 的阶段
+       分项损失**），现为 3 项只在 3D 链路、**4 项部分接入**（`2D=P`）。
        均见 `能力边界矩阵.md`
        §2 备注。2D 模态 / 屈曲已按内核事实接通（opt-in）；第九次由 FE
        `--modal-detail` 追加 `[MODAL2D]` 段（`BASIS=xy`）补出周期 T / X·Y
-       两向参与质量 / 节点振型，其余 2D ↔ 3D 仍不对齐（**B2 剩余 3 项**）。
+       两向参与质量 / 节点振型，其余 2D ↔ 3D 仍不对齐（**B2 剩余 2 项**）。
        逐条依据见 `能力边界矩阵.md` §4.1 / §4.2。
        **这是真实能力缺口、不是文档滞后**，与 P4 一起排期。
        内核侧尚无协作体系求解键（注册表 4 键、`detect_kind` 二选一），
@@ -471,9 +474,33 @@ Z 向参与质量**不存在（不是 0，不补零）**，θz 只作振型展�
 `T=1/f` 由内核写出，Python 不得现算。参与质量是模态截断判据，
 不是规范合格判定。
 
+### 2D 分项预应力损失明细（`[PRESTRESSLOSS2D]`，第十次）
+
+FE 的 `prestress_loss.hpp::computePrestressLosses` 六项公式 2D / 3D 同源，
+但 2D 入口原先只取 `effectivePrestressRatio` 一个标量，六项算完当场丢弃。
+第十次（用户授权破例改 FE 内核）**不新算力学**：`loss` 行一字不动，另取
+一份同源明细，由 `prestress_loss_output_2d.hpp` 写成 opt-in 的
+`[PRESTRESSLOSS2D]` 段（`BASIS=2d_global`、`P<id> SIGMA_CON= SL1=..SL6=
+SPE= RATIO=`，12 位有效数字、单位 Pa，字段与 3D `stage prestress loss`
+同源）。`example_mixed.exe <dat> --loss-detail` 写 `<stem>.loss.txt`；
+`--loss-detail-only` **只取明细、不求解、不写 `.result`**，避让
+`example_stage.exe` 施工阶段主路径。默认 `.result` / 控制台 / 12 格默认
+`.dat` 逐位不变，FE 回归黄金基线不刷新；只收录 `LOSSREF` 束，缺束写
+`ERROR=no_lossref_prestress` 不摆空表。**2D 没有阶段维度**：不设 `STAGE`
+占位、不造阶段号，`P<id>` 是输入行首显式束号，不等于 3D 的阶段分项损失。
+BS 侧 `bridge_spec.py` 补 22 键 `*PRESTRESS_LOSS` 表与非阶段
+`*PRESTRESS ... LOSSREF=` 束（显式挂 `BridgeSpec`，不进 `DEFAULTS` /
+`FIELDS`）、`prestress_loss_2d.py` 唯一口径层只解析不现算不补零；
+`solve_2d(loss_detail=True)` / `ModelDoc.solve(loss_2d_detail=True)` /
+界面第二层开关 `loss2ddetail_opt` 双层 opt-in 默认全关，HTML 与四出口
+`Report` 用同一张表。`verify_prestress_loss_2d.py` 守卫 FE 源码契约、
+独立闭式解、12 类负例、默认 HTML 零污染、12 格黄金哈希与四出口同源。
+矩阵该格 `2D=P` 不是 `Y`；**B2 剩余 2 项**（三层迭代过程量 / 被 X20
+契约锁死的多格式导出与 `.mct` 反向导入）继续写「没有」。
+
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **44 个脚本全绿**，其中 39 个带汇总输出的脚本合计 **2821 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_strength_2d.py` 162/162、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 134/134、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 118/118、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 227/227，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **45 个脚本全绿**，其中 40 个带汇总输出的脚本合计 **3047 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_strength_2d.py` 162/162、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 134/134、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 126/126、`verify_prestress_loss_2d.py` 213/213、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 232/232，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
@@ -481,8 +508,10 @@ Z 向参与质量**不存在（不是 0，不补零）**，θz 只作振型展�
 
 2D 模态 / 线性屈曲已按内核事实接通（opt-in，见 `能力边界矩阵.md` §2 备注）；
 B2 的「截面应力」半部随后按 `P` 口径接入（`strength_2d.py`，承载力仍显式拒绝），
-B2 剩余 3 项、组合体系（B1，用户本轮暂缓）、B3 非线性稳定全过程、B4 预应力
-损失两处规范口径、B5 无应力曲率的**现状、两阶段规格与验收断言**统一写在
+第十次由 FE opt-in 补 `[PRESTRESSLOSS2D]` 段闭环「2D 分项预应力损失
+明细」后 **B2 剩余 2 项**；这两项与组合体系（B1，用户本轮暂缓）、
+B3 非线性稳定全过程、B4 预应力损失两处规范口径、B5 无应力曲率的
+**现状、两阶段规格与验收断言**统一写在
 `B类后续项接入规格.md`，由 `verify_b_class_spec.py` 纯离线守卫。这些项目
 **只立规格、未实现力学**；未实现期 `[BUCKLING] ERROR=nonlinear_state_not_supported`
 与「σl2 只按直线筋 / εcs·φ 需查表输入」等如实边界一律保留，不虚报能力。

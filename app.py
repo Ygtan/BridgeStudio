@@ -648,6 +648,58 @@ if doc.kind != "beam" and _cap.get("solve2d"):
     if not _cap.get("strength2d"):
         st.caption("2D 求解链不可用；勾选也只会得到中文「做不了」说明。")
 
+    # 2D 分项预应力损失明细（第十次 opt-in）：参数显式挂在 BridgeSpec，
+    # 不进 DEFAULTS / FIELDS；doc.build() 每次 rerun 会重建 model，故此处重挂。
+    # 留空 / 非法 JSON 一律中文说明，不静默兜底、不猜参数、不补零。
+    _loss2d_on = st.checkbox(
+        "同时输出 2D 分项预应力损失明细（默认关闭，需填参数）",
+        value=False, key="loss2ddetail_opt",
+        help="[PRESTRESSLOSS2D] 段由 FE 内核写出，Python 只解析、不重算 σl1~σl6。"
+             "2D 没有阶段维度，段里不设 STAGE 占位；σl3/σl5/σl6 不进 σpe 与 Pe。"
+             "参数留空只会得到中文「不做」说明，不补零。")
+    _loss2d_cfg = ""
+    if _loss2d_on:
+        _loss2d_cfg = st.text_area(
+            "2D 分项损失参数 JSON（loss 表 + tendon 束；留空 = 不启用）",
+            value="", key="loss2d_cfg", height=130,
+            help="格式：{\"loss\": {22 键参数表}, \"tendon\": "
+                 "{\"elems\": [1,2,3,4], \"P\": 1500000, \"F\": 0.2}}。"
+                 "loss 对应 JTG 3362 §6.2 的 *PRESTRESS_LOSS 表；tendon 是"
+                 "非阶段 *PRESTRESS 束，elems / P 必须显式给出。两者都会写进"
+                 " .dat，默认留空时一个字节不多写。")
+    _loss2d_supported = hasattr(doc.model, "prestress_losses")
+    if _loss2d_supported:
+        # build() 每次 rerun 重建 model，清空后再按本次控件值重挂。
+        doc.model.prestress_losses = {}
+        doc.model.prestresses = []
+    if _loss2d_on and not _loss2d_supported:
+        st.info("当前模型不是 BridgeSpec，2D 分项损失明细不可用；"
+                "本次只给中文「不做」说明。")
+    elif _loss2d_on and not (_loss2d_cfg or "").strip():
+        st.info("未填 2D 分项损失参数；本次求解只给中文「不做」说明，不补零。")
+    elif _loss2d_on:
+        try:
+            import json
+            from bridge_spec import Prestress2D, PrestressLoss2D
+
+            _cfg = json.loads(_loss2d_cfg)
+            if (not isinstance(_cfg, dict)
+                    or not isinstance(_cfg.get("loss"), dict)
+                    or not isinstance(_cfg.get("tendon"), dict)):
+                raise ValueError("JSON 必须含 loss 与 tendon 两个对象")
+            _tendon = Prestress2D(**_cfg["tendon"])
+            _tendon.loss_ref = 1
+            doc.model.prestress_losses = {1: PrestressLoss2D(**_cfg["loss"])}
+            doc.model.prestresses = [_tendon]
+            _loss_errs = [e for e in doc.model.validate_model()
+                          if "PRESTRESS" in e]
+            if _loss_errs:
+                raise ValueError("；".join(_loss_errs))
+        except Exception as _le:
+            doc.model.prestress_losses = {}
+            doc.model.prestresses = []
+            st.error(f"2D 分项损失参数无效：{_le}")
+
     _dat_now_2d = doc.to_dat()
     if st.button("运行施工阶段 + 规范组合求解", type="primary"):
         _outdir = Path("out/gui_2d")
@@ -657,11 +709,14 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                 _res2d = doc.solve(out_dir=_outdir, dat_name="gui_2d.dat",
                                    modal_2d=_modal2d_on,
                                    strength_2d=_strength2d_on,
-                                   modal_2d_detail=_modal2d_detail_on)
+                                   modal_2d_detail=_modal2d_detail_on,
+                                   loss_2d_detail=_loss2d_on)
                 st.session_state.solve2d = {"dat_text": _dat_now_2d,
                                             "modal2d": _modal2d_on,
                                             "modal2ddetail": _modal2d_detail_on,
                                             "strength2d": _strength2d_on,
+                                            "loss2ddetail": _loss2d_on,
+                                            "loss2dcfg": _loss2d_cfg,
                                             "res": _res2d}
             except Exception as _e:
                 st.session_state.solve2d = None
@@ -671,7 +726,9 @@ if doc.kind != "beam" and _cap.get("solve2d"):
     if _s2d and (_s2d.get("dat_text") != _dat_now_2d
                  or bool(_s2d.get("modal2d", False)) != _modal2d_on
                  or bool(_s2d.get("modal2ddetail", False)) != _modal2d_detail_on
-                 or bool(_s2d.get("strength2d", False)) != _strength2d_on):
+                 or bool(_s2d.get("strength2d", False)) != _strength2d_on
+                 or bool(_s2d.get("loss2ddetail", False)) != _loss2d_on
+                 or str(_s2d.get("loss2dcfg", "")) != _loss2d_cfg):
         st.warning("模型参数或求解开关已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
         _s2d = None
     if _s2d:
@@ -745,6 +802,22 @@ if doc.kind != "beam" and _cap.get("solve2d"):
             if _s2.get("status") != "ok" or not _st:
                 st.warning(strength_status_text(_s2))
             st.caption(CAPACITY_NOTE)
+        if _loss2d_on:
+            from prestress_loss_2d import status_text as loss2d_status_text
+
+            _l2 = getattr(_r2d, "prestress_loss", None) or {}
+            _lt = getattr(_r2d, "prestress_loss_tables", lambda: {})()
+            st.markdown("**2D 分项预应力损失明细**")
+            for _t in _lt.values():
+                st.markdown(
+                    "| " + " | ".join(_t["headers"]) + " |\n|"
+                    + "---|" * len(_t["headers"]) + "\n"
+                    + "\n".join("| " + " | ".join(r) + " |" for r in _t["rows"]))
+                st.caption(_t["note"])
+            if _l2.get("status") != "ok":
+                st.warning(loss2d_status_text(_l2))
+            else:
+                st.caption(loss2d_status_text(_l2))
         for _d in _r2d.diagnostics:
             st.caption(f"· {_d}")
 

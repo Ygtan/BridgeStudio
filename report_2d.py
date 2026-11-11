@@ -41,15 +41,25 @@ BOUNDARY_NOTE = (
     "2D 报告只列内核已给出的成桥态内力、挠度、施工阶段与车道活载包络、"
     "JTG D60 三种组合，以及 opt-in 的 2D 频率 / 线性屈曲因子与截面应力；"
     "除 opt-in 的 [MODAL2D] 明细段（BASIS=xy，只给 X/Y 两向参与质量与"
-    "节点振型）外，2D 报告没有振型 / 参与质量 / 承载力 Mu / Vu / 结构云图，"
-    "缺的字段不补零，不拿应力利用率冒充承载力利用率。2D 没有出平面自由度，"
-    "Z 向参与质量不存在（不是 0）；四出口机制对齐不等于 2D 力学能力与 3D 对齐。"
+    "节点振型）、第十次 opt-in 的 [PRESTRESSLOSS2D] 明细段（2D 非阶段"
+    "LOSSREF 束的 σl1~σl6 / σpe）外，2D 报告没有振型 / 参与质量 / "
+    "承载力 Mu / Vu / 结构云图，缺的字段不补零，不拿应力利用率冒充"
+    "承载力利用率。2D 没有出平面自由度，Z 向参与质量不存在（不是 0）；"
+    "2D 没有阶段维度，分项损失明细不等于 3D 阶段分项损失；"
+    "四出口机制对齐不等于 2D 力学能力与 3D 对齐。"
 )
 DETAIL_BOUNDARY_NOTE = (
     "本次 opt-in 的 [MODAL2D] 明细段由 2D 内核写出周期 T、X/Y 两向有效"
     "参与质量与节点振型；这是 2D 的 BASIS=xy 口径，没有 3D 的 Z 向参与质量，"
     "也没有结构云图与振型动画。参与质量是模态截断是否足够的判据，"
     "不是规范合格判定。"
+)
+LOSS_BOUNDARY_NOTE = (
+    "本次 opt-in 的 [PRESTRESSLOSS2D] 明细段由 2D 内核写出非阶段 LOSSREF "
+    "束的 σl1~σl6、σpe 与 σpe/σcon；字段名与单位同 3D，但 2D 没有阶段"
+    "维度，不设 STAGE 占位。σl3 / σl5 / σl6 是后期损失，不进 σpe 与 Pe；"
+    "σl2 只按直线筋；εcs / φ 需按附录 C 查表输入。分项损失是复核明细，"
+    "不是规范合格判定，也不是 3D 阶段分项损失。"
 )
 NO_LIVE_NOTE = (
     "没有车道活载包络，组合里只有恒载项。这不是完整的正常使用验算。"
@@ -324,7 +334,23 @@ def build_2d_document(res: Any, spec: Any) -> R.Report:
 
         blocks.append({"type": "note", "text": str(CAPACITY_NOTE)})
 
-    # ⑦ 诊断与能力边界
+    # ⑦ 2D 分项预应力损失明细（第十次 opt-in）：2D 非阶段束，
+    #    不冒充 3D 的阶段分项损失口径。
+    pl = getattr(res, "prestress_loss", None) or {}
+    if pl.get("status") != "not_requested":
+        blocks.append({"type": "h1", "text": "2D 分项预应力损失明细"})
+        pt = (res.prestress_loss_tables()
+              if hasattr(res, "prestress_loss_tables") else {})
+        for key, tb in pt.items():
+            add(key, tb)
+        if not pt:
+            from prestress_loss_2d import status_text as loss_status_text
+
+            blocks.append({"type": "note",
+                           "text": str(loss_status_text(pl))})
+        blocks.append({"type": "note", "text": LOSS_BOUNDARY_NOTE})
+
+    # ⑧ 诊断与能力边界
     blocks.append({"type": "h1", "text": "诊断与能力边界"})
     diags = [str(d) for d in (getattr(res, "diagnostics", None) or [])]
     if diags:
