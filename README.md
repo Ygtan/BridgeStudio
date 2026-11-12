@@ -34,7 +34,7 @@ X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（
 `X20_接入约定.md` 管「X20 资产怎么接」，**`能力边界矩阵.md` 管「接到之后到底有哪些能力、哪些还没有」**：
 6 桥型 × 2 维度主矩阵（建造器键 / 求解入口 / 阶段·活载·预应力参数逐格对拍）、
 20 项维度级能力的 `文件::符号` 依据、参数覆盖契约与刻意隐藏白名单、
-3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（258/258）纯离线守卫：
+3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（270/270）纯离线守卫：
 主矩阵与 `BUILDERS` / `SOLVER_OF` 对拍、依据符号真实存在、
 `DEFAULTS ⊆ FIELDS ∪ 白名单`、额外控件带 `default`、默认值在区间内、
 12 个建造器「控件渲染写回 params 后默认 `.dat` 逐位不变」、
@@ -528,14 +528,16 @@ Newton 一层**：FE `fem_2d.hpp` 新增 `NewtonStep2D` / `NewtonTrace2D` 挂进
 四出口 `Report` 用同两张表。`verify_newton_2d.py` 守卫 FE 源码契约、
 端到端 oracle、20 类负例、默认 HTML 零污染、12 格黄金哈希与四出口同源。
 矩阵该格 `2D=P` 不是 `Y`；**第十三次已按 opt-in 首次真正新造 2D 力学、
-接通 `[LENGTH2D]` 平面索长闭合一层（该格 `N→P`、仍 `P` 不 `Y`），`[OPT]`
-仍没有对应力学、仍标 `N`、不造占位、不写不适用段冒充闭环**；2D 版不等于
+接通 `[LENGTH2D]` 平面索长闭合一层（该格 `N→P`、仍 `P` 不 `Y`）；第十四次
+起 `[OPT2D]` 2D 平面索力优化已按 opt-in 新造接入**（该格 `N→P`、仍 `P` 不
+`Y`），只 MINMAXM + 显式索力箱，3D 的 SYSGUARD / MINENERGY / `J=M·D`
+影响矩阵在 2D 仍没有、不等于 3D `[OPT]`；2D 版不等于
 3D 的垂度 / Ernst / 共转成桥态 / 闭式影响矩阵，本项不等于 3D 三层迭代
 已移植。过程量只说明数值如何收敛，不是规范合格判定。
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **48 个脚本全绿**，其中 43 个带汇总输出的脚本合计 **3875 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 150/150、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 159/159、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 230/230、`verify_length_2d.py` 246/246、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 258/258，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **49 个脚本全绿**，其中 44 个带汇总输出的脚本合计 **4197 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 150/150、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 171/171、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 241/241、`verify_length_2d.py` 257/257、`verify_opt_2d.py` 276/276、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 270/270，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
@@ -548,14 +550,19 @@ B2 的「截面应力」半部随后按 `P` 口径接入（`strength_2d.py`，�
 （`[NEWTON2D]`，该格 `2D=P`），当时 `[LENGTH]` / `[OPT]` 两层 2D 内核
 没有对应力学、两格仍标 `N`；第十三次首次真正新造 2D 力学、按 opt-in
 接通 `[LENGTH2D]` 平面索长闭合一层（该格 `N→P`、仍 `P` 不 `Y`），
-`[OPT]` 仍标 `N`，**B2 剩余仍 2 项**但内容再收窄为「`[OPT]` 一层力学 +
-多格式导出 / `.mct` 反向导入」；这两项与组合体系（B1，用户本轮暂缓）、
+第十三次收官时 `[OPT]` 仍标 `N`、**B2 剩余 2 项**（内容曾再收窄为
+「`[OPT]` 一层力学 + 多格式导出 / `.mct` 反向导入」）；**第十四次起
+`[OPT2D]` 2D 平面索力优化按 opt-in 首次新造第二层力学接通**（该格
+`N→P`、仍 `P` 不 `Y`），§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、
+**B2 剩余 1 项**——仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入；
+这 1 项与组合体系（B1，用户本轮暂缓）、
 B3 非线性稳定全过程、B4 预应力损失两处规范口径、B5 无应力曲率的
 **现状、两阶段规格与验收断言**统一写在
 `B类后续项接入规格.md`，由 `verify_b_class_spec.py` 纯离线守卫。这些项目里
 B3 / B4 / B5 仍**只立规格、未实现力学**；B2 的 `[LENGTH2D]` 一层自第十三次
-起已按 opt-in 首次真正新造 2D 力学接通（该格 `N→P`、仍 `P` 不 `Y`），
-`[OPT]` 仍只立规格、未实现力学；未实现期 `[BUCKLING] ERROR=nonlinear_state_not_supported`
+起、2D 平面索力优化 `[OPT2D]` 一层自第十四次起已按 opt-in 真正新造 2D
+力学接通（两格都 `N→P`、仍 `P` 不 `Y`），`[OPT2D]` 只 MINMAXM + 显式
+索力箱、不等于 3D `[OPT]`；未实现期 `[BUCKLING] ERROR=nonlinear_state_not_supported`
 与「σl2 只按直线筋 / εcs·φ 需查表输入」等如实边界一律保留，不虚报能力。
 
 ### 2D 截面应力验算的 P 口径（2026-11-10）
@@ -598,8 +605,10 @@ Python-only 契约，不写进 `.dat`；缺任一项整章 `refused` 并逐条�
 能力矩阵「截面应力 / 承载力验算」2D **仍标 `P`、不标 `Y`**：压弯 / 轴压、
 预应力、受扭、Mz / Vy 与 3D 全套承载力仍未覆盖；§4.2 计数与
 **B2 剩余 2 项**当时均不变；第十三次 `[LENGTH2D]` 一层按 opt-in 首次真正
-新造 2D 力学接通后 §4.2 现为 **1 个 `2D=N` + 6 个 `2D=P`**、`[OPT]` 仍标 `N`，
-**B2 剩余仍 2 项**但内容再收窄为「`[OPT]` 一层力学 + 多格式导出」。
+新造 2D 力学接通后，第十三次收官时 §4.2 为 **1 个 `2D=N` + 6 个 `2D=P`**、
+**B2 剩余 2 项**；**第十四次起 `[OPT2D]` 2D 平面索力优化按 opt-in 新造
+接通**（该格 `N→P`、仍 `P` 不 `Y`），§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、
+**B2 剩余 1 项**（仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入）。
 
 ### 2D 平面索长闭合 `[LENGTH2D]`（2026-11-11，第十三次）
 
@@ -633,6 +642,47 @@ NJ / J / geomErr / STAGE 占位。BS 侧 `length_2d.py` 唯一口径层只解析
 默认全关，不等于 3D 的垂度 / Ernst / 共转成桥态 / 闭式影响矩阵 /
 `[OPT]`→`[LENGTH]`→`[NEWTON]` 三层迭代），`[OPT]` 仍 N，§4.2 变
 **1 个 `2D=N` + 6 个 `2D=P`**，**B2 剩余仍 2 项**。
+
+### 2D 平面索力优化 `[OPT2D]`（2026-11-12，第十四次）
+
+B2 里**首次新造第二层力学**（FE `631c1d1`、BS `222b7d3`）：2D 平面索力
+优化按 opt-in 接通。用户拍板只做 `MINMAXM`——最小化**用户显式登记的
+BEAM 单元端弯矩集合**的 `max|M|`，内核不自动识别「主梁」、不补零；约束
+只有**显式索力箱** `TMIN` / `TMAX`（必填、`0<TMIN<TMAX`、
+`BND_SRC=USER`，缺一写 `ERROR=missing_tension_bounds`），**绝不猜 3D 的
+`1.5×RIGID`**；不做 `MINENERGY`（2D 无裸结构弯曲应变能柔度 `Fm` /
+影响矩阵），2D 无 DECKLOAD / 塔顶 `ΣT·cos` / SYSGUARD 三判据、不造占位。
+变量是无量纲名义索力 `x=T/Tscale`，经
+`Lu(x)=Lgeom/(1+Tscale·x/EA−istrn)` 落到第十三次无垂度线性杆本构，
+**中心有限差分 Jacobian + IRLS(p=2/4/8/16) + 投影梯度**求解——
+**不是 3D 的 `J=M·D` 闭式影响矩阵**，也**不等于 3D
+`[OPT]`→`[LENGTH]`→`[NEWTON]` 三层迭代**。`APPLIED=1` 只表示建议
+`T*` 被采纳，命中 `T*` 属 `[LENGTH2D]` 职责；`[OPT2D]` 只定目标、
+**不写回 `.dat` / `.result`**，`T` 行只是过程量不能当设计索力；峰值不降写
+`objective_not_improved` / `APPLIED=0`；`Nfinal ≠ T*`（结构柔性使
+`Lu(T)` 闭式只是近似）。
+
+FE 侧新增 `*CABLE_OPT2D` 契约（`OPT2D=1 TMIN= TMAX= TOL= MAXITER= IRLS=
+ROUNDTOL=` 参数行 + 逐索 `T0` 行 + 逐个 `M` 登记行）、
+`fem_2d.cpp::iterateCableOpt2D()`、`<stem>.opt.txt` 的 `[OPT2D]` 段
+（`I` / `T` / `M` 行与 `STATUS` / `CONVERGED` / `CONVBY` / `APPLIED` /
+`REJECT`），`example_mixed.exe --opt-detail` / `--opt-detail-only`；无契约写
+`ERROR=no_opt_request` 不摆空表。BS 侧 `opt_2d.py` 唯一口径层（14 态 +
+4 张表 `opt_2d_summary_table` / `opt_2d_iter_table` / `opt_2d_cable_table` /
+`opt_2d_moment_table`）、`OptSpec2D` + `BridgeSpec.opt_2d`、
+`solve_2d(opt_detail=)` ⑧ 分支、`ModelDoc.solve(opt_2d_detail=)`、
+`capability()["opt2d"]`、界面开关 `opt2ddetail_opt` / `opt2d_cfg`、
+`export_html.py` 的 `opt_html`、`report_2d.py` 章 ⑪（诊断顺延 ⑫），
+双层 opt-in 默认全关。两个 oracle：正例 `verify_opt_2d.dat`
+`T*=TMIN=200000`、`MPEAK0=1304347.826`、`MPEAK=260869.5652`、
+`APPLIED=1`、`CONVERGED=1`；负例 `verify_opt_2d_negative.dat`
+`objective_not_improved` / `APPLIED=0`。编译 rc=0、`ctest` 7/7
+（37/37 黄金基线未刷新）、三条零污染证据通过；默认 `.dat` / 默认
+`.result` / 默认 HTML 逐位不变，12 格 `DEFAULT_DAT_SHA` 与 37 个黄金基线
+都不刷新。该格 `2D=N` → `2D=P`、**仍 `P` 不 `Y`**：2D 版缺 SYSGUARD /
+MINENERGY / 影响矩阵 / 垂度 / Ernst / 共转成桥态 / 三维制造线形，
+**不等于 3D `[OPT]`**；§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、
+**B2 剩余 1 项**（仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入）。
 
 ### 2D 引用完整性校验（`P` 口径）
 

@@ -369,11 +369,11 @@ def gaps_and_process() -> None:
                if ln.startswith("| 目标索力优化")]
     check("§2 索长迭代 / 几何闭合格按第十三次标 2D=P（仍 P 不 Y）",
           len(lg_rows) == 1 and "| P | Y |" in lg_rows[0], str(lg_rows))
-    check("§2 目标索力优化 [OPT] 格仍标 2D=N",
-          len(op_rows) == 1 and "| N | Y |" in op_rows[0], str(op_rows))
+    check("§2 目标索力优化 [OPT] 格第十四次标 2D=P（仍 P 不 Y）",
+          len(op_rows) == 1 and "| P | Y |" in op_rows[0], str(op_rows))
     check("§2 登记 [NEWTON2D] / BASIS=2d_global 防漂移",
           "[NEWTON2D]" in text and "BASIS=2d_global" in text)
-    check("§2 写明 [LENGTH2D] 一层已接通、[OPT] 仍缺、不造占位",
+    check("历史段落仍登记 §2 写 [LENGTH2D] 已接通、[OPT] 仍缺、不造占位（第十三次口径）",
           "[LENGTH2D]" in text and "[OPT]" in text
           and "不造占位" in text and "没有对应力学" in text)
     check("§2 写明 2D 不写 REFACT / TOLF / TOLD",
@@ -381,9 +381,9 @@ def gaps_and_process() -> None:
     check("§2 写明过程量不构成规范判定",
           "不构成规范合格判定" in text or "不是规范合格判定" in text)
     check("能力矩阵登记第十一次闭环记录", "第十一次闭环记录" in text)
-    check("§4.2 当前为 1 个 2D=N + 6 个 2D=P",
+    check("历史段落仍登记 §4.2 为 1 个 2D=N + 6 个 2D=P（第十三次口径）",
           "1 个 `2D=N`" in text and "6 个 `2D=P`" in text)
-    check("§4.2 写明 B2 剩余 2 项且内容收窄",
+    check("历史段落仍登记 §4.2 写 B2 剩余 2 项且内容收窄（第十三次口径）",
           "B2 剩余 2 项" in text and "内容已收窄" in text)
     # 2026-11-11 第十二次：Mu / Vu 半部按 opt-in 接通，但该格仍标 P。
     check("能力矩阵登记第十二次闭环记录", "第十二次闭环记录" in text)
@@ -391,7 +391,7 @@ def gaps_and_process() -> None:
           "| 截面应力 / 承载力验算 | P | Y |" in text
           and "capacity_2d.py::evaluate" in text
           and "bridge_spec.py::RebarSpec2D" in text)
-    check("§4.2 当前计数 1 个 2D=N + 6 个 2D=P、B2 剩余仍 2 项",
+    check("历史段落仍登记 §4.2 计数 1 个 2D=N + 6 个 2D=P、B2 剩余仍 2 项（第十三次口径）",
           "1 个 `2D=N`" in text and "6 个 `2D=P`" in text
           and "B2 剩余仍 2 项" in text)
     check("矩阵写明压弯 / 轴压不做与无活载轴力包络",
@@ -406,8 +406,8 @@ def gaps_and_process() -> None:
           "length_2d.py::parse_length_txt" in text
           and "bridge_spec.py::LengthSpec2D" in text
           and "verify_length_2d.py::main" in text)
-    check("§2 [OPT] 格仍 | N | Y |（不虚报、不造占位）",
-          "| 目标索力优化 `[OPT]` + 体系守卫 | N | Y |" in text
+    check("§2 [OPT] 格第十四次标 | P | Y |（仍不虚报 Y、不造占位）",
+          "| 目标索力优化 `[OPT]` + 体系守卫 | P | Y |" in text
           and "不造占位" in text)
     check("矩阵写明 2D 是无垂度线性杆 + 有限差分 J + LM、不等于 3D 三层迭代",
           "无垂度线性杆" in text and "中心有限差分 Jacobian" in text
@@ -418,13 +418,13 @@ def gaps_and_process() -> None:
           and "verify_length_2d.py" in read(ROOT / "开发使用手册.md"))
     check("矩阵写明该格仍标 P 不标 Y",
           "仍标 `P` 不标 `Y`" in text)
-    check("§4.2 现为 1 个 2D=N + 6 个 2D=P 且 B2 剩余仍 2 项",
+    check("历史段落仍登记 §4.2 为 1 个 2D=N + 6 个 2D=P 且 B2 剩余仍 2 项（第十三次口径）",
           "1 个 `2D=N`" in text and "6 个 `2D=P`" in text
           and "B2 剩余仍 2 项" in text)
-    check("§4.2 写明 B2 剩余 2 项内容再收窄为 [OPT] 一层 + 多格式导出 / .mct",
+    check("历史段落仍登记 B2 剩余 2 项内容再收窄为 [OPT] 一层 + 多格式导出 / .mct",
           "内容再收窄为" in text and "`[OPT]` 一层力学" in text
           and "`.mct` 反向导入" in text)
-    check("§2 写明 [OPT] 仍没有对应力学、不造占位、不写不适用段",
+    check("历史段落仍登记 [OPT] 仍没有对应力学、不造占位、不写不适用段（第十三次口径）",
           "仍没有对应力学" in text and "不造占位" in text
           and "[OPT]" in text)
     check("§2 依据列登记 2D Newton 真实符号",
@@ -432,11 +432,11 @@ def gaps_and_process() -> None:
           and "solve_2d.py::newton_tables" in text)
     nt_src = read(ROOT / "newton_2d.py")
     s2d_new = read(ROOT / "solve_2d.py")
-    check("2D Newton 口径层写明不重算 / [LENGTH2D] 已接入 / [OPT] 仍缺",
+    check("2D Newton 口径层第十四次写明不重算 / [LENGTH2D] / [OPT2D] 独立 opt-in 链",
           "不重算" in nt_src and "[LENGTH2D]" in nt_src
-          and "[OPT]" in nt_src and "没有对应力学" in nt_src
-          and "第十三次起 `[LENGTH2D]` 平面索长闭合一层已按 opt-in 新造接入" in s2d_new
-          and "带约束目标索力优化仍没有对应力学" in s2d_new)
+          and "第十四次" in nt_src and "[OPT2D]" in nt_src
+          and "第十四次" in s2d_new and "[OPT2D]" in s2d_new
+          and "opt_detail" in s2d_new)
     check("§2 写明 [MODAL2D] / BASIS=xy / Z 向不存在",
           "[MODAL2D]" in text and "BASIS=xy" in text
           and "不存在（不是 0）" in text)
@@ -476,6 +476,80 @@ def gaps_and_process() -> None:
         check(f"守卫自身不含 {banned}", banned not in src)
 
 
+def fourteenth() -> None:
+    """第十四次：[OPT2D] 2D 平面索力优化按 opt-in 新造接通，矩阵该格 N→P
+    （仍 P 不 Y），§4.2 变 0N+7P、B2 剩余 1 项；`0 个 2D=N` 断言只落在
+    确实含该串的文档上，历史串仍按 D 类准则保留。"""
+    text = read(DOC)
+    check("第十四次：矩阵 §2 [OPT] 格 | P | Y | 且 P ≠ Y、不等于 3D [OPT]",
+          "| 目标索力优化 `[OPT]` + 体系守卫 | P | Y |" in text
+          and "P ≠ Y" in text and "不等于 3D `[OPT]`" in text)
+    check("第十四次：矩阵 §4.2 0 个 2D=N + 7 个 2D=P、B2 剩余 1 项、第十四次闭环记录",
+          "0 个 `2D=N` + 7 个 `2D=P`" in text
+          and "B2 剩余 1 项" in text
+          and "第十四次闭环记录" in text
+          and "第十四次起 `[OPT2D]`" in text)
+    check("第十四次：矩阵仍标 P 不标 Y、只 MINMAXM + 显式索力箱 TMIN/TMAX、不做 MINENERGY",
+          "仍标 `P` 不标 `Y`" in text and "MINMAXM" in text
+          and "TMIN" in text and "TMAX" in text
+          and "不做 `MINENERGY`" in text)
+    check("第十四次：矩阵如实边界 2D 无 SYSGUARD / DECKLOAD / J=M·D 闭式影响矩阵、不等于 3D 三层迭代",
+          "SYSGUARD" in text and "DECKLOAD" in text and "J=M·D" in text
+          and "三层迭代" in text and "不等于 3D" in text)
+    check("第十四次：矩阵写明 APPLIED=1 只是建议值、命中 T* 属 [LENGTH2D] 职责",
+          "APPLIED=1" in text
+          and "命中 `T*` 属 `[LENGTH2D]` 职责" in text)
+    check("第十四次：矩阵写明默认 .dat / .result / HTML 逐位不变、DEFAULT_DAT_SHA 不刷新",
+          "默认 `.dat` / 默认 `.result` / 默认 HTML 逐位不变" in text
+          and "DEFAULT_DAT_SHA" in text and "不刷新" in text)
+    rd = read(ROOT / "README.md")
+    use = read(ROOT / "使用说明.md")
+    guide = read(ROOT / "开发使用手册.md")
+    check("第十四次：README 新章、开发手册 0N+7P、使用说明只写 B2 剩余 1 项",
+          "### 2D 平面索力优化 `[OPT2D]`" in rd
+          and "0 个 `2D=N` + 7 个 `2D=P`" in guide
+          and "B2 剩余 1 项" in guide and "B2 剩余 1 项" in use
+          and "0 个 `2D=N`" not in use)
+    o = read(ROOT / "opt_2d.py")
+    g = read(ROOT / "verify_opt_2d.py")
+    check("第十四次：opt_2d.py 含 BOUNDARY_NOTE / parse_opt_txt / 四张表键与如实边界",
+          "BOUNDARY_NOTE" in o and "parse_opt_txt" in o
+          and all(k in o for k in ("opt_2d_summary_table",
+                                   "opt_2d_iter_table",
+                                   "opt_2d_cable_table",
+                                   "opt_2d_moment_table"))
+          and "APPLIED=1 只表示建议值被采纳" in o
+          and "命中 T* 属 [LENGTH2D] 职责" in o)
+    check("第十四次：verify_opt_2d.py 在位、汇总按布尔位统计、12 格 DEFAULT_DAT_SHA 不刷新",
+          (ROOT / "verify_opt_2d.py").is_file()
+          and "PASS.append((name, bool(ok), str(detail)))" in g
+          and "sum(1 for _, ok, _ in PASS if ok)" in g
+          and "12 格 DEFAULT_DAT_SHA" in g and "不刷新" in g)
+    bs = read(ROOT / "bridge_spec.py")
+    s2d = read(ROOT / "solve_2d.py")
+    mdpy = read(ROOT / "model_doc.py")
+    app = read(ROOT / "app.py")
+    ehtml = read(ROOT / "export_html.py")
+    rpt = read(ROOT / "report_2d.py")
+    check("第十四次：BS 源码符号 OptSpec2D / opt_detail / opt_2d_detail / opt2ddetail_opt / opt_html / ⑪",
+          "class OptSpec2D" in bs and "opt_detail" in s2d
+          and "opt_2d_detail" in mdpy and "opt2ddetail_opt" in app
+          and "opt_html" in ehtml and "⑪" in rpt)
+    from solve_2d import _fem_eigen_dir
+    root = _fem_eigen_dir()
+    if root:
+        cl = read(root / "CHANGELOG.md")
+        ifmt = read(root / "input_format.md")
+        um = read(root / "USER_MANUAL.md")
+        check("第十四次：FE 三文档登记 ## 2026-11-12 / *CABLE_OPT2D / 二维 opt-in 专章",
+              "## 2026-11-12" in cl and "[OPT2D]" in cl
+              and "### 6.6 `*CABLE_OPT2D`" in ifmt
+              and "#### 二维 opt-in `[OPT2D]`" in um)
+        check("第十四次：FE CHANGELOG 第十三次历史句仍保留（不删历史条目）",
+              "`[OPT]` 带约束目标索力优化在 2D" in cl
+              and "仍不做" in cl)
+
+
 def main() -> int:
     print("=" * 78)
     doc_structure()
@@ -486,6 +560,7 @@ def main() -> int:
     dat_invariant(builder_map)
     live_effect(builder_map)
     gaps_and_process()
+    fourteenth()
     n_pass = sum(1 for ok, _, _ in RESULTS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(RESULTS)} 通过")

@@ -766,7 +766,7 @@ def docs() -> None:
           "基线不刷新" in fe_log and "CASES 不加该算例" in fe_log)
     check("FE CHANGELOG 写明默认输出逐位不变",
           "逐位不变" in fe_log)
-    check("FE CHANGELOG 写明 [OPT] 仍 N、不造占位",
+    check("历史段落仍登记 FE CHANGELOG 写 [OPT] 仍 N、不造占位（第十三次口径）",
           "仍标 `2D=N`" in fe_log and "不造占位" in fe_log)
     check("FE CHANGELOG 写明不等于 3D 三层迭代",
           "三层迭代" in fe_log)
@@ -791,11 +791,12 @@ def docs() -> None:
           str(length_rows))
     opt_rows = [ln for ln in mat.splitlines()
                 if ln.startswith("| 目标索力优化")]
-    check("矩阵 [OPT] 格仍标 2D=N（3D 仍 Y）",
-          len(opt_rows) == 1 and "| N | Y |" in opt_rows[0], str(opt_rows))
-    check("矩阵 §4.2 为 1 个 2D=N + 6 个 2D=P",
+    check("矩阵 [OPT] 格第十四次标 2D=P 不虚报 Y（3D 仍 Y）",
+          len(opt_rows) == 1 and "| P | Y |" in opt_rows[0], str(opt_rows))
+    check("历史段落仍登记矩阵 §4.2 为 1 个 2D=N + 6 个 2D=P（第十三次口径）",
           "1 个 `2D=N`" in mat and "6 个 `2D=P`" in mat)
-    check("矩阵仍写 B2 剩余仍 2 项", "B2 剩余仍 2 项" in mat)
+    check("历史段落仍登记矩阵写 B2 剩余仍 2 项（第十三次口径）",
+          "B2 剩余仍 2 项" in mat)
     check("矩阵有第十三次闭环记录", "第十三次闭环记录" in mat)
     check("矩阵写明仍标 P 不标 Y", "仍标 `P` 不标 `Y`" in mat)
     check("矩阵写明不等于 3D 三层迭代",
@@ -803,11 +804,11 @@ def docs() -> None:
 
     check("B 类规格 §6 第 11 条登记 [LENGTH2D] 一层不虚报",
           "11. 第十三次 `[LENGTH2D]` 一层不虚报" in spec_doc)
-    check("B 类规格第 11 条写明 1N+6P / B2 剩余 2 项 / 不等于 3D",
+    check("历史段落仍登记 B 类规格第 11 条 1N+6P / B2 剩余 2 项 / 不等于 3D",
           "1 个 `2D=N` + 6 个 `2D=P`" in spec_doc
           and "B2 剩余仍 2 项" in spec_doc
           and "三层迭代" in spec_doc)
-    check("B 类规格写明 [OPT] 仍 2D=N、仍标 P 不 Y",
+    check("历史段落仍登记 B 类规格写 [OPT] 2D=N、仍标 P 不 Y（第十三次口径）",
           "`[OPT]` 格仍 `2D=N`" in spec_doc and "不是 `Y`" in spec_doc)
 
     # 守卫名在矩阵依据列 / B 类规格 §6 / 开发手册三处登记；README 与
@@ -821,10 +822,83 @@ def docs() -> None:
           "[LENGTH2D]" in use and "第十三次" in use)
     check("开发手册 登记 [LENGTH2D] 与第十三次",
           "[LENGTH2D]" in guide and "第十三次" in guide)
-    check("README 写明 [OPT] 仍 N / 仍 P 不 Y / 1N+6P",
+    check("历史段落仍登记 README 写 [OPT] N / 仍 P 不 Y / 1N+6P（第十三次口径）",
           "`[OPT]` 仍标 `N`" in rd
           and "仍 `P` 不 `Y`" in rd
           and "1 个 `2D=N` + 6 个 `2D=P`" in rd)
+
+
+def fourteenth() -> None:
+    """第十四次：[OPT2D] 2D 平面索力优化按 opt-in 新造接通，矩阵该格 N→P
+    （仍 P 不 Y），§4.2 变 0N+7P、B2 剩余 1 项；`0 个 2D=N` 断言只落在
+    确实含该串的文档上，历史串仍按 D 类准则保留。"""
+    print("\n[8] 第十四次 [OPT2D] 口径对拍")
+    mat = read(ROOT / "能力边界矩阵.md")
+    spec_doc = read(ROOT / "B类后续项接入规格.md")
+    rd = read(ROOT / "README.md")
+    use = read(ROOT / "使用说明.md")
+    guide = read(ROOT / "开发使用手册.md")
+
+    check("第十四次：矩阵 [OPT] 格 | P | Y | 且 P ≠ Y、不等于 3D [OPT]",
+          "| 目标索力优化 `[OPT]` + 体系守卫 | P | Y |" in mat
+          and "P ≠ Y" in mat and "不等于 3D `[OPT]`" in mat)
+    check("第十四次：矩阵 §4.2 0 个 2D=N + 7 个 2D=P、B2 剩余 1 项、第十四次闭环记录",
+          "0 个 `2D=N` + 7 个 `2D=P`" in mat
+          and "B2 剩余 1 项" in mat
+          and "第十四次闭环记录" in mat)
+    check("第十四次：矩阵如实边界 APPLIED=1 只是建议值 / 命中 T* 属 [LENGTH2D] / 不做 MINENERGY",
+          "APPLIED=1" in mat
+          and "命中 `T*` 属 `[LENGTH2D]` 职责" in mat
+          and "不做 `MINENERGY`" in mat and "SYSGUARD" in mat
+          and "DECKLOAD" in mat and "J=M·D" in mat
+          and "默认 `.dat` / 默认 `.result` / 默认 HTML 逐位不变" in mat
+          and "DEFAULT_DAT_SHA" in mat and "不刷新" in mat)
+    check("第十四次：README 新章、开发手册 0N+7P、使用说明只写 B2 剩余 1 项",
+          "### 2D 平面索力优化 `[OPT2D]`" in rd
+          and "0 个 `2D=N` + 7 个 `2D=P`" in guide
+          and "B2 剩余 1 项" in guide and "B2 剩余 1 项" in use
+          and "0 个 `2D=N`" not in use)
+    check("第十四次：B 类规格 §0 部分实现、§6 第 12 条不虚报、未闭环清单 B2 剩余 1 项",
+          "部分实现（十四次逐次接入）" in spec_doc
+          and "12. 第十四次 `[OPT2D]` 2D 平面索力优化不虚报" in spec_doc
+          and "明确未闭环" in spec_doc and "B2 剩余 1 项" in spec_doc
+          and "仅含被 X20 契约锁死的多格式导出" in spec_doc)
+    src_len = read(ROOT / "length_2d.py")
+    check("第十四次：length_2d.py 写明独立 opt-in 的 [OPT2D] 平面索力优化段",
+          "第十四次另立独立 opt-in 的 `[OPT2D]` 平面索力优化段" in src_len)
+    o = read(ROOT / "opt_2d.py")
+    g = read(ROOT / "verify_opt_2d.py")
+    check("第十四次：opt_2d.py 含 BOUNDARY_NOTE / parse_opt_txt / 四张表键与如实边界",
+          (ROOT / "opt_2d.py").is_file()
+          and "BOUNDARY_NOTE" in o and "parse_opt_txt" in o
+          and all(k in o for k in ("opt_2d_summary_table",
+                                   "opt_2d_iter_table",
+                                   "opt_2d_cable_table",
+                                   "opt_2d_moment_table"))
+          and "APPLIED=1 只表示建议值被采纳" in o
+          and "命中 T* 属 [LENGTH2D] 职责" in o)
+    check("第十四次：verify_opt_2d.py 在位、汇总按布尔位统计、12 格 DEFAULT_DAT_SHA 不刷新",
+          (ROOT / "verify_opt_2d.py").is_file()
+          and "PASS.append((name, bool(ok), str(detail)))" in g
+          and "sum(1 for _, ok, _ in PASS if ok)" in g
+          and "12 格 DEFAULT_DAT_SHA" in g and "不刷新" in g)
+
+    cl = read(FE / "CHANGELOG.md")
+    ifmt = read(FE / "input_format.md")
+    um = read(FE / "USER_MANUAL.md")
+    check("第十四次：FE input_format / USER_MANUAL 登记 *CABLE_OPT2D 段与二维 opt-in 专章",
+          "### 6.6 `*CABLE_OPT2D`" in ifmt
+          and "#### 二维 opt-in `[OPT2D]`" in um
+          and "--opt-detail-only" in um)
+    check("第十四次：FE CHANGELOG ## 2026-11-12 / [OPT2D] 小节 / iterateCableOpt2D / verify_opt_2d.dat",
+          "## 2026-11-12" in cl
+          and "### 新增：2D 平面索力优化 [OPT2D] 段" in cl
+          and "iterateCableOpt2D()" in cl
+          and "verify_opt_2d.dat" in cl)
+    check("第十四次：FE CHANGELOG 第十三次历史句仍保留（不删历史条目）",
+          "`[OPT]` 带约束目标索力优化在 2D" in cl
+          and "仍不做" in cl
+          and "一字不改、仍为当时的事实记录" in cl)
 
 
 def main() -> int:
@@ -839,6 +913,7 @@ def main() -> int:
     wiring_and_zero_pollution()
     exports()
     docs()
+    fourteenth()
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(PASS)} 通过")
