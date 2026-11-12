@@ -842,7 +842,7 @@ def fourteenth() -> None:
     check("第十四次：矩阵 [OPT] 格 | P | Y | 且 P ≠ Y、不等于 3D [OPT]",
           "| 目标索力优化 `[OPT]` + 体系守卫 | P | Y |" in mat
           and "P ≠ Y" in mat and "不等于 3D `[OPT]`" in mat)
-    check("第十四次：矩阵 §4.2 0 个 2D=N + 7 个 2D=P、B2 剩余 1 项、第十四次闭环记录",
+    check("历史段落仍登记第十四次矩阵 §4.2 0N+7P、B2 剩余 1 项与第十四次闭环记录",
           "0 个 `2D=N` + 7 个 `2D=P`" in mat
           and "B2 剩余 1 项" in mat
           and "第十四次闭环记录" in mat)
@@ -853,16 +853,15 @@ def fourteenth() -> None:
           and "DECKLOAD" in mat and "J=M·D" in mat
           and "默认 `.dat` / 默认 `.result` / 默认 HTML 逐位不变" in mat
           and "DEFAULT_DAT_SHA" in mat and "不刷新" in mat)
-    check("第十四次：README 新章、开发手册 0N+7P、使用说明只写 B2 剩余 1 项",
-          "### 2D 平面索力优化 `[OPT2D]`" in rd
-          and "0 个 `2D=N` + 7 个 `2D=P`" in guide
-          and "B2 剩余 1 项" in guide and "B2 剩余 1 项" in use
+    check("第十五次：README 新章、开发手册 0N+9P、使用说明 B2 剩余 0 项",
+          "### 2D 平行导出 / 导入链（2026-11-12，第十五次）" in rd
+          and "0 个 `2D=N` + 9 个 `2D=P`" in guide
+          and "B2 剩余 0 项" in guide and "B2 剩余 0 项" in use
           and "0 个 `2D=N`" not in use)
-    check("第十四次：B 类规格 §0 部分实现、§6 第 12 条不虚报、未闭环清单 B2 剩余 1 项",
-          "部分实现（十四次逐次接入）" in spec_doc
-          and "12. 第十四次 `[OPT2D]` 2D 平面索力优化不虚报" in spec_doc
-          and "明确未闭环" in spec_doc and "B2 剩余 1 项" in spec_doc
-          and "仅含被 X20 契约锁死的多格式导出" in spec_doc)
+    check("第十五次：B 类规格 §0 十五次逐次接入、§6 第 13 条不虚报、未闭环清单 B2 剩余 0 项",
+          "部分实现（十五次逐次接入）" in spec_doc
+          and "13. 第十五次" in spec_doc
+          and "明确未闭环" in spec_doc and "B2 剩余 0 项" in spec_doc)
     src_len = read(ROOT / "length_2d.py")
     check("第十四次：length_2d.py 写明独立 opt-in 的 [OPT2D] 平面索力优化段",
           "第十四次另立独立 opt-in 的 `[OPT2D]` 平面索力优化段" in src_len)
@@ -901,6 +900,51 @@ def fourteenth() -> None:
           and "一字不改、仍为当时的事实记录" in cl)
 
 
+def fifteenth() -> None:
+    """第十五次：核对 README / 使用说明 / 开发手册第十五次新章与计数、
+    export_2d_formats.py 写出器与导入器符号、3D to_canonical 签名、
+    FE 仓三份文档零改动；逐条按布尔位统计，历史条目按 D 类准则保留。"""
+    rd = read(ROOT / "README.md")
+    use = read(ROOT / "使用说明.md")
+    guide = read(ROOT / "开发使用手册.md")
+    e2d = read(ROOT / "export_2d_formats.py")
+    e3d = read(ROOT / "export_formats.py")
+    fe_dir = ROOT.parent / "FEM-Eigen"
+    cl = read(fe_dir / "CHANGELOG.md")
+    um = read(fe_dir / "USER_MANUAL.md")
+    fmt = read(fe_dir / "input_format.md")
+    check("第十五次：README 新章 ### 2D 平行导出 / 导入链（2026-11-12，第十五次）",
+          "### 2D 平行导出 / 导入链（2026-11-12，第十五次）" in rd)
+    check("第十五次：README §4.2 0 个 2D=N + 9 个 2D=P 与 B2 剩余 0 项",
+          "0 个 `2D=N` + 9 个 `2D=P`" in rd
+          and "B2 剩余 0 项" in rd)
+    check("第十五次：README 第十四次章节标题 ### 2D 平面索力优化 [OPT2D] 仍在",
+          "### 2D 平面索力优化 `[OPT2D]`" in rd)
+    check("第十五次：使用说明 §8.5 2D 平行导出 / 导入链新章与 B2 剩余 0 项",
+          "### 8.5 2D 平行导出 / 导入链（2026-11-12，第十五次）" in use
+          and "B2 剩余 0 项" in use)
+    check("第十五次：开发手册 §8.x 新章 / 登记表 12 项 / 0N+9P",
+          all(k in guide for k in (
+              "### 8.x 2D 平行导出 / 导入链（2026-11-12，第十五次）",
+              "登记表 12 项", "0 个 `2D=N` + 9 个 `2D=P`")))
+    check("第十五次：开发手册历史句 B2 剩余由 2 项收窄为 1 项 / 第十四次收官时的历史计数 仍在",
+          "B2 剩余由 2 项收窄为 1 项" in guide
+          and "第十四次收官时的历史计数" in guide)
+    check("第十五次：export_2d_formats.py 三个写出器 / export_2d_all / read_mct_2d_text / read_mct_2d_file 齐备",
+          all(k in e2d for k in (
+              "write_ansys_2d", "write_abaqus_2d", "write_midas_2d",
+              "export_2d_all", "read_mct_2d_text", "read_mct_2d_file")))
+    check("第十五次：export_2d_formats.py 显式 dimension=2D / dimension_not_plane / 不补 0 / 不适用 / warnings",
+          all(k in e2d for k in (
+              "dimension=2D", "dimension_not_plane", "不补 0",
+              "不适用", "warnings")))
+    check("第十五次：3D export_formats.py 的 to_canonical(model: ModelSpec3D) 签名一字未改",
+          "def to_canonical(model: ModelSpec3D) -> tuple[dict[str, Any], list[str]]:" in e3d)
+    check("第十五次：FE 仓三份文档零改动（不含 X20 / 多格式导出 / .mct 段）",
+          bool(cl) and bool(um) and bool(fmt)
+          and all(k not in cl + um + fmt for k in ("X20", "多格式导出", ".mct")))
+
+
 def main() -> int:
     print("=" * 78)
     print("2D 平面索长闭合 [LENGTH2D] 守卫（B2 第十三次，纯离线 + 本地内核实跑）")
@@ -914,6 +958,7 @@ def main() -> int:
     exports()
     docs()
     fourteenth()
+    fifteenth()
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(PASS)} 通过")

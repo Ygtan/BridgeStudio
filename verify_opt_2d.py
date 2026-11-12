@@ -814,9 +814,9 @@ def docs() -> None:
                 if ln.startswith("| 目标索力优化")]
     check("矩阵 §2 [OPT] 格现在是 | P | Y |（3D 仍 Y）",
           len(opt_rows) == 1 and "| P | Y |" in opt_rows[0], str(opt_rows))
-    check("矩阵 §4.2 当前计数 0 个 2D=N + 7 个 2D=P",
+    check("历史段落仍登记矩阵 §4.2 第十四次计数 0N+7P",
           "0 个 `2D=N` + 7 个 `2D=P`" in mat)
-    check("矩阵 B2 剩余由 2 项收窄为 1 项",
+    check("历史段落仍登记矩阵 B2 剩余由 2 项收窄为 1 项",
           "B2 剩余由 2 项收窄为 1 项" in mat)
     check("矩阵有第十四次闭环记录段",
           "2026-11-12 第十四次闭环记录" in mat)
@@ -832,29 +832,30 @@ def docs() -> None:
           and "第十三次" in hist)
 
     # B 类规格 §0 / §6 第 12 条 / 未闭环清单。
-    check("B 类规格 §0 部分实现（十四次逐次接入）",
-          "部分实现（十四次逐次接入）" in spec_doc)
+    check("历史段落仍登记十四次逐次接入、当前为十五次",
+          "部分实现（十五次逐次接入）" in spec_doc
+          and "十四次" in spec_doc)
     check("B 类规格 §6 第 12 条 [OPT2D] 不虚报",
           "12. 第十四次 `[OPT2D]` 2D 平面索力优化不虚报" in spec_doc)
-    check("B 类规格未闭环清单 B2 剩余 1 项且只剩 X20 契约锁死项",
+    check("历史段落仍登记 B 类规格第十四次未闭环清单 B2 剩余 1 项与 X20 契约锁死项",
           "0 个 `2D=N` + 7 个 `2D=P`" in spec_doc
           and "B2 剩余 1 项" in spec_doc
           and "X20 契约锁死" in spec_doc)
 
-    # README / 使用说明 / 开发手册：第十四次当前陈述 + 当前计数口径。
-    check("README 第十四次 [OPT2D] 当前陈述",
+    # README / 使用说明 / 开发手册：第十五次当前口径 + 第十四次历史章节标题仍在。
+    check("历史段落仍登记 README 第十四次 [OPT2D] 章节标题",
           "第十四次" in rd and "### 2D 平面索力优化 `[OPT2D]`" in rd)
-    check("README §4.2 现为 0 个 2D=N + 7 个 2D=P / 不等于 3D [OPT]",
-          "0 个 `2D=N` + 7 个 `2D=P`" in rd
+    check("README §4.2 现为 0N+9P / 不等于 3D [OPT]",
+          "0 个 `2D=N` + 9 个 `2D=P`" in rd
           and "不等于 3D `[OPT]`" in rd)
-    check("使用说明 第十四次 [OPT2D] 当前陈述与 B2 剩余 1 项",
-          "第十四次" in use and "[OPT2D]" in use
-          and "B2 剩余 1 项" in use
+    check("使用说明第十五次 [OPT2D] 与 B2 剩余 0 项",
+          "第十五次" in use and "[OPT2D]" in use
+          and "B2 剩余 0 项" in use
           and "第十三次起 `[LENGTH2D]`" in use)
-    check("开发手册 第十四次 [OPT2D] 当前陈述与 0 个 2D=N + 7 个 2D=P",
-          "第十四次" in guide and "[OPT2D]" in guide
-          and "0 个 `2D=N` + 7 个 `2D=P`" in guide
-          and "B2 剩余 1 项" in guide)
+    check("开发手册第十五次 [OPT2D] 当前陈述与 0N+9P",
+          "第十五次" in guide and "[OPT2D]" in guide
+          and "0 个 `2D=N` + 9 个 `2D=P`" in guide
+          and "B2 剩余 0 项" in guide)
 
     # FE 三份：CHANGELOG 新小节 / input_format §6.6 / USER_MANUAL 专章与对照表。
     check("FE CHANGELOG 顶部 ## 2026-11-12",
@@ -883,6 +884,59 @@ def docs() -> None:
     check("README 质量保障段登记断言总数", "项断言" in rd)
 
 
+def fifteenth() -> None:
+    """第十五次：核对 README / 使用说明 / 开发手册第十五次新章与历史串、
+    矩阵 §2 两格与 §4.2 计数 / 第十五次闭环记录 / 云图格仍 N、B 类规格
+    十五次口径、2D 源码正交与 3D 签名；逐条按布尔位统计。"""
+    mat = read(ROOT / "能力边界矩阵.md")
+    spec_doc = read(ROOT / "B类后续项接入规格.md")
+    rd = read(ROOT / "README.md")
+    use = read(ROOT / "使用说明.md")
+    guide = read(ROOT / "开发使用手册.md")
+    e2d = read(ROOT / "export_2d_formats.py")
+    e3d = read(ROOT / "export_formats.py")
+    check("第十五次：README 新章 + 0N+9P + B2 剩余 0 项",
+          "### 2D 平行导出 / 导入链（2026-11-12，第十五次）" in rd
+          and "0 个 `2D=N` + 9 个 `2D=P`" in rd
+          and "B2 剩余 0 项" in rd)
+    check("第十五次：README 第十四次 [OPT2D] 章节标题仍在、不等于 3D [OPT]",
+          "### 2D 平面索力优化 `[OPT2D]`" in rd
+          and "不等于 3D `[OPT]`" in rd)
+    check("第十五次：使用说明 §8.5 新章 / B2 剩余 0 项 / 第十五次 / 第十三次起 [LENGTH2D]",
+          all(k in use for k in (
+              "### 8.5 2D 平行导出 / 导入链（2026-11-12，第十五次）",
+              "B2 剩余 0 项", "第十五次", "第十三次起 `[LENGTH2D]`")))
+    check("第十五次：使用说明第十四次 [OPT2D] 按 P 接通串已不存在（改第十五次表述）",
+          "第十四次 `[OPT2D]` 按 `P` 接通" not in use
+          and "第十四次起 `[OPT2D]` 2D 平面索力优化按 opt-in 新造接通" in use)
+    check("第十五次：开发手册 §8.x 新章 / 登记表 12 项 / B2 剩余由 2 项收窄为 1 项 / 0N+9P",
+          all(k in guide for k in (
+              "### 8.x 2D 平行导出 / 导入链（2026-11-12，第十五次）",
+              "登记表 12 项", "B2 剩余由 2 项收窄为 1 项",
+              "0 个 `2D=N` + 9 个 `2D=P`")))
+    check("第十五次：开发手册第十四次历史计数跨行保留（连续串 0N+7P / B2 剩余 1 项 均不在）",
+          "0 个 `2D=N` +" in guide and "7 个 `2D=P`" in guide
+          and "0 个 `2D=N` + 7 个 `2D=P`" not in guide
+          and "B2 剩余 1 项" not in guide)
+    check("第十五次：矩阵 §2 两格 | P | Y | 与两条 2D 依据符号",
+          "| ANSYS / Abaqus / MIDAS 多格式导出 | P | Y |" in mat
+          and "| `.mct` 反向导入 | P | Y |" in mat
+          and "export_2d_formats.py::to_plane" in mat
+          and "export_2d_formats.py::read_mct_2d" in mat)
+    check("第十五次：矩阵 §4.2 0N+9P / B2 剩余 0 项 / 第十五次闭环记录 / 云图格仍 N",
+          all(k in mat for k in (
+              "0 个 `2D=N` + 9 个 `2D=P`", "B2 剩余 0 项",
+              "第十五次闭环记录",
+              "| 3D 活载包络结构云图 / 逐端明细表 | N | Y |")))
+    check("第十五次：B 类规格 部分实现（十五次逐次接入） / 13. 第十五次 / B2 剩余 0 项",
+          all(k in spec_doc for k in (
+              "部分实现（十五次逐次接入）", "13. 第十五次", "B2 剩余 0 项")))
+    check("第十五次：export_2d_formats.py 正交不 import 3D 链、3D to_canonical 签名未改",
+          "from export_formats import" not in e2d
+          and "import mct_io" not in e2d
+          and "def to_canonical(model: ModelSpec3D) -> tuple[dict[str, Any], list[str]]:" in e3d)
+
+
 def main() -> int:
     print("=" * 78)
     print("2D 平面索力优化 [OPT2D] 守卫（B2 第十四次，纯离线 + 本地内核实跑）")
@@ -896,6 +950,7 @@ def main() -> int:
     wiring()
     exports()
     docs()
+    fifteenth()
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(PASS)} 通过")

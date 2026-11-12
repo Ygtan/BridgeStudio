@@ -484,7 +484,7 @@ def fourteenth() -> None:
     check("第十四次：矩阵 §2 [OPT] 格 | P | Y | 且 P ≠ Y、不等于 3D [OPT]",
           "| 目标索力优化 `[OPT]` + 体系守卫 | P | Y |" in text
           and "P ≠ Y" in text and "不等于 3D `[OPT]`" in text)
-    check("第十四次：矩阵 §4.2 0 个 2D=N + 7 个 2D=P、B2 剩余 1 项、第十四次闭环记录",
+    check("历史段落仍登记第十四次矩阵 §4.2 0N+7P、B2 剩余 1 项与第十四次闭环记录",
           "0 个 `2D=N` + 7 个 `2D=P`" in text
           and "B2 剩余 1 项" in text
           and "第十四次闭环记录" in text
@@ -505,10 +505,10 @@ def fourteenth() -> None:
     rd = read(ROOT / "README.md")
     use = read(ROOT / "使用说明.md")
     guide = read(ROOT / "开发使用手册.md")
-    check("第十四次：README 新章、开发手册 0N+7P、使用说明只写 B2 剩余 1 项",
-          "### 2D 平面索力优化 `[OPT2D]`" in rd
-          and "0 个 `2D=N` + 7 个 `2D=P`" in guide
-          and "B2 剩余 1 项" in guide and "B2 剩余 1 项" in use
+    check("第十五次：README 新章、开发手册 0N+9P、使用说明 B2 剩余 0 项",
+          "### 2D 平行导出 / 导入链（2026-11-12，第十五次）" in rd
+          and "0 个 `2D=N` + 9 个 `2D=P`" in guide
+          and "B2 剩余 0 项" in guide and "B2 剩余 0 项" in use
           and "0 个 `2D=N`" not in use)
     o = read(ROOT / "opt_2d.py")
     g = read(ROOT / "verify_opt_2d.py")
@@ -550,6 +550,46 @@ def fourteenth() -> None:
               and "仍不做" in cl)
 
 
+def fifteenth() -> None:
+    """第十五次：B2「2D 平行导出 / 导入链」两格按 B 档平行链接通（仍 P 不 Y），
+    矩阵 §2 两格标 P、依据列登记 2D 真实符号，§4.2 变 0N+9P、B2 剩余 0 项；
+    逐条核对矩阵新口径、历史串保留、如实边界与 2D 源码正交，按布尔位统计。"""
+    text = read(DOC)
+    e2d = read(ROOT / "export_2d_formats.py")
+    check("第十五次：矩阵 §2 多格式导出格 | P | Y |、依据列含 export_2d_formats.py::to_plane",
+          "| ANSYS / Abaqus / MIDAS 多格式导出 | P | Y |" in text
+          and "export_2d_formats.py::to_plane" in text)
+    check("第十五次：矩阵 §2 .mct 反向导入格 | P | Y |、依据列含 export_2d_formats.py::read_mct_2d",
+          "| `.mct` 反向导入 | P | Y |" in text
+          and "export_2d_formats.py::read_mct_2d" in text)
+    check("第十五次：矩阵 §4.2 0 个 2D=N + 9 个 2D=P 与 B2 剩余 0 项",
+          "0 个 `2D=N` + 9 个 `2D=P`" in text
+          and "B2 剩余 0 项" in text)
+    check("第十五次：矩阵有第十五次闭环记录段",
+          "第十五次闭环记录" in text)
+    check("第十五次：矩阵 3D 活载包络云图格仍 | N | Y |（P4 成果层未计入 9P）",
+          "| 3D 活载包络结构云图 / 逐端明细表 | N | Y |" in text)
+    check("第十五次：矩阵历史串 1 个 2D=N + 6 个 2D=P / B2 剩余 2 项 / B2 剩余 1 项 / 仅剩被 X20 仍在",
+          all(k in text for k in (
+              "1 个 `2D=N` + 6 个 `2D=P`", "B2 剩余 2 项",
+              "B2 剩余 1 项", "仅剩被 X20")))
+    check("第十五次：矩阵如实边界 P ≠ Y / 不等于 3D [OPT] / MIDAS 数值对拍仍未做 / 无 GUI 入口",
+          all(k in text for k in (
+              "P ≠ Y", "不等于 3D `[OPT]`",
+              "MIDAS 数值对拍仍未做", "无 GUI 入口")))
+    check("第十五次：矩阵写明 DEFAULT_DAT_SHA 不刷新 / 逐位不变",
+          "DEFAULT_DAT_SHA" in text and "不刷新" in text
+          and "逐位不变" in text)
+    check("第十五次：export_2d_formats.py 存在且含 PLANE_SCHEMA / DIMENSION = 2D / to_plane / read_mct_2d / PlaneMctImport",
+          (ROOT / "export_2d_formats.py").is_file()
+          and all(k in e2d for k in (
+              "PLANE_SCHEMA", 'DIMENSION = "2D"', "to_plane",
+              "read_mct_2d", "PlaneMctImport")))
+    check("第十五次：export_2d_formats.py 不含 from export_formats import / import mct_io（3D 正交）",
+          "from export_formats import" not in e2d
+          and "import mct_io" not in e2d)
+
+
 def main() -> int:
     print("=" * 78)
     doc_structure()
@@ -561,6 +601,7 @@ def main() -> int:
     live_effect(builder_map)
     gaps_and_process()
     fourteenth()
+    fifteenth()
     n_pass = sum(1 for ok, _, _ in RESULTS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(RESULTS)} 通过")

@@ -25,16 +25,18 @@
 X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（唯一真源
 `ModelSpec3D` / 唯一转换点 `to_canonical` / 只出不进）、A/B/C 三档处理分级、
 统一字段·单位·坐标与分块编号规范、已知缺陷修正清单、资产登记表、禁止项，
-全部收敛在 **`X20_接入约定.md`**，并由 **`verify_x20_contract.py`**（78/78）
+全部收敛在 **`X20_接入约定.md`**，并由 **`verify_x20_contract.py`**（91/91）
 做成可执行守卫。新增或修改 X20 资产必须先登记再实现；仓库内不得出现
 归档目录的路径常量或 `bridge_fe_modeler` 导入。
+第十五次起 2D 三格式导出 / `.mct` 反向导入另走平面专用平行链，正交约定见
+`X20_接入约定.md` §3.4（不改 3D 唯一转换点 `to_canonical`、两条链互不冒充）。
 
 ## 能力边界矩阵
 
 `X20_接入约定.md` 管「X20 资产怎么接」，**`能力边界矩阵.md` 管「接到之后到底有哪些能力、哪些还没有」**：
 6 桥型 × 2 维度主矩阵（建造器键 / 求解入口 / 阶段·活载·预应力参数逐格对拍）、
 20 项维度级能力的 `文件::符号` 依据、参数覆盖契约与刻意隐藏白名单、
-3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（270/270）纯离线守卫：
+3 条真实缺口 + 历次闭环记录（编号容量 / 包络云图 / PDF 记载纠正 / B 类）。由 **`verify_capability_matrix.py`**（280/280）纯离线守卫：
 主矩阵与 `BUILDERS` / `SOLVER_OF` 对拍、依据符号真实存在、
 `DEFAULTS ⊆ FIELDS ∪ 白名单`、额外控件带 `default`、默认值在区间内、
 12 个建造器「控件渲染写回 params 后默认 `.dat` 逐位不变」、
@@ -537,7 +539,7 @@ Newton 一层**：FE `fem_2d.hpp` 新增 `NewtonStep2D` / `NewtonTrace2D` 挂进
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **49 个脚本全绿**，其中 44 个带汇总输出的脚本合计 **4197 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 150/150、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 171/171、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 241/241、`verify_length_2d.py` 257/257、`verify_opt_2d.py` 276/276、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 78/78、`verify_capability_matrix.py` 270/270，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **50 个脚本全绿**，其中 45 个带汇总输出的脚本合计 **4524 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 150/150、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 181/181、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 251/251、`verify_length_2d.py` 267/267、`verify_opt_2d.py` 286/286、`verify_2d_export_import.py` 264/264、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 91/91、`verify_capability_matrix.py` 280/280，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
@@ -553,9 +555,9 @@ B2 的「截面应力」半部随后按 `P` 口径接入（`strength_2d.py`，�
 第十三次收官时 `[OPT]` 仍标 `N`、**B2 剩余 2 项**（内容曾再收窄为
 「`[OPT]` 一层力学 + 多格式导出 / `.mct` 反向导入」）；**第十四次起
 `[OPT2D]` 2D 平面索力优化按 opt-in 首次新造第二层力学接通**（该格
-`N→P`、仍 `P` 不 `Y`），§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、
-**B2 剩余 1 项**——仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入；
-这 1 项与组合体系（B1，用户本轮暂缓）、
+`N→P`、仍 `P` 不 `Y`），§4.2 现为 **0 个 `2D=N` + 9 个 `2D=P`**、
+**B2 剩余 0 项**——第十五次 B2「2D 平行导出 / 导入链」的多格式导出 / `.mct` 反向导入已按 B 档平行链接通（两格 `N→P`、仍 `P` 不 `Y`），B2 逐次接入全部收口；
+B2 已收口的这两格（`P ≠ Y` 的如实边界、见下文新增节）与组合体系（B1，用户本轮暂缓）、
 B3 非线性稳定全过程、B4 预应力损失两处规范口径、B5 无应力曲率的
 **现状、两阶段规格与验收断言**统一写在
 `B类后续项接入规格.md`，由 `verify_b_class_spec.py` 纯离线守卫。这些项目里
@@ -607,8 +609,7 @@ Python-only 契约，不写进 `.dat`；缺任一项整章 `refused` 并逐条�
 **B2 剩余 2 项**当时均不变；第十三次 `[LENGTH2D]` 一层按 opt-in 首次真正
 新造 2D 力学接通后，第十三次收官时 §4.2 为 **1 个 `2D=N` + 6 个 `2D=P`**、
 **B2 剩余 2 项**；**第十四次起 `[OPT2D]` 2D 平面索力优化按 opt-in 新造
-接通**（该格 `N→P`、仍 `P` 不 `Y`），§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、
-**B2 剩余 1 项**（仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入）。
+接通**（该格 `N→P`、仍 `P` 不 `Y`），**2026-11-12 第十五次**起 B2「2D 平行导出 / 导入链」两格按 B 档平行链接通（`2D=N` → `2D=P`、**仍 `P` 不 `Y`**），§4.2 现为 **0 个 `2D=N` + 9 个 `2D=P`**、**B2 剩余 0 项**（第十五次两格按 `P` 接通，仍 `P ≠ Y`；B2 逐次接入全部收口）。
 
 ### 2D 平面索长闭合 `[LENGTH2D]`（2026-11-11，第十三次）
 
@@ -681,8 +682,39 @@ ROUNDTOL=` 参数行 + 逐索 `T0` 行 + 逐个 `M` 登记行）、
 `.result` / 默认 HTML 逐位不变，12 格 `DEFAULT_DAT_SHA` 与 37 个黄金基线
 都不刷新。该格 `2D=N` → `2D=P`、**仍 `P` 不 `Y`**：2D 版缺 SYSGUARD /
 MINENERGY / 影响矩阵 / 垂度 / Ernst / 共转成桥态 / 三维制造线形，
-**不等于 3D `[OPT]`**；§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、
-**B2 剩余 1 项**（仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入）。
+**不等于 3D `[OPT]`**；**2026-11-12 第十五次**起 B2「2D 平行导出 / 导入链」两格按 B 档平行链接通（`2D=N` → `2D=P`、**仍 `P` 不 `Y`**），§4.2 现为 **0 个 `2D=N` + 9 个 `2D=P`**、**B2 剩余 0 项**（第十五次两格按 `P` 接通，仍 `P ≠ Y`；B2 逐次接入全部收口）。
+
+### 2D 平行导出 / 导入链（2026-11-12，第十五次）
+
+B2 最后两格（ANSYS / Abaqus / MIDAS 多格式导出、`.mct` 反向导入）按
+`X20_接入约定.md` §3.4 的 **B 档平行链**接通（§8「先登记 §7 再实现」新增
+资产 `B5`，`ASSET_REGISTRY` 由 11 项变 12 项、§1–§9 九章结构不变），
+两格 `2D=N` → `2D=P`、**仍 `P ≠ Y`**，B2 剩余 0 项。两条链**正交、互不冒充**：
+
+- **契约形态**：新建 `export_2d_formats.py` 定义 `plane_frame_2d/v1`
+  **平行 2D 中间表示**（**不叫 canonical dict**）；3D 的
+  `export_formats.to_canonical(model: ModelSpec3D)` 与三个写出器签名
+  **一字不动**、3D 唯一转换点不经过。
+- **接口 / CLI**：导出 `to_plane` → `write_ansys_2d` / `write_abaqus_2d` /
+  `write_midas_2d` / `export_2d_all`（`.ans` / `.inp` / `.mct`）；导入
+  `read_mct_2d` / `read_mct_2d_text` / `PlaneMctImport` 读回 `BridgeSpec`。
+  只有模块 API + CLI，**无 GUI 入口**（界面按钮仍只走 3D）。
+- **维度语义**：显式 `dimension="2D"`，只有 x/y、平面 3 dof `UX/UY/ROTZ`、
+  单一惯矩 `I`；**不写 z / 6dof / `IYY`·`IZZ`·`IXX`，缺项标「不适用」
+  而不是补 0**。写 `.mct` 时 z=0（平面几何事实）与平面外 dof 固定（格式要求）
+  逐条进 `warnings`；导入只接受 z 全 0 且平面外约束一致的平面模型，否则
+  `errors` 写 `dimension_not_plane` 且 `spec=None`，**绝不静默投影丢信息**。
+- **有损项只登记不还原**：车道 / 影响线 / 成桥态 / 施工阶段 / 自重 /
+  预应力 / β 角 / DBUSER / 分布荷载一律进 `warnings`、不补 0、不猜值。
+- **仍 `P ≠ Y`**：2D 版格式覆盖窄于 3D、无 GUI 入口、MIDAS 数值对拍仍未做
+  （本机无 MIDAS）；3D `.mct` 反向导入是 `mct_io.MctImport` 的完整双向互导，
+  2D 只是平面专用平行链，不等于 3D。
+- **默认零污染 / FE 仓零改动**：本轮不改 `export_formats.py` / `mct_io.py` /
+  `bridge_spec.py` / `app.py` / `solve_2d.py` / `export_html.py`，默认 `.dat` /
+  默认 `.result` / 默认 HTML 逐位不变，12 格 `DEFAULT_DAT_SHA` 与 FE 37 个
+  黄金基线不刷新；B1 仍暂缓、B3 / B4 / B5 仍只立规格、MIDAS 数值对拍未闭环。
+  FE 仓本轮零改动、零文档改动，BS 侧闭环不等于 FE 内核已实现 3D 等价能力。
+  独立守卫 `verify_2d_export_import.py`（264/264，覆盖契约正交 / 三格式写出 / .mct 往返 oracle / 维度拒绝 / 默认零污染 / 两仓文档对拍）。
 
 ### 2D 引用完整性校验（`P` 口径）
 

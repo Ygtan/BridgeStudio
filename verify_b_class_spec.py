@@ -445,25 +445,24 @@ def b2_opt_2d() -> None:
     check("第十四次：矩阵 §2 [OPT] 格 | P | Y | 且 P ≠ Y、不等于 3D [OPT]",
           "| 目标索力优化 `[OPT]` + 体系守卫 | P | Y |" in mat
           and "P ≠ Y" in mat and "不等于 3D `[OPT]`" in mat)
-    check("第十四次：矩阵 §4.2 0 个 2D=N + 7 个 2D=P、B2 剩余 1 项、有第十四次闭环记录",
+    check("历史段落仍登记第十四次矩阵 §4.2 0N+7P、B2 剩余 1 项与第十四次闭环记录",
           "0 个 `2D=N` + 7 个 `2D=P`" in mat
           and "B2 剩余 1 项" in mat
           and "第十四次闭环记录" in mat)
-    check("第十四次：B 类规格 §0 部分实现（十四次逐次接入）且 §6 第 12 条 [OPT2D] 不虚报",
-          "部分实现（十四次逐次接入）" in t and "第十四次" in t
-          and "12. 第十四次 `[OPT2D]` 2D 平面索力优化不虚报" in t
-          and "矩阵该格 `2D=P` 不是 `Y`" in t)
-    check("第十四次：B 类规格未闭环清单 B2 剩余 1 项只剩 X20 契约锁死项",
-          "明确未闭环" in t and "B2 剩余 1 项" in t
-          and "仅含被 X20 契约锁死的多格式导出" in t)
+    check("历史段落仍登记第十四次 §0 十四次逐次接入与 §6 第 12 条（当前为十五次逐次接入）",
+          "部分实现（十五次逐次接入）" in t and "12. 第十四次" in t
+          and "13. 第十五次" in t and "十四次" in t)
+    check("第十五次：未闭环清单 B2 剩余 0 项、两格按 P 接通仍 P≠Y",
+          "明确未闭环" in t and "B2 剩余 0 项" in t
+          and "按 `P` 接通" in t and "仍 `P ≠ Y`" in t)
     check("第十四次：README 新章 ### 2D 平面索力优化 `[OPT2D]` 在位",
           "### 2D 平面索力优化 `[OPT2D]`" in rd)
-    check("第十四次：开发手册登记 0 个 2D=N + 7 个 2D=P 与 B2 剩余 1 项",
-          "0 个 `2D=N` + 7 个 `2D=P`" in guide
-          and "B2 剩余 1 项" in guide and "第十四次" in guide)
-    check("第十四次：使用说明写 B2 剩余 1 项、[OPT2D] 按 P 接通且不落 0 个 2D=N",
-          "B2 剩余 1 项" in use
-          and "第十四次 `[OPT2D]` 按 `P` 接通" in use
+    check("第十五次：开发手册登记 0N+9P 与 B2 剩余 0 项",
+          "0 个 `2D=N` + 9 个 `2D=P`" in guide
+          and "B2 剩余 0 项" in guide and "第十五次" in guide)
+    check("第十五次：使用说明写 B2 剩余 0 项、第十五次新章且不落 0 个 2D=N",
+          "B2 剩余 0 项" in use
+          and "### 8.5 2D 平行导出 / 导入链（2026-11-12，第十五次）" in use
           and "0 个 `2D=N`" not in use)
 
     o = read(ROOT / "opt_2d.py")
@@ -514,6 +513,55 @@ def b2_opt_2d() -> None:
               and "一字不改、仍为当时的事实记录" in cl)
 
 
+def b2_fifteenth() -> None:
+    """第十五次：B2「2D 平行导出 / 导入链」两格按 B 档平行链接通（仍 P 不 Y），
+    矩阵 §4.2 变 0N+9P、B2 剩余 0 项；逐条核对第十五次新口径、X20 正交约定、
+    注册表与如实能力边界，第十四次历史条目仍按 D 类准则保留。"""
+    spec_doc = read(SPEC)
+    x20 = read(ROOT / "X20_接入约定.md")
+    vx = read(ROOT / "verify_x20_contract.py")
+    check("第十五次：B 类规格 §0 部分实现（十五次逐次接入）、§6 13. 第十五次、未闭环清单 B2 剩余 0 项",
+          "部分实现（十五次逐次接入）" in spec_doc
+          and "13. 第十五次" in spec_doc
+          and "明确未闭环" in spec_doc
+          and "B2 剩余 0 项" in spec_doc)
+    check("第十五次：B 类规格带日期历史段仍登记 仍被 **X20 契约**锁死 / 继续写「没有」 / 12. 第十四次",
+          "仍被 **X20 契约**锁死" in spec_doc
+          and "继续写「没有」" in spec_doc
+          and "12. 第十四次" in spec_doc)
+    check("第十五次：B 类规格 §6 第 13 条写明两格 2D=P 不是 Y、plane_frame_2d/v1 不是 canonical dict",
+          "13. 第十五次" in spec_doc and "矩阵两格 `2D=P`" in spec_doc
+          and "不是 canonical dict" in spec_doc
+          and "plane_frame_2d/v1" in spec_doc)
+    check("第十五次：B 类规格写明显式 dimension=2D + dimension_not_plane 拒绝非平面、绝不静默投影",
+          'dimension="2D"' in spec_doc and "dimension_not_plane" in spec_doc
+          and "spec=None" in spec_doc
+          and "绝不静默投影丢信息" in spec_doc)
+    check("第十五次：B 类规格写明缺项标「不适用」不补 0、格式占位逐条进 warnings、无 GUI 入口",
+          "缺项标「不适用」不补 0" in spec_doc
+          and "格式占位逐条进 `warnings`" in spec_doc
+          and "无 GUI 入口" in spec_doc)
+    check("第十五次：B 类规格写明 MIDAS 数值对拍仍未做、12 格 DEFAULT_DAT_SHA 不刷新、FE 仓零改动",
+          "MIDAS 数值对拍本机无 MIDAS、仍未做" in spec_doc
+          and "12 格 `DEFAULT_DAT_SHA`" in spec_doc
+          and "不刷新" in spec_doc
+          and "FE 仓本轮零改动" in spec_doc)
+    check("第十五次：X20 契约 §3.4 / | `B5` | / plane_frame_2d/v1 / dimension_not_plane / 格式占位 / 不违反铁律 3 齐备",
+          all(k in x20 for k in (
+              "### 3.4 2D 平行链的正交约定", "| `B5` |",
+              "plane_frame_2d/v1", "dimension_not_plane",
+              "格式占位", "不违反铁律 3")))
+    check("第十五次：X20 契约 §1–§9 九章齐全且 §9 新增 2D 平行链禁止项",
+          all(f"## {i}." in x20 for i in range(1, 10))
+          and "把 2D 平面刚架中间表示" in x20)
+    check("第十五次：verify_x20_contract.py ASSET_REGISTRY 登记 B5 为 B 档且有 plane_chain()",
+          "ASSET_REGISTRY" in vx and '"B5": "B"' in vx
+          and "def plane_chain()" in vx and "plane_chain()" in vx)
+    check("第十五次：组合体系（B1）仍显式拒绝、B5 仍 P 不 Y、无 GUI 入口",
+          "组合体系（B1）仍显式拒绝" in x20
+          and "仍 `P` 不 `Y`" in x20 and "无 GUI 入口" in x20)
+
+
 def main() -> int:
     print("=" * 78)
     print("B 类后续项接入规格守卫（纯离线）")
@@ -530,6 +578,7 @@ def main() -> int:
     b2_capacity_2d()
     b2_length_2d()
     b2_opt_2d()
+    b2_fifteenth()
     spec_rules()
     no_new_capability()
     dat_invariant()

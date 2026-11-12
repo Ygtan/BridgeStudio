@@ -688,7 +688,7 @@ def fourteenth() -> None:
     rd = read(ROOT / "README.md")
     use = read(ROOT / "使用说明.md")
     guide = read(ROOT / "开发使用手册.md")
-    check("第十四次：矩阵 [OPT] 格 | P | Y |、§4.2 0N+7P、B2 剩余 1 项、第十四次闭环记录",
+    check("历史段落仍登记第十四次矩阵 [OPT] 格 2D=P、§4.2 0N+7P、B2 剩余 1 项与第十四次闭环记录",
           "| 目标索力优化 `[OPT]` + 体系守卫 | P | Y |" in mat
           and "0 个 `2D=N` + 7 个 `2D=P`" in mat
           and "B2 剩余 1 项" in mat
@@ -701,16 +701,15 @@ def fourteenth() -> None:
           and "命中 `T*` 属 `[LENGTH2D]` 职责" in mat
           and "默认 `.dat` / 默认 `.result` / 默认 HTML 逐位不变" in mat
           and "DEFAULT_DAT_SHA" in mat and "不刷新" in mat)
-    check("第十四次：README 新章、开发手册 0N+7P、使用说明只写 B2 剩余 1 项",
-          "### 2D 平面索力优化 `[OPT2D]`" in rd
-          and "0 个 `2D=N` + 7 个 `2D=P`" in guide
-          and "B2 剩余 1 项" in guide and "B2 剩余 1 项" in use
+    check("第十五次：README 新章、开发手册 0N+9P、使用说明 B2 剩余 0 项",
+          "### 2D 平行导出 / 导入链（2026-11-12，第十五次）" in rd
+          and "0 个 `2D=N` + 9 个 `2D=P`" in guide
+          and "B2 剩余 0 项" in guide and "B2 剩余 0 项" in use
           and "0 个 `2D=N`" not in use)
-    check("第十四次：B 类规格 §0 部分实现、§6 第 12 条不虚报、未闭环清单 B2 剩余 1 项",
-          "部分实现（十四次逐次接入）" in spec_doc
-          and "12. 第十四次 `[OPT2D]` 2D 平面索力优化不虚报" in spec_doc
-          and "明确未闭环" in spec_doc and "B2 剩余 1 项" in spec_doc
-          and "仅含被 X20 契约锁死的多格式导出" in spec_doc)
+    check("第十五次：B 类规格 §0 十五次逐次接入、§6 第 13 条不虚报、未闭环清单 B2 剩余 0 项",
+          "部分实现（十五次逐次接入）" in spec_doc
+          and "13. 第十五次" in spec_doc
+          and "明确未闭环" in spec_doc and "B2 剩余 0 项" in spec_doc)
     o = read(ROOT / "opt_2d.py")
     g = read(ROOT / "verify_opt_2d.py")
     check("第十四次：opt_2d.py 含 BOUNDARY_NOTE / parse_opt_txt / 四张表键与如实边界",
@@ -749,6 +748,52 @@ def fourteenth() -> None:
           and "一字不改、仍为当时的事实记录" in cl)
 
 
+def fifteenth() -> None:
+    """第十五次：核对 X20 契约 §3.4 正交约定 / §9 新增禁止项 / 九章齐全、
+    verify_x20_contract.py 注册表与 plane_chain()、verify_2d_export_import.py
+    布尔位统计、2D 源码与如实能力边界；逐条按布尔位统计。"""
+    x20 = read(ROOT / "X20_接入约定.md")
+    vx = read(ROOT / "verify_x20_contract.py")
+    vg = read(ROOT / "verify_2d_export_import.py")
+    e2d = read(ROOT / "export_2d_formats.py")
+    use = read(ROOT / "使用说明.md")
+    spec_doc = read(ROOT / "B类后续项接入规格.md")
+    check("第十五次：X20 契约 §3.4 2D 平行链的正交约定在位",
+          "### 3.4 2D 平行链的正交约定" in x20)
+    check("第十五次：X20 契约登记 | `B5` | / plane_frame_2d/v1 / export_2d_formats.py::to_plane",
+          all(k in x20 for k in (
+              "| `B5` |", "plane_frame_2d/v1",
+              "export_2d_formats.py::to_plane")))
+    check("第十五次：X20 契约 §1–§9 九章齐全",
+          all(f"## {i}." in x20 for i in range(1, 10)))
+    check("第十五次：X20 契约 §9 新增 2D 平行链禁止项（不得冒充 canonical dict / 回流 3D）",
+          "把 2D 平面刚架中间表示" in x20 and "## 9." in x20)
+    check("第十五次：verify_x20_contract.py ASSET_REGISTRY 12 项含 B5 为 B 档、有 plane_chain()",
+          "ASSET_REGISTRY" in vx and '"B5": "B"' in vx
+          and all(f'"{k}": "' in vx for k in (
+              "A0", "A1", "A2", "A3", "B1", "B2", "B3", "B4", "B5",
+              "C1", "C2", "C3"))
+          and "def plane_chain()" in vx and "plane_chain()" in vx)
+    check("第十五次：verify_2d_export_import.py 在位且按布尔位统计（PASS.append / sum(1 for _, ok, _ in PASS if ok)）",
+          (ROOT / "verify_2d_export_import.py").is_file()
+          and "PASS.append((name, bool(ok), str(detail)))" in vg
+          and "sum(1 for _, ok, _ in PASS if ok)" in vg)
+    check("第十五次：export_2d_formats.py 含 PLANE_DOF_NAMES / NOT_APPLICABLE / 格式占位 / warnings",
+          all(k in e2d for k in (
+              "PLANE_DOF_NAMES", "NOT_APPLICABLE", "格式占位", "warnings")))
+    check("第十五次：如实边界 只 P 不 Y / P ≠ Y / 无 GUI 入口 / MIDAS 数值对拍仍未做",
+          all(k in use for k in (
+              "P ≠ Y", "无 GUI 入口", "MIDAS 数值对拍仍未做"))
+          and "仍 `P` 不 `Y`" in x20)
+    check("第十五次：默认 .dat / .result / 默认 HTML 逐位不变、12 格 DEFAULT_DAT_SHA 不刷新",
+          "逐位不变" in use and "12 格 `DEFAULT_DAT_SHA`" in use
+          and "不刷新" in use)
+    check("第十五次：组合体系（B1）仍显式拒绝 / 不违反铁律 3 / FE 仓零改动",
+          "组合体系（B1）仍显式拒绝" in x20
+          and "不违反铁律 3" in x20
+          and "FE 仓本轮零改动" in spec_doc)
+
+
 def main() -> int:
     print("=" * 78)
     print("2D 内层 Newton 逐迭代过程量段守卫（B2 第十一次，纯离线 + 本地内核实跑）")
@@ -762,6 +807,7 @@ def main() -> int:
     exports()
     docs()
     fourteenth()
+    fifteenth()
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(PASS)} 通过")

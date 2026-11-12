@@ -51,7 +51,7 @@ def read(name: str) -> str:
 #: 契约 §7 资产登记表：id → 档位。新增资产必须先改契约再改这里。
 ASSET_REGISTRY: dict[str, str] = {
     "A0": "A", "A1": "A", "A2": "A", "A3": "A",
-    "B1": "B", "B2": "B", "B3": "B", "B4": "B",
+    "B1": "B", "B2": "B", "B3": "B", "B4": "B", "B5": "B",
     "C1": "C", "C2": "C", "C3": "C",
 }
 
@@ -268,6 +268,79 @@ def smoke_and_fixes() -> None:
           "X20 原版" in CONTRACT.read_text(encoding="utf-8"))
 
 
+def plane_chain() -> None:
+    print("\n[8] 2D 平行链：§3.4 正交约定、B5 登记、物理隔离")
+    text = CONTRACT.read_text(encoding="utf-8") if CONTRACT.is_file() else ""
+    new_mod = ROOT / "export_2d_formats.py"
+    src = read("export_2d_formats.py") if new_mod.is_file() else ""
+
+    check("契约新增 §3.4 2D 平行链的正交约定",
+          "### 3.4 2D 平行链的正交约定（B 档，2026-11-12 第十五次）" in text)
+    check("§3.4 字面量：plane_frame_2d/v1 / dimension=2D / B5",
+          all(k in text for k in ("plane_frame_2d/v1", "dimension=2D", "`B5`")))
+    check("§3.4 字面量：dimension_not_plane / 格式占位 / 不适用 / 补 0",
+          all(k in text for k in ("dimension_not_plane", "格式占位", "不适用", "补 0")))
+    check("§3.4 字面量：不违反铁律 3 / 组合体系 / 不回流 / 正交",
+          all(k in text for k in ("不违反铁律 3", "组合体系", "不回流", "正交")))
+
+    b5_row = [ln for ln in text.splitlines()
+              if ln.strip().startswith("|") and "`B5`" in ln]
+    b5_cells: list[str] = []
+    if b5_row:
+        b5_cells = [c.strip() for c in b5_row[0].strip().strip("|").split("|")]
+    check("§7 登记表含 B5 行且档位为 B",
+          len(b5_row) == 1 and len(b5_cells) >= 7 and b5_cells[3] == "B",
+          b5_cells[3] if len(b5_cells) >= 7 else "行缺失")
+
+    sec9 = text.split("## 9. 禁止项")[1] if "## 9. 禁止项" in text else ""
+    n_forbid = len([ln for ln in sec9.splitlines() if ln.startswith("- ")])
+    check("§9 新增 2D 禁止项且禁止项不少于 7 条",
+          "把 2D 平面刚架中间表示（`plane_frame_2d/v1`）称作 canonical dict" in text
+          and "3D 写出器链路" in text and n_forbid >= 7, f"{n_forbid} 条")
+
+    n_h2 = len(re.findall(r"(?m)^## \d+\.", text))
+    check("九章结构不变（§1–§9 齐全、无新增顶层章节）",
+          all(sec in text for sec in SECTIONS) and n_h2 == 9, f"h2={n_h2}")
+
+    check("export_2d_formats.py 存在", new_mod.is_file())
+    symbols = ("PLANE_SCHEMA", 'DIMENSION = "2D"', "to_plane", "read_mct_2d",
+               "write_ansys_2d", "write_abaqus_2d", "write_midas_2d",
+               "export_2d_all", "PlaneMctImport")
+    miss = [s for s in symbols if s not in src]
+    check("2D 模块接口符号齐全（PLANE_SCHEMA / DIMENSION / to_plane / 三写出器 / ...）",
+          not miss, str(miss))
+
+    ef = read("export_formats.py")
+    check("3D 链路未被动过：to_canonical 签名一字未改",
+          "def to_canonical(model: ModelSpec3D) -> tuple[dict[str, Any], list[str]]:" in ef)
+
+    banned = ("from export_formats import", "import export_formats", "def to_canonical(")
+    hits = [b for b in banned if b in src]
+    check("2D 模块无 import export_formats / 无 def to_canonical(",
+          not hits, str(hits))
+
+    # 精确判定「canonical 不作中间格式名」：用 tokenize 去掉字符串 / 注释 /
+    # f-string 内容，只留代码 token；说明文字里的「不是 X20 canonical dict」不误伤。
+    import io
+    import tokenize
+    skip = {tokenize.STRING, tokenize.COMMENT}
+    for extra in ("FSTRING_START", "FSTRING_MIDDLE", "FSTRING_END"):
+        if hasattr(tokenize, extra):
+            skip.add(getattr(tokenize, extra))
+    code_tokens: list[str] = []
+    for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+        if tok.type not in skip:
+            code_tokens.append(tok.string)
+    code = " ".join(code_tokens)
+    bad_ids = [w for w in ("canonical", "export_formats", "to_canonical") if w in code]
+    check("2D 模块未把 canonical / export_formats / to_canonical 用作代码标识符",
+          not bad_ids, str(bad_ids))
+
+    doc0 = src.split('"""')[1] if '"""' in src else ""
+    check("2D 模块 docstring 明确「不是 X20 canonical dict」",
+          "不是 X20 canonical dict" in doc0)
+
+
 def main() -> int:
     print("=" * 78)
     print("X20 资产接入约定：文档 / 唯一转换点 / 无旁路 / 口径对拍")
@@ -279,6 +352,7 @@ def main() -> int:
     contact_points()
     field_mapping()
     smoke_and_fixes()
+    plane_chain()
     n_pass = sum(1 for ok, _, _ in RESULTS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(RESULTS)} 通过")

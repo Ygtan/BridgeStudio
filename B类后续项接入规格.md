@@ -9,7 +9,7 @@
 | 项 | 本轮状态 | 依据 |
 | --- | --- | --- |
 | B1 组合体系 | **暂缓**（用户指定） | `组合体系接入规格.md`、`verify_combo_system.py` 86/86 显式拒绝 |
-| B2 2D ↔ 3D 能力对齐 | **部分实现（十四次逐次接入）**：先按源码事实接通 2D 模态 / 线性屈曲；第六次 A 档按 `P` 口径接通 2D **截面应力**半部（承载力当时显式拒绝）；第七次把「引用完整性中文校验」按源码事实由 `N` 纠正为 `P` 并补齐；第八次接通「同源计算书四出口」的**导出机制**（仍标 `P`）；第九次由 FE opt-in 补 `[MODAL2D]` 段闭环「模态周期 T / 振型 / 参与质量」（`BASIS=xy`，用户拍板方向口径，收官时 **B2 剩余 3 项**）；第十次由 FE opt-in 补 `[PRESTRESSLOSS2D]` 段闭环「2D 分项预应力损失明细」（`BASIS=2d_global`，仍标 `P` 不标 `Y`）；第十一次由 FE opt-in 留痕补 `[NEWTON2D]` 段，**只闭环三层迭代中的内层 Newton 一层**（该格 `N→P`，仍标 `P` 不标 `Y`），`[LENGTH]` / `[OPT]` 两层经只读调研确认 2D 内核没有对应力学、两格继续标 `N`、不造占位，**B2 剩余 2 项**（内容收窄为「两层力学 + 多格式导出」）；第十二次在同一格内按 opt-in `RebarSpec2D` / `capacity_2d.py` 接通 Mu / Vu 一条 flex 链（压弯 / 轴压仍缺、仍标 `P` 不标 `Y`），§4.2 与 **B2 剩余 2 项**均不变；第十三次**首次真正新造 2D 力学**、按 opt-in 补齐 `[LENGTH2D]` 平面索长闭合一层（该格 `2D=N` → `2D=P`、仍标 `P` 不标 `Y`），`[OPT]` 仍标 `N`、不造占位，第十三次收官时 §4.2 为 **1 个 `2D=N` + 6 个 `2D=P`**、**B2 剩余 2 项**（内容曾再收窄为「`[OPT]` 一层力学 + 多格式导出 / `.mct` 反向导入」）；**第十四次** `[OPT2D]` 2D 平面索力优化按 opt-in **首次新造第二层力学**接通（该格 `N→P`、仍标 `P` 不标 `Y`，只 MINMAXM + 显式索力箱、不等于 3D `[OPT]`），§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、**B2 剩余 1 项**（仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入），双层 opt-in 默认全关、默认 `.dat` / `.result` / 黄金基线逐位不变，逐项评估写入 §1 | `modal_2d.py`、`verify_modal_2d.py` 111/111、`strength_2d.py`、`verify_strength_2d.py` 162/162、`bridge_spec.py::validate_model`、`verify_validate_2d.py` 83/83、`report_2d.py`、`verify_report_2d.py`、`modal_2d.py::parse_modal_detail`、`verify_modal_detail_2d.py`、`prestress_loss_2d.py`、`verify_prestress_loss_2d.py`、`newton_2d.py`、`verify_newton_2d.py` |
+| B2 2D ↔ 3D 能力对齐 | **部分实现（十五次逐次接入）**：先按源码事实接通 2D 模态 / 线性屈曲；第六次 A 档按 `P` 口径接通 2D **截面应力**半部（承载力当时显式拒绝）；第七次把「引用完整性中文校验」按源码事实由 `N` 纠正为 `P` 并补齐；第八次接通「同源计算书四出口」的**导出机制**（仍标 `P`）；第九次由 FE opt-in 补 `[MODAL2D]` 段闭环「模态周期 T / 振型 / 参与质量」（`BASIS=xy`，用户拍板方向口径，收官时 **B2 剩余 3 项**）；第十次由 FE opt-in 补 `[PRESTRESSLOSS2D]` 段闭环「2D 分项预应力损失明细」（`BASIS=2d_global`，仍标 `P` 不标 `Y`）；第十一次由 FE opt-in 留痕补 `[NEWTON2D]` 段，**只闭环三层迭代中的内层 Newton 一层**（该格 `N→P`，仍标 `P` 不标 `Y`），`[LENGTH]` / `[OPT]` 两层经只读调研确认 2D 内核没有对应力学、两格继续标 `N`、不造占位，**B2 剩余 2 项**（内容收窄为「两层力学 + 多格式导出」）；第十二次在同一格内按 opt-in `RebarSpec2D` / `capacity_2d.py` 接通 Mu / Vu 一条 flex 链（压弯 / 轴压仍缺、仍标 `P` 不标 `Y`），§4.2 与 **B2 剩余 2 项**均不变；第十三次**首次真正新造 2D 力学**、按 opt-in 补齐 `[LENGTH2D]` 平面索长闭合一层（该格 `2D=N` → `2D=P`、仍标 `P` 不标 `Y`），`[OPT]` 仍标 `N`、不造占位，第十三次收官时 §4.2 为 **1 个 `2D=N` + 6 个 `2D=P`**、**B2 剩余 2 项**（内容曾再收窄为「`[OPT]` 一层力学 + 多格式导出 / `.mct` 反向导入」）；**第十四次** `[OPT2D]` 2D 平面索力优化按 opt-in **首次新造第二层力学**接通（该格 `N→P`、仍标 `P` 不标 `Y`，只 MINMAXM + 显式索力箱、不等于 3D `[OPT]`），§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、**B2 剩余 1 项**（仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入），双层 opt-in 默认全关、默认 `.dat` / `.result` / 黄金基线逐位不变，逐项评估写入 §1；**2026-11-12 第十五次** B2「2D 平行导出 / 导入链」两格按 B 档 `P` 接通（多格式导出 / `.mct` 反向导入，`2D=N` → `2D=P`、**仍 `P` 不 `Y`**），§4.2 现为 **0 个 `2D=N` + 9 个 `2D=P`**、**B2 剩余 0 项**（B2 逐次接入全部收口；两格仍 `P ≠ Y`） | `modal_2d.py`、`verify_modal_2d.py` 111/111、`strength_2d.py`、`verify_strength_2d.py` 162/162、`bridge_spec.py::validate_model`、`verify_validate_2d.py` 83/83、`report_2d.py`、`verify_report_2d.py`、`modal_2d.py::parse_modal_detail`、`verify_modal_detail_2d.py`、`prestress_loss_2d.py`、`verify_prestress_loss_2d.py`、`newton_2d.py`、`verify_newton_2d.py` |
 | B3 非线性稳定全过程 | **只写规格**（无代码基础、无解析锚点） | §2 |
 | B4 预应力损失两处规范口径 | **只写规格**（σl2 有条文但口径待决；σl6 缺规范表值） | §3 |
 | B5 成桥态无应力曲率 | **只写规格**（研究性扩展） | §4 |
@@ -79,7 +79,7 @@
 
 原 §4.2 写「9 个 `2D=N` 都只在 3D」。以源码复核后发现**其中 2 格是文档与内核事实漂移**：`fem_2d.cpp:2344 computeNaturalFrequencies2D`、`:2415 computeBucklingFactors2D` 早就能算，`example_modal.exe`（`CMakeLists.txt:215`）会写 `<stem>.modal.txt`；BridgeStudio 只是从未读它。本轮已接通并把能力矩阵 §2 两格改 `Y`，§4.2 收窄为 **7 个** `2D=N`。
 第六次 A 档又把「截面应力 / 承载力验算」一格由 `N` 改 `P`（只接通应力半部、承载力显式拒绝），
-第七次又把「引用完整性中文校验」由 `N` 改 `P`，第八次把「同源计算书四出口」由 `N` 改 `P`，故第九次收官时 §4.2 为 4 个 `2D=N` + 3 个 `2D=P`；**「7 个」是上一轮的历史计数，不代表当前仍全是 `N`**。第九次闭环「模态周期 T / 振型 / 参与质量」——该项不是 §2 的一格，故 `4N+3P` 不变，只把 B2 剩余由 4 项收窄为 3 项。第十次闭环「2D 分项预应力损失明细」——该项是 §2 的一格，故当时 §4.2 为 3 个 `2D=N` + 4 个 `2D=P`，**B2 剩余 2 项**（由 3 项收窄）。第十一次只闭环「内层 Newton / 共转列式过程量」一格，故 §4.2 现为 **2 个 `2D=N` + 5 个 `2D=P`**；**B2 剩余仍 2 项**，但内容由「`[LENGTH]`·`[NEWTON]`·`[OPT]` 三层迭代过程量 / 多格式导出」收窄为「`[LENGTH]` / `[OPT]` 两层力学 / 多格式导出」。第十三次起 `[LENGTH2D]` 一层已按 opt-in 接通（该格 `2D=N` → `2D=P`）；**第十四次起 `[OPT2D]` 2D 平面索力优化按 opt-in 新造接通**（该格 `2D=N` → `2D=P`、仍 `P` 不 `Y`），只 MINMAXM + 显式索力箱、不等于 3D `[OPT]`；§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、**B2 剩余 1 项**（仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入）。
+第七次又把「引用完整性中文校验」由 `N` 改 `P`，第八次把「同源计算书四出口」由 `N` 改 `P`，故第九次收官时 §4.2 为 4 个 `2D=N` + 3 个 `2D=P`；**「7 个」是上一轮的历史计数，不代表当前仍全是 `N`**。第九次闭环「模态周期 T / 振型 / 参与质量」——该项不是 §2 的一格，故 `4N+3P` 不变，只把 B2 剩余由 4 项收窄为 3 项。第十次闭环「2D 分项预应力损失明细」——该项是 §2 的一格，故当时 §4.2 为 3 个 `2D=N` + 4 个 `2D=P`，**B2 剩余 2 项**（由 3 项收窄）。第十一次只闭环「内层 Newton / 共转列式过程量」一格，故 §4.2 现为 **2 个 `2D=N` + 5 个 `2D=P`**；**B2 剩余仍 2 项**，但内容由「`[LENGTH]`·`[NEWTON]`·`[OPT]` 三层迭代过程量 / 多格式导出」收窄为「`[LENGTH]` / `[OPT]` 两层力学 / 多格式导出」。第十三次起 `[LENGTH2D]` 一层已按 opt-in 接通（该格 `2D=N` → `2D=P`）；**第十四次起 `[OPT2D]` 2D 平面索力优化按 opt-in 新造接通**（该格 `2D=N` → `2D=P`、仍 `P` 不 `Y`），只 MINMAXM + 显式索力箱、不等于 3D `[OPT]`；**2026-11-12 第十五次** B2「2D 平行导出 / 导入链」两格按 B 档接通（多格式导出 / `.mct` 反向导入，`2D=N` → `2D=P`、**仍 `P` 不 `Y`**），§4.2 现为 **0 个 `2D=N` + 9 个 `2D=P`**、**B2 剩余 0 项**（第十五次两格按 `P` 接通、仍 `P ≠ Y`；B2 逐次接入全部收口）。
 
 > 2026-11-11 第九次追加：**破例改 FE 内核**（用户明确授权）。`ModalResult2D.modes`
 > 早有全阶振型、`assembleMassMatrix2D()` 可重建同一份 M，缺的只是写出。
@@ -101,12 +101,18 @@
 | 3D 活载包络结构云图 | `solve_2d.py:194-222` 已接 2D 活载包络**数值**；云图是 `view_3d.py` / `envelope_3d.py` 的空间展示层 | ③ 维度不适用 | 矩阵须写「数值 Y / 3D 云图不适用」，不是移植 |
 | 同源计算书四出口（§2 标 `P`） | `Solve2DResult` 无 `tables()` / `metrics()` / `report()`；`write_2d_html` 是默认 2D 计算书 | ③ Python 适配层（**第八次已接通导出机制**） | `report_2d.py::build_2d_document` 装成 `report_3d.Report`，`write_2d_all` 原样复用四写出器；`verify_report_2d.py` 守卫。内容仍窄于 3D，故标 `P` |
 | 多格式导出 / `.mct` 反向导入 | `export_formats.py::to_canonical` 只吃
-`ModelSpec3D`；`mct_io.read_mct*` 只产 `ModelSpec3D` | ③ Python 适配层
-（**契约锁死，本轮明确不做**） | `X20_接入约定.md` 铁律 2 把 `to_canonical`
-定义为 `ModelSpec3D → canonical dict` 的**唯一转换点**，§9 禁止改签名 /
-另建 canonical；canonical schema 必带 `z`、6 dof 与 `IZZ/IYY/IXX`，
-「不映射」在现有 schema 无处安放，硬接只能补 0 冒充 3D 字段。除非用户
-授权改契约并走 §8 的 B 档登记流程，否则保持 `2D=N` |
+`ModelSpec3D`；`mct_io.read_mct*` 只产 `ModelSpec3D`（均为 3D 链，一字未动）。
+**第十五次**：另建 `export_2d_formats.py` 的 `plane_frame_2d/v1` 平行 2D 中间
+表示（**不是 canonical dict**） | ③ Python 适配层（**第十五次按 B 档平行链
+接通，仍 `P` 不 `Y`**） | `X20_接入约定.md` 铁律 2 把 `to_canonical` 定义为
+`ModelSpec3D → canonical dict` 的**唯一转换点**，§9 禁止改签名 / 另建
+canonical；canonical schema 必带 `z`、6 dof 与 `IZZ/IYY/IXX`，「不映射」在
+现有 schema 无处安放，硬接只能补 0 冒充 3D 字段——原结论是「除非用户授权
+改契约并走 §8 的 B 档登记流程，否则保持 `2D=N`」；**已于第十五次按此流程
+授权并登记资产 `B5`（B 档）+ 新增 §3.4「2D 平行链的正交约定」**：两条链
+正交、互不冒充，2D 不改 3D 唯一转换点、不补 0、显式 `dimension="2D"` +
+拒绝非平面（`dimension_not_plane`）、z=0 与平面外 dof 固定逐条进 `warnings`；
+仍 `P ≠ Y` |
 | 引用完整性中文校验 | `bridge_spec.py::validate_model` 早有中文引用校验
 （重复 id、单元→类型 / 节点、边界→节点、荷载→节点、缺 I / A、转角 dof
 无刚度），`solve_2d` / `ModelDoc.validate` / `app.py` 三处调用；FE 2D 内核
@@ -234,5 +240,18 @@ oracle、`ultimate` 逐端最不利效应同源、`γ0 / α1 / α3` 出处、缺
     X20 契约锁死的多格式导出 / `.mct` 反向导入）；双层 opt-in 默认全关、
     默认 `.dat` / `.result` / 默认 HTML 逐位不变、37 个黄金基线不刷新、
     `verify_opt_2d.py` 守卫 FE 源码契约 / 独立 oracle / 零污染 / 四出口同源。
+13. 第十五次 `export_2d_formats.py` 2D 平行链不虚报：矩阵两格 `2D=P`
+    不是 `Y`；`plane_frame_2d/v1` 是平行 2D 中间表示、**不是 canonical dict**；
+    3D 的 `to_canonical(model: ModelSpec3D)` 与三个写出器签名一字未动、
+    3D 唯一转换点不经过；显式 `dimension="2D"` + 拒绝非平面
+    （`errors` 写 `dimension_not_plane` 且 `spec=None`、绝不静默投影丢信息）；
+    不写 z / 6dof / `IYY`·`IZZ`·`IXX`、缺项标「不适用」不补 0，z=0 与
+    平面外 dof 固定等格式占位逐条进 `warnings`；2D 只有模块 API + CLI、
+    **无 GUI 入口**；MIDAS 数值对拍本机无 MIDAS、仍未做；有损项（车道 /
+    影响线 / 成桥态 / 施工阶段 / 自重 / 预应力 / β 角 / DBUSER / 分布荷载）
+    只登记不还原；默认 `.dat` / 默认 `.result` / 默认 HTML 逐位不变、
+    12 格 `DEFAULT_DAT_SHA` 与 FE 37 个黄金基线不刷新；FE 仓本轮零改动、
+    零文档改动。独立守卫 `verify_2d_export_import.py`（264/264，
+    覆盖契约正交 / 三格式 / 往返 oracle / 维度拒绝 / 零污染）；BS 侧闭环不等于 FE 内核已实现 3D 等价能力。
 
-**明确未闭环**：B3 全过程曲线、B4 两项公式 / 表值接入、B5 无应力曲率、**B2 剩余 1 项**（仅含被 X20 契约锁死的多格式导出与 `.mct` 反向导入；`[OPT]` 带约束索力优化一层 2D 内核力学已于 **2026-11-12 第十四次**按 `P` 接通为 `[OPT2D]` 2D 平面索力优化，仍 `P ≠ Y`、不等于 3D `[OPT]`；`[LENGTH2D]` 已于第十三次按 `P` 接通，仍不等于 3D `[LENGTH]`，内层 Newton 已于第十一次按 `P` 闭环，不等于三层全闭环）、2D 承载力的压弯 / 轴压半部（Mu / Vu 已于第十二次按 `RebarSpec2D` opt-in 接通，仍标 `P`）、四出口计算书内容补齐（导出机制已闭环，仍标 `P`）、2D 分项损失明细的 3D 阶段维度（第十次只接通非阶段束明细，仍标 `P`）、MIDAS 数值对拍、组合体系建造器。任何一项真正落地前，能力矩阵与计算书都必须继续写「没有」，不得靠改写文档提前打勾；`P` 不是 `Y`，应力利用率不得冒充 Mu/Vu 承载力验算。
+**明确未闭环**：B3 全过程曲线、B4 两项公式 / 表值接入、B5 无应力曲率、**B2 剩余 0 项**（第十五次 B2「2D 平行导出 / 导入链」两格按 `P` 接通，仍 `P ≠ Y`；`[OPT]` 带约束索力优化一层 2D 内核力学已于 **2026-11-12 第十四次**按 `P` 接通为 `[OPT2D]` 2D 平面索力优化，仍 `P ≠ Y`、不等于 3D `[OPT]`；`[LENGTH2D]` 已于第十三次按 `P` 接通，仍不等于 3D `[LENGTH]`，内层 Newton 已于第十一次按 `P` 闭环，不等于三层全闭环）、2D 承载力的压弯 / 轴压半部（Mu / Vu 已于第十二次按 `RebarSpec2D` opt-in 接通，仍标 `P`）、四出口计算书内容补齐（导出机制已闭环，仍标 `P`）、2D 分项损失明细的 3D 阶段维度（第十次只接通非阶段束明细，仍标 `P`）、MIDAS 数值对拍、组合体系建造器。任何一项真正落地前，能力矩阵与计算书都必须继续写「没有」，不得靠改写文档提前打勾；`P` 不是 `Y`，应力利用率不得冒充 Mu/Vu 承载力验算。
