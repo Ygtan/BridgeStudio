@@ -424,7 +424,7 @@ def refusals() -> None:
     src = read(ROOT / "capacity_2d.py")
     for kw in ("不重写任何规范公式", "整章 `refused`", "不补零",
                "不用", "12 角点", "5% / 1%", "check_capacity",
-               "key == \"ultimate\"", "无活载轴力包络"):
+               "key == \"ultimate\"", "capacity_axial_2d.py"):
         check(f"口径层写明边界：{kw}", kw in src)
 
 
@@ -558,8 +558,8 @@ def exports() -> None:
         check(f"HTML 出口含表「{tb['title'][:12]}」", tb["title"] in html)
     check("HTML 出口数值与表字典同源",
           tabs["capacity_2d_table"]["rows"][0][1] in html)
-    check("HTML 出口写明压弯 / 轴压不做",
-          "压弯 / 轴压" in html and "仍不做" in html)
+    check("HTML 出口写明本章只走 flex 链、压弯 / 轴压由独立章负责",
+          "压弯 / 轴压" in html and "capacity_axial_2d" in html)
 
     d4 = OUT / "four"
     d4.mkdir(parents=True, exist_ok=True)
@@ -612,12 +612,13 @@ def docs() -> None:
     check("矩阵写明 B2 剩余仍 2 项", "B2 剩余仍 2 项" in mat
           or "B2 剩余 2 项" in mat)
     check("矩阵登记第十二次闭环记录", "第十二次闭环记录" in mat)
-    check("矩阵写明压弯 / 轴压不做",
-          "压弯 / 轴压" in mat and "无活载轴力包络" in mat)
+    check("矩阵写明第十六次压弯 / 轴压按 P 接通、仍不虚报 Y",
+          "压弯 / 轴压" in mat and "capacity_axial_2d.py" in mat
+          and "仍标 `P`" in mat)
     spec = read(ROOT / "B类后续项接入规格.md")
     check("B 类规格登记第十二次与 verify_capacity_2d.py",
           "第十二次" in spec and "verify_capacity_2d.py" in spec)
-    check("B 类规格写明 Mu/Vu 已接入、压弯轴压仍缺",
+    check("B 类规格登记第十二次 Mu/Vu 与第十六次压弯 / 轴压",
           "Mu / Vu" in spec and "第十二次" in spec
           and "压弯 / 轴压" in spec)
     check("B 类规格仍保留 RebarSpec2D 与配筋契约口径",

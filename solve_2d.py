@@ -30,7 +30,7 @@
 
 第五条链（**opt-in，默认关闭**）：`final_beam` + `beam_combinations` →
 `strength_2d.evaluate` → `section_strength.check`，出 2D **截面应力**验算表。
-只做应力这一半：2D 没有配筋契约，承载力 Mu/Vu 一律显式写「做不了」。
+只做应力这一半：本表不出 Mu/Vu / 压弯 / 轴压，承载力由独立 opt-in 章负责。
 **不解析内核「单元应力 (Pa)」段**（那是第二套 σ，且阶段结果文件没有该段）；
 截面参数缺 AW / WT / WB / grade / kind / 板厚时整章拒绝，不静默兜底。
 
@@ -92,6 +92,7 @@ from pathlib import Path
 from typing import Any
 
 import capacity_2d
+import capacity_axial_2d
 import combination
 import length_2d
 import modal_2d
@@ -204,10 +205,18 @@ class Solve2DResult:
                                  "source": newton_2d.SOURCE})
     # 2D 正截面抗弯 Mu / 斜截面抗剪 Vu（opt-in）：capacity_2d.evaluate 的结果。
     # 默认 "not_requested"；纯 Python 校核，不调内核、不写 .dat、缺配筋整章
-    # 拒绝。压弯 / 轴压在 2D 仍不做（组合轴力 N 只有恒载单值）。
+    # 拒绝。本章只走 flex 链；压弯 / 轴压由下一条独立 opt-in 链负责。
     capacity: dict[str, Any] = field(
         default_factory=lambda: {"status": "not_requested",
                                  "source": capacity_2d.SOURCE, "tables": {}})
+    # 2D 偏心受压 / 轴心受压（第十六次 opt-in，纯 BS 侧）：
+    # capacity_axial_2d.evaluate 的结果。默认 "not_requested"；独立读
+    # final_beam + live_beam(NMin/NMax)，不修改 beam_combinations 默认路径。
+    # 缺活载轴力包络或 RebarSpec2D.l0 时整章拒绝，不静默取短柱。
+    axial_capacity: dict[str, Any] = field(
+        default_factory=lambda: {"status": "not_requested",
+                                 "source": capacity_axial_2d.SOURCE,
+                                 "tables": {}})
     # 2D 平面索长闭合 [LENGTH2D]（opt-in）：length_2d.parse_length_txt 的结果。
     # 默认 "not_requested"；只解析内核段，不另求一组 Lu、不由位移反推索力。
     length: dict[str, Any] = field(
@@ -259,6 +268,10 @@ class Solve2DResult:
     def capacity_tables(self) -> dict[str, dict[str, Any]]:
         """2D 承载力 Mu / Vu 表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
         return capacity_2d.tables(self.capacity)
+
+    def axial_capacity_tables(self) -> dict[str, dict[str, Any]]:
+        """2D 压弯 / 轴压表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
+        return capacity_axial_2d.tables(self.axial_capacity)
 
     def length_tables(self) -> dict[str, dict[str, Any]]:
         """2D 平面索长闭合表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
@@ -472,6 +485,7 @@ def solve_2d(
     loss_detail: bool = False,
     newton_detail: bool = False,
     capacity: bool = False,
+    axial_capacity: bool = False,
     length_detail: bool = False,
     opt_detail: bool = False,
 ) -> Solve2DResult:
@@ -518,10 +532,22 @@ def solve_2d(
     M_pos / M_neg / Vd；配筋取 opt-in 的 `ElemTypeDef.rebar`
     （`RebarSpec2D`，Python-only，不写进 .dat）；公式唯一来源
     `section_strength.check_capacity`，不重写规范公式。缺配筋 / 缺材料等级
-    整章 `refused`，不补零、不编配筋。压弯 / 轴压在 2D 仍不做（组合轴力 N
-    只有恒载单值、无活载轴力包络），不照搬 3D 的 5% / 1% 分派阈值。
+    整章 `refused`，不补零、不编配筋。本章只走 flex 链；压弯 / 轴压由
+    `axial_capacity=True` 的独立 opt-in 链（`capacity_axial_2d.py`）负责，
+    两者不共用效应源、不互相覆盖。
     该分支先于 `strength` 执行，让应力章的承载力边界措辞能按实际状态选择；
     默认 False 时不新增 diagnostics、不新增表、计算书一字不变。
+
+    `axial_capacity=True` 时做 2D **偏心受压（压弯）/ 轴心受压**验算，结果进
+    `res.axial_capacity`（表由 `res.axial_capacity_tables()` 取）。第十六次
+    新增的独立 opt-in 链：效应直接取内核已算出的 `final_beam` 恒载单值与
+    `live_beam` 的 `NMin/NMax` / `MyMin/MyMax` 包络，按 `combination.ULTIMATE`
+    系数在**同一 (单元, 端)** 配对并枚举 2x2 角点；**不修改**
+    `beam_combinations()` 的 12 角点应力口径，默认计算书一字不变。轴压
+    >5%·fcd·b·h 才分派，再按偏心距 <1% 截面高走轴压 / 压弯；`RebarSpec2D.l0`
+    必填、缺活载轴力包络整章 `no_axial_live`，都不静默兜底，不拿恒载单值
+    冒充完整判定。公式唯一来源 `section_strength.check_eccentric` /
+    `check_axial`。默认 False 时不新增 diagnostics、不新增表。
 
     `length_detail=True` 时做 2D **平面索长闭合 `[LENGTH2D]`**：要求模型
     显式挂了 `BridgeSpec.length_2d`（`LengthSpec2D`：逐索目标索力 T*），
@@ -731,10 +757,17 @@ def solve_2d(
 
     # ③′ 2D 承载力 Mu / Vu（opt-in，纯 Python）：先于应力章执行，让
     #    strength_2d.capacity_note_for(res.capacity) 按实际状态挑措辞。
-    #    只走 flex 链，不做压弯 / 轴压分派；不调内核、不写 .dat。
+    #    只走 flex 链；压弯 / 轴压由 ③″ 的独立链负责；不调内核、不写 .dat。
     if capacity:
         res.capacity = capacity_2d.evaluate(res, spec)
         res.diagnostics.append(capacity_2d.status_text(res.capacity))
+
+    # ③″ 2D 压弯 / 轴压（第十六次 opt-in，纯 BS 侧独立口径层）：
+    #    不调内核、不写 .dat、不修改 beam_combinations / 12 角点应力。
+    if axial_capacity:
+        res.axial_capacity = capacity_axial_2d.evaluate(res, spec)
+        res.diagnostics.append(
+            capacity_axial_2d.status_text(res.axial_capacity))
 
     # ④ 2D 截面应力验算（opt-in）：只用成桥态内力 + 同一份 spec 的显式
     #    截面/材料参数，不跑新内核、不解析「单元应力 (Pa)」段、不写 .dat。

@@ -16,7 +16,8 @@
   由 `verify_report_2d.py` 逐项对拍；这里不另立第二套口径。
 - opt-in 的模态 / 截面应力 / 承载力章按 `status != "not_requested"` 出现，
   与旧 HTML 完全同一判据；第十二次新增的承载力章只出 Mu / Vu
-  （需 `RebarSpec2D` 配筋契约），压弯 / 轴压仍显式写「做不了」；
+  （需 `RebarSpec2D` 配筋契约），第十六次新增的 ⑨′ 章独立出压弯 / 轴压
+  （同一份配筋 + 必填 l0 + 内核活载轴力包络），两章不共用效应源；
   第十三次新增的平面索长闭合章只出 2D 无垂度线性杆的 Lu 命中 T* 过程量
   （需 `BridgeSpec.length_2d` 契约）；第十四次新增的平面索力优化章只出
   2D `[OPT2D]` 的 MINMAXM 过程量（需 `BridgeSpec.opt_2d` 契约：显式索力箱
@@ -33,6 +34,7 @@ from pathlib import Path
 from typing import Any
 
 import capacity_2d
+import capacity_axial_2d
 import length_2d
 import opt_2d
 import report_3d as R
@@ -55,7 +57,8 @@ BOUNDARY_NOTE = (
     "LOSSREF 束的 σl1~σl6 / σpe）、第十一次 opt-in 的 [NEWTON2D] 明细段"
     "（内层 Newton 逐迭代过程量）外，2D 报告没有振型 / 参与质量 / "
     "结构云图。第十二次新增的 opt-in 承载力章只出 Mu / Vu（正截面抗弯 / "
-    "斜截面抗剪，需 RebarSpec2D 配筋契约），压弯 / 轴压仍不做；第十三次"
+    "斜截面抗剪，需 RebarSpec2D 配筋契约）；第十六次新增的 opt-in ⑨′ 章"
+    "独立出压弯 / 轴压（同端配对活载轴力包络 + 必填 l0），仍标 P；第十三次"
     "新增的 opt-in [LENGTH2D] 章只出 2D 无垂度线性杆的平面索长闭合过程量"
     "（需 BridgeSpec.length_2d 目标索力契约）；第十四次新增的 opt-in "
     "[OPT2D] 章只出 2D 平面索力优化 MINMAXM 过程量（需 BridgeSpec.opt_2d "
@@ -69,6 +72,8 @@ BOUNDARY_NOTE = (
 )
 #: 承载力章边界文案的唯一来源是 capacity_2d.py（唯一口径层），不另写一套。
 CAPACITY_BOUNDARY_NOTE = capacity_2d.BOUNDARY_NOTE
+#: 压弯 / 轴压章边界文案的唯一来源是 capacity_axial_2d.py（第十六次）。
+AXIAL_BOUNDARY_NOTE = capacity_axial_2d.BOUNDARY_NOTE
 #: 平面索长闭合章边界文案的唯一来源是 length_2d.py（唯一口径层）。
 LENGTH_BOUNDARY_NOTE = length_2d.BOUNDARY_NOTE
 #: 平面索力优化章边界文案的唯一来源是 opt_2d.py（唯一口径层，第十四次）。
@@ -422,6 +427,23 @@ def build_2d_document(res: Any, spec: Any) -> R.Report:
             blocks.append({"type": "note",
                            "text": str(capacity_2d.status_text(cap))})
         blocks.append({"type": "note", "text": CAPACITY_BOUNDARY_NOTE})
+
+    # ⑨′ 2D 压弯 / 轴压（第十六次 opt-in，纯 BS 侧独立口径层）：
+    #    只走 eccentric / axial 两条链，效应直接取 final_beam + live_beam
+    #    的 NMin/NMax 同端配对；缺 l0 / 缺活载轴力包络整章拒绝，不摆空表。
+    #    编号用 ⑨′，不重排后续章号。
+    ax = getattr(res, "axial_capacity", None) or {}
+    if ax.get("status") != "not_requested":
+        blocks.append({"type": "h1",
+                       "text": "2D 偏心受压（压弯）/ 轴心受压承载力"})
+        at = (res.axial_capacity_tables()
+              if hasattr(res, "axial_capacity_tables") else {})
+        for key, tb in at.items():
+            add(key, tb)
+        if not at:
+            blocks.append({"type": "note",
+                           "text": str(capacity_axial_2d.status_text(ax))})
+        blocks.append({"type": "note", "text": AXIAL_BOUNDARY_NOTE})
 
     # ⑩ 2D 平面索长闭合 [LENGTH2D]（第十三次 opt-in，FE 内核新造力学）：
     #    只走「无垂度线性杆 Lu 命中 T*」一层；无契约 / 内核 ERROR / 解析

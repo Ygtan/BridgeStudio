@@ -94,11 +94,14 @@ class BeamCombo:
     `rows[(单元, 端)] = {"N","MyMin","MyMax","VzMin","VzMax"}`（N·m / N）。
     弯矩保留 min/max 两侧：活载本身是包络，两端极值对应不同的车辆位置。
 
-    **轴力只有单值 N，且只含恒载项。** 内核的 `live beam envelope` 段只输出
-    My/Vz 包络，没有活载轴力——所以组合里 N 只能写成 γ_G·N_G。对自锚式
-    悬索桥这不是小事：梁轴力 ≈ 0.998H，而活载会改变 H，实际轴力比这里
-    给出的还要大几个百分点。`has_axial_live` 必须跟着这个事实走，
-    界面与报告要把它说出来。
+    **本组合口径的轴力只有单值 N，且只含恒载项。** 内核其实已按每单元每端
+    登记 `FORCE/N`，把活载轴力包络 `NMin/NMax` 写进 `_envelope_lane1.txt`，
+    BS 也解析进了 `live_beam`；但本层按 12 角点应力验算的历史口径只取
+    `q.get("N", 0.0)`（键名不匹配，恒取 0），故组合里 N 只有 γ_G·N_G。
+    这是「本层没消费」，不是「内核没算」：压弯 / 轴压见独立 opt-in 层
+    `capacity_axial_2d.py`（FE 零改动、默认路径一字不动）。对自锚式悬索桥
+    梁轴力 ≈ 0.998H，活载会改变 H；`has_axial_live` 恒 False 只反映本层
+    口径，界面与报告必须如实说出，不得据此推断内核能力。
     """
 
     spec: ComboSpec
@@ -110,7 +113,7 @@ class BeamCombo:
         """|分量| 最大的截面 → ((单元, 端), 值)。
 
         `comp="N"` 时按单值处理：轴力在组合里只有一个数，没有 Min/Max 的
-        两侧之分（缺活载轴力包络，见类文档）。
+        两侧之分（本层不消费活载轴力包络，见类文档）。
         """
         if comp == "N":
             best_n: tuple[tuple[int, str], float] | None = None
@@ -220,8 +223,12 @@ def beam_combinations(res: Any) -> list[BeamCombo]:
     if not final:
         return []
     has_live = bool(live)
-    # 内核活载包络只给 My/Vz，没有轴力。这里实测而不是假定：哪天内核补上
-    # N 的活载包络，这段代码自动开始用它，不用改两处。
+    # 本层按 12 角点应力口径只消费 My/Vz 与恒载单值 N。内核其实已写出
+    # 活载轴力包络 NMin/NMax（fem_2d.cpp::defaultEnvelopeSpecs），但为了
+    # 不改默认计算书数值，这里保持历史口径；压弯 / 轴压由独立 opt-in 层
+    # capacity_axial_2d.py 直接消费 NMin/NMax，不走本函数。
+    # 下面的判定只看单值键 "N"（而非 "NMin"/"NMax"），故恒为 False：
+    # 这是本组合层的口径标记，不代表内核有没有算活载轴力。
     has_axial_live = any("N" in (v or {}) for v in live.values())
     out: list[BeamCombo] = []
     for spec in ALL:

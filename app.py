@@ -721,8 +721,8 @@ if doc.kind != "beam" and _cap.get("solve2d"):
         "同时输出 2D 正截面抗弯 / 斜截面抗剪承载力 Mu、Vu（默认关闭，需填配筋）",
         value=False, key="capacity2d_opt",
         help="只走 flex 链：效应取基本组合逐端最不利 M_pos / M_neg / Vd，"
-             "复用 section_strength.check_capacity。压弯 / 轴压在 2D 仍不做"
-             "（组合轴力 N 只有恒载单值、无活载轴力包络）。"
+             "复用 section_strength.check_capacity。压弯 / 轴压由下面独立的"
+             "「2D 压弯 / 轴压」勾选框负责（需活载轴力包络与 l0）。"
              "参数留空或模型无混凝土 grade 时整章中文拒绝，不补零。")
     _capacity2d_cfg = ""
     if _capacity2d_on:
@@ -769,6 +769,17 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                 if hasattr(_t2, "rebar"):
                     _t2.rebar = None
             st.error(f"2D 配筋参数无效：{_ce}")
+
+    # 2D 压弯 / 轴压（第十六次 opt-in，纯 BS 侧独立口径层）：复用上面
+    # capacity_2d 勾选框里填的同一份 RebarSpec2D（含必填 l0），不另建
+    # 第二套配筋控件；缺活载轴力包络或 l0 时整章中文拒绝，不摆空表。
+    _axial2d_on = st.checkbox(
+        "同时输出 2D 偏心受压（压弯）/ 轴心受压承载力（默认关闭，需填配筋与 l0）",
+        value=False, key="axialcapacity2d_opt",
+        help="复用上方 2D 配筋 JSON（RebarSpec2D.l0 必填、单位 mm），"
+             "效应直接取内核已算出的活载轴力包络 NMin/NMax，按同一"
+             "(单元, 端) 配对枚举角点；不修改 12 角点应力口径。"
+             "无车道活载轴力包络或未填 l0 时整章中文拒绝，不静默兜底。")
 
     # 2D 平面索长闭合 [LENGTH2D]（第十三次 opt-in，FE 内核新造力学）：
     # 目标索力 T* 必须由用户显式给出，程序不猜、不改分析类型、不偷写段。
@@ -901,6 +912,7 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                                    loss_2d_detail=_loss2d_on,
                                    newton_2d_detail=_newton2d_on,
                                    capacity_2d=_capacity2d_on,
+                                   axial_capacity_2d=_axial2d_on,
                                    length_2d_detail=_length2d_on,
                                    opt_2d_detail=_opt2d_on)
                 st.session_state.solve2d = {"dat_text": _dat_now_2d,
@@ -912,6 +924,7 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                                             "newton2ddetail": _newton2d_on,
                                             "capacity2d": _capacity2d_on,
                                             "capacity2dcfg": _capacity2d_cfg,
+                                            "axialcapacity2d": _axial2d_on,
                                             "length2ddetail": _length2d_on,
                                             "length2dcfg": _length2d_cfg,
                                             "opt2ddetail": _opt2d_on,
@@ -931,6 +944,7 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                  or bool(_s2d.get("newton2ddetail", False)) != _newton2d_on
                  or bool(_s2d.get("capacity2d", False)) != _capacity2d_on
                  or str(_s2d.get("capacity2dcfg", "")) != _capacity2d_cfg
+                 or bool(_s2d.get("axialcapacity2d", False)) != _axial2d_on
                  or bool(_s2d.get("length2ddetail", False)) != _length2d_on
                  or str(_s2d.get("length2dcfg", "")) != _length2d_cfg
                  or bool(_s2d.get("opt2ddetail", False)) != _opt2d_on
@@ -1101,9 +1115,10 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                  "PDF 需本机 Edge / Chrome，失败只降级 PDF 这一个出口。"
                  "2D 报告不含振型与结构云图；承载力 Mu / Vu 只在勾选"
                  "「2D 正截面抗弯 / 斜截面抗剪承载力」并填了配筋后出现，"
-                 "压弯 / 轴压仍不做；平面索长闭合章只在勾选并填了逐索"
-                 "目标索力 T* 后出现，第十四次新增的平面索力优化章只在"
-                 "勾选并填了显式索力箱后出现；[OPT]（3D 三层迭代 + 体系"
+                 "压弯 / 轴压只在勾选「2D 偏心受压 / 轴心受压承载力」并填了"
+                 "配筋与 l0、且内核有活载轴力包络后出现；平面索长闭合章只在"
+                 "勾选并填了逐索目标索力 T* 后出现，第十四次新增的平面索力"
+                 "优化章只在勾选并填了显式索力箱后出现；[OPT]（3D 三层迭代 + 体系"
                  "守卫）那一层仍不做。")
         if _report2d_on and st.button("生成 2D 四出口计算书",
                                       key="report2d_btn"):

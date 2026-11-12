@@ -539,7 +539,7 @@ Newton 一层**：FE `fem_2d.hpp` 新增 `NewtonStep2D` / `NewtonTrace2D` 挂进
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **50 个脚本全绿**，其中 45 个带汇总输出的脚本合计 **4524 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 150/150、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 181/181、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 251/251、`verify_length_2d.py` 267/267、`verify_opt_2d.py` 286/286、`verify_2d_export_import.py` 264/264、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 91/91、`verify_capability_matrix.py` 280/280，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **51 个脚本全绿**，其中 46 个带汇总输出的脚本合计 **4906 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_capacity_axial_2d.py` 382/382、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 150/150、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 181/181、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 251/251、`verify_length_2d.py` 267/267、`verify_opt_2d.py` 286/286、`verify_2d_export_import.py` 264/264、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 91/91、`verify_capability_matrix.py` 280/280，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
@@ -591,8 +591,10 @@ Python-only 契约，不写进 `.dat`；缺任一项整章 `refused` 并逐条�
 
 - **只走 flex 链**：正截面抗弯 Mu（JTG 3362-2018 §5.2.2 / §5.2.3）+
   斜截面抗剪 Vu（§5.2.9，仅配箍筋）；My 正 / 负两面各算 Mu、缺筋 `util=∞`。
-  压弯 / 轴压不做 —— 2D 组合轴力 N 只有恒载单值、无活载轴力包络，
-  不照搬 3D 的 5% / 1% 分派阈值。
+  本章不设 3D 的 5% / 1% 分派阈值（`BeamCombo.rows` 的 N 按历史口径只有
+  恒载单值）；压弯 / 轴心受压由**2026-11-12 第十六次**独立 opt-in 章
+  `capacity_axial_2d.py` 接通（直接消费内核活载轴力包络 `NMin/NMax`），
+  两章不共用效应源、不互相覆盖。
 - **效应只取 `ultimate` 基本组合的逐端最不利** M_pos / M_neg / Vd，
   与 3D `result_3d._capacity_cases` 同源；不用 2D 应力的 12 角点相乘。
   `γ0=1.0 / α1=1.0 / α3=1.1` 与 3D 分派同源硬编码，不猜参数。
@@ -604,8 +606,9 @@ Python-only 契约，不写进 `.dat`；缺任一项整章 `refused` 并逐条�
   默认全关；`strength_2d.capacity_note_for()` 让应力章按 `res.capacity`
   状态挑措辞，不与新章自相矛盾。`verify_capacity_2d.py` 独立守卫。
 
-能力矩阵「截面应力 / 承载力验算」2D **仍标 `P`、不标 `Y`**：压弯 / 轴压、
-预应力、受扭、Mz / Vy 与 3D 全套承载力仍未覆盖；§4.2 计数与
+能力矩阵「截面应力 / 承载力验算」2D **仍标 `P`、不标 `Y`**：2D 逐分量
+独立极值不等于同一工况的联合最不利 (N, M)，预应力、受扭、Mz / Vy 与
+3D 全套承载力仍未覆盖；§4.2 计数与
 **B2 剩余 2 项**当时均不变；第十三次 `[LENGTH2D]` 一层按 opt-in 首次真正
 新造 2D 力学接通后，第十三次收官时 §4.2 为 **1 个 `2D=N` + 6 个 `2D=P`**、
 **B2 剩余 2 项**；**第十四次起 `[OPT2D]` 2D 平面索力优化按 opt-in 新造
@@ -715,6 +718,43 @@ B2 最后两格（ANSYS / Abaqus / MIDAS 多格式导出、`.mct` 反向导入�
   黄金基线不刷新；B1 仍暂缓、B3 / B4 / B5 仍只立规格、MIDAS 数值对拍未闭环。
   FE 仓本轮零改动、零文档改动，BS 侧闭环不等于 FE 内核已实现 3D 等价能力。
   独立守卫 `verify_2d_export_import.py`（264/264，覆盖契约正交 / 三格式写出 / .mct 往返 oracle / 维度拒绝 / 默认零污染 / 两仓文档对拍）。
+
+### 2D 压弯 / 轴压半部（2026-11-12，第十六次）
+
+B2 收官后补齐第十二次留下的承载力另一半，**纯 BridgeStudio 侧、FE 仓
+零改动、零文档改动**。用户四项拍板全选推荐，并在动手前先做三路只读调研：
+
+- **一条调研纠偏**：`combination.py` 旧注释「内核的 live beam envelope 段
+  只输出 My/Vz 包络，没有活载轴力」与两仓源码矛盾。FE
+  `defaultEnvelopeSpecs()` 已为每单元每端登记 `FORCE/N` 并写出
+  `E<id>_N1/N2`（`fem_2d.cpp:4457`），BS `_parse_lane_envelope()` 已解析成
+  `NMin/NMax`（`solve_2d.py:362-363`）；只是 `beam_combinations()` 按历史
+  口径取 `q.get("N", 0.0)`（键名不匹配，恒取 0），组合 N 才退化成恒载
+  单值。第十二次据此拒绝压弯 / 轴压，属**过时注释造成的误判**。
+- **不修组合层**：那是 `strength_2d` 12 角点应力的效应源，改它就等于改
+  默认计算书数值。新建 opt-in 独立口径层 `capacity_axial_2d.py`，直接读
+  `final_beam` + `live_beam`，按 `combination.ULTIMATE` 系数在**同一
+  (单元, 端)** 配对并枚举 2×2 角点；不写回 `BeamCombo.rows`、不跨端、
+  不跨分量。**逐分量独立极值不冒充同一车辆位置的联合最不利 (N, M)**。
+- **三链分派与 3D 同源**：`Nc = max(-N_comb, 0)`、`n_axial = fcd·b·h`，
+  `Nc > 5%·n_axial` 才进本章，再按 `e0 = Md/Nc < 1%·截面高` 分轴心受压
+  （§5.3.1）/ 偏心受压（§5.3.4）；不显著的角点归 flex 链、本章不出表。
+  公式与表唯一来源 `section_strength.check_eccentric` / `check_axial` /
+  `eccentric_table` / `axial_table` / `capacity_calculation_sheet`，
+  不重写规范公式、不重算 `K·ΔU=R`。
+- **不静默兜底**：`RebarSpec2D.l0`（mm）必填，缺失整章 `refused`、不静默
+  取短柱 `φ=1` / `η=1`；内核没有活载轴力包络整章 `no_axial_live`，不拿
+  恒载单值冒充完整判定。状态非 `ok` 一律 `tables() == {}`。
+- **接线与同源**：`solve_2d(axial_capacity=)` →
+  `ModelDoc.solve(axial_capacity_2d=)` → 界面 `axialcapacity2d_opt`（复用
+  同一份配筋 JSON）→ `res.axial_capacity_tables()` 唯一取数口 → HTML 与四
+  出口 ⑨′ 章（不重排后续章号）。双层 opt-in 默认全关，默认 `.dat` /
+  `.result` / HTML 逐位不变，12 格 `DEFAULT_DAT_SHA` 与 FE 37 个黄金基线
+  不刷新。独立守卫 `verify_capacity_axial_2d.py`，含纠偏证据、闭式 oracle、
+  13 类拒绝负例、默认零污染、四出口同源与两仓文档对拍。
+- **仍 `P ≠ Y`**：矩阵该格 2D 仍 `P`、§4.2 仍 **0 个 `2D=N` + 9 个
+  `2D=P`**、**B2 剩余 0 项**；2D 逐分量包络近似、无 GUI 入口、不等于 3D
+  全套承载力。B1 仍暂缓、B3 / B4 / B5 仍只立规格、MIDAS 数值对拍未闭环。
 
 ### 2D 引用完整性校验（`P` 口径）
 

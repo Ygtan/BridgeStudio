@@ -661,17 +661,23 @@ def group_h() -> None:
     for k in ("plane_frame_2d/v1", "2D 平行导出", "export_2d_formats"):
         check(f"默认 HTML 不含「{k}」", k not in html0)
 
-    # 四个业务文件本轮零改动：源码零引用 + git diff --stat 为空（两者都做）。
+    # 第十五次：四个业务文件零引用平行链。第十六次起这些文件因 opt-in
+    # 2D 压弯 / 轴压链接入而有改动，故不再要求「零改动」，改为锁住更本质
+    # 的契约：对它们的任何改动都不得回流第十五次平行链 / 3D 唯一转换点。
     biz = ("bridge_spec.py", "solve_2d.py", "app.py", "export_html.py")
     for f in biz:
         check(f"{f} 源码无 export_2d_formats 引用",
               "export_2d_formats" not in read(ROOT / f))
     r = subprocess.run(
-        ["git", "-C", str(ROOT), "diff", "--stat", "--"] + list(biz),
+        ["git", "-C", str(ROOT), "diff", "--"] + list(biz),
         capture_output=True, text=True)
-    check("四个业务文件 git diff --stat 为空",
-          r.returncode == 0 and not r.stdout.strip(),
-          repr(r.stdout.strip()[:80]))
+    dtxt = r.stdout
+    check("四个业务文件的改动不触碰第十五次平行链 / 3D 唯一转换点",
+          r.returncode == 0
+          and not any(t in dtxt for t in
+                      ("export_2d_formats", "to_canonical", "mct_io",
+                       "plane_frame_2d/v1", "PlaneMctImport")),
+          repr(dtxt[:80]))
 
 
 # ---------------------------------------------------------------- [I] 契约与两仓文档

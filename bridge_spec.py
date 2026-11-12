@@ -92,7 +92,7 @@ class RebarSpec2D(BaseModel):
     Asp_neg: float | None = None
     as_neg: float | None = None
     asp_neg: float | None = None
-    l0: float = 0.0                    # 计算长度 mm（0=未提供；本轮不做压弯/轴压）
+    l0: float = 0.0                    # 计算长度 mm（0=未提供；capacity_axial_2d 必填）
     hollow: bool = False                # 空心箱形（毛面积/回转半径用）
     outer_bf: float = 0.0              # 外轮廓宽 mm（0=按 bf 取）
 

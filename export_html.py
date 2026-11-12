@@ -268,6 +268,34 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
         _chunks.append(
             f"<div class=\"note\">{html.escape(CAPACITY_BOUNDARY_NOTE)}</div>")
         capacity_html = "".join(_chunks)
+    # 2D 压弯 / 轴压（第十六次 opt-in，纯 BS 侧独立口径层）：
+    # 默认 not_requested 时整章不出现；状态非 ok 只出中文说明，不摆空表。
+    # 占位符与 capacity_html 同一行，默认渲染为空串不改动默认 HTML 一个字节。
+    axial_html = ""
+    _ax = getattr(res, "axial_capacity", None) or {}
+    if _ax.get("status") != "not_requested":
+        from capacity_axial_2d import BOUNDARY_NOTE as AXIAL_BOUNDARY_NOTE
+        from capacity_axial_2d import status_text as axial_status_text
+
+        _chunks = ["<h2>2D 偏心受压（压弯）/ 轴心受压承载力</h2>"]
+        _tables = (res.axial_capacity_tables()
+                   if hasattr(res, "axial_capacity_tables") else {})
+        for _t in _tables.values():
+            _chunks.append(f"<h3>{html.escape(str(_t['title']))}</h3>")
+            _chunks.append("<table><tr>" + "".join(
+                f"<th>{html.escape(str(h))}</th>" for h in _t["headers"]) + "</tr>")
+            for _row in _t["rows"]:
+                _chunks.append("<tr>" + "".join(
+                    f"<td>{html.escape(str(c))}</td>" for c in _row) + "</tr>")
+            _chunks.append("</table>")
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(str(_t['note']))}</div>")
+        if not _tables:
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(axial_status_text(_ax))}</div>")
+        _chunks.append(
+            f"<div class=\"note\">{html.escape(AXIAL_BOUNDARY_NOTE)}</div>")
+        axial_html = "".join(_chunks)
     # 2D 平面索长闭合 [LENGTH2D]（第十三次 opt-in，FE 内核新造力学）：
     # 默认 not_requested 时整章不出现；无契约 / 内核 ERROR / 解析拒绝时
     # 只出中文说明，不摆空表、不补零。三张表由 length_2d.tables 唯一给出。
@@ -443,7 +471,7 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
 {strength_html}
 {loss_html}
 {newton_html}
-{capacity_html}
+{capacity_html}{axial_html}
 {length_html}{opt_html}
 <h2>成桥态梁端内力</h2>
 <table>

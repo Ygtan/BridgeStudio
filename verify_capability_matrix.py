@@ -394,8 +394,9 @@ def gaps_and_process() -> None:
     check("历史段落仍登记 §4.2 计数 1 个 2D=N + 6 个 2D=P、B2 剩余仍 2 项（第十三次口径）",
           "1 个 `2D=N`" in text and "6 个 `2D=P`" in text
           and "B2 剩余仍 2 项" in text)
-    check("矩阵写明压弯 / 轴压不做与无活载轴力包络",
-          "压弯 / 轴压" in text and "无活载轴力包络" in text)
+    check("矩阵写明第十六次压弯 / 轴压按 P 接通、仍 P ≠ Y",
+          "压弯 / 轴压" in text and "capacity_axial_2d.py" in text
+          and "第十六次" in text and "P ≠ Y" in text)
     check("独立守卫 verify_capacity_2d.py 在位且手册登记",
           (ROOT / "verify_capacity_2d.py").is_file()
           and "verify_capacity_2d.py" in read(ROOT / "开发使用手册.md"))

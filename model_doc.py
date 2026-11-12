@@ -1851,6 +1851,9 @@ class ModelDoc:
             # 2D 承载力 Mu/Vu 也是纯 Python 校核，但还需模型显式挂
             # ElemTypeDef.rebar（RebarSpec2D）与混凝土 grade，否则整章拒绝。
             "capacity2d": (not is_beam) and solve_2d_available(),
+            # 2D 压弯 / 轴压是纯 Python 校核（第十六次），但还需模型显式挂
+            # RebarSpec2D（含必填 l0）且内核产出活载轴力包络，否则整章拒绝。
+            "axialcapacity2d": (not is_beam) and solve_2d_available(),
             # 2D 平面索长闭合需要 example_mixed.exe 支持 --length-detail-only，
             # 且模型必须显式挂 BridgeSpec.length_2d 契约；这里只报 exe 可用性。
             "length2d": (not is_beam) and solve_2d_available(),
@@ -1866,6 +1869,7 @@ class ModelDoc:
               modal_2d: bool = False, strength_2d: bool = False,
               modal_2d_detail: bool = False, loss_2d_detail: bool = False,
               newton_2d_detail: bool = False, capacity_2d: bool = False,
+              axial_capacity_2d: bool = False,
               length_2d_detail: bool = False, opt_2d_detail: bool = False):
         """求解的唯一入口，按维度路由到对应内核。
 
@@ -1873,13 +1877,17 @@ class ModelDoc:
         （Solve2DResult，施工阶段 + 车道活载 + 规范组合）。单梁（ModelSpec）没有
         施工阶段/车道，仍走 `fem_eigen_export.run_fem_eigen` 的一次性静力。
 
-        `modal_2d` / `strength_2d` / `capacity_2d` 是 2D 侧的 opt-in
+        `modal_2d` / `strength_2d` / `capacity_2d` / `axial_capacity_2d`
+        是 2D 侧的 opt-in
         **求解选项**（默认 False），不是模型参数：不进 DEFAULTS / FIELDS、
         不写进 `.dat`；三维分支忽略它们。`strength_2d` 只做截面应力。
         `capacity_2d` 是第十二次新增的 2D 正截面抗弯 Mu / 斜截面抗剪 Vu
         章（独立口径层 `capacity_2d.py`）：需要模型显式挂
         `ElemTypeDef.rebar` 的 `RebarSpec2D` 与混凝土 `grade`，缺一整章
-        `refused`；效应只取基本组合的逐端最不利值，压弯 / 轴压仍不做。
+        `refused`；效应只取基本组合的逐端最不利值，本章只走 flex 链。
+        `axial_capacity_2d` 是第十六次新增的独立 opt-in 链
+        （`capacity_axial_2d.py`）：压弯 / 轴压，需 `RebarSpec2D.l0` 与
+        内核活载轴力包络，缺一整章拒绝；不修改 `beam_combinations` 默认路径。
         该章的边界措辞由 `strength_2d.capacity_note_for()` 按
         `res.capacity` 状态选择，不拿应力利用率冒充承载力利用率。
         `modal_2d_detail` 是 `modal_2d` 之上的第二层 opt-in（默认 False）：
@@ -1957,6 +1965,7 @@ class ModelDoc:
                         loss_detail=bool(loss_2d_detail),
                         newton_detail=bool(newton_2d_detail),
                         capacity=bool(capacity_2d),
+                        axial_capacity=bool(axial_capacity_2d),
                         length_detail=bool(length_2d_detail),
                         opt_detail=bool(opt_2d_detail))
 
