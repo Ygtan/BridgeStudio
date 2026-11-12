@@ -645,8 +645,10 @@ def group_h() -> None:
     check("mct_io.py 仍含 write_mct / read_mct_text / MctImport",
           all(k in mct_src for k in ("def write_mct(", "def read_mct_text(",
                                      "class MctImport")))
-    check("verify_x20_contract.py ASSET_REGISTRY 12 项且含 B5:B",
-          len(VX.ASSET_REGISTRY) == 12 and VX.ASSET_REGISTRY.get("B5") == "B")
+    check("verify_x20_contract.py ASSET_REGISTRY 13 项且含 B5:B / B6:B",
+          len(VX.ASSET_REGISTRY) == 13
+          and VX.ASSET_REGISTRY.get("B5") == "B"
+          and VX.ASSET_REGISTRY.get("B6") == "B")
     check("verify_x20_contract.py 九章 SECTIONS 结构未变",
           len(VX.SECTIONS) == 9
           and all(s.startswith("## %d." % i) for i, s in enumerate(VX.SECTIONS, 1)))
@@ -721,8 +723,8 @@ def group_i() -> None:
         cells = [c.strip() for c in s.strip("|").split("|")]
         if len(cells) >= 7 and re.fullmatch(r"`[ABC]\d`", cells[0]):
             rows[cells[0][1:-1]] = cells
-    check("契约 §7 与 ASSET_REGISTRY 逐项对拍 12 项（含档位）",
-          len(rows) == 12 and set(rows) == set(VX.ASSET_REGISTRY)
+    check("契约 §7 与 ASSET_REGISTRY 逐项对拍（含档位、按登记表长度）",
+          len(rows) == len(VX.ASSET_REGISTRY) and set(rows) == set(VX.ASSET_REGISTRY)
           and all(rows[k][3] == g for k, g in VX.ASSET_REGISTRY.items()),
           str(sorted(set(rows) ^ set(VX.ASSET_REGISTRY))))
 
@@ -809,8 +811,10 @@ def group_j() -> None:
           "def plane_chain(" in vxsrc and hasattr(VX, "plane_chain"))
     body = vxsrc.split("def plane_chain(")[1].split("def main(")[0]
     check("plane_chain() 走 check() 逐条登记", "check(" in body)
-    check("ASSET_REGISTRY 12 项且含 B5:B",
-          len(VX.ASSET_REGISTRY) == 12 and VX.ASSET_REGISTRY.get("B5") == "B")
+    check("ASSET_REGISTRY 13 项且含 B5:B / B6:B",
+          len(VX.ASSET_REGISTRY) == 13
+          and VX.ASSET_REGISTRY.get("B5") == "B"
+          and VX.ASSET_REGISTRY.get("B6") == "B")
     check("verify_x20_contract.py 末尾仍打印 N/N 通过（按布尔位统计）",
           "通过" in vxsrc and "{n_pass}/{len(RESULTS)}" in vxsrc
           and "sum(1 for ok, _, _ in RESULTS if ok)" in vxsrc)

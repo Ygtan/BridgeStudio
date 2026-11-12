@@ -539,7 +539,7 @@ Newton 一层**：FE `fem_2d.hpp` 新增 `NewtonStep2D` / `NewtonTrace2D` 挂进
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **51 个脚本全绿**，其中 46 个带汇总输出的脚本合计 **4906 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_capacity_axial_2d.py` 382/382、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 150/150、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 181/181、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 251/251、`verify_length_2d.py` 267/267、`verify_opt_2d.py` 286/286、`verify_2d_export_import.py` 264/264、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 91/91、`verify_capability_matrix.py` 280/280，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **52 个脚本全绿**，其中 47 个带汇总输出的脚本合计 **5108 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_capacity_axial_2d.py` 382/382、`verify_compact_dat_2d.py` 201/201、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 150/150、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 181/181、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 251/251、`verify_length_2d.py` 267/267、`verify_opt_2d.py` 286/286、`verify_2d_export_import.py` 264/264、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 92/92、`verify_capability_matrix.py` 280/280，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
@@ -755,6 +755,39 @@ B2 收官后补齐第十二次留下的承载力另一半，**纯 BridgeStudio �
 - **仍 `P ≠ Y`**：矩阵该格 2D 仍 `P`、§4.2 仍 **0 个 `2D=N` + 9 个
   `2D=P`**、**B2 剩余 0 项**；2D 逐分量包络近似、无 GUI 入口、不等于 3D
   全套承载力。B1 仍暂缓、B3 / B4 / B5 仍只立规格、MIDAS 数值对拍未闭环。
+
+### 2D `.dat` 紧凑写法 `*FILL` / `*DO`（2026-11-12，第十七次）
+
+用户指出「节点和单元有规律增加时，X20 里的 `*FILL` / `*DO` 语法在 2D 出口没有保留」。
+调研结论：**3D 主链一直在**（`ModelSpec3D.to_dat(compact=True)` 默认开），FE 2D 内核
+`fem_2d.hpp::expandLines` 也一直能读回；真正缺的是 `BridgeSpec.to_dat()` 主链与
+`fem_eigen_export.spec_to_dat` 等旁路。本轮按四项拍板（节点 `*FILL` + 单元 `*DO`、
+严格可逆自检、求解与展示统一、只做 `BridgeSpec` 主链）补上 **opt-in 默认关闭**的
+2D 紧凑导出。
+
+- **独立 2D 压缩器**：`compact_dat_2d.py` 不 import 3D 压缩器 / `export_formats` /
+  `to_canonical`（`X20_接入约定.md` §3.4 正交约定、§7 新增 `B6`）。2D 只有 x/y 且写
+  `%.6f`；2D 内核 `substituteLoopVar` 只认 `VAR` / `k*VAR` / `VAR±m` / `k*VAR±m`，
+  不支持括号、除法与嵌套循环。
+- **严格可逆性自检（本轮新发现）**：内核 `*FILL` 用 `setprecision(15)` 线性插值后重新写出
+  中间点，逐行版却是 `%.6f`；`0→10 m` 分 3 段时插值给 `3.3333333333333335`、逐行版是
+  `3.333333`，差 3.3e-7 m，属**真实几何漂移**而非格式差异。因此每个候选宏都先用
+  参考展开器 `expand_lines()`（按 `fem_2d.hpp` 语义）展开，节点字典 / 单元列表必须与
+  逐行版逐字段相同才允许压；不合格整段退回逐行，绝不静默近似。`arch` 拱肋曲线点、
+  `0→10` 分 3 段都属于「压不动」。
+- **默认零污染**：`BridgeSpec.to_dat(compact=False)` → `ModelDoc.to_dat(compact_2d=)`
+  / `solve(compact_2d_dat=)` → `solve_2d(compact_dat=)` → 界面 `compact2ddat_opt`
+  与结果区 `.dat` 下载。3D 分支保持 `to_dat()` 原样调用（原 `compact=True` 不受影响），
+  单梁 `spec_to_dat` 本轮**不覆盖**。默认 `.dat` / `.result` / 默认 HTML 逐位不变，
+  12 格 `DEFAULT_DAT_SHA` 与 FE 37 个黄金基线不刷新。
+- **真跑内核对拍**：同一模型逐行版 / 紧凑版分别交 `example_mixed.exe`，`.result`
+  逐字节相同，`final_beam` / `final_disp` 完全相同；5 个 2D 桥型主链实测
+  `beam_bridge` 121→47 行、`suspension_2d` 413→226 行，全部模型级等价。紧凑开关
+  会在 `diagnostics` 如实登记口径（四出口同源），`res.fingerprint` 按写盘文本计算，
+  两版不同属预期。
+- **如实边界**：这只是**文本层压缩、不是新力学能力**，不改索长、共转、垂度、Ernst
+  或任何判定；能力矩阵仍按原口径、`P ≠ Y`，B2 剩余 0 项不变。独立守卫
+  `verify_compact_dat_2d.py`。
 
 ### 2D 引用完整性校验（`P` 口径）
 

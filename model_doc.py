@@ -1777,7 +1777,7 @@ class ModelDoc:
 
     # ------------------------------------------------------------ 契约
 
-    def to_dat(self) -> str:
+    def to_dat(self, compact_2d: bool = False) -> str:
         """导出 FEM-Eigen `.dat` 文本——唯一对外求解契约。
 
         维度优先于 kind：``ModelDoc("beam", dimension="3d")`` 的 builder_key
@@ -1785,6 +1785,13 @@ class ModelDoc:
         ``fem_eigen_export.spec_to_dat`` 并抛 "ModelSpec3D 没有 length"。
         界面 ``ui_3d`` 的 ``is_stale(doc.to_dat())`` 正是这条路径。与
         :meth:`solve` 一样先按 ``is_3d`` 分流，2D 单梁才用 target_len 展开。
+
+        ``compact_2d``（第十七次 **opt-in，默认 False**）只作用于 2D
+        ``BridgeSpec``：节点走 ``*FILL``、单元走 ``*DO``，由
+        ``compact_dat_2d.py`` 独立实现。**3D 分支保持 ``to_dat()`` 原样调用**
+        （``ModelSpec3D.to_dat(compact=True)`` 本来就默认开），单梁
+        ``spec_to_dat`` 本轮不覆盖；默认 False 时 12 格 ``DEFAULT_DAT_SHA``
+        逐位不变。
         """
         if self.kind == "beam" and not self.is_3d:
             from fem_eigen_export import spec_to_dat
@@ -1794,7 +1801,9 @@ class ModelDoc:
                 target_len=float(self.params.get("target_len", 0.5)),
                 self_weight=bool(self.params.get("self_weight", False)),
             )
-        return self.model.to_dat()
+        if self.is_3d:
+            return self.model.to_dat()
+        return self.model.to_dat(compact=bool(compact_2d))
 
     def capability(self) -> dict[str, bool]:
         """能力自述：界面据此决定显示哪些区块，而不是写 `if 是桥`。"""
@@ -1870,7 +1879,8 @@ class ModelDoc:
               modal_2d_detail: bool = False, loss_2d_detail: bool = False,
               newton_2d_detail: bool = False, capacity_2d: bool = False,
               axial_capacity_2d: bool = False,
-              length_2d_detail: bool = False, opt_2d_detail: bool = False):
+              length_2d_detail: bool = False, opt_2d_detail: bool = False,
+              compact_2d_dat: bool = False):
         """求解的唯一入口，按维度路由到对应内核。
 
         三维 → `solver_3d.solve`（SolveResult）；二维桥型 → `solve_2d.solve_2d`
@@ -1928,6 +1938,13 @@ class ModelDoc:
         段，不重算优化、不另求一组最优索力、不由位移反推弯矩、不补零。
         段名带 2D 后缀，不与 3D `[OPT]` 解析链串段。不勾时 `.dat` /
         `.result` / 默认 HTML 逐位不变。
+
+        `compact_2d_dat`（第十七次 **opt-in，默认 False**）是 2D `.dat`
+        文本层的紧凑写法开关：节点连续等距段写 `*FILL`、规则单元写
+        `*DO … *ENDDO`，由 `compact_dat_2d.py` 独立实现并逐个宏做可逆性
+        自检；FE 内核 preprocess 展开后与逐行版是同一个模型，不做力学近似。
+        它是**求解选项**而不是模型参数：不进 DEFAULTS / FIELDS，三维与单梁
+        分支忽略。默认 False 时写盘 `.dat` / `.result` / 默认 HTML 逐位不变。
         """
         # 即使调用方绕过界面校验，也不允许把组合体系偷偷送进单一体系内核。
         if self.params.get("combo_system"):
@@ -1967,7 +1984,8 @@ class ModelDoc:
                         capacity=bool(capacity_2d),
                         axial_capacity=bool(axial_capacity_2d),
                         length_detail=bool(length_2d_detail),
-                        opt_detail=bool(opt_2d_detail))
+                        opt_detail=bool(opt_2d_detail),
+                        compact_dat=bool(compact_2d_dat))
 
     # ------------------------------------------------------------ 展示
 

@@ -94,6 +94,7 @@ from typing import Any
 import capacity_2d
 import capacity_axial_2d
 import combination
+import compact_dat_2d  # 第十七次：2D .dat opt-in 紧凑写法（默认关闭）
 import length_2d
 import modal_2d
 import newton_2d
@@ -488,6 +489,7 @@ def solve_2d(
     axial_capacity: bool = False,
     length_detail: bool = False,
     opt_detail: bool = False,
+    compact_dat: bool = False,
 ) -> Solve2DResult:
     """求解一个 BridgeSpec，返回 `Solve2DResult`。
 
@@ -571,6 +573,14 @@ def solve_2d(
     反推弯矩、不补零。段名带 2D 后缀，不与 3D `[OPT]` 解析链串段。
     默认 False 时 `.dat` / `.result` / 默认 HTML 逐位不变。
 
+    `compact_dat`（第十七次 **opt-in，默认 False**）：写盘喂内核的 `.dat`
+    节点走 `*FILL`、单元走 `*DO … *ENDDO`，由 `compact_dat_2d.py` 独立实现。
+    这是**文本层**压缩，不是新力学能力：FE 内核 `preprocess` 展开后与逐行版
+    是同一个模型，每个宏都先过可逆性自检，压不动就逐行。默认 False 时
+    `.dat` / `.result` / 默认 HTML 逐位不变；打开后 `res.dat_text` 与
+    `res.fingerprint` 按紧凑版计算，并在 `diagnostics` 如实登记（四出口同源）。
+    单梁 `fem_eigen_export.spec_to_dat` 不在本轮覆盖范围内。
+
     用法::
 
         spec = build_beam_bridge(span=30, n_spans=3, staged=True, lane=True)
@@ -587,7 +597,8 @@ def solve_2d(
     if not dat_name.lower().endswith(".dat"):
         dat_name += ".dat"
     dat_path = out / dat_name
-    dat_path.write_text(spec.to_dat(), encoding="utf-8")
+    dat_path.write_text(spec.to_dat(compact=bool(compact_dat)),
+                        encoding="utf-8")
 
     res = Solve2DResult(
         title=getattr(spec, "title", "") or "未命名",
@@ -596,6 +607,9 @@ def solve_2d(
         stats={"nodes": len(spec.nodes), "elements": len(spec.elements),
                "stages": len(spec.stages), "lanes": len(spec.lanes)},
     )
+    if compact_dat:
+        # diagnostics 会进 report_2d.Report 与 HTML，四出口同源带上这条口径说明。
+        res.diagnostics.append(compact_dat_2d.DIAGNOSTIC)
 
     # ① 恒载/施工阶段 → 成桥态
     if spec.stages:

@@ -51,7 +51,7 @@ def read(name: str) -> str:
 #: 契约 §7 资产登记表：id → 档位。新增资产必须先改契约再改这里。
 ASSET_REGISTRY: dict[str, str] = {
     "A0": "A", "A1": "A", "A2": "A", "A3": "A",
-    "B1": "B", "B2": "B", "B3": "B", "B4": "B", "B5": "B",
+    "B1": "B", "B2": "B", "B3": "B", "B4": "B", "B5": "B", "B6": "B",
     "C1": "C", "C2": "C", "C3": "C",
 }
 
@@ -291,6 +291,12 @@ def plane_chain() -> None:
     check("§7 登记表含 B5 行且档位为 B",
           len(b5_row) == 1 and len(b5_cells) >= 7 and b5_cells[3] == "B",
           b5_cells[3] if len(b5_cells) >= 7 else "行缺失")
+
+    b6_row = [ln for ln in text.splitlines()
+              if ln.strip().startswith("|") and "`B6`" in ln]
+    check("§7 登记表含 B6 行且 ASSET_REGISTRY 档位为 B",
+          len(b6_row) == 1 and ASSET_REGISTRY.get("B6") == "B"
+          and "compact_dat_2d.py" in b6_row[0])
 
     sec9 = text.split("## 9. 禁止项")[1] if "## 9. 禁止项" in text else ""
     n_forbid = len([ln for ln in sec9.splitlines() if ln.startswith("- ")])

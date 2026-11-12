@@ -29,6 +29,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, model_validator
 
+import compact_dat_2d  # 第十七次：2D .dat opt-in 紧凑导出（默认关闭）
+
 # ---------------------------------------------------------------- 基础定义
 
 
@@ -724,12 +726,20 @@ class BridgeSpec(BaseModel):
 
     # ------------------------------------------------------------ 导出
 
-    def to_dat(self) -> str:
+    def to_dat(self, compact: bool = False) -> str:
         """生成 FEM-Eigen `.dat`（new format）文本。
 
         与 fem_eigen_export.spec_to_dat 共用同一套关键字约定，注意两点：
         - `*EN,id,n1,n2` 里 id 是单元自身的编号；
         - `*GRAVITY` 必须显式写出，因为求解器 gy 默认就是 -9.81。
+
+        `compact`（第十七次，**默认 False**）：节点走 `*FILL`、单元走
+        `*DO … *ENDDO`，由 `compact_dat_2d.py` 独立实现（2D 与 3D 两链正交，
+        不 import 3D 压缩器）。每个宏都先做可逆性自检，内核 preprocess
+        展开后必须与逐行版是同一个模型；压不动就逐行，绝不静默近似。
+        默认 False 时本函数**逐位不变**，12 格 `DEFAULT_DAT_SHA` 与 FE
+        37 个黄金基线都不刷新。单梁 `fem_eigen_export.spec_to_dat` 不在本轮
+        覆盖范围内，仍逐行写出。
         """
         out: list[str] = []
         out.append("# 由 fe_nl_preprocessor 自动生成（桥梁规范模型 BridgeSpec）")
@@ -778,10 +788,17 @@ class BridgeSpec(BaseModel):
             out.append(f"{t.id} " + " ".join(f))
         out.append("")
 
+        if compact:
+            out.append("! 紧凑写法：*FILL 补等间距节点、*DO 展开规则单元"
+                       "（内核可读回；每个宏都经过可逆性自检）")
         out.append("! 节点：id x y")
         out.append("*NODE")
-        for n in self.nodes:
-            out.append(f"{n.id} {n.x:.6f} {n.y:.6f}")
+        if compact:
+            out.extend(compact_dat_2d.compress_nodes(
+                [(n.id, n.x, n.y) for n in self.nodes]))
+        else:
+            for n in self.nodes:
+                out.append(f"{n.id} {n.x:.6f} {n.y:.6f}")
         out.append("")
 
         out.append("! 单元：按类型分组，组内 *EN,id,n1,n2")
@@ -792,8 +809,12 @@ class BridgeSpec(BaseModel):
             out.append(f"*TYPE,{t.id}")
             out.append(f"*MAT,{t.mat}")
             out.append(f"*REAL,{t.id}")
-            for e in group:
-                out.append(f"*EN,{e.id},{e.n1},{e.n2}")
+            if compact:
+                out.extend(compact_dat_2d.compress_elements(
+                    [(e.id, e.n1, e.n2) for e in group]))
+            else:
+                for e in group:
+                    out.append(f"*EN,{e.id},{e.n1},{e.n2}")
         out.append("")
 
         out.append("! 边界约束（1=u, 2=v, 3=θ）")

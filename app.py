@@ -770,6 +770,19 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                     _t2.rebar = None
             st.error(f"2D 配筋参数无效：{_ce}")
 
+    # 2D .dat 紧凑写法（第十七次 opt-in，纯文本层 / FE 内核零改动）：
+    # 连续等距节点写 *FILL、规则单元写 *DO，内核 preprocess 展开后与逐行版
+    # 是同一个模型；每个宏先过可逆性自检，压不动就逐行。默认关闭时写盘
+    # .dat / .result / 默认 HTML 逐位不变，单梁 spec_to_dat 本轮不覆盖。
+    _compact2d_on = st.checkbox(
+        "2D .dat 用紧凑写法（*FILL / *DO，默认关闭）",
+        value=False, key="compact2ddat_opt",
+        help="只改文本层：节点有规律递增时写 *FILL 首末点，单元按编号"
+             "规律写 *DO I … *ENDDO，由 FE 内核 preprocess 原样展开。"
+             "不做力学近似、不改求解结果；每个宏都先自检展开后与逐行版"
+             "逐字段相同，0→10 m 分 3 段这类会漂移的段自动退回逐行。"
+             "勾选后写盘 .dat、结果指纹与下方下载内容都是紧凑版。")
+
     # 2D 压弯 / 轴压（第十六次 opt-in，纯 BS 侧独立口径层）：复用上面
     # capacity_2d 勾选框里填的同一份 RebarSpec2D（含必填 l0），不另建
     # 第二套配筋控件；缺活载轴力包络或 l0 时整章中文拒绝，不摆空表。
@@ -914,7 +927,8 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                                    capacity_2d=_capacity2d_on,
                                    axial_capacity_2d=_axial2d_on,
                                    length_2d_detail=_length2d_on,
-                                   opt_2d_detail=_opt2d_on)
+                                   opt_2d_detail=_opt2d_on,
+                                   compact_2d_dat=_compact2d_on)
                 st.session_state.solve2d = {"dat_text": _dat_now_2d,
                                             "modal2d": _modal2d_on,
                                             "modal2ddetail": _modal2d_detail_on,
@@ -929,6 +943,7 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                                             "length2dcfg": _length2d_cfg,
                                             "opt2ddetail": _opt2d_on,
                                             "opt2dcfg": _opt2d_cfg,
+                                            "compact2ddat": _compact2d_on,
                                             "res": _res2d}
             except Exception as _e:
                 st.session_state.solve2d = None
@@ -948,7 +963,8 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                  or bool(_s2d.get("length2ddetail", False)) != _length2d_on
                  or str(_s2d.get("length2dcfg", "")) != _length2d_cfg
                  or bool(_s2d.get("opt2ddetail", False)) != _opt2d_on
-                 or str(_s2d.get("opt2dcfg", "")) != _opt2d_cfg):
+                 or str(_s2d.get("opt2dcfg", "")) != _opt2d_cfg
+                 or bool(_s2d.get("compact2ddat", False)) != _compact2d_on):
         st.warning("模型参数或求解开关已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
         _s2d = None
     if _s2d:
@@ -961,6 +977,19 @@ if doc.kind != "beam" and _cap.get("solve2d"):
         _c3.metric("单元数", f"{_r2d.stats.get('elements', 0)}")
         _c4.metric("施工阶段数", f"{_r2d.stats.get('stages_solved', _r2d.stats.get('stages', 0))}")
         st.caption(f"内核：`{_r2d.solver}`")
+
+        # 第十七次：写盘喂内核的 .dat 可直接下载 / 预览。默认逐行；勾选
+        # 紧凑写法后 res.dat_text 就是 *FILL / *DO 版，指纹按它计算。
+        _dat_show = str(getattr(_r2d, "dat_text", "") or "")
+        if _dat_show:
+            st.download_button(
+                "下载本次写盘的 .dat", data=_dat_show.encode("utf-8"),
+                file_name="gui_2d.dat", mime="text/plain",
+                key="dat2d_download",
+                help="默认逐行写出；勾选上方「紧凑写法」后规则节点/单元改为 "
+                     "*FILL / *DO，由内核 preprocess 展开，模型与逐行版等价。")
+            with st.expander("查看本次写盘的 .dat（FEM-Eigen new format）"):
+                st.code(_dat_show[:20000], language="text")
 
         _combos = _r2d.combinations()
         if _combos:
