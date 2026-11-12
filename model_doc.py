@@ -1854,6 +1854,9 @@ class ModelDoc:
             # 2D 平面索长闭合需要 example_mixed.exe 支持 --length-detail-only，
             # 且模型必须显式挂 BridgeSpec.length_2d 契约；这里只报 exe 可用性。
             "length2d": (not is_beam) and solve_2d_available(),
+            # 2D 平面索力优化需要 example_mixed.exe 支持 --opt-detail-only，
+            # 且模型必须显式挂 BridgeSpec.opt_2d 契约；这里只报 exe 可用性。
+            "opt2d": (not is_beam) and solve_2d_available(),
             "cable": self.kind in ("cable_stayed", "suspension"),
             "nonlinear": str(getattr(self.model, "analysis", "LINEAR")).upper()
                          == "NONLINEAR",
@@ -1863,7 +1866,7 @@ class ModelDoc:
               modal_2d: bool = False, strength_2d: bool = False,
               modal_2d_detail: bool = False, loss_2d_detail: bool = False,
               newton_2d_detail: bool = False, capacity_2d: bool = False,
-              length_2d_detail: bool = False):
+              length_2d_detail: bool = False, opt_2d_detail: bool = False):
         """求解的唯一入口，按维度路由到对应内核。
 
         三维 → `solver_3d.solve`（SolveResult）；二维桥型 → `solve_2d.solve_2d`
@@ -1895,7 +1898,9 @@ class ModelDoc:
         `example_mixed.exe --newton-detail-only` 读 `[NEWTON2D]` 段；
         Python 只解析、不重算。线性模型写中文「不做」，不强制改分析类型。
         第十三次起 `[LENGTH2D]` 平面索长闭合由 `length_2d_detail` 单独
-        接入，`[OPT]` 仍没有对应力学；本开关只覆盖内层 Newton。
+        接入，第十四次起 `[OPT2D]` 平面索力优化由 `opt_2d_detail` 单独
+        接入；`[OPT]`（3D 三层迭代 + 体系守卫）那一层仍没有对应力学；
+        本开关只覆盖内层 Newton。
         不勾时命令行、输出文件、diagnostics 与计算书逐位不变。
 
         `length_2d_detail` 是 2D 平面索长闭合 `[LENGTH2D]` 的 opt-in（默认
@@ -1905,6 +1910,16 @@ class ModelDoc:
         没挂契约写中文「不做」，不调内核、不猜 T*、不改分析类型。
         Python 只解析内核段，不重算 Lu、不由位移反推索力、不补零。
         不勾时 `.dat` / `.result` / 默认 HTML 逐位不变。
+
+        `opt_2d_detail` 是 2D 平面索力优化 `[OPT2D]` 的 opt-in（默认
+        False）：只有模型显式挂了 `BridgeSpec.opt_2d`（`OptSpec2D`：显式
+        索力箱 TMIN/TMAX + 逐 CABLE 初始名义索力 T0 + 登记 BEAM 端弯矩）
+        才写 `*CABLE_OPT2D` 并追加一次 `example_mixed.exe
+        --opt-detail-only` 读 `[OPT2D]` 段；没挂契约写中文「不做」，不调
+        内核、不猜索力箱 / T0 / 登记端、不改分析类型。Python 只解析内核
+        段，不重算优化、不另求一组最优索力、不由位移反推弯矩、不补零。
+        段名带 2D 后缀，不与 3D `[OPT]` 解析链串段。不勾时 `.dat` /
+        `.result` / 默认 HTML 逐位不变。
         """
         # 即使调用方绕过界面校验，也不允许把组合体系偷偷送进单一体系内核。
         if self.params.get("combo_system"):
@@ -1942,7 +1957,8 @@ class ModelDoc:
                         loss_detail=bool(loss_2d_detail),
                         newton_detail=bool(newton_2d_detail),
                         capacity=bool(capacity_2d),
-                        length_detail=bool(length_2d_detail))
+                        length_detail=bool(length_2d_detail),
+                        opt_detail=bool(opt_2d_detail))
 
     # ------------------------------------------------------------ 展示
 

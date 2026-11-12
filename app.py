@@ -709,8 +709,9 @@ if doc.kind != "beam" and _cap.get("solve2d"):
         value=False, key="newton2ddetail_opt",
         help="[NEWTON2D] 段由 FE 内核留痕写出，Python 只解析、不重算 "
              "K·ΔU=R。2D 没有 REFACT、没有 TOLF/TOLD 拆分、没有阶段占位；"
-             "第十三次起 [LENGTH2D] 平面索长闭合由单独开关接入，[OPT] "
-             "带约束目标索力优化仍没有对应力学；本开关只覆盖内层 Newton。"
+             "第十三次起 [LENGTH2D] 平面索长闭合、第十四次起 [OPT2D] 平面"
+             "索力优化都由各自单独开关接入（2D 独立段）；[OPT]（3D 三层迭代 "
+             "+ 体系守卫）那一层仍没有对应力学；本开关只覆盖内层 Newton。"
              "线性模型只会得到中文「不做」说明。")
 
     # 2D 承载力 Mu / Vu（第十二次 opt-in，纯 BS 侧）：配筋是
@@ -777,9 +778,10 @@ if doc.kind != "beam" and _cap.get("solve2d"):
         value=False, key="length2ddetail_opt",
         help="[LENGTH2D] 段由 FE 内核新造的 2D 力学写出（无垂度线性杆 + "
              "中心有限差分 Jacobian + LM），Python 只解析、不重算。"
-             "需模型显式挂 BridgeSpec.length_2d；[OPT] 带约束目标索力优化"
-             "仍不做、不造占位。留空或目标单元不是 CABLE 时只给中文"
-             "「不做」说明，不补零。")
+             "需模型显式挂 BridgeSpec.length_2d；[OPT]（3D 三层迭代 + 体系"
+             "守卫）那一层仍不做、不造占位，第十四次另立的 [OPT2D] 平面"
+             "索力优化是独立 2D 段、由单独开关接入。留空或目标单元不是 "
+             "CABLE 时只给中文「不做」说明，不补零。")
     _length2d_cfg = ""
     if _length2d_on:
         _length2d_cfg = st.text_area(
@@ -820,6 +822,72 @@ if doc.kind != "beam" and _cap.get("solve2d"):
         except Exception as _le:
             doc.model.length_2d = None
             st.error(f"2D 索长闭合契约无效：{_le}")
+
+    # 2D 平面索力优化 [OPT2D]（第十四次 opt-in，FE 内核新造力学）：
+    # 索力箱 TMIN/TMAX、逐 CABLE 初始名义索力 T0、登记 BEAM 端弯矩都必须
+    # 由用户显式给出，程序不猜、不改分析类型、不偷写段。契约挂上后
+    # to_dat() 才会写 *CABLE_OPT2D，默认路径逐位不变。
+    _opt2d_on = st.checkbox(
+        "同时输出 2D 平面索力优化过程量（默认关闭，需填显式索力箱与梁端弯矩登记）",
+        value=False, key="opt2ddetail_opt",
+        help="[OPT2D] 段由 FE 内核新造的 2D 力学写出（MINMAXM + 显式索力箱 + "
+             "中心有限差分 Jacobian + IRLS + 投影梯度），Python 只解析、不重算。"
+             "需模型显式挂 BridgeSpec.opt_2d；min max|M| 只针对用户显式登记的 "
+             "BEAM 端弯矩，不自动识别主梁。不是 3D 的 J=M·D 闭式影响矩阵，"
+             "也不等于 3D [OPT]→[LENGTH]→[NEWTON] 三层迭代。留空或 TMIN/TMAX "
+             "不合法时只给中文「不做」说明，不补零、不猜参数。")
+    _opt2d_cfg = ""
+    if _opt2d_on:
+        _opt2d_cfg = st.text_area(
+            "2D 索力优化 JSON（索力箱 + 逐索 T0 + 登记梁端；留空 = 不启用）",
+            value="", key="opt2d_cfg", height=130,
+            help='格式：{"t_min": 200000.0, "t_max": 1500000.0, '
+                 '"targets": {"<CABLE 单元号>": 1000000.0}, '
+                 '"moments": [[<BEAM 单元号>, <端号 1|2>]], '
+                 '"tol": 1e-7, "max_iter": 120, "irls": 4, '
+                 '"round_tol": 1e-5}。'
+                 'TMIN/TMAX 必须显式给且 0 < TMIN < TMAX；T0 受拉为正、>0。'
+                 '只有显式填写才在 .dat 写 *CABLE_OPT2D，默认 .dat 逐位不变。')
+    if hasattr(doc.model, "opt_2d"):
+        doc.model.opt_2d = None   # 每次 rerun 先清空，绝不沿用上次契约
+    if _opt2d_on and not (_opt2d_cfg or "").strip():
+        st.info("未填 2D 索力优化契约；本次求解只给中文「不做」说明，"
+                "不猜索力箱 / T0 / 登记端、不补零。")
+    elif _opt2d_on and not hasattr(doc.model, "opt_2d"):
+        st.info("当前模型不是 BridgeSpec，2D 索力优化不可用；"
+                "本次只给中文「不做」说明。")
+    elif _opt2d_on:
+        try:
+            import json
+            from bridge_spec import OptSpec2D
+
+            _ocfg = json.loads(_opt2d_cfg)
+            if not isinstance(_ocfg, dict):
+                raise ValueError("JSON 必须是对象")
+            if "t_min" not in _ocfg or "t_max" not in _ocfg:
+                raise ValueError("必须显式给出 t_min / t_max（0 < TMIN < TMAX）")
+            _otg = _ocfg.get("targets")
+            if not isinstance(_otg, dict) or not _otg:
+                raise ValueError("targets 必须是非空的 {CABLE 单元号: T0} 对象")
+            _om = _ocfg.get("moments")
+            if not isinstance(_om, list) or not _om:
+                raise ValueError("moments 必须是非空的 [[BEAM 单元号, 端号]] 列表")
+            _otg2 = {int(k): float(v) for k, v in _otg.items()}
+            _om2 = [(int(p[0]), int(p[1])) for p in _om]
+            doc.model.opt_2d = OptSpec2D(
+                targets=_otg2, moments=_om2,
+                t_min=float(_ocfg["t_min"]), t_max=float(_ocfg["t_max"]),
+                tol=float(_ocfg.get("tol", 1e-7)),
+                max_iter=int(_ocfg.get("max_iter", 120)),
+                irls=int(_ocfg.get("irls", 4)),
+                round_tol=float(_ocfg.get("round_tol", 1e-5)))
+            _operrs = [e for e in doc.model.validate_model()
+                       if "2D 索力优化" in e]
+            if _operrs:
+                raise ValueError("；".join(_operrs))
+        except Exception as _oe:
+            doc.model.opt_2d = None
+            st.warning(f"2D 索力优化契约无效：{_oe}")
     _dat_now_2d = doc.to_dat()
     if st.button("运行施工阶段 + 规范组合求解", type="primary"):
         _outdir = Path("out/gui_2d")
@@ -833,7 +901,8 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                                    loss_2d_detail=_loss2d_on,
                                    newton_2d_detail=_newton2d_on,
                                    capacity_2d=_capacity2d_on,
-                                   length_2d_detail=_length2d_on)
+                                   length_2d_detail=_length2d_on,
+                                   opt_2d_detail=_opt2d_on)
                 st.session_state.solve2d = {"dat_text": _dat_now_2d,
                                             "modal2d": _modal2d_on,
                                             "modal2ddetail": _modal2d_detail_on,
@@ -845,6 +914,8 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                                             "capacity2dcfg": _capacity2d_cfg,
                                             "length2ddetail": _length2d_on,
                                             "length2dcfg": _length2d_cfg,
+                                            "opt2ddetail": _opt2d_on,
+                                            "opt2dcfg": _opt2d_cfg,
                                             "res": _res2d}
             except Exception as _e:
                 st.session_state.solve2d = None
@@ -861,7 +932,9 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                  or bool(_s2d.get("capacity2d", False)) != _capacity2d_on
                  or str(_s2d.get("capacity2dcfg", "")) != _capacity2d_cfg
                  or bool(_s2d.get("length2ddetail", False)) != _length2d_on
-                 or str(_s2d.get("length2dcfg", "")) != _length2d_cfg):
+                 or str(_s2d.get("length2dcfg", "")) != _length2d_cfg
+                 or bool(_s2d.get("opt2ddetail", False)) != _opt2d_on
+                 or str(_s2d.get("opt2dcfg", "")) != _opt2d_cfg):
         st.warning("模型参数或求解开关已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
         _s2d = None
     if _s2d:
@@ -999,6 +1072,22 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                 st.warning(length2d_status_text(_lg2))
             else:
                 st.caption(length2d_status_text(_lg2))
+        if _opt2d_on:
+            from opt_2d import status_text as opt2d_status_text
+
+            _op2 = getattr(_r2d, "opt", None) or {}
+            _optbl = getattr(_r2d, "opt_tables", lambda: {})()
+            st.markdown("**2D 平面索力优化（MINMAXM · 过程量）**")
+            for _t in _optbl.values():
+                st.markdown(
+                    "| " + " | ".join(_t["headers"]) + " |\n|"
+                    + "---|" * len(_t["headers"]) + "\n"
+                    + "\n".join("| " + " | ".join(r) + " |" for r in _t["rows"]))
+                st.caption(_t["note"])
+            if _op2.get("status") != "ok":
+                st.warning(opt2d_status_text(_op2))
+            else:
+                st.caption(opt2d_status_text(_op2))
         for _d in _r2d.diagnostics:
             st.caption(f"· {_d}")
 
@@ -1013,7 +1102,9 @@ if doc.kind != "beam" and _cap.get("solve2d"):
                  "2D 报告不含振型与结构云图；承载力 Mu / Vu 只在勾选"
                  "「2D 正截面抗弯 / 斜截面抗剪承载力」并填了配筋后出现，"
                  "压弯 / 轴压仍不做；平面索长闭合章只在勾选并填了逐索"
-                 "目标索力 T* 后出现，[OPT] 仍不做。")
+                 "目标索力 T* 后出现，第十四次新增的平面索力优化章只在"
+                 "勾选并填了显式索力箱后出现；[OPT]（3D 三层迭代 + 体系"
+                 "守卫）那一层仍不做。")
         if _report2d_on and st.button("生成 2D 四出口计算书",
                                       key="report2d_btn"):
             from report_2d import build_and_write

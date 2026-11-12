@@ -296,6 +296,34 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
         _chunks.append(
             f"<div class=\"note\">{html.escape(LENGTH_BOUNDARY_NOTE)}</div>")
         length_html = "".join(_chunks)
+    # 2D 平面索力优化 [OPT2D]（第十四次 opt-in，FE 内核新造力学）：
+    # 默认 not_requested 时整章不出现；非 ok 时只出中文说明 + 边界 note，
+    # 不摆空表、不补零。四张表由 opt_2d.tables 唯一给出，只在 ok 时出现。
+    opt_html = ""
+    _op = getattr(res, "opt", None) or {}
+    if _op.get("status") != "not_requested":
+        from opt_2d import BOUNDARY_NOTE as OPT_BOUNDARY_NOTE
+        from opt_2d import status_text as opt_status_text
+
+        _chunks = ["<h2>2D 平面索力优化（MINMAXM · 过程量）</h2>"]
+        _tables = (res.opt_tables()
+                   if hasattr(res, "opt_tables") else {})
+        for _t in _tables.values():
+            _chunks.append(f"<h3>{html.escape(str(_t['title']))}</h3>")
+            _chunks.append("<table><tr>" + "".join(
+                f"<th>{html.escape(str(h))}</th>" for h in _t["headers"]) + "</tr>")
+            for _row in _t["rows"]:
+                _chunks.append("<tr>" + "".join(
+                    f"<td>{html.escape(str(c))}</td>" for c in _row) + "</tr>")
+            _chunks.append("</table>")
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(str(_t['note']))}</div>")
+        if not _tables:
+            _chunks.append(
+                f"<div class=\"note\">{html.escape(opt_status_text(_op))}</div>")
+        _chunks.append(
+            f"<div class=\"note\">{html.escape(OPT_BOUNDARY_NOTE)}</div>")
+        opt_html = "".join(_chunks)
     age_rows = []
     for s in getattr(spec, "stages", []) or []:
         t = float(getattr(s, "time", 0.0) or 0.0)
@@ -416,7 +444,7 @@ def write_2d_html(res, spec, out_path: str | Path) -> Path:
 {loss_html}
 {newton_html}
 {capacity_html}
-{length_html}
+{length_html}{opt_html}
 <h2>成桥态梁端内力</h2>
 <table>
 <tr><th>单元</th><th>端</th><th>N (kN)</th><th>My (kN·m)</th><th>Vz (kN)</th></tr>

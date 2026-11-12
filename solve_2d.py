@@ -47,8 +47,9 @@
 内核留痕字段不参与判据与步长计算，Python 只解析、不重算、不补零。
 `--newton-detail-only` 求解后只写明细、不写 `.result`、不覆盖主结果。
 **第十三次起 `[LENGTH2D]` 平面索长闭合一层已按 opt-in 新造接入（见第八条
-链），但 `[OPT]` 带约束目标索力优化仍没有对应力学；本链只覆盖内层 Newton，
-不等于 3D 三层迭代过程量已移植。**
+链），第十四次起 `[OPT2D]` 平面索力优化另按独立 opt-in 新造接入（见第十四次
+新增链 / ⑧ 分支）。`[OPT]`（3D 三层迭代 + 体系守卫）那一层仍没有对应力学；
+本链只覆盖内层 Newton，不等于 3D 三层迭代过程量已移植。**
 
 第八条链（**opt-in，默认关闭**）：`BridgeSpec.length_2d` 显式给出每根
 CABLE 的目标索力 T* → `to_dat()` 写 `*CABLE_LENGTH2D` →
@@ -57,7 +58,20 @@ CABLE 的目标索力 T* → `to_dat()` 写 `*CABLE_LENGTH2D` →
 这是**首次真正新造的 2D 力学**（无垂度线性杆本构 + 中心有限差分
 Jacobian + LM 阻尼最小二乘），不是「内核已算、只补留痕」；Python 只解析
 内核段，不重算、不补零、不由位移反推索力、不猜 T*、不改分析类型。
-`[OPT]` 仍标 `N`、不造占位。
+`[OPT]`（3D 三层迭代 + 体系守卫）那一层仍标 `N`、不造占位；第十四次
+另立的独立 opt-in `[OPT2D]` 平面索力优化段不是 3D `[OPT]`，见下段。
+
+第十四次新增的 opt-in 链（`[OPT2D]` 平面索力优化，默认关闭）：
+`BridgeSpec.opt_2d` 显式给出索力箱 `TMIN/TMAX` + 逐 CABLE 初始名义索力
+T0 + 登记 BEAM 端弯矩 → `to_dat()` 写 `*CABLE_OPT2D` →
+`example_mixed.exe --opt-detail-only` → `<stem>.opt.txt` 的 `[OPT2D]` 段
+→ `opt_2d` 解析，出收敛摘要 / 逐轮迭代 / 逐索过程量 / 登记梁端弯矩四张表。
+这是 2D 平面索力优化（MINMAXM，`min max|M|` 只针对用户显式登记的 BEAM
+端弯矩，中心有限差分 Jacobian + IRLS + 投影梯度），**不是** 3D 的
+`J=M·D` 闭式影响矩阵，也不等于 3D `[OPT]→[LENGTH]→[NEWTON]` 三层迭代；
+2D 无 DECKLOAD / 塔顶平衡 / SYSGUARD 三判据，不造占位。Python 只解析
+内核段，不重算优化、不补零、不由位移反推弯矩、不猜索力箱。`[OPT2D]`
+段带 2D 后缀，不与 3D `[OPT]` 解析链串段。
 
 坐标约定
 --------
@@ -82,6 +96,7 @@ import combination
 import length_2d
 import modal_2d
 import newton_2d
+import opt_2d
 import prestress_loss_2d as loss2d
 import strength_2d
 
@@ -198,6 +213,11 @@ class Solve2DResult:
     length: dict[str, Any] = field(
         default_factory=lambda: {"status": "not_requested",
                                  "source": length_2d.SOURCE})
+    # 2D 平面索力优化 [OPT2D]（opt-in）：opt_2d.parse_opt_txt 的结果。
+    # 默认 "not_requested"；只解析内核段，不重算优化、不由位移反推弯矩。
+    opt: dict[str, Any] = field(
+        default_factory=lambda: {"status": "not_requested",
+                                 "source": opt_2d.SOURCE})
 
     def modal_tables(self) -> dict[str, dict[str, Any]]:
         """报告 / 界面同源的表；无可用结果时为空 dict。
@@ -243,6 +263,10 @@ class Solve2DResult:
     def length_tables(self) -> dict[str, dict[str, Any]]:
         """2D 平面索长闭合表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
         return length_2d.tables(self.length)
+
+    def opt_tables(self) -> dict[str, dict[str, Any]]:
+        """2D 平面索力优化表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
+        return opt_2d.tables(self.opt)
 
     @property
     def fingerprint(self) -> str:
@@ -449,6 +473,7 @@ def solve_2d(
     newton_detail: bool = False,
     capacity: bool = False,
     length_detail: bool = False,
+    opt_detail: bool = False,
 ) -> Solve2DResult:
     """求解一个 BridgeSpec，返回 `Solve2DResult`。
 
@@ -483,7 +508,9 @@ def solve_2d(
     主结果；Python 只解析、不重算 Newton 过程、不补零。默认 False：不调该
     exe、不写新 diagnostics、计算书一字不变；线性模型写中文「不做」，
     不强制把分析类型改成非线性。第十三次起 `[LENGTH2D]` 平面索长闭合由
-    第八条链单独接入，`[OPT]` 仍没有对应力学；本链只覆盖内层 Newton。
+    第八条链单独接入，第十四次起 `[OPT2D]` 平面索力优化由独立 opt-in 链
+    单独接入；`[OPT]`（3D 三层迭代 + 体系守卫）那一层仍没有对应力学；
+    本链只覆盖内层 Newton。
 
     `capacity=True` 时做 2D **正截面抗弯 Mu / 斜截面抗剪 Vu** 验算，结果进
     `res.capacity`（表由 `res.capacity_tables()` 取）。这是纯 Python 校核：
@@ -505,6 +532,18 @@ def solve_2d(
     内核无契约段（`ERROR=no_length_request`）也如实给 `no_contract` 状态。
     Python 只解析内核段：不重算 `Lu`、不另求一组下料长度、不由位移反推
     索力、不补零。默认 False 时 `.dat` / `.result` / 默认 HTML 逐位不变。
+
+    `opt_detail=True` 时做 2D **平面索力优化 `[OPT2D]`**：要求模型显式挂了
+    `BridgeSpec.opt_2d`（`OptSpec2D`：显式索力箱 TMIN/TMAX + 逐 CABLE 初始
+    名义索力 T0 + 登记 BEAM 端弯矩），`to_dat()` 才会写 `*CABLE_OPT2D`；
+    随后追加一次 `example_mixed.exe --opt-detail-only`，只读它写出的
+    `<stem>.opt.txt` 里的 `[OPT2D]` 段（表由 `res.opt_tables()` 取）。
+    没挂契约就写中文「不做」，不调内核、不猜索力箱 / T0 / 登记端、不改
+    分析类型、不偷写段；内核无契约段（`ERROR=no_opt_request`）、契约非法
+    （`ERROR=missing_tension_bounds`）也如实给 `no_contract` / `kernel_error`
+    状态。Python 只解析内核段：不重算优化、不另求一组最优索力、不由位移
+    反推弯矩、不补零。段名带 2D 后缀，不与 3D `[OPT]` 解析链串段。
+    默认 False 时 `.dat` / `.result` / 默认 HTML 逐位不变。
 
     用法::
 
@@ -804,6 +843,40 @@ def solve_2d(
                         "status": "solver_error", "source": _lg_src,
                         "reason": str(e)}
         res.diagnostics.append(length_2d.status_text(res.length))
+
+    # ⑧ 2D 平面索力优化 [OPT2D]（第十四次 opt-in）：只读内核写出的
+    #    <stem>.opt.txt，不重算优化、不由位移反推弯矩、不猜索力箱 / T0 /
+    #    登记梁端、不改分析类型。没有显式契约就不调内核、不偷写 *CABLE_OPT2D。
+    if opt_detail:
+        _op_src = opt_2d.SOURCE
+        _osp = getattr(spec, "opt_2d", None)
+        _otargets = getattr(_osp, "targets", None) if _osp is not None else None
+        if not _otargets:
+            res.opt = {"status": "no_contract", "source": _op_src}
+        else:
+            exe = _find_exe("example_mixed.exe")
+            if exe is None:
+                res.opt = {"status": "unavailable", "source": _op_src}
+            else:
+                op_path = out / (dat_path.stem + ".opt.txt")
+                if op_path.exists():
+                    op_path.unlink()   # 不读上一次求解的残留
+                try:
+                    stdout = _run(exe, dat_name, out, timeout,
+                                  extra_args=["--opt-detail-only"])
+                    if not op_path.is_file():
+                        res.opt = {
+                            "status": "no_output", "source": _op_src,
+                            "stdout": (stdout or "")[-500:]}
+                    else:
+                        res.opt = opt_2d.parse_opt_txt(
+                            op_path.read_text(encoding="utf-8",
+                                              errors="replace"))
+                except SolverUnavailable2D as e:
+                    res.opt = {
+                        "status": "solver_error", "source": _op_src,
+                        "reason": str(e)}
+        res.diagnostics.append(opt_2d.status_text(res.opt))
     return res
 
 

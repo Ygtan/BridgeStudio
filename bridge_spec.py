@@ -27,7 +27,7 @@ import math
 import re
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # ---------------------------------------------------------------- 基础定义
 
@@ -377,6 +377,73 @@ class LengthSpec2D(BaseModel):
         return "\n".join(lines)
 
 
+class OptSpec2D(BaseModel):
+    """2D 平面索力优化 [OPT2D] 的 opt-in 输入契约（第十四次）。
+
+    与 `LengthSpec2D` 同构、但力学不同：`[LENGTH2D]` 是「无垂度线性杆 Lu
+    命中 T*」的闭合求解，本契约是「显式索力箱 + 登记梁端弯矩 → min max|M|」
+    的目标优化。BS 只写 FE 输入契约 `*CABLE_OPT2D`，最优索力 / 归一化目标 /
+    中心有限差分 Jacobian / IRLS / 投影梯度全部由 FEM-Eigen 内核算，Python
+    不算、不猜、不补零。
+
+    字段口径（与 FE 输入段一字对应）：
+    * `targets`：CABLE 单元号 -> 初始名义索力 T0（N），数字开头行；
+    * `moments`：[(BEAM 单元号, 端号 1|2)]，`M` 开头登记行；
+    * `t_min` / `t_max`：显式索力箱 TMIN/TMAX（N），**必须显式给且 0<TMIN<TMAX**，
+      缺任一或顺序颠倒内核写 `ERROR=missing_tension_bounds` / `bad_bounds`；
+    * `tol` / `max_iter` / `irls` / `round_tol`：TOL / MAXITER / IRLS / ROUNDTOL。
+
+    只有显式挂到 `BridgeSpec.opt_2d` 时才写，默认 None 时 `to_dat()` 一个
+    字节不多写，12 格 `DEFAULT_DAT_SHA` 不变。真源在本 BridgeSpec，不进
+    `model_doc.DEFAULTS` / `FIELDS`，X20 不参与。
+    """
+
+    targets: dict[int, float] = Field(default_factory=dict)
+    moments: list[tuple[int, int]] = Field(default_factory=list)
+    t_min: float
+    t_max: float
+    tol: float = 1e-7
+    max_iter: int = 120
+    irls: int = 4
+    round_tol: float = 1e-5
+
+    @model_validator(mode="after")
+    def _validate_opt(self) -> "OptSpec2D":
+        # 契约非法必须在 Python 侧以中文拦下，而不是让内核写 ERROR 段再回读。
+        if not (0.0 < self.t_min < self.t_max):
+            raise ValueError(
+                "2D 索力优化契约 TMIN/TMAX 必须显式给出且 0 < TMIN < TMAX；"
+                "缺任一或顺序颠倒内核会写 ERROR=missing_tension_bounds / bad_bounds")
+        if self.tol <= 0.0 or self.round_tol <= 0.0:
+            raise ValueError("2D 索力优化契约 TOL / ROUNDTOL 必须大于 0")
+        if self.max_iter < 1 or self.irls < 1:
+            raise ValueError("2D 索力优化契约 MAXITER / IRLS 必须为正整数")
+        for eid, t0 in self.targets.items():
+            if t0 <= 0.0:
+                raise ValueError(
+                    f"2D 索力优化 CABLE 单元 {eid} 的初始名义索力 T0 必须大于 0")
+        for elem, end in self.moments:
+            if end not in (1, 2):
+                raise ValueError(
+                    f"2D 索力优化登记梁端 ({elem}, {end}) 的端号必须是 1 或 2")
+        return self
+
+    def to_dat(self) -> str:
+        """写 FE 输入段 `*CABLE_OPT2D`（参数行 + 逐索行 + 弯矩登记行）。"""
+        lines = [
+            "*CABLE_OPT2D",
+            "OPT2D=1 "
+            f"TMIN={self.t_min:.10g} TMAX={self.t_max:.10g} "
+            f"TOL={self.tol:.10g} MAXITER={self.max_iter} "
+            f"IRLS={self.irls} ROUNDTOL={self.round_tol:.10g}",
+        ]
+        for eid in sorted(self.targets):
+            lines.append(f"{eid} {self.targets[eid]:.10g}")
+        for elem, end in self.moments:
+            lines.append(f"M {elem} {end}")
+        return "\n".join(lines)
+
+
 class BridgeSpec(BaseModel):
     title: str = "bridge"
     nodes: list[NodeDef] = Field(default_factory=list)
@@ -404,6 +471,9 @@ class BridgeSpec(BaseModel):
     # 2D 平面索长闭合（第十三次 opt-in）：默认 None，to_dat() 一个字节不多写。
     # 真源在本 BridgeSpec，不进 model_doc.DEFAULTS / FIELDS，X20 不参与。
     length_2d: LengthSpec2D | None = None
+    # 2D 平面索力优化（第十四次 opt-in）：默认 None，to_dat() 一个字节不多写。
+    # 真源在本 BridgeSpec，同样不进 model_doc.DEFAULTS / FIELDS，X20 不参与。
+    opt_2d: OptSpec2D | None = None
 
     # ------------------------------------------------------------ 校验
 
@@ -595,6 +665,42 @@ class BridgeSpec(BaseModel):
                                 f"（当前 {kind or '未知'}）")
                 if target <= 0.0:
                     errs.append(f"2D 索长闭合目标单元 {eid} 的目标索力 T* 必须大于 0")
+
+        # 2D 平面索力优化契约（第十四次 opt-in）：默认 None 时零校验成本。
+        # 目标 CABLE / 登记 BEAM 端必须存在且类型对、索力箱显式合法；做不到
+        # 就显式中文报错，不静默跳过、不拿别的单元类型冒充、不替设计猜参数。
+        if self.opt_2d is not None:
+            osp = self.opt_2d
+            if not osp.targets:
+                errs.append("2D 索力优化契约 *CABLE_OPT2D 没有给任何 CABLE 初始名义索力 T0")
+            if not osp.moments:
+                errs.append(
+                    "2D 索力优化契约 *CABLE_OPT2D 没有登记任何 BEAM 端弯矩"
+                    "（min max|M| 没有对象）")
+            if not (0.0 < osp.t_min < osp.t_max):
+                errs.append(
+                    "2D 索力优化契约 *CABLE_OPT2D 的索力箱必须显式给且 0 < TMIN < TMAX")
+            o_kinds = {t.id: str(getattr(t.kind, "value", t.kind)).upper()
+                       for t in self.elem_types}
+            o_emap = {e.id: e for e in self.elements}
+            for eid in sorted(osp.targets):
+                e = o_emap.get(eid)
+                if e is None:
+                    errs.append(f"2D 索力优化目标 CABLE 单元 {eid} 不存在")
+                    continue
+                kind = o_kinds.get(e.type_id, "")
+                if kind != "CABLE":
+                    errs.append(f"2D 索力优化目标单元 {eid} 必须是 CABLE"
+                                f"（当前 {kind or '未知'}）")
+            for elem, end in osp.moments:
+                e = o_emap.get(elem)
+                if e is None:
+                    errs.append(f"2D 索力优化登记梁端单元 {elem} 不存在")
+                    continue
+                kind = o_kinds.get(e.type_id, "")
+                if kind != "BEAM":
+                    errs.append(f"2D 索力优化登记梁端单元 {elem} 必须是 BEAM"
+                                f"（当前 {kind or '未知'}）")
         return errs
 
     # ------------------------------------------------------------ 摘要
@@ -750,6 +856,14 @@ class BridgeSpec(BaseModel):
         if self.length_2d is not None and self.length_2d.targets:
             out.append("! 2D 平面索长闭合目标索力契约（opt-in，默认不写）")
             out.append(self.length_2d.to_dat())
+            out.append("")
+
+        # 2D 平面索力优化（第十四次 opt-in）：默认 opt_2d=None 时一个字节
+        # 都不多写；只有用户显式给出「索力箱 + 逐索 T0 + 登记梁端」才写契约段。
+        # 内核在整份 .dat 读完后才解析，出现在施工阶段之前不影响解析。
+        if self.opt_2d is not None and self.opt_2d.targets:
+            out.append("! 2D 平面索力优化目标与显式索力箱契约（opt-in，默认不写）")
+            out.append(self.opt_2d.to_dat())
             out.append("")
 
         if self.stages:
