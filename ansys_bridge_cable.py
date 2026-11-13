@@ -218,6 +218,36 @@ def _dofs(a: int, b: int) -> list[int]:
     return list(range(a, b + 1))
 
 
+def _vertical_beam_orientations(
+        model: ModelSpec3D, kinds: dict[int, str]) -> dict[int, tuple[float, float, float]]:
+    """纯竖直 BEAM 单元 -> ANSYS BEAM4 方向节点 K 的坐标。
+
+    FEM-Eigen 3D 的 ``beam3DTransformation`` 对轴 ∥ global Z 的单元取
+    ``ez_ref = global Y``，于是 ``ey = Y × Z = +X``、``ez = Z × X = +Y``，
+    即局部 y = 全局 X、局部 z = 全局 Y。ANSYS BEAM4 默认把竖直单元的
+    局部 y 放到全局 Y，IY/IZ 恰好互换（实测 IY≠IZ 时 UX/UY 对调）。
+
+    ANSYS ``E,I,J,K`` 的第三节点 K 定义局部 x-z 平面：把 K 放在 I 点的
+    全局 +Y 方向，ANSYS 的局部 z 就变成 +Y、局部 y 变成 +X，与 FEM 一致。
+    本机 ANSYS 18.0 实测：IY=0.01/IZ=0.04 的竖直悬臂梁同时受 FX/FY 时，
+    默认写法 UX/UY 与 FEM 对调，加 K(+Y) 后逐位一致、0 warning，
+    且 K 节点无需约束。详见 ansys_probe/vertical_beam_probe.py。
+
+    水平/斜梁（含 X-Z 平面斜梁）两侧本就一致，不生成 K 节点，
+    因此既有 CB3D03/CB3D04 的 APDL 输出逐字节不变。
+    """
+    nodes = {n.id: n for n in model.nodes}
+    out: dict[int, tuple[float, float, float]] = {}
+    for e in model.elements:
+        if kinds.get(e.etype) in AXIAL_KINDS:
+            continue
+        p1, p2 = nodes[e.n1], nodes[e.n2]
+        dx, dy, dz = p2.x - p1.x, p2.y - p1.y, p2.z - p1.z
+        if abs(dx) < 1e-9 and abs(dy) < 1e-9 and abs(dz) > 1e-9:
+            out[e.id] = (p1.x, p1.y + 1.0, p1.z)
+    return out
+
+
 def _axial_only_nodes(model: ModelSpec3D) -> set[int]:
     """只被轴向杆（TRUSS/CABLE）连接的节点：FEM-Eigen 只给 3 个平动 DOF。"""
     kinds = {t.id: t.kind for t in model.etypes}
@@ -279,6 +309,14 @@ def spec_mixed_to_apdl(model: ModelSpec3D, *, jobname: str,
                         if kinds[e.etype] not in AXIAL_KINDS)
     link_elems = sorted(e.id for e in model.elements
                         if kinds[e.etype] in AXIAL_KINDS)
+    # 竖直 BEAM 的 ANSYS 方向节点（编号接在模型节点之后，不参与后处理循环）
+    orient = _vertical_beam_orientations(model, kinds)
+    orient_node: dict[int, int] = {}
+    if orient:
+        next_id = max(node_ids) + 1
+        for eid in sorted(orient):
+            orient_node[eid] = next_id
+            next_id += 1
 
     L: list[str] = []
     add = L.append
@@ -317,6 +355,12 @@ def spec_mixed_to_apdl(model: ModelSpec3D, *, jobname: str,
     add("! ---- Nodes (X longitudinal, Y transverse, Z vertical) ----")
     for nd in sorted(model.nodes, key=lambda n: n.id):
         add("N,{},{},{},{}".format(nd.id, _num(nd.x), _num(nd.y), _num(nd.z)))
+    if orient_node:
+        add("! ---- Orientation nodes K (vertical BEAM4, local y = global X) ----")
+        for eid in sorted(orient_node):
+            kx, ky, kz = orient[eid]
+            add("N,{},{},{},{}".format(orient_node[eid],
+                                      _num(kx), _num(ky), _num(kz)))
     # ---- elements: keep FEM element id == ANSYS element number ----
     add("! ---- Elements (created in ascending FEM id order) ----")
     for e in sorted(model.elements, key=lambda e: e.id):
@@ -324,7 +368,9 @@ def spec_mixed_to_apdl(model: ModelSpec3D, *, jobname: str,
         add("TYPE,{}".format(t.id))
         add("MAT,{}".format(t.mat))
         add("REAL,{}".format(t.real))
-        add("E,{},{}".format(e.n1, e.n2))
+        add("E,{},{}{}".format(
+            e.n1, e.n2,
+            ",{}".format(orient_node[e.id]) if e.id in orient_node else ""))
     # ---- boundary conditions: clip to available DOF on axial-only nodes ----
     add("! ---- Boundary conditions ----")
     for b in model.boundaries:
@@ -334,9 +380,16 @@ def spec_mixed_to_apdl(model: ModelSpec3D, *, jobname: str,
         for d in _dofs(*b.dofs):
             if d <= mx:
                 add("D,{},{},{}".format(b.node, DOF3_NAME[d], _num(b.value)))
-    add("! ---- Nodal loads (same *CLOAD as FEM-Eigen 3D) ----")
+    # *CLOAD 是累加语义，ANSYS 的 F 是覆盖语义：同一 (node,dof) 的多条
+    # 荷载必须先合并，否则后一条会覆盖前一条（塔柱自重按段两端各半写时
+    # 会静默丢一半荷载）。既有算例无重复，合并后输出顺序与数值不变。
+    merged_loads: dict[tuple[int, int], float] = {}
     for ld in model.loads:
-        add("F,{},{},{}".format(ld.node, DOF3_LOAD[ld.dof], _num(ld.value)))
+        key = (ld.node, ld.dof)
+        merged_loads[key] = merged_loads.get(key, 0.0) + ld.value
+    add("! ---- Nodal loads (same *CLOAD as FEM-Eigen 3D) ----")
+    for (nd, dof), val in sorted(merged_loads.items()):
+        add("F,{},{},{}".format(nd, DOF3_LOAD[dof], _num(val)))
     add("FINISH")
     add("/SOLU")
     add("ANTYPE,STATIC")
@@ -477,7 +530,8 @@ def _fmt(x: float, width: int = 16) -> str:
 
 def compare_mixed(model: ModelSpec3D, fem: dict,
                    adisp: dict, areac: dict, abeam: dict, alink: dict,
-                   *, stem: str, tol: float = 1e-3) -> tuple[str, bool]:
+                   *, stem: str, tol: float = 1e-3,
+                   tower: bool = False) -> tuple[str, bool]:
     """混合单元校核：位移 / 梁端力 / 杆轴力 / 竖向力平衡 + 特征量汇总。"""
     lines: list[str] = []
     ok_all = True
@@ -500,8 +554,12 @@ def compare_mixed(model: ModelSpec3D, fem: dict,
     add("单元语义: FEM-Eigen 线性 3D 内核把 CABLE/TRUSS 都按 (EA/L)·c⊗c 轴向杆装配,")
     add("          不区分只拉不压、不读 L0、无垂度；ANSYS LINK180 同为轴向杆，口径一致。")
     add("          只受拉 / 悬链线 / Ernst / 索力迭代属于 cable_solver.exe 非线性链。")
-    add("局部坐标: X-Z 平面斜梁两侧均用 ez_ref=global Z，实测逐位一致；纯竖直 BEAM 会")
-    add("          差 90°，本算例竖向构件一律用轴向杆规避。")
+    if tower:
+        add("局部坐标: X-Z 平面斜梁两侧均用 ez_ref=global Z，实测逐位一致；竖直塔柱 BEAM")
+        add("          由 ANSYS 方向节点 K(+Y) 对齐 FEM 的 ey=+X / ez=+Y，IY/IZ 不互换。")
+    else:
+        add("局部坐标: X-Z 平面斜梁两侧均用 ez_ref=global Z，实测逐位一致；纯竖直 BEAM 会")
+        add("          差 90°，本算例竖向构件一律用轴向杆规避。")
     add("")
 
     # [1] 节点位移

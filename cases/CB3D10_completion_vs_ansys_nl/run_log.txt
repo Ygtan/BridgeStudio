@@ -1,0 +1,2 @@
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d10_completion_nl -i cb3d10_completion_nl.inp -o cb3d10_completion_nl_ansys.out
+[ANSYS-NLGEOM-LINK180] exit=0

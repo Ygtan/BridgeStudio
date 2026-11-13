@@ -1,0 +1,47 @@
+==============================================================================
+CB3D10 非线性成桥态 vs ANSYS NLGEOM + LINK180 算例归档
+==============================================================================
+
+唯一数据源: BridgeStudio.cable_stayed_3d.build_cable_stayed_3d(
+  {'main_span': 80.0, 'side_span': 30.0, 'tower_height': 25.0, 'n_cable': 4, 'panel': 10.0, 'B': 12.0, 'h': 2.5, 'tf': 0.28, 'tw': 0.45, 'tower_b': 3.0, 'tower_h': 3.0, 'q_deck': 50000.0, 'cable_area_mm2': 3000.0, 'cable_dens': 0.0, 'mode': 'COMPLETION', 'method': 'DECK'})  -> ModelSpec3D
+
+FEM 成桥态: MODE=COMPLETION METHOD=DECK, converged=True, iterations=4,
+  closure_err=2.005793e-10 m, tension_err=3.529675e-09
+  索数 16，索力 423.7 .. 731.1 kN
+
+链路:
+  ModelSpec3D.to_dat()              -> cb3d10_completion.dat
+  cable_solver.exe <stem>.dat       -> cb3d10_completion_cable.txt
+    [ERECTED]  -> ANSYS 初始几何（制造线形）
+    [CABLE] L0 -> INISTATE 初应变 eps=(L_ERECTED-L0)/L0
+    [U] / [REACTION] -> FEM 参考值
+  spec_nl_to_apdl()                 -> cb3d10_completion_nl.inp
+  ANSYS180.exe -b -i *.inp          -> _nl_disp/_reac/_link.csv
+  compare_nl()                      -> compare_report.txt
+
+ANSYS 语义（本机 v180 实测）:
+  LINK180: KEYOPT(3)=1 tension-only, KEYOPT(2)=0；轴力 = SMISC 1
+  R,id,A,ISTRN 的 ISTRN 对 LINK180 无效；初应变必须用
+    INISTATE,SET,DTYP,EPEL + INISTATE,DEFINE,<e>,,EPEL,X,eps
+  竖直/近竖直 BEAM4 用方向节点 K(+Y) 对齐 FEM 局部轴（16 个）
+  NLGEOM,ON + NSUBST,20,100,10 + NEQIT,50
+  APDL 命令流纯 ASCII；*CFOPEN+*VWRITE 一次写出整个数组
+
+口径边界:
+  索自重 W=0 关闭垂度/Ernst（ANSYS LINK180 无垂度模型）。
+  FEM 共转列式索用 Lagrangian 工程应变 N=EA/L0*(Ln-L0)；
+  ANSYS NLGEOM 用 Almansi 应变，两者一阶一致，差异 O(eps^2)。
+  BEAM4 不参与大转动更新，成桥位移为 mm 量级，影响为二阶。
+
+文件清单:
+  cb3d10_completion.dat                    COMPLETION 前处理输出
+  cb3d10_completion.model.json             模型快照
+  cb3d10_completion_cable.txt              cable_solver 原始结果（冻结）
+  cb3d10_completion_nl.inp                 ANSYS APDL
+  cb3d10_completion_nl_*.csv               ANSYS 位移/反力/索力 CSV
+  cb3d10_completion_nl_ansys.out           ANSYS 作业日志
+  compare_report.txt / manifest.txt / run_log.txt
+
+复现:
+  C:\Users\user\anaconda3\python.exe D:\AI-work\BridgeStudio\cases\run_cases_nl.py
+==============================================================================
