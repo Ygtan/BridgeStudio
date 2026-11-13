@@ -1,0 +1,24 @@
+==============================================================================
+CB3D05 非线性成桥态算例归档
+==============================================================================
+
+唯一数据源: BridgeStudio.cable_stayed_3d.build_cable_stayed_3d(
+  main_span=200, side_span=80, tower_height=60, n_cable=12, panel=8,
+  mode=COMPLETION, method=DECK)  -> ModelSpec3D（含 *CABLE_BRIDGE / *CABLE）
+
+链路:
+  ModelSpec3D.to_dat()              -> cb3d05_completion.dat
+  cable_solver.exe <stem>.dat      -> cb3d05_completion_cable.txt
+  fem_eigen_cable.parse_cable_result() -> smoke_report.txt
+
+文件清单:
+  cb3d05_completion.dat            前处理输出（3D 非线性斜拉桥，48 索）
+  cb3d05_completion.model.json     模型快照
+  cb3d05_completion_cable.txt      cable_solver 原始结果（冻结）
+  smoke_report.txt                 自洽校核报告
+  run_log.txt / manifest.txt
+
+复现:
+  C:\Users\user\anaconda3\python.exe D:\AI-work\BridgeStudio\cases\run_cable_solver_smoke.py
+  (需 C:\msys64\mingw64\bin 在 PATH；不需要 ANSYS)
+==============================================================================

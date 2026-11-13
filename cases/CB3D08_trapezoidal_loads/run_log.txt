@@ -1,0 +1,5 @@
+$ D:\AI-work\FEM-Eigen\build\example_3d_report.exe cb3d08_trapezoid.dat
+  [FEM-Eigen-3D] rc=0
+  stdout: report written: cb3d08_trapezoid.report.txt
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d08_trapezoid -i cb3d08_trapezoid.inp -o cb3d08_trapezoid_ansys.out
+  [ANSYS-BEAM4] rc=0

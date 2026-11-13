@@ -25,3 +25,15 @@ streamlit.log
 
 # ---- 文档流水线中间产物 ----
 output/
+
+# ---- ANSYS 批处理二进制/数据库运行产物（每次求解重生成，不入库）----
+# 保留 .dat / .inp / .model.json / .csv / .txt / .out 作为算例归档证据
+cases/**/*.rst
+cases/**/*.emat
+cases/**/*.esav
+cases/**/*.full
+cases/**/*.mntr
+cases/**/*.DSP
+cases/**/*.dsp
+cases/**/*.err
+cases/**/*.log

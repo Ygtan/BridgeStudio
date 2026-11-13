@@ -1,0 +1,36 @@
+算例 CB03 : 两跨连续梁（CB01 几何）叠加材料自重：DENS=7850 kg/m3, g=9.81
+生成时间: 2026-11-13 17:25:25
+
+唯一数据源: BridgeSpec（BridgeStudio/bridge_spec.py::build_beam_bridge）
+  kwargs = {'span': 40.0, 'n_spans': 2, 'n_elem': 20, 'shape': 'rectangular', 'h': 1.2, 'b': 0.6, 'udl_kN': 20.0, 'gravity': -9.81}
+  setup  = 无
+  工况   = 均布 20 kN/m + 自重（FEM *GRAVITY 0 -9.81 / ANSYS ACEL,0,9.81,0）
+
+文件清单:
+  cb03_selfweight.dat          BridgeStudio 前处理输出，FEM-Eigen .dat (new format)
+  cb03_selfweight.model.json   BridgeSpec 模型快照（JSON）
+  cb03_selfweight.inp          ANSYS MAPDL 命令流（与 .dat 同源）
+  cb03_selfweight.result       FEM-Eigen 求解结果
+  cb03_selfweight_ansys.out    ANSYS 批处理输出（许可/求解日志）
+  cb03_selfweight_disp.csv     ANSYS 节点位移 node UX UY ROTZ
+  cb03_selfweight_reac.csv     ANSYS 节点反力 node FX FY
+  cb03_selfweight_elem.csv     ANSYS 单元端力 elem NI VI MI NJ VJ MJ
+  cb03_selfweight.log/.err/.rst 等 ANSYS 作业日志/数据库/结果文件
+  compare_report.txt           FEM-Eigen / ANSYS / 闭式解 对比报告
+  run_log.txt                  本次运行的命令与退出码
+
+复现步骤:
+  1) C:\Users\user\anaconda3\python.exe D:\AI-work\BridgeStudio\cases\run_cases.py
+     --case CB03
+  2) 单独重跑 FEM-Eigen:
+     PATH 加入 C:\msys64\mingw64\bin 后执行
+     D:\AI-work\FEM-Eigen\build\example_mixed.exe D:\AI-work\BridgeStudio\cases\CB03_selfweight\cb03_selfweight.dat
+  3) 单独重跑 ANSYS（工作目录必须是本算例目录）:
+     C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb03_selfweight -i cb03_selfweight.inp -o cb03_selfweight_ansys.out
+
+ANSYS 关键约定（本机 v180 / BEAM3 实测）:
+  ET,1,BEAM3 ; R,1,A,I,H ; SFBEAM,ELEM,1,PRES,+q,+q 产生向下荷载
+  SMISC 1/2/6 = i 端 N/V/M ; 7/8/12 = j 端 N/V/M
+  F,node,FY,-P 对应 *CLOAD ; ACEL,0,9.81,0 + MP,DENS 对应 *GRAVITY 0 -9.81
+  COMBIN14 + KEYOPT(2)=2 = 2D UY 接地弹簧，对应 *BOUNDARY ... K=<k>
+  *CFOPEN + *VWRITE 导出机器可读 CSV，无需人工拷贝列表

@@ -1,0 +1,5 @@
+$ D:\AI-work\FEM-Eigen\build\example_3d_report.exe cb3d06_udl.dat
+  [FEM-Eigen-3D] rc=0
+  stdout: report written: cb3d06_udl.report.txt
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d06_udl -i cb3d06_udl.inp -o cb3d06_udl_ansys.out
+  [ANSYS-BEAM4] rc=0

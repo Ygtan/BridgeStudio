@@ -1,0 +1,5 @@
+$ D:\AI-work\FEM-Eigen\build\example_3d_report.exe cb3d04_arch_bridge.dat
+[FEM-Eigen-3D] exit=0
+    report written: cb3d04_arch_bridge.report.txt
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d04_arch_bridge -i cb3d04_arch_bridge.inp -o cb3d04_arch_bridge_ansys.out
+[ANSYS-BEAM4-LINK180] exit=0

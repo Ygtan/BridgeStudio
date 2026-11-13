@@ -1,0 +1,5 @@
+$ D:\AI-work\FEM-Eigen\build\example_3d_report.exe cb3d07_selfweight.dat
+  [FEM-Eigen-3D] rc=0
+  stdout: report written: cb3d07_selfweight.report.txt
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d07_selfweight -i cb3d07_selfweight.inp -o cb3d07_selfweight_ansys.out
+  [ANSYS-BEAM4] rc=0

@@ -1,0 +1,43 @@
+==============================================================================
+3D 混合单元算例归档: CB3D03 single-pylon cable-stayed bridge 3D (BEAM + CABLE)
+==============================================================================
+
+模型: 独塔双跨斜拉桥 3D 单梁线：L=60 m / 12 个 BEAM 主梁单元，塔顶 z=18 m 刚性锚点，6 根 CABLE 斜拉索（A=4000 mm2），q=20 kN/m 节点化；ANSYS BEAM4 + LINK180
+唯一数据源: ModelSpec3D (BridgeStudio/model_spec_3d.py)
+  build_cable_stayed_3d(**{'span': 60.0, 'n_elem': 12, 'B': 8.0, 'h': 2.0, 'tw': 0.02, 'tf': 0.025, 'E_deck': 34500000000.0, 'nu': 0.2, 'tower_z': 18.0, 'cable_area': 0.004, 'E_cable': 195000000000.0, 'udl_kN': 20.0, 'title': '独塔斜拉桥 3D 混合单元（BEAM 主梁 + CABLE 斜拉索）'})
+
+链路:
+  ModelSpec3D.to_dat(compact=False)   -> cb3d03_cable_stayed.dat   (FEM-Eigen 3D)
+  spec_mixed_to_apdl()                 -> cb3d03_cable_stayed.inp  (ANSYS 18.0)
+  example_3d_report.exe <stem>.dat    -> cb3d03_cable_stayed.report.txt
+  ANSYS180.exe -b -j <job> -i *.inp   -> _disp/_reac/_beam/_link.csv
+  compare_mixed()                      -> compare_report.txt
+
+文件清单:
+  cb3d03_cable_stayed.dat            前处理输出（FEM-Eigen 3D .dat）
+  cb3d03_cable_stayed.model.json     模型快照（ModelSpec3D JSON）
+  cb3d03_cable_stayed.inp            ANSYS BEAM4 + LINK180 APDL
+  cb3d03_cable_stayed.report.txt     FEM-Eigen 3D 结果（位移 + 混合单元内力）
+  cb3d03_cable_stayed_disp/_reac.csv ANSYS 节点位移 / 反力
+  cb3d03_cable_stayed_beam/_link.csv ANSYS BEAM4 i 端 6 分量 / LINK180 轴力
+  cb3d03_cable_stayed_ansys.out      ANSYS 作业日志
+  compare_report.txt / manifest.txt / run_log.txt
+
+关键约定（本机 ANSYS v180 实测，见 ansys_probe/link_probe.py, arch_probe.py）:
+  X 纵向 / Y 横向 / Z 竖向；竖向荷载 = DOF3(UZ) = ANSYS FZ
+  FEM-Eigen 线性 3D 内核把 CABLE/TRUSS 都按 (EA/L)·c⊗c 轴向杆装配,
+    不区分只拉不压、不读 L0、无垂度 -> ANSYS LINK180 口径一致
+  只受拉 / 悬链线 / Ernst / 索力迭代属 cable_solver.exe 非线性链
+  BEAM4: ET,1,BEAM4 + R,1,A,IZZ,IYY,TKZ,TKY,0 + RMORE,0,J,0,0,0,0
+         SHEARZ/SHEARY=0 -> Euler-Bernoulli，与 FEM-Eigen 3D 严格一致
+  LINK180: ET,2,LINK180 + R,2,A,ISTRN ; 轴力 = SMISC 1
+  斜梁局部坐标: 两侧均 ez_ref=global Z -> ey=Z×ex，X-Z 平面斜梁逐位一致
+                纯竖直 BEAM 会差 90°，竖向构件一律改用轴向杆
+  ETABLE 需按 ESEL,S,TYPE 分组，避免对 LINK180 请求梁的 SMISC 分量
+  *CFOPEN + *VWRITE 一次写出整个数组，外面不能再套 *DO
+  APDL 命令流必须纯 ASCII（中文标题需转义）
+
+复现:
+  C:\Users\user\anaconda3\python.exe D:\AI-work\BridgeStudio\cases\run_cases_cable.py --case all
+  (需 C:\msys64\mingw64\bin 在 PATH；ANSYS 许可仅校核脚本需要)
+==============================================================================

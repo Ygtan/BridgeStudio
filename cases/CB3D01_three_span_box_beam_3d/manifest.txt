@@ -1,0 +1,50 @@
+==============================================================================
+3D 算例归档: CB3D01 three-span box beam 3D 3x30m nodalized UDL
+==============================================================================
+
+模型: 三跨连续箱梁 3D 单梁线：3x30 m，箱形截面 8.0x2.0 m / tw=0.02 tf=0.025，30 个 3D BEAM 单元，均布荷载 20 kN/m 节点化
+唯一数据源: ModelSpec3D (BridgeStudio/model_spec_3d.py)
+  build_box_beam_3d(**{'spans': (30.0, 30.0, 30.0), 'n_elem_per_span': 10, 'B': 8.0, 'h': 2.0, 'tw': 0.02, 'tf': 0.025, 'E': 206000000000.0, 'nu': 0.2, 'udl_kN': 20.0, 'title': '三跨连续箱梁 3D 单梁线 均布荷载'})
+
+链路:
+  ModelSpec3D.to_dat(compact=False)   -> cb3d01_3span.dat   (FEM-Eigen 3D)
+  spec3d_to_apdl(BEAM188)            -> cb3d01_3span.inp   (ANSYS 18.0)
+  spec3d_to_apdl(BEAM4)              -> cb3d01_3span_b4.inp (EB 严格基准)
+  example_3d_report.exe <stem>.dat   -> cb3d01_3span.report.txt
+  ANSYS180.exe -b -j <job> -i *.inp  -> *_disp/_reac/_elem.csv
+  compare_3d()                       -> compare_report.txt
+
+文件清单:
+  cb3d01_3span.dat                   前处理输出（FEM-Eigen 3D .dat）
+  cb3d01_3span.model.json            模型快照（ModelSpec3D JSON）
+  cb3d01_3span.inp                   ANSYS BEAM188 APDL（SECTYPE/SECDATA）
+  cb3d01_3span_b4.inp                ANSYS BEAM4 APDL（R/RMORE, 无剪切）
+  cb3d01_3span.report.txt            FEM-Eigen 3D 结果（6DOF 位移 + i 端 6 分量内力）
+  cb3d01_3span_disp/_reac/_elem.csv  BEAM188 节点位移/反力/单元端力
+  cb3d01_3span_b4_disp/_b4_reac/_b4_elem.csv BEAM4 节点位移/反力/单元端力
+  cb3d01_3span_ansys.out / _b4_ansys.out ANSYS 作业日志
+  compare_report.txt                 三方对比报告
+  manifest.txt / run_log.txt         本清单 / 命令与退出码
+
+3D 关键约定（本机 v180 实测）:
+  X 纵向 / Y 横向 / Z 竖向；竖向荷载 = DOF3(UZ) = ANSYS FZ
+  竖向弯曲 IY <-> ANSYS IYY；横向 IZ <-> IZZ；扭转 J <-> Torsion Constant
+  BEAM188: ET,1,BEAM188 + SECTYPE,1,BEAM,ASEC + SECDATA,A,IYY,0,IZZ,0,J,...
+  BEAM4:   ET,1,BEAM4 + R,1,A,IZZ,IYY,TKZ,TKY,0 + RMORE,0,J,0,0,0,0
+           SHEARZ/SHEARY=0 -> Euler-Bernoulli，与 FEM-Eigen 3D 严格一致
+  BEAM188 SMISC 1/2/3/4/5/6 = Fx/My/Mz/TQ/SFz/SFy(I), 14..19 = J 端
+  BEAM4   SMISC 1..6 = N/Vy/Vz/T/My/Mz(I), 7..12 = J 端
+  *CFOPEN + *VWRITE 一次写出整个数组，外面不能再套 *DO
+
+已知内核差异（不判 FAIL，报告第 [4] 节量化）:
+  FEM-Eigen 3D / BEAM4 = 12x12 Euler-Bernoulli 三次梁；
+  BEAM188 = 一阶剪切变形 Timoshenko + 线性形函数，含剪切挠度 PL/(GA)。
+
+已知内核缺口（未改 C++ 源码）:
+  FEM-Eigen 3D 不认识 *ELEMENT_LOAD / *GRAVITY / *SELF_WEIGHT（静默忽略），
+  DENS 只进一致质量矩阵。故均布荷载节点化为 *CLOAD，ANSYS 用同一组 F 施加。
+
+复现:
+  C:\Users\user\anaconda3\python.exe D:\AI-work\BridgeStudio\cases\run_cases_3d.py --case all
+  (需 C:\msys64\mingw64\bin 在 PATH；ANSYS 许可仅本校核脚本需要)
+==============================================================================

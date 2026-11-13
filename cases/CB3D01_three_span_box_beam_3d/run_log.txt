@@ -1,0 +1,8 @@
+CASE CB3D01  CB3D01 three-span box beam 3D 3x30m nodalized UDL
+$ D:\AI-work\FEM-Eigen\build\example_3d_report.exe cb3d01_3span.dat
+[FEM-Eigen-3D] exit=0
+    report written: cb3d01_3span.report.txt
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d01_3span -i cb3d01_3span.inp -o cb3d01_3span_ansys.out
+[ANSYS-cb3d01_3span] exit=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d01_3span_b4 -i cb3d01_3span_b4.inp -o cb3d01_3span_b4_ansys.out
+[ANSYS-cb3d01_3span_b4] exit=0

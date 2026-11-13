@@ -338,6 +338,35 @@ class NodalLoad3D(BaseModel):
     value: float                    # N 或 N·m
 
 
+class ElemLoad3D(BaseModel):
+    """`*ELEMENT_LOAD`：作用在单元上的分布荷载（FEM-Eigen 3D 线性内核）。
+
+    行格式 ``<单元号|区间> <方向> <q1> <q2>``，q 单位 N/m，
+    q1/q2 分别是单元 i/j 端强度，方向为全局单位向量。
+    ``dir`` 支持 GX/GY/GZ（全局轴）与 LX/LY/LZ（单元局部轴）。
+    默认全空，既有 .dat 不输出这一段。
+    """
+
+    e_from: int
+    e_to: int | None = None
+    dir: str = "GZ"
+    q1: float
+    q2: float
+
+
+class SelfWeight3D(BaseModel):
+    """`*SELF_WEIGHT`：旧格式显式自重（与自动 DENS 自重叠加）。
+
+    行格式 ``<ALL|单元号> <RHO|MASS> <value>``；RHO 为密度 kg/m³
+    （乘 g·A），MASS 为线质量 kg/m（乘 g）。需要同时写 `*GRAVITY`
+    才会生效（3D 内核 g 默认 0）。
+    """
+
+    who: str = "ALL"
+    rule: str = "MASS"
+    value: float
+
+
 class Prestress3D(BaseModel):
     """一条预应力筋（施工阶段 *STAGE 的 PRESTRESS=，等效荷载法）。
 
@@ -539,6 +568,13 @@ class ModelSpec3D(BaseModel):
     elements: list[Element3D] = Field(default_factory=list)
     boundaries: list[Boundary3D] = Field(default_factory=list)
     loads: list[NodalLoad3D] = Field(default_factory=list)  # 仅静力求解用
+    # 真实单元分布荷载 / 重力加速度（3D 线性内核已支持）。
+    # 默认全空 / 全零：不含这两段的既有 .dat 逐字节不变。
+    # 3D 内核的 g 默认就是 0（与 2D 的 gy=-9.81 不同），必须显式写
+    # *GRAVITY 才启用自重，否则含 DENS 的模态/成桥态算例不受影响。
+    elem_loads: list[ElemLoad3D] = Field(default_factory=list)
+    self_weights: list[SelfWeight3D] = Field(default_factory=list)
+    gravity: tuple[float, float, float] = (0.0, 0.0, 0.0)
     stages: list[Stage3D] = Field(default_factory=list)
     # 分项预应力损失表：编号 → 参数。只有束写了 `loss_ref` 才会被引用；
     # 空表不输出任何内容，既有 .dat 逐位不变。
@@ -836,6 +872,22 @@ class ModelSpec3D(BaseModel):
             L.append("*CLOAD")
             for ld in self.loads:
                 L.append(f"{ld.node} {ld.dof} {fmt(ld.value)}")
+
+        # 真实分布荷载与重力（3D 线性内核）。空列表/零向量时完全不输出，
+        # 保证既有 .dat 逐字节不变。
+        if self.elem_loads:
+            L.append("*ELEMENT_LOAD")
+            for el in self.elem_loads:
+                hi = el.e_to if el.e_to is not None else el.e_from
+                rng = str(el.e_from) if hi == el.e_from else f"{el.e_from}-{hi}"
+                L.append(f"{rng} {el.dir} {fmt(el.q1)} {fmt(el.q2)}")
+        if self.self_weights:
+            L.append("*SELF_WEIGHT")
+            for sw in self.self_weights:
+                L.append(f"{sw.who} {sw.rule} {fmt(sw.value)}")
+        if any(self.gravity):
+            L.append("*GRAVITY")
+            L.append(" ".join(fmt(v) for v in self.gravity))
 
         # 分项损失表写在 *STAGE 之前（内核读完整份文件后才解析 LOSSREF，
         # 写在后面也能引用）；空表时这一段完全不出现。

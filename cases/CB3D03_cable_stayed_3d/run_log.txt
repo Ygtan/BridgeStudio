@@ -1,0 +1,5 @@
+$ D:\AI-work\FEM-Eigen\build\example_3d_report.exe cb3d03_cable_stayed.dat
+[FEM-Eigen-3D] exit=0
+    report written: cb3d03_cable_stayed.report.txt
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d03_cable_stayed -i cb3d03_cable_stayed.inp -o cb3d03_cable_stayed_ansys.out
+[ANSYS-BEAM4-LINK180] exit=0

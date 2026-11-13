@@ -1,0 +1,8 @@
+CASE CB3D02  CB3D02 three-span box beam 3D lateral force + torsion
+$ D:\AI-work\FEM-Eigen\build\example_3d_report.exe cb3d02_space.dat
+[FEM-Eigen-3D] exit=0
+    report written: cb3d02_space.report.txt
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d02_space -i cb3d02_space.inp -o cb3d02_space_ansys.out
+[ANSYS-cb3d02_space] exit=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d02_space_b4 -i cb3d02_space_b4.inp -o cb3d02_space_b4_ansys.out
+[ANSYS-cb3d02_space_b4] exit=0

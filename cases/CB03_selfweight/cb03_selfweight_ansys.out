@@ -1,0 +1,708 @@
+
+ ANSYS Multiphysics                                
+
+
+ *------------------------------------------------------------------*
+ |                                                                  |
+ |   W E L C O M E   T O   T H E   A N S Y S (R)  P R O G R A M     |
+ |                                                                  |
+ *------------------------------------------------------------------*
+
+
+
+
+ ***************************************************************
+ *            ANSYS Release 18.0     LEGAL NOTICES             *
+ ***************************************************************
+ *                                                             *
+ * Copyright 2016 SAS IP, Inc.  All rights reserved.           *
+ * Unauthorized use, distribution or duplication is            *
+ * prohibited.                                                 *
+ *                                                             *
+ * Ansys is a registered trademark of ANSYS, Inc. or its       *
+ * subsidiaries in the United States or other countries.       *
+ * See the ANSYS, Inc. online documentation or the ANSYS, Inc. *
+ * documentation CD or online help for the complete Legal      *
+ * Notice.                                                     *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * THIS ANSYS SOFTWARE PRODUCT AND PROGRAM DOCUMENTATION       *
+ * INCLUDE TRADE SECRETS AND CONFIDENTIAL AND PROPRIETARY      *
+ * PRODUCTS OF ANSYS, INC., ITS SUBSIDIARIES, OR LICENSORS.    *
+ * The software products and documentation are furnished by    *
+ * ANSYS, Inc. or its subsidiaries under a software license    *
+ * agreement that contains provisions concerning               *
+ * non-disclosure, copying, length and nature of use,          *
+ * compliance with exporting laws, warranties, disclaimers,    *
+ * limitations of liability, and remedies, and other           *
+ * provisions.  The software products and documentation may be *
+ * used, disclosed, transferred, or copied only in accordance  *
+ * with the terms and conditions of that software license      *
+ * agreement.                                                  *
+ *                                                             *
+ * ANSYS, Inc. is a UL registered                              *
+ * ISO 9001:2008 company.                                      *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * This product is subject to U.S. laws governing export and   *
+ * re-export.                                                  *
+ *                                                             *
+ * For U.S. Government users, except as specifically granted   *
+ * by the ANSYS, Inc. software license agreement, the use,     *
+ * duplication, or disclosure by the United States Government  *
+ * is subject to restrictions stated in the ANSYS, Inc.        *
+ * software license agreement and FAR 12.212 (for non-DOD      *
+ * licenses).                                                  *
+ *                                                             *
+ ***************************************************************
+
+ Release 18.0
+     
+ Point Releases and Patches installed:   
+     
+ ANSYS, Inc. Products Release 18.0   
+ ANSYS Mechanical Products Release 18.0  
+ ANSYS Autodyn Release 18.0  
+ ANSYS LS-DYNA Release 18.0  
+ ANSYS AIM Release 18.0  
+ ANSYS CFX (includes ANSYS CFD-Post) Release 18.0
+ ANSYS Fluent (includes ANSYS CFD-Post) Release 18.0 
+ ANSYS TurboGrid Release 18.0
+ ANSYS FENSAP-ICE Release 18.0   
+ ANSYS Polyflow (includes ANSYS CFD-Post) Release 18.0   
+ ANSYS Forte Release 18.0
+ ANSYS Chemkin Release 18.0  
+ ANSYS ICEM CFD Release 18.0 
+ ANSYS Aqwa Release 18.0 
+ ANSYS Icepak (includes ANSYS CFD-Post) Release 18.0 
+ AutoCAD Release 18.0
+ ACIS Release 18.0   
+ Catia, Version 4 Release 18.0   
+ Catia, Version 6 Release 18.0   
+ Creo Elements/Direct Modeling Release 18.0  
+ Inventor Release 18.0   
+ JTOpen Release 18.0 
+ NX Release 18.0 
+ Parasolid Release 18.0  
+ Creo Parametric (formerly Pro/ENGINEER) Release 18.0
+ Solid Edge Release 18.0 
+ SolidWorks Release 18.0 
+ ANSYS, Inc. License Manager Release 18.0
+
+
+          *****  ANSYS COMMAND LINE ARGUMENTS  *****
+  INITIAL JOBNAME              = cb03_selfweight                                                                                                                                                                                                                                         
+  BATCH MODE REQUESTED (-b)    = LIST
+  INPUT FILE COPY MODE (-c)    = COPY
+
+ RELEASE= Release 18.0         BUILD= 18.0      UP20161219   VERSION=WINDOWS x64 
+ CURRENT JOBNAME=cb03_selfweight  17:25:24  NOV 13, 2026 CP=      0.203
+
+     1  /BATCH  
+     2  /TITLE,CB03 two-span beam UDL 20kN/m + self weight (DENS + ACEL)
+     3  ! Generated by BridgeStudio/ansys_bridge.py from ONE BridgeSpec 
+     4  ! Same nodes/elements/material/section/BC/loads as the FEM-Eigen .dat   
+     5  /PREP7  
+     6  ! ---- Element type: 2D elastic beam (Euler-Bernoulli) ---- 
+     7  ET,1,BEAM3  
+     8  ! ---- Real constant: ARCT, IZZ, HEIGHT ----
+     9  R,1,0.72,0.0864,1.2 
+    10  ! ---- Material ----
+    11  MP,EX,1,2.06e+11
+    12  MP,PRXY,1,0.3   
+    13  MP,DENS,1,7850  
+    14  MP,ALPX,1,1.2e-05   
+    15  ! ---- Nodes ----   
+    16  N,1,0,0,0.0 
+    17  N,2,2,0,0.0 
+    18  N,3,4,0,0.0 
+    19  N,4,6,0,0.0 
+    20  N,5,8,0,0.0 
+    21  N,6,10,0,0.0
+    22  N,7,12,0,0.0
+    23  N,8,14,0,0.0
+    24  N,9,16,0,0.0
+    25  N,10,18,0,0.0   
+    26  N,11,20,0,0.0   
+    27  N,12,22,0,0.0   
+    28  N,13,24,0,0.0   
+    29  N,14,26,0,0.0   
+    30  N,15,28,0,0.0   
+    31  N,16,30,0,0.0   
+    32  N,17,32,0,0.0   
+    33  N,18,34,0,0.0   
+    34  N,19,36,0,0.0   
+    35  N,20,38,0,0.0   
+    36  N,21,40,0,0.0   
+    37  ! ---- Elements ----
+    38  TYPE,1  
+    39  MAT,1   
+    40  REAL,1  
+    41  E,1,2   
+    42  E,2,3   
+    43  E,3,4   
+    44  E,4,5   
+    45  E,5,6   
+    46  E,6,7   
+    47  E,7,8   
+    48  E,8,9   
+    49  E,9,10  
+    50  E,10,11 
+    51  E,11,12 
+    52  E,12,13 
+    53  E,13,14 
+    54  E,14,15 
+    55  E,15,16 
+    56  E,16,17 
+    57  E,17,18 
+    58  E,18,19 
+    59  E,19,20 
+    60  E,20,21 
+    61  ! ---- Boundary conditions (1=UX 2=UY 3=ROTZ) ----  
+    62  D,1,UX,0
+    63  D,1,UY,0
+    64  D,11,UY,0   
+    65  D,21,UY,0   
+    66  ! ---- Loads ----   
+    67  *DO,EID,1,20
+    68   SFBEAM,EID,1,PRES,20000,20000  
+    69  *ENDDO  
+    70  ACEL,0.0,9.81,0.0   
+    71  ! ---- Solve ----   
+    72  FINISH  
+    73  /SOLU   
+    74  ANTYPE,STATIC   
+    75  SOLVE   
+    76  FINISH  
+    77  ! ---- Post-processing: export machine-readable results ----
+    78  /POST1  
+    79  SET,LAST
+    80  ! BEAM3 SMISC: 1/2/6 = N/V/M at I, 7/8/12 = N/V/M at J  
+    81  ETABLE,ENI,SMISC,1  
+    82  ETABLE,EVI,SMISC,2  
+    83  ETABLE,EMI,SMISC,6  
+    84  ETABLE,ENJ,SMISC,7  
+    85  ETABLE,EVJ,SMISC,8  
+    86  ETABLE,EMJ,SMISC,12 
+    87  *DIM,ADSP,ARRAY,21,4
+    88  *DO,I,1,21  
+    89   ADSP(I,1)=I
+    90   *GET,TMP,NODE,I,U,X
+    91   ADSP(I,2)=TMP  
+    92   *GET,TMP,NODE,I,U,Y
+    93   ADSP(I,3)=TMP  
+    94   *GET,TMP,NODE,I,ROT,Z  
+    95   ADSP(I,4)=TMP  
+    96  *ENDDO  
+    97  ! *VWRITE with an array starting index writes ALL remaining rows;   
+    98  ! do NOT wrap it in a *DO loop (that duplicates the tail).  
+    99  *CFOPEN,cb03_selfweight_disp,csv
+   100  *VWRITE,ADSP(1,1),ADSP(1,2),ADSP(1,3),ADSP(1,4) 
+   101   (1X,F8.0,3(1X,E18.10)) 
+   102  *CFCLOS 
+   103  *DIM,ARCT,ARRAY,21,3
+   104  *DO,I,1,21  
+   105   ARCT(I,1)=I
+   106   *GET,TMP,NODE,I,RF,FX  
+   107   ARCT(I,2)=TMP  
+   108   *GET,TMP,NODE,I,RF,FY  
+   109   ARCT(I,3)=TMP  
+   110  *ENDDO  
+   111  *CFOPEN,cb03_selfweight_reac,csv
+   112  *VWRITE,ARCT(1,1),ARCT(1,2),ARCT(1,3)   
+   113   (1X,F8.0,2(1X,E18.10)) 
+   114  *CFCLOS 
+   115  *DIM,AELM,ARRAY,20,7
+   116  *DO,I,1,20  
+   117   AELM(I,1)=I
+   118   *GET,TMP,ELEM,I,ETAB,ENI   
+   119   AELM(I,2)=TMP  
+   120   *GET,TMP,ELEM,I,ETAB,EVI   
+   121   AELM(I,3)=TMP  
+   122   *GET,TMP,ELEM,I,ETAB,EMI   
+   123   AELM(I,4)=TMP  
+   124   *GET,TMP,ELEM,I,ETAB,ENJ   
+   125   AELM(I,5)=TMP  
+   126   *GET,TMP,ELEM,I,ETAB,EVJ   
+   127   AELM(I,6)=TMP  
+   128   *GET,TMP,ELEM,I,ETAB,EMJ   
+   129   AELM(I,7)=TMP  
+   130  *ENDDO  
+   131  *CFOPEN,cb03_selfweight_elem,csv
+   132  *VWRITE,AELM(1,1),AELM(1,2),AELM(1,3),AELM(1,4),AELM(1,5),AELM(1,6),AELM(1,7)   
+   133   (1X,F8.0,6(1X,E18.10)) 
+   134  *CFCLOS 
+   135  FINISH  
+   136  /EXIT,NOSAVE
+
+ RUN SETUP PROCEDURE FROM FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans
+
+ /INPUT FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans  LINE=       0
+
+ TITLE= 
+ CB03 two-span beam UDL 20kN/m + self weight (DENS + ACEL)                     
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   17:25:24  NOV 13, 2026 CP=      0.250
+
+ CB03 two-span beam UDL 20kN/m + self weight (DENS + ACEL)                     
+
+
+
+          ***** ANSYS ANALYSIS DEFINITION (PREP7) *****
+
+ ELEMENT TYPE       1 IS BEAM3        2-D ELASTIC BEAM            
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    ROTZ
+  TWO-DIMENSIONAL MODEL
+
+ REAL CONSTANT SET       1  ITEMS   1 TO   6
+   0.72000      0.86400E-01   1.2000       0.0000       0.0000       0.0000    
+
+ MATERIAL         1     EX   =  0.2060000E+12  
+
+ MATERIAL         1     PRXY =  0.3000000      
+
+ MATERIAL         1     DENS =   7850.000      
+
+ MATERIAL         1     ALPX =  0.1200000E-04  
+
+ NODE         1  KCS=      0  X,Y,Z=  0.0000       0.0000       0.0000     
+
+ NODE         2  KCS=      0  X,Y,Z=  2.0000       0.0000       0.0000     
+
+ NODE         3  KCS=      0  X,Y,Z=  4.0000       0.0000       0.0000     
+
+ NODE         4  KCS=      0  X,Y,Z=  6.0000       0.0000       0.0000     
+
+ NODE         5  KCS=      0  X,Y,Z=  8.0000       0.0000       0.0000     
+
+ NODE         6  KCS=      0  X,Y,Z=  10.000       0.0000       0.0000     
+
+ NODE         7  KCS=      0  X,Y,Z=  12.000       0.0000       0.0000     
+
+ NODE         8  KCS=      0  X,Y,Z=  14.000       0.0000       0.0000     
+
+ NODE         9  KCS=      0  X,Y,Z=  16.000       0.0000       0.0000     
+
+ NODE        10  KCS=      0  X,Y,Z=  18.000       0.0000       0.0000     
+
+ NODE        11  KCS=      0  X,Y,Z=  20.000       0.0000       0.0000     
+
+ NODE        12  KCS=      0  X,Y,Z=  22.000       0.0000       0.0000     
+
+ NODE        13  KCS=      0  X,Y,Z=  24.000       0.0000       0.0000     
+
+ NODE        14  KCS=      0  X,Y,Z=  26.000       0.0000       0.0000     
+
+ NODE        15  KCS=      0  X,Y,Z=  28.000       0.0000       0.0000     
+
+ NODE        16  KCS=      0  X,Y,Z=  30.000       0.0000       0.0000     
+
+ NODE        17  KCS=      0  X,Y,Z=  32.000       0.0000       0.0000     
+
+ NODE        18  KCS=      0  X,Y,Z=  34.000       0.0000       0.0000     
+
+ NODE        19  KCS=      0  X,Y,Z=  36.000       0.0000       0.0000     
+
+ NODE        20  KCS=      0  X,Y,Z=  38.000       0.0000       0.0000     
+
+ NODE        21  KCS=      0  X,Y,Z=  40.000       0.0000       0.0000     
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      1       1      2
+
+ ELEMENT      2       2      3
+
+ ELEMENT      3       3      4
+
+ ELEMENT      4       4      5
+
+ ELEMENT      5       5      6
+
+ ELEMENT      6       6      7
+
+ ELEMENT      7       7      8
+
+ ELEMENT      8       8      9
+
+ ELEMENT      9       9     10
+
+ ELEMENT     10      10     11
+
+ ELEMENT     11      11     12
+
+ ELEMENT     12      12     13
+
+ ELEMENT     13      13     14
+
+ ELEMENT     14      14     15
+
+ ELEMENT     15      15     16
+
+ ELEMENT     16      16     17
+
+ ELEMENT     17      17     18
+
+ ELEMENT     18      18     19
+
+ ELEMENT     19      19     20
+
+ ELEMENT     20      20     21
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES            1 TO           1 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES            1 TO           1 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES           11 TO          11 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES           21 TO          21 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ *DO LOOP ON PARAMETER= EID FROM  1.0000     TO  20.000     BY  1.0000    
+
+ SPECIFIED SURFACE LOAD PRES FOR BEAM ELEMENT       1  LKEY = 1
+     VALI,VALJ     =     20000.         20000.    
+
+ *ENDDO  INDEX= EID                             
+
+ ACEL=    0.0000      9.8100      0.0000    
+
+
+ ***** ROUTINE COMPLETED *****  CP =         0.250
+
+
+
+ *****  ANSYS SOLUTION ROUTINE  *****
+
+
+ PERFORM A STATIC ANALYSIS
+  THIS WILL BE A NEW ANALYSIS
+
+ *****  ANSYS SOLVE    COMMAND  *****
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   17:25:24  NOV 13, 2026 CP=      0.250
+
+ CB03 two-span beam UDL 20kN/m + self weight (DENS + ACEL)                     
+
+
+
+                       S O L U T I O N   O P T I O N S
+
+   PROBLEM DIMENSIONALITY. . . . . . . . . . . . .2-D                  
+   DEGREES OF FREEDOM. . . . . . UX   UY   ROTZ
+   ANALYSIS TYPE . . . . . . . . . . . . . . . . .STATIC (STEADY-STATE)
+   GLOBALLY ASSEMBLED MATRIX . . . . . . . . . . .SYMMETRIC  
+
+ *** NOTE ***                            CP =       0.250   TIME= 17:25:24
+ Present time 0 is less than or equal to the previous time.  Time will   
+ default to 1.                                                           
+
+                      L O A D   S T E P   O P T I O N S
+
+   LOAD STEP NUMBER. . . . . . . . . . . . . . . .     1
+   TIME AT END OF THE LOAD STEP. . . . . . . . . .  1.0000    
+   NUMBER OF SUBSTEPS. . . . . . . . . . . . . . .     1
+   STEP CHANGE BOUNDARY CONDITIONS . . . . . . . .    NO
+   INERTIA LOADS                        X           Y           Z 
+      ACEL . . . . . . . . . . . .  0.0000      9.8100      0.0000    
+   PRINT OUTPUT CONTROLS . . . . . . . . . . . . .NO PRINTOUT
+   DATABASE OUTPUT CONTROLS. . . . . . . . . . . .ALL DATA WRITTEN
+                                                  FOR THE LAST SUBSTEP
+
+
+ SOLUTION MONITORING INFO IS WRITTEN TO FILE= cb03_selfweight.mntr                                                                                                                                                                                                                                                
+
+
+
+
+            **** CENTER OF MASS, MASS, AND MASS MOMENTS OF INERTIA ****
+
+  CALCULATIONS ASSUME ELEMENT MASS AT ELEMENT CENTROID
+
+  TOTAL MASS =  0.22608E+06
+
+                           MOM. OF INERTIA         MOM. OF INERTIA
+  CENTER OF MASS            ABOUT ORIGIN        ABOUT CENTER OF MASS
+
+  XC =   20.000          IXX =    0.000          IXX =    0.000    
+  YC =   0.0000          IYY =   0.1205E+09      IYY =   0.3007E+08
+  ZC =   0.0000          IZZ =   0.1205E+09      IZZ =   0.3007E+08
+                         IXY =    0.000          IXY =    0.000    
+                         IYZ =    0.000          IYZ =    0.000    
+                         IZX =    0.000          IZX =    0.000    
+
+
+  *** MASS SUMMARY BY ELEMENT TYPE ***
+
+  TYPE      MASS
+     1   226080.    
+
+ Range of element maximum matrix coefficients in global coordinates
+ Maximum = 7.416E+10 at element 20.                                      
+ Minimum = 7.416E+10 at element 20.                                      
+
+   *** ELEMENT MATRIX FORMULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        20  BEAM3         0.000   0.000000
+ Time at end of element matrix formulation CP = 0.265625.                
+
+ SPARSE MATRIX DIRECT SOLVER.
+  Number of equations =          59,    Maximum wavefront =      6
+  Memory allocated for solver              =     0.074 MB
+  Memory required for in-core solution     =     0.071 MB
+  Memory required for out-of-core solution =     0.067 MB
+
+ *** NOTE ***                            CP =       0.328   TIME= 17:25:24
+ The Sparse Matrix Solver is currently running in the in-core memory     
+ mode.  This memory mode uses the most amount of memory in order to      
+ avoid using the hard drive as much as possible, which most often        
+ results in the fastest solution time.  This mode is recommended if      
+ enough physical memory is present to accommodate all of the solver      
+ data.                                                                   
+ Sparse solver maximum pivot= 1.4832E+11 at node 7 UX.                   
+ Sparse solver minimum pivot= 227887500 at node 17 UY.                   
+ Sparse solver minimum pivot in absolute value= 227887500 at node 17 UY. 
+
+   *** ELEMENT RESULT CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        20  BEAM3         0.000   0.000000
+
+   *** NODAL LOAD CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        20  BEAM3         0.000   0.000000
+ *** LOAD STEP     1   SUBSTEP     1  COMPLETED.    CUM ITER =      1
+ *** TIME =   1.00000         TIME INC =   1.00000      NEW TRIANG MATRIX
+
+
+ *** ANSYS BINARY FILE STATISTICS
+  BUFFER SIZE USED= 16384
+        0.062 MB WRITTEN ON ELEMENT MATRIX FILE: cb03_selfweight.emat
+        0.062 MB WRITTEN ON ELEMENT SAVED DATA FILE: cb03_selfweight.esav
+        0.062 MB WRITTEN ON ASSEMBLED MATRIX FILE: cb03_selfweight.full
+        0.312 MB WRITTEN ON RESULTS FILE: cb03_selfweight.rst
+
+ FINISH SOLUTION PROCESSING
+
+
+ ***** ROUTINE COMPLETED *****  CP =         0.406
+
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   17:25:24  NOV 13, 2026 CP=      0.438
+
+ CB03 two-span beam UDL 20kN/m + self weight (DENS + ACEL)                     
+
+
+
+          ***** ANSYS RESULTS INTERPRETATION (POST1) *****
+
+ *** NOTE ***                            CP =       0.438   TIME= 17:25:24
+ Reading results into the database (SET command) will update the current 
+ displacement and force boundary conditions in the database with the     
+ values from the results file for that load set.  Note that any          
+ subsequent solutions will use these values unless action is taken to    
+ either SAVE the current values or not overwrite them (/EXIT,NOSAVE).    
+
+
+ USE LAST SUBSTEP ON RESULT FILE  FOR LOAD CASE 0 
+
+ SET COMMAND GOT LOAD STEP=     1  SUBSTEP=     1  CUMULATIVE ITERATION=     1
+   TIME/FREQUENCY=  1.0000    
+ TITLE= CB03 two-span beam UDL 20kN/m + self weight (DENS + ACEL)               
+
+ STORE ENI      FROM ITEM=SMIS COMP=   1  FOR ALL SELECTED ELEMENTS
+
+ STORE EVI      FROM ITEM=SMIS COMP=   2  FOR ALL SELECTED ELEMENTS
+
+ STORE EMI      FROM ITEM=SMIS COMP=   6  FOR ALL SELECTED ELEMENTS
+
+ STORE ENJ      FROM ITEM=SMIS COMP=   7  FOR ALL SELECTED ELEMENTS
+
+ STORE EVJ      FROM ITEM=SMIS COMP=   8  FOR ALL SELECTED ELEMENTS
+
+ STORE EMJ      FROM ITEM=SMIS COMP=  12  FOR ALL SELECTED ELEMENTS
+
+ SET PARAMETER DIMENSIONS ON  ADSP TYPE=ARRA  DIMENSIONS=    21     4     1
+
+ *DO LOOP ON PARAMETER= I FROM  1.0000     TO  21.000     BY  1.0000    
+
+ PARAMETER ADSP(I,1) =     1.000000000    
+
+ *GET  TMP       FROM  NODE      1  ITEM=U    X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(I,2) =     0.000000000    
+
+ *GET  TMP       FROM  NODE      1  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(I,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE      1  ITEM=ROT  Z     VALUE=-0.706487849E-03
+
+ PARAMETER ADSP(I,4) =   -0.7064878491E-03
+
+ *ENDDO  INDEX= I                               
+
+ OPENED FILE= cb03_selfweight_disp.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ SET PARAMETER DIMENSIONS ON  ARCT TYPE=ARRA  DIMENSIONS=    21     3     1
+
+ *DO LOOP ON PARAMETER= I FROM  1.0000     TO  21.000     BY  1.0000    
+
+ PARAMETER ARCT(I,1) =     1.000000000    
+
+ *GET  TMP       FROM  NODE       1  ITEM=RF   FX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(I,2) =     0.000000000    
+
+ *GET  TMP       FROM  NODE       1  ITEM=RF   FY    VALUE=  565845.900     
+
+ PARAMETER ARCT(I,3) =     565845.9000    
+
+ *ENDDO  INDEX= I                               
+
+ OPENED FILE= cb03_selfweight_reac.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ SET PARAMETER DIMENSIONS ON  AELM TYPE=ARRA  DIMENSIONS=    20     7     1
+
+ *DO LOOP ON PARAMETER= I FROM  1.0000     TO  20.000     BY  1.0000    
+
+ PARAMETER AELM(I,1) =     1.000000000    
+
+ *GET  TMP       FROM  ELEM       1  ITEM=ETAB ENI       VALUE=  0.00000000    
+
+ PARAMETER AELM(I,2) =     0.000000000    
+
+ *GET  TMP       FROM  ELEM       1  ITEM=ETAB EVI       VALUE= -565845.875    
+
+ PARAMETER AELM(I,3) =    -565845.8750    
+
+ *GET  TMP       FROM  ELEM       1  ITEM=ETAB EMI       VALUE= 0.341970008E-09
+
+ PARAMETER AELM(I,4) =    0.3419700079E-09
+
+ *GET  TMP       FROM  ELEM       1  ITEM=ETAB ENJ       VALUE=  0.00000000    
+
+ PARAMETER AELM(I,5) =     0.000000000    
+
+ *GET  TMP       FROM  ELEM       1  ITEM=ETAB EVJ       VALUE= -414953.656    
+
+ PARAMETER AELM(I,6) =    -414953.6562    
+
+ *GET  TMP       FROM  ELEM       1  ITEM=ETAB EMJ       VALUE=  980799.562    
+
+ PARAMETER AELM(I,7) =     980799.5625    
+
+ *ENDDO  INDEX= I                               
+
+ OPENED FILE= cb03_selfweight_elem.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ EXIT THE ANSYS POST1 DATABASE PROCESSOR
+
+
+ ***** ROUTINE COMPLETED *****  CP =         0.469
+
+
+
+ EXIT ANSYS WITHOUT SAVING DATABASE
+
+
+ NUMBER OF WARNING MESSAGES ENCOUNTERED=          0
+ NUMBER OF ERROR   MESSAGES ENCOUNTERED=          0
+
++--------------------- A N S Y S   S T A T I S T I C S ------------------------+
+
+Release: Release 18.0       Build: 18.0       Update: UP20161219   Platform: WINDOWS x64 
+Date Run: 11/13/2026   Time: 17:25     Process ID: 9600
+Operating System: Windows 10  (Build: 19045)
+
+Processor Model:         Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
+
+Compiler: Intel(R) FORTRAN Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) C/C++ Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) Math Kernel Library Version 11.3.3 Product Build 20160413
+
+Number of machines requested            :    1
+Total number of cores available         :    8
+Number of physical cores available      :    4
+Number of processes requested           :    1
+Number of threads per process requested :    2
+Total number of cores requested         :    2 (Shared Memory Parallel)                    
+
+GPU Acceleration: Not Requested
+
+Job Name: cb03_selfweight
+Working Directory: D:\AI-work\BridgeStudio\cases\CB03_selfweight
+
+Total CPU time for main thread                    :        0.4 seconds
+Total CPU time summed for all threads             :        0.8 seconds
+
+Elapsed time spent pre-processing model (/PREP7)  :        0.0 seconds
+Elapsed time spent solution - preprocessing       :        0.0 seconds
+Elapsed time spent computing solution             :        0.1 seconds
+Elapsed time spent solution - postprocessing      :        0.0 seconds
+Elapsed time spent post-processing model (/POST1) :        0.0 seconds
+ 
+Equation solver used                              :            Sparse (symmetric)
+Equation solver computational rate                :        0.6 Mflops
+
+Maximum total memory used                         :       10.0 MB
+Maximum total memory allocated                    :     2112.0 MB
+Total physical memory available                   :         16 GB
+
++------------------ E N D   A N S Y S   S T A T I S T I C S -------------------+
+
+
+ *---------------------------------------------------------------------------*
+ |                                                                           |
+ |                            ANSYS RUN COMPLETED                            |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Ansys Release 18.0          Build 18.0         UP20161219     WINDOWS x64 |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Database Requested(-db)  1024 MB    Scratch Memory Requested      1024 MB |
+ | Maximum Database Used       1 MB    Maximum Scratch Memory Used      9 MB |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ |        CP Time      (sec) =          0.781       Time  =  17:25:25        |
+ |        Elapsed Time (sec) =          5.000       Date  =  11/13/2026      |
+ |                                                                           |
+ *---------------------------------------------------------------------------*

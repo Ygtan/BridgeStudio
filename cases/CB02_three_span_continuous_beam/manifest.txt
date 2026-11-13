@@ -1,0 +1,36 @@
+算例 CB02 : 三跨等截面连续箱梁：3x30 m，箱形截面 h=2.0 m / b=8.0 m，30 个梁单元，均布荷载 20 kN/m
+生成时间: 2026-11-13 17:25:20
+
+唯一数据源: BridgeSpec（BridgeStudio/bridge_spec.py::build_beam_bridge）
+  kwargs = {'span': 90.0, 'n_spans': 3, 'n_elem': 30, 'shape': 'box', 'h': 2.0, 'b': 8.0, 'udl_kN': 20.0, 'gravity': 0.0}
+  setup  = 无
+  工况   = 等跨满布均布荷载（有闭式解）
+
+文件清单:
+  cb02_3span.dat               BridgeStudio 前处理输出，FEM-Eigen .dat (new format)
+  cb02_3span.model.json        BridgeSpec 模型快照（JSON）
+  cb02_3span.inp               ANSYS MAPDL 命令流（与 .dat 同源）
+  cb02_3span.result            FEM-Eigen 求解结果
+  cb02_3span_ansys.out         ANSYS 批处理输出（许可/求解日志）
+  cb02_3span_disp.csv          ANSYS 节点位移 node UX UY ROTZ
+  cb02_3span_reac.csv          ANSYS 节点反力 node FX FY
+  cb02_3span_elem.csv          ANSYS 单元端力 elem NI VI MI NJ VJ MJ
+  cb02_3span.log/.err/.rst 等   ANSYS 作业日志/数据库/结果文件
+  compare_report.txt           FEM-Eigen / ANSYS / 闭式解 对比报告
+  run_log.txt                  本次运行的命令与退出码
+
+复现步骤:
+  1) C:\Users\user\anaconda3\python.exe D:\AI-work\BridgeStudio\cases\run_cases.py
+     --case CB02
+  2) 单独重跑 FEM-Eigen:
+     PATH 加入 C:\msys64\mingw64\bin 后执行
+     D:\AI-work\FEM-Eigen\build\example_mixed.exe D:\AI-work\BridgeStudio\cases\CB02_three_span_continuous_beam\cb02_3span.dat
+  3) 单独重跑 ANSYS（工作目录必须是本算例目录）:
+     C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb02_3span -i cb02_3span.inp -o cb02_3span_ansys.out
+
+ANSYS 关键约定（本机 v180 / BEAM3 实测）:
+  ET,1,BEAM3 ; R,1,A,I,H ; SFBEAM,ELEM,1,PRES,+q,+q 产生向下荷载
+  SMISC 1/2/6 = i 端 N/V/M ; 7/8/12 = j 端 N/V/M
+  F,node,FY,-P 对应 *CLOAD ; ACEL,0,9.81,0 + MP,DENS 对应 *GRAVITY 0 -9.81
+  COMBIN14 + KEYOPT(2)=2 = 2D UY 接地弹簧，对应 *BOUNDARY ... K=<k>
+  *CFOPEN + *VWRITE 导出机器可读 CSV，无需人工拷贝列表

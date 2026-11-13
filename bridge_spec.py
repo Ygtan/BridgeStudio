@@ -143,11 +143,17 @@ class ElemDef(BaseModel):
 
 
 class BoundaryDef(BaseModel):
-    """`*BOUNDARY`。dofs 写法："1-2" 铰、"2" 竖向辊、"1-3" 固结。"""
+    """`*BOUNDARY`。dofs 写法："1-2" 铰、"2" 竖向辊、"1-3" 固结。
+
+    `k > 0` 时该自由度改为接地弹簧（FEM-Eigen `*BOUNDARY` 第四列 `K=`），
+    `value` 为弹簧基准位移（支座沉降）。单位：平动 dof 为 N/m，转动 dof
+    为 N*m/rad。默认 0 时 to_dat() 的输出逐字节不变。
+    """
 
     node: int
     dofs: str = "1-2"
     value: float = 0.0
+    k: float = 0.0
 
 
 class NodalLoadDef(BaseModel):
@@ -520,6 +526,12 @@ class BridgeSpec(BaseModel):
         for b in self.boundaries:
             if b.node not in node_ids:
                 errs.append(f"边界约束引用了不存在的节点 {b.node}")
+            if b.k < 0:
+                errs.append(f"边界约束节点 {b.node} 的弹性刚度 k 不能为负 ({b.k})")
+            if b.k > 0 and "-" in str(b.dofs):
+                errs.append(
+                    f"弹性支承节点 {b.node} 的 dofs 必须是单个自由度，"
+                    f"不能是区间 '{b.dofs}'（每个弹簧需单独一行）")
 
         # 转角自由度：TRUSS/CABLE/STRUT 只连 u、v，若某节点没有任何 BEAM 相连
         # 且 dof 3 未被约束，求解器会报"零刚度自由度"。在这里提前拦下来。
@@ -820,7 +832,10 @@ class BridgeSpec(BaseModel):
         out.append("! 边界约束（1=u, 2=v, 3=θ）")
         out.append("*BOUNDARY")
         for b in self.boundaries:
-            out.append(f"{b.node} {b.dofs} {b.value:.6g}")
+            line = f"{b.node} {b.dofs} {b.value:.6g}"
+            if b.k > 0:
+                line += f" K={b.k:.6g}"
+            out.append(line)
         out.append("")
 
         if self.nodal_loads:

@@ -1,0 +1,43 @@
+==============================================================================
+CB3D07 3D distributed UDL + DENS selfweight + SELF_WEIGHT + point load
+同 CB3D06 几何 + *ELEMENT_LOAD 20 kN/m + DENS=2500 自动自重 (g=-9.81) + *SELF_WEIGHT ALL MASS 100 + 跨中节点力 -100 kN
+==============================================================================
+唯一数据源: ModelSpec3D（ansys_bridge_3d_loads.build_box_beam_3d_loads）
+  kwargs = {'q_kN': 20.0, 'dens': 2500.0, 'gravity': (0.0, 0.0, -9.81), 'self_weights': ({'who': 'ALL', 'rule': 'MASS', 'value': 100.0},), 'extra_loads': ((16, 3, -100000.0),)}
+
+链路:
+  BridgeSpec3D -> to_dat()               cb3d07_selfweight.dat
+               -> spec3d_loads_to_apdl() cb3d07_selfweight.inp  (ANSYS BEAM4)
+  FEM-Eigen example_3d_report.exe        cb3d07_selfweight.report.txt
+  ANSYS180 -b                           cb3d07_selfweight_disp/_reac/_elem.csv
+
+文件清单:
+  cb3d07_selfweight.dat          FEM-Eigen 前处理输出（含 *ELEMENT_LOAD / *GRAVITY）
+  cb3d07_selfweight.model.json   模型快照
+  cb3d07_selfweight.inp          ANSYS BEAM4 命令流（SFBEAM / MP,DENS / ACEL）
+  cb3d07_selfweight.report.txt   FEM-Eigen 3D 位移 + i 端内力
+  cb3d07_selfweight_disp.csv     ANSYS 节点位移 UX..ROTZ
+  cb3d07_selfweight_reac.csv     ANSYS 节点反力 FX..MZ
+  cb3d07_selfweight_elem.csv     ANSYS 单元 i/j 端力
+  cb3d07_selfweight_ansys.out    ANSYS 作业日志（校核证据）
+  compare_report.txt             三方对比报告
+  run_log.txt                    运行命令与退出码
+
+同源约定:
+  *ELEMENT_LOAD 1-30 GZ -q1 -q2  <->  SFBEAM,ELEM,1,PRES,+q1,+q2
+      （BEAM4 LKEY=1 实测对应全局 -Z；PRES 为正面号向下）
+  *GRAVITY 0 0 -9.81 + DENS      <->  MP,DENS + ACEL,0,0,9.81
+      （ACEL 是惯性加速度，与重力向量反号）
+  *SELF_WEIGHT ALL MASS m        <->  并入同一条 SFBEAM 的 PRES 幅值
+      （ANSYS 同面重复 SFBEAM 会覆盖，故先求和再写一条）
+  SMISC 1/2/3/4/5/6 = i 端 N/Vy/Vz/T/My/Mz；7..12 = j 端
+  *CFOPEN + *VWRITE 一次写整列，外层不可再套 *DO
+
+边界:
+  3D 内核 g 默认 0（与 2D 的 gy=-9.81 不同），必须显式写 *GRAVITY；
+  分布荷载/自重与 *STAGE 不能混用（readModel3D 会显式拒绝，不静默）；
+  APDL 对标只支持 GZ 方向与纯 -Z 重力，其它方向由闭式解套件验证。
+
+复现:
+  C:\Users\user\anaconda3\python.exe D:\AI-work\BridgeStudio\cases\run_cases_3d_loads.py --case all
+==============================================================================
