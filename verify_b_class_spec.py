@@ -203,12 +203,33 @@ def no_new_capability() -> None:
     if root:
         cs = read(root / "cable_solver.cpp")
         ifmt = read(root / "input_format_3d.md")
-        check("内核未新增 STABILITY 关键字 / 结果段",
-              "STABILITY=1" not in cs and "[STABILITY]" not in cs
-              and "[STABILITY]" not in ifmt)
+        # 第十七次（2026-11-14）：B3 按 §2.3 两阶段规格 opt-in 接入。
+        # 守卫不再禁止 [STABILITY]，改为锁住「默认全关 / 不改主求解器 /
+        # 保留 BUCKLING ERROR / 独立锚点 / 仍 P 不 Y」的不虚报口径。
+        sout = read(root / "stability_output_3d.hpp")
+        check("B3 opt-in：关键字与结果段已在源码登记",
+              '"STABILITY"' in cs and "[STABILITY]" in ifmt
+              and "stabilityErrorSection3D" in sout)
+        check("B3 opt-in：默认全关且分流独立于成桥态闭环",
+              "bool enabled = false;" in cs
+              and "if (cfg.stability.enabled)" in cs
+              and "return runStabilityMode" in cs)
+        check("B3 opt-in：StabilityCfg 独立、主求解器零改动",
+              "struct StabilityCfg" in cs
+              and "NonlinearOptions3D nl;" in cs
+              and "solveModel3DNonlinear" in read(root / "fem_3d_nl.hpp")
+              and "Ftarget" in read(root / "fem_3d_nl.hpp"))
+        check("B3 opt-in：[BUCKLING] ERROR 段仍保留",
+              '"nonlinear_state_not_supported"' in cs)
+        check("B3 opt-in：独立守卫与矩阵 P≠Y 在位",
+              (ROOT / "verify_stability_3d.py").is_file()
+              and "stability_3d.py" in read(ROOT / "开发使用手册.md")
+              and "| 非线性稳定全过程（球面弧长法 opt-in） | N | P |"
+              in read(ROOT / "能力边界矩阵.md"))
         nl = read(root / "fem_3d_nl.hpp")
-        check("内核未新增路径跟踪求解器",
-              "solveEquilibriumPath3D" not in nl)
+        check("内核未新增第二套路径跟踪求解器（仍在独立头文件）",
+              "solveEquilibriumPath3D" not in nl
+              and "arc-length" not in nl and "Riks" not in nl)
     m2 = read(ROOT / "modal_2d.py")
     check("2D 模态层不重算 K/M、不补周期 T",
           "不重算 K/M" in m2 and "T = 1/f" in m2)

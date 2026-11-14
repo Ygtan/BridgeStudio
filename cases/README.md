@@ -76,6 +76,18 @@ FEM-Eigen `tests/benchmark/snap_through_ansys_3d/README.md`。
 - **关键语义差异**：FEM `*CLOAD` 累加、ANSYS `F` 覆盖，导出前必须合并
   重复 `(node, dof)`；竖直 BEAM 需用方向节点 `K(+Y)` 对齐 FEM 局部轴。
 
+## CB3D18：主链路 `[STABILITY]` opt-in（2026-11-14，M 阶段）
+
+本阶段**不在 `BridgeStudio/cases/` 建算例目录**：FEM-Eigen 的
+`cable_solver.exe` 新增 `STABILITY=1` 独立 opt-in 模式，`.dat` +
+冻结 `[STABILITY]` 输出 + 3311 项黄金值 + 第 20 项 CTest 全部归档在
+`FEM-Eigen/tests/benchmark/stable_path_3d/`。BridgeStudio 侧只新增
+唯一解析器 `stability_3d.py`、独立守卫 `verify_stability_3d.py`，
+以及能力矩阵 / B 类规格 / README / 使用说明 / 开发手册的登记，
+**不产生新的 ANSYS APDL 或 `.inp`**（ANSYS `ARCLEN` 对标证据已在
+CB3D17 归档，主链路与之逐值同源，无需重跑 ANSYS）。
+能力矩阵该行标 `P` 不标 `Y`，边界见 `B类后续项接入规格.md` §2.5。
+
 ## 归档规则
 
 `.gitignore` 放行 `.dat` / `.inp` / `.model.json` / `.csv` / `.txt` / `.out`

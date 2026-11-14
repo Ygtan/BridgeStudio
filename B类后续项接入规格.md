@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | B1 组合体系 | **暂缓**（用户指定） | `组合体系接入规格.md`、`verify_combo_system.py` 86/86 显式拒绝 |
 | B2 2D ↔ 3D 能力对齐 | **部分实现（十五次逐次接入）**：先按源码事实接通 2D 模态 / 线性屈曲；第六次 A 档按 `P` 口径接通 2D **截面应力**半部（承载力当时显式拒绝）；第七次把「引用完整性中文校验」按源码事实由 `N` 纠正为 `P` 并补齐；第八次接通「同源计算书四出口」的**导出机制**（仍标 `P`）；第九次由 FE opt-in 补 `[MODAL2D]` 段闭环「模态周期 T / 振型 / 参与质量」（`BASIS=xy`，用户拍板方向口径，收官时 **B2 剩余 3 项**）；第十次由 FE opt-in 补 `[PRESTRESSLOSS2D]` 段闭环「2D 分项预应力损失明细」（`BASIS=2d_global`，仍标 `P` 不标 `Y`）；第十一次由 FE opt-in 留痕补 `[NEWTON2D]` 段，**只闭环三层迭代中的内层 Newton 一层**（该格 `N→P`，仍标 `P` 不标 `Y`），`[LENGTH]` / `[OPT]` 两层经只读调研确认 2D 内核没有对应力学、两格继续标 `N`、不造占位，**B2 剩余 2 项**（内容收窄为「两层力学 + 多格式导出」）；第十二次在同一格内按 opt-in `RebarSpec2D` / `capacity_2d.py` 接通 Mu / Vu 一条 flex 链（压弯 / 轴压仍缺、仍标 `P` 不标 `Y`），§4.2 与 **B2 剩余 2 项**均不变；第十三次**首次真正新造 2D 力学**、按 opt-in 补齐 `[LENGTH2D]` 平面索长闭合一层（该格 `2D=N` → `2D=P`、仍标 `P` 不标 `Y`），`[OPT]` 仍标 `N`、不造占位，第十三次收官时 §4.2 为 **1 个 `2D=N` + 6 个 `2D=P`**、**B2 剩余 2 项**（内容曾再收窄为「`[OPT]` 一层力学 + 多格式导出 / `.mct` 反向导入」）；**第十四次** `[OPT2D]` 2D 平面索力优化按 opt-in **首次新造第二层力学**接通（该格 `N→P`、仍标 `P` 不标 `Y`，只 MINMAXM + 显式索力箱、不等于 3D `[OPT]`），§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、**B2 剩余 1 项**（仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入），双层 opt-in 默认全关、默认 `.dat` / `.result` / 黄金基线逐位不变，逐项评估写入 §1；**2026-11-12 第十五次** B2「2D 平行导出 / 导入链」两格按 B 档 `P` 接通（多格式导出 / `.mct` 反向导入，`2D=N` → `2D=P`、**仍 `P` 不 `Y`**），§4.2 现为 **0 个 `2D=N` + 9 个 `2D=P`**、**B2 剩余 0 项**（B2 逐次接入全部收口；两格仍 `P ≠ Y`） | `modal_2d.py`、`verify_modal_2d.py` 111/111、`strength_2d.py`、`verify_strength_2d.py` 162/162、`bridge_spec.py::validate_model`、`verify_validate_2d.py` 83/83、`report_2d.py`、`verify_report_2d.py`、`modal_2d.py::parse_modal_detail`、`verify_modal_detail_2d.py`、`prestress_loss_2d.py`、`verify_prestress_loss_2d.py`、`newton_2d.py`、`verify_newton_2d.py` |
-| B3 非线性稳定全过程 | **只写规格**（无代码基础、无解析锚点） | §2 |
+| B3 非线性稳定全过程 | **第十七次按 opt-in 接入（2026-11-14）**：`STABILITY=1` 把球面弧长法平衡路径跟踪接入 `cable_solver.exe` 主程序，`[STABILITY]` 段 + 独立解析锚点 + 第 20 项 CTest；默认全关、既有算例逐位不变。**仍标 `P` 不标 `Y`**，边界见 §2.5 | §2、§2.5 |
 | B4 预应力损失两处规范口径 | **只写规格**（σl2 有条文但口径待决；σl6 缺规范表值） | §3 |
 | B5 成桥态无应力曲率 | **只写规格**（研究性扩展） | §4 |
 
@@ -32,6 +32,19 @@
 无 GUI 入口、不等于 3D 全套承载力。
 
 **本轮没有做的事**（逐条可核对）：不新增 kind、不新增求解键、不新增 `*CABLE_BRIDGE` 关键字、不改任何内核数值路径、不刷新 `dat_byte_regression` 黄金基线。第九次、第十次、第十一次是用户逐次明确授权的三次破例：只在 FE 侧新增 opt-in 的 `[MODAL2D]` / `[PRESTRESSLOSS2D]` / `[NEWTON2D]` 结果段（默认关闭、不动既有四段与任何力学判据 / 数值路径），BS 侧新增解析 / 报告 / 界面接入层与守卫，默认 `.dat` / 默认 `.modal.txt` / `.result` 逐位不变。第十一次特别地**不新造力学**：`[LENGTH]` / `[OPT]` 两层 2D 内核没有对应力学，两格继续标 `N`、不造占位、不写不适用段冒充闭环。第十三次起已**首次真正新造** `[LENGTH2D]` 平面索长闭合一层（该格 `2D=N` → `2D=P`）；**第十四次起 `[OPT2D]` 2D 平面索力优化已按 opt-in 新造接入**（该格 `2D=N` → `2D=P`、仍 `P` 不 `Y`），只 MINMAXM + 显式索力箱，3D 的 SYSGUARD / MINENERGY / `J=M·D` 影响矩阵在 2D 仍没有、不等于 3D `[OPT]`。
+
+**2026-11-14 第十七次（B3 主链路 opt-in 接入）**：用户选 a，按 §2.3 原两阶段
+规格落地。FE 侧 `cable_solver.exe` 新增 `STABILITY=1` 独立 opt-in 模式
+（默认全关），在 `readModel3D` 参考构形上调用 L 阶段已用 ANSYS `ARCLEN`
+对标过的 `stability_path_3d.hpp` 球面弧长法，输出 `[STABILITY]` 段与
+`ERROR=` 双函数；**不改** `NonlinearOptions3D` 默认值、不改成桥态默认
+参数、不删 `[BUCKLING] ERROR=nonlinear_state_not_supported`。BS 侧新增
+唯一解析器 `stability_3d.py` 与独立守卫。验收按 §2.4 八条逐条落实，
+默认 `.dat` / `_cable.txt` / 黄金基线逐位不变，能力矩阵该行**标 `P` 不标
+`Y`**（边界见 §2.5）。B1 仍暂缓、B4 / B5 仍只立规格、MIDAS 数值对拍
+仍未闭环；本节不把 opt-in 探针写成「成桥态闭环已具备全过程稳定分析」。
+B4 的两处公式 / 表值接入与 B5 无应力曲率的**两阶段规格尚未实现**，
+不得因 B3 已 opt-in 接入而顺带把它们写成已落地。
 
 > 2026-11-10 第六次（A 档）追加：用户选 A、B1 组合体系仍暂缓。本档只把 §1 表格里
 > 「截面应力 / 承载力验算」的**应力半部已接入**（`strength_2d.py`，`verify_strength_2d.py`
@@ -157,20 +170,96 @@ oracle、`ultimate` 逐端最不利效应同源、`γ0 / α1 / α3` 出处、缺
 - `cable_solver.cpp:1822-1823` 无条件写该 ERROR 段（链路性质判定，不是运行期状态机）；`input_format_3d.md:435`、`USER_MANUAL.md:425-426`、`BridgeStudio/buckling_3d.py:59-80` 与 `开发使用手册.md:911` 同口径。
 - `fem_3d_nl.hpp:800 solveModel3DNonlinear` 是**荷载控制** Newton：`:952-954` `Ftarget = lam·Fext`，`:994-995` 残差/位移判据，`:1013` 迭代用尽直接抛错。全库检索 `弧长 / Riks / 位移控制 / 极值点 / 荷载-位移` 零命中（「弧长」只指索的几何弧长）。
 - 可复用组件：一致切线刚度（`:342/:405/:704-732`）、残差装配（`:956-962`）、符号分解（`:965-973`）、过程留痕 `NewtonTrace3D`（`:756-776`）、「正常段 + ERROR 段」写出框架（`buckling_output_3d.hpp`、`newton_output_3d.hpp`）。
+- **第十七次变更（2026-11-14）**：以上 §2.1 是第十次立规格时的源码快照，
+  **历史事实保留不删**。L 阶段（CB3D17）已新增独立
+  `stability_path_3d.hpp` / `snap_probe.cpp` 并用 ANSYS `ARCLEN` 完成
+  1686 项黄金值对标；第十七次把同一内核以 `STABILITY=1` opt-in 接入
+  `cable_solver.exe` 主程序。`fem_3d_nl.hpp::solveModel3DNonlinear`
+  **仍是荷载控制 Newton**、仍是 `Ftarget = lam·Fext`，`NonlinearOptions3D`
+  默认值一字未动；`[BUCKLING]` ERROR 段仍无条件写出。
 
-### 2.2 缺什么
+### 2.2 缺什么（第十七次后的收窄）
 
-路径跟踪控制（位移控制或弧长法）、λ 作为未知量的增广系统与约束方程、越过极值点的下降段与分支处理、初始缺陷形态/幅值、材料非线性本构、**独立解析锚点**（如 Euler 柱后屈曲或已知极值点）。这些都没有代码或数值依据，属实质算法新增，不是把已有段改名。
+**已补齐**：球面弧长法的路径跟踪控制、λ 作为未知量的增广系统与
+Crisfield 球面约束方程、越过极值点的下降段、LU 对角量级比
+（含约束自由度置 1，**不是奇异判据**，与 CB3D17 同源）、
+**独立解析锚点**（von Mises 两杆浅桁架闭式 `P(v)` 极值点 + ANSYS
+`ARCLEN` 对标）、逐平衡点过程留痕与 `ERROR=` 双函数。
+**仍缺**（见 §2.5）：位移控制 / Riks / 分支屈曲与分支切换、初始缺陷
+形态与幅值 / 缺陷敏感性、材料非线性本构、CR 梁后屈曲基准题
+（Williams toggle / Lee frame）、真实桥梁全过程稳定对标。
+这些仍是实质算法新增，不是把已有段改名。
 
-### 2.3 两阶段规格（均未实现）
+### 2.3 两阶段规格（第十七次已实现，2026-11-14）
 
-1. **内核**：新增 opt-in 关键字（建议 `STABILITY=1`、`PATHMETHOD=`、`CTRLDOF=`、`MAXPATHSTEP=`，默认全关）与新求解器（建议 `stability_path_3d.hpp`），复用 `solveModel3DNonlinear` 的装配 / 切线 / 分解；新增结果段（建议 `[STABILITY]`）逐平衡点写 λ、控制点位移、残差、切线奇异指标、收敛标志，并配 `ERROR=<code>` 双函数。新段置于 `[END]` 前，**不改** `NonlinearOptions3D` 默认值（`:737-749`）与 `cable_solver.cpp:1055-1058` 默认参数，否则会污染 `[NEWTON]` 与全部非线性算例。`[BUCKLING] ERROR=nonlinear_state_not_supported` 在实现并验证前**必须保留**。
-2. **BridgeStudio**：新增解析器（仿 `buckling_3d.py`）、结果字段、报告章与能力矩阵行 / 守卫；未产出时章节照出但写中文「做不了」，不出空表。
+第十七次按本节原两阶段规格落地，**只做 opt-in，默认全关**：
 
-### 2.4 禁止与验收断言
+1. **内核（FE）**：`*CABLE_BRIDGE` 增 `STABILITY=1` / `PATHMETHOD=SPHERE` /
+   `CTRLNODE=` / `CTRLDOF=` / `CTRLTARGET=` / `DS0=` / `DSMIN=` / `DSMAX=` /
+   `PSI=` / `MAXPATHSTEP=` / `STABITER=` / `STABTOL=` / `STRAIN=` 共 13 个键，
+   全部默认关闭（`STABILITY=0`）。**`STABTOL` / `STABITER` 必须带 `STAB`
+   前缀**：`*CABLE_BRIDGE` 既有 `TOL`（几何闭合容差 1e-8）与 `MAXITER`
+   （外层迭代上限 20）已被成桥态闭环占用，直接复用同名键会悄悄改掉
+   既有算例的默认参数，违反「默认逐位不变」。开启时 `cable_solver.exe` 在
+   `readModel3D` 的**参考构形**上分流，调用
+   `stability_path_3d.hpp::solveArcLengthPath3D`（L 阶段已用
+   ANSYS `ARCLEN` 对标过的球面弧长法），结果写 `<stem>_stability.txt`，
+   `[STABILITY]` 段置于 `[END]` 前。段内逐平衡点写
+   `I STEP= LAMBDA= CTRL= RES= ITER= DS= PIVOT= CONVERGED=`，
+   汇总行写 `KIND/STATUS/BASIS/NSTEP/CONVERGED/…`；失败走
+   `stabilityErrorSection3D` 的 `ERROR=<code>` 双函数
+   （`zero_reference_load` / `empty_dof_map` / `invalid_control_dof` /
+   `arc_length_step_collapsed` / `max_steps_reached` / `solver_exception` /
+   `unsupported_path_method` / `no_equilibrium_point`，共 8 类内核码；
+   BS 侧另有 `no_stability_section` 表示根本没这段）。
+   新段**不改** `NonlinearOptions3D` 默认值与
+   `cable_solver.cpp` 成桥态默认参数，故 `[NEWTON]` 与全部既有非线性算例
+   不受影响。**`[BUCKLING] ERROR=nonlinear_state_not_supported` 原样保留**：
+   线性屈曲对共转成桥态不适用是独立的物理结论，spec 原文要求「实现并验证前
+   必须保留」，实现后仍不删除，避免把两种 λ 混为一谈。
+2. **BridgeStudio**：新增唯一解析器 `stability_3d.py`（仿 `buckling_3d.py`，
+   **只解析不重算** λ / 路径 / 极值点）、`ERROR_TEXT` 中文说明、能力矩阵行与
+   独立守卫 `verify_stability_3d.py`；未产出时章节照出但写中文「做不了」，
+   **不摆空表、不补 0**。
 
-- 禁止：拿线弹性 λ 冒充全过程极值点；给「规范稳定安全系数合格限值」编数；编造初始缺陷幅值 / 缺陷敏感性系数；把过程量写成合格判定；删掉 §2.1 的如实边界说明。
-- 验收：① 默认全关时 37 个 `dat_byte_regression` 用例逐位不变；② 开启后每个平衡点满足残差判据；③ 独立锚点（解析极值点）误差有明确阈值并记录推导；④ 缺参数 / 未收敛 / 未产出写 `ERROR=`；⑤ `[BUCKLING]` ERROR 段在实现验证前仍存在；⑥ 报告章与结果段同源、λ 与全过程极值点分列不互冒充；⑦ `test_3d_nl.cpp` 有独立锚点而非只加黄金基线；⑧ 能力矩阵在真正实现前不得标 `Y`。
+### 2.4 禁止与验收断言（第十七次逐条落实）
+
+- 禁止（继续生效）：拿线弹性 λ 冒充全过程极值点；给「规范稳定安全系数合格
+  限值」编数；编造初始缺陷幅值 / 缺陷敏感性系数；把过程量写成合格判定；
+  删掉 §2.1 的如实边界说明。**不拿线弹性 λ 冒充**仍是 `[BUCKLING]` 与
+  `[STABILITY]` 两章共同口径。
+- 验收逐条：① `STABILITY=0` 时 12 格默认 `.dat` 黄金哈希、37 个
+  `dat_byte_regression` 用例与全部既有 `_cable.txt` 逐位不变（第 20 项
+  CTest 有「默认零污染」断言）；② 每个收敛平衡点残差
+  `|R| ≤ TOL·|Fref|`，段内逐点写 `RES=` 由 `compare_stable_path_3d.py`
+  判定；③ 独立锚点用 von Mises 两杆浅桁架闭式
+  `L(v)=√(B²+(H−v)²)`、`P(v)=−2N(H−v)/L`，极值点由黄金分割求
+  `dP/dv=0`，阈值与推导写进 `benchmark/stable_path_3d/README.md`，
+  且**与 L 阶段 `snap_probe` / ANSYS `ARCLEN` 同一组解析值对拍**；
+  ④ 缺参数 / 未收敛 / 未产出写 `ERROR=`，负例进 CTest；
+  ⑤ `[BUCKLING]` ERROR 段仍在 `cable_solver.cpp` 与默认输出中；
+  ⑥ BS 报告章与 `[STABILITY]` 段同源，λ 与全过程极值点分列；
+  ⑦ 独立锚点是解析闭式而非只加黄金基线（第 20 项 CTest + `test_3d_nl.cpp`
+  原有 CR 锚点）；⑧ 能力矩阵该行**标 `P` 不标 `Y`**，理由见 §2.5。
+
+### 2.5 如实边界（B3 仍 `P ≠ Y`）
+
+- `STABILITY=1` 是 `cable_solver.exe` 的**独立 opt-in 模式**，在参考构形上
+  跟踪平衡路径；**不等于**成桥态闭环 / 索长迭代 / 施工阶段链路已具备
+  全过程稳定分析。既有索承体系闭环默认路径一字未动。
+- 只实现**球面弧长法**（`PATHMETHOD=SPHERE`），载荷控制仍由
+  `fem_3d_nl.hpp::solveModel3DNonlinear` 承担；位移控制、Riks / 线搜索、
+  分支屈曲（bifurcation）与分支切换、初始缺陷形态 / 幅值 / 缺陷敏感性、
+  材料非线性本构、动力 snap-through 均**未覆盖**。
+- 内核默认工程应变 `N=EA(L−L0)/L0`，`STRAIN=1` 才切对数应变
+  `N=EA·ln(L/L0)`（与 ANSYS `LINK180 KEYOPT(2)=1` 同口径）；两者都是
+  共转 + 解析一致切线，**不等于**材料非线性。
+- λ 仍是参考荷载放大倍数，**不是规范稳定安全系数**；JTG 3362 无 λ 合格
+  限值，§2.4 禁止给它编数。极限点处的
+  `One indefinite tangent matrix is detected` 是物理标志不是求解失败。
+- `P ≠ Y` 的结论：主链路默认关闭、只有轴向 / CR 杆系基准题有独立解析
+  锚点、Williams toggle / Lee frame 等 CR 梁后屈曲与真实桥梁的全过程
+  稳定分析仍未对标。任何一项落地前不得把 `P` 涂成 `Y`。
 
 ## 3. B4 预应力损失两处规范口径
 
@@ -270,5 +359,16 @@ oracle、`ultimate` 逐端最不利效应同源、`γ0 / α1 / α3` 出处、缺
     12 格 `DEFAULT_DAT_SHA` 与 FE 37 个黄金基线不刷新；FE 仓本轮零改动、
     零文档改动。独立守卫 `verify_2d_export_import.py`（264/264，
     覆盖契约正交 / 三格式 / 往返 oracle / 维度拒绝 / 零污染）；BS 侧闭环不等于 FE 内核已实现 3D 等价能力。
+14. 第十七次 `[STABILITY]` 主链路 opt-in 不虚报：默认 `STABILITY=0` 时
+    `cable_solver.cpp` 既有结果文件逐位不变；`fem_3d_nl.hpp` 仍是荷载
+    控制 Newton、`NonlinearOptions3D` 默认值零改动；`[BUCKLING]`
+    `ERROR=nonlinear_state_not_supported` 仍在源码与默认输出；
+    `[STABILITY]` 段有 `ERROR=` 双函数与 6 类错误码、逐点残差判据、
+    独立解析锚点（与 CB3D17 `snap_probe` / ANSYS `ARCLEN` 同源）；
+    能力矩阵该行 `P` 不是 `Y`、§2.5 五条边界在位；
+    `verify_stability_3d.py` 与第 20 项 CTest 守卫「只解析不重算 /
+    缺段写中文做不了 / 不补 0 / 默认零污染」。
 
-**明确未闭环**：B3 全过程曲线、B4 两项公式 / 表值接入、B5 无应力曲率、**B2 剩余 0 项**（第十五次 B2「2D 平行导出 / 导入链」两格按 `P` 接通，仍 `P ≠ Y`；`[OPT]` 带约束索力优化一层 2D 内核力学已于 **2026-11-12 第十四次**按 `P` 接通为 `[OPT2D]` 2D 平面索力优化，仍 `P ≠ Y`、不等于 3D `[OPT]`；`[LENGTH2D]` 已于第十三次按 `P` 接通，仍不等于 3D `[LENGTH]`，内层 Newton 已于第十一次按 `P` 闭环，不等于三层全闭环）、四出口计算书内容补齐（导出机制已闭环，仍标 `P`）、2D 分项损失明细的 3D 阶段维度（第十次只接通非阶段束明细，仍标 `P`）、MIDAS 数值对拍、组合体系建造器。任何一项真正落地前，能力矩阵与计算书都必须继续写「没有」，不得靠改写文档提前打勾；`P` 不是 `Y`，应力利用率不得冒充 Mu/Vu 承载力验算。2D 承载力的压弯 / 轴压半部已于 **2026-11-12 第十六次**按 `P` 口径接通（`capacity_axial_2d.py` / `verify_capacity_axial_2d.py`，仍 `P ≠ Y`），不再列入上述未闭环清单。
+**明确未闭环**：B3 的分支屈曲 / 初始缺陷 / 材料非线性 / CR 梁后屈曲 /
+真实桥梁全过程稳定对标（第十七次起主链路 opt-in 球面弧长法已接入，
+但按 §2.5 仍标 `P` 不标 `Y`）、B4 两项公式 / 表值接入、B5 无应力曲率、**B2 剩余 0 项**（第十五次 B2「2D 平行导出 / 导入链」两格按 `P` 接通，仍 `P ≠ Y`；`[OPT]` 带约束索力优化一层 2D 内核力学已于 **2026-11-12 第十四次**按 `P` 接通为 `[OPT2D]` 2D 平面索力优化，仍 `P ≠ Y`、不等于 3D `[OPT]`；`[LENGTH2D]` 已于第十三次按 `P` 接通，仍不等于 3D `[LENGTH]`，内层 Newton 已于第十一次按 `P` 闭环，不等于三层全闭环）、四出口计算书内容补齐（导出机制已闭环，仍标 `P`）、2D 分项损失明细的 3D 阶段维度（第十次只接通非阶段束明细，仍标 `P`）、MIDAS 数值对拍、组合体系建造器。任何一项真正落地前，能力矩阵与计算书都必须继续写「没有」，不得靠改写文档提前打勾；`P` 不是 `Y`，应力利用率不得冒充 Mu/Vu 承载力验算。2D 承载力的压弯 / 轴压半部已于 **2026-11-12 第十六次**按 `P` 口径接通（`capacity_axial_2d.py` / `verify_capacity_axial_2d.py`，仍 `P ≠ Y`），不再列入上述未闭环清单。
