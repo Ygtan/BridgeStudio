@@ -1,0 +1,43 @@
+CB3D19 CR beam frame post-buckling: FEM arc-length vs ANSYS ARCLEN
+==============================================================================
+E=2.1e+11 Pa  G=8.1e+13 Pa  A=0.001 m2  IY=IZ=1e-06 m4  J=2e-06 m4
+B=2 m  H=0.5 m  NELEM=24/slope  PREF=4e+06 N  VMAX=0.95 m
+BEAM188 KEYOPT(3)=2 + Gx1000 (EB退化); IY=IZ 消除局部轴约定差异
+
+--- 独立解析锚点：2D 线性刚架刚度矩阵（纯 Python，非 FEM 内核）---
+k0_analytic = 1.211946322189e+07 N/m ; k0/PREF = 3.029865805471
+[PASS] k0 FEM vs 独立锚点 [fine] : k0_fem=1.211946322188e+07  rel=1.907e-13 (tol 1.0e-08)
+[PASS] k0 FEM vs 独立锚点 [coarse] : k0_fem=1.211946322188e+07  rel=1.907e-13 (tol 1.0e-08)
+[PASS] k0 FEM vs 独立锚点 [psi_half] : k0_fem=1.211946322188e+07  rel=1.907e-13 (tol 1.0e-08)
+
+--- ANSYS 逐子步：反力反算 λ 与 TIME、初始线性斜率、极限点 ---
+[PASS] lambda_reaction vs TIME [fr_fine] : worst=5.663932e-05 (tol 1.0e-04), n=120
+[PASS] ANSYS 初始斜率 vs k0/PREF [fr_fine] : slope=3.020577944  analytic=3.029865805  rel=3.065e-03 (tol 1.0e-02)
+  first limit point [fr_fine]: v*=0.0432315  lambda*=0.0895740 (raw v=0.0419247 lambda=0.0895006)
+[PASS] 下降段反向荷载 [fr_fine] : lambda_min=-0.0186223
+  v_final=0.952925 ; ANSYS log errors=0 warnings=1
+[PASS] lambda_reaction vs TIME [fr_coarse] : worst=2.931966e-05 (tol 1.0e-04), n=55
+[PASS] ANSYS 初始斜率 vs k0/PREF [fr_coarse] : slope=3.023520122  analytic=3.029865805  rel=2.094e-03 (tol 1.0e-02)
+  first limit point [fr_coarse]: v*=0.0446536  lambda*=0.0897523 (raw v=0.0423826 lambda=0.0895382)
+[PASS] 下降段反向荷载 [fr_coarse] : lambda_min=-0.0186068
+  v_final=0.961405 ; ANSYS log errors=0 warnings=1
+
+--- FEM 弧长路径自洽 ---
+[PASS] 收敛与残差 [fine] : converged=1 error_empty=1 max_res_rel=8.835e-10 npoints=659
+[PASS] 下降段与终止位移 [fine] : lambda_min=-0.0186535 v_final=0.950635
+[PASS] 收敛与残差 [coarse] : converged=1 error_empty=1 max_res_rel=7.960e-10 npoints=655
+[PASS] 下降段与终止位移 [coarse] : lambda_min=-0.0186535 v_final=0.950989
+[PASS] 收敛与残差 [psi_half] : converged=1 error_empty=1 max_res_rel=9.208e-10 npoints=656
+[PASS] 下降段与终止位移 [psi_half] : lambda_min=-0.0186535 v_final=0.950243
+[PASS] 负例错误码 [bad_noload] : expect zero_reference_load got zero_reference_load
+
+--- FEM 弧长路径 vs ANSYS ARCLEN 曲线（三点二次插值）---
+[PASS] 曲线一致性 [fr_fine] vs FEM[fine] : worst|dlambda|=3.404741e-04 @ v=0.03115 (tol 1.0e-03)
+[PASS] 第一极限点 [fr_fine] : ANSYS=(0.0432315,0.0895740) FEM=(0.0434672,0.0893558) tol=2.0e-03
+[PASS] 曲线一致性 [fr_coarse] vs FEM[coarse] : worst|dlambda|=3.277273e-04 @ v=0.03444 (tol 1.0e-03)
+[PASS] 第一极限点 [fr_coarse] : ANSYS=(0.0446536,0.0897523) FEM=(0.0434710,0.0893558) tol=2.0e-03
+
+[PASS] ANSYS 日志 0 error [fr_fine] : errors=0 warnings=1
+[PASS] ANSYS 日志 0 error [fr_coarse] : errors=0 warnings=1
+
+RESULT: ALL CHECKS PASSED

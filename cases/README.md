@@ -5,7 +5,7 @@
 ANSYS APDL（`.inp`）、模型快照（`.model.json`）、ANSYS 批处理输出
 （`.out` / CSV）与对比报告（`.txt`），可离线复查，不需要再跑 ANSYS。
 
-命名规则：`CB01~CB05` 为 2D 连续梁，`CB3D01~CB3D17` 为 3D 算例；
+命名规则：`CB01~CB05` 为 2D 连续梁，`CB3D01~CB3D19` 为 3D 算例；
 编号按接入顺序递增，与 FEM-Eigen 侧 `tests/benchmark/` 的回归套件一一对应。
 
 ## 算例清单
@@ -34,6 +34,7 @@ ANSYS APDL（`.inp`）、模型快照（`.model.json`）、ANSYS 批处理输出
 | CB3D15 | `CB3D15_suspension_cable_selfweight` | 与 CB3D13 同参数但 `cable_dens=7850`（`W>0`），验证**空缆态不再退化** | `run_cases_sag.py` | `cable_sag_ansys_3d` |
 | CB3D16 | `CB3D16_large_rotation_beam_column` | 共转 CR 梁**大转动卷圆**（至 2π）+ **梁柱 P-Δ 放大** vs ANSYS `BEAM188 + NLGEOM`（8 个 job） | `run_cases_beamnl.py` | `beam_nl_ansys_3d` |
 | CB3D17 | `CB3D17_snap_through_arc_length` | 球面弧长法**后屈曲 / snap-through 全过程**（极限点、下降段、反向荷载）vs ANSYS `LINK180 + ARCLEN`（3 个 job） | `run_cases_snap.py` | `snap_through_ansys_3d` |
+| CB3D19 | `CB3D19_frame_postbuckling_arc_length` | 共转 CR 梁**刚接框架（Williams toggle 型）后屈曲全过程** vs ANSYS `BEAM188 + ARCLEN`（2 个 job，每杆 24 单元） | `run_cases_frame.py` | `frame_postbuckling_3d` |
 
 CB3D13 除全桥 APDL 外还归档 5 份阶段 APDL（`*_stage1..5.inp`）与对应
 ANSYS CSV；三层验证口径见 `ansys_bridge_erection.py` 模块头与
@@ -47,6 +48,13 @@ CB3D17 是首个启用 `ARCLEN` 的算例：参考荷载必须大于解析极限
 否则 ANSYS 在 λ=1 就停；`KEYOPT(2)=1` 与对数应变解析严格同口径，
 `=0` 只作应变度量对照。见 `ansys_bridge_snap.py` 模块头及
 FEM-Eigen `tests/benchmark/snap_through_ansys_3d/README.md`。
+CB3D19 是首个把**球面弧长法与共转 CR 梁框架**组合起来的算例：
+`BEAM188` 用 `KEYOPT(3)=2` + `MP,GXY = G×1000` 退化到 EB 口径，
+`IY=IZ` 消除局部轴约定差；极限点取**第一个 λ 局部极大**（框架翻越后
+强硬化，全局最大落在终点），判据区间限定 `0 ≤ v ≤ VMAX=0.95`。
+独立锚点不是桁架闭式 `P(v)`，而是三套线性刚架刚度实现的 `k0` 对拍。
+见 `ansys_bridge_frame.py` 模块头及
+FEM-Eigen `tests/benchmark/frame_postbuckling_3d/README.md`。
 
 > CB3D14 是**单元级本构探针**：`.sag` 参数文件与 7 份 APDL 都从
 > `ansys_bridge_sag.py::SAG_CFG` 同源生成，FEM 侧由 `cable_sag_probe.exe`
@@ -63,6 +71,15 @@ FEM-Eigen `tests/benchmark/snap_through_ansys_3d/README.md`。
 > `snap_probe.exe` 调 `stability_path_3d.hpp::solveArcLengthPath3D`。
 > 该求解器是**新文件**，不改 `solveModel3DNonlinear` 主链路；B 类规格
 > 「主链路未接入非线性稳定全过程」的如实边界仍然成立。
+>
+> CB3D19 同样是**独立路径跟踪探针**：`.frame` 参数文件与 2 份 APDL
+> 都从 `ansys_bridge_frame.py::FRAME_CFG / FRAME_*_CASES` 同源生成，
+> FEM 侧由 `frame_probe.exe` 调同一个
+> `stability_path_3d.hpp::solveArcLengthPath3D`，力学组合了
+> `fem_3d_nl.hpp` 的共转 CR 梁内力 / 一致切线；两个内核头文件
+> 一字未改。它**仍不是** `cable_solver.exe` 成桥态闭环 / 施工阶段
+> 链路，能力矩阵 B3 继续标 `P` 不标 `Y`，边界见
+> `B类后续项接入规格.md` §2.5。
 
 ## 同源导出约定
 
@@ -87,6 +104,26 @@ FEM-Eigen `tests/benchmark/snap_through_ansys_3d/README.md`。
 **不产生新的 ANSYS APDL 或 `.inp`**（ANSYS `ARCLEN` 对标证据已在
 CB3D17 归档，主链路与之逐值同源，无需重跑 ANSYS）。
 能力矩阵该行标 `P` 不标 `Y`，边界见 `B类后续项接入规格.md` §2.5。
+
+## CB3D19：CR 梁刚接框架后屈曲独立对标（2026-11-14，N 阶段 / 第十八次）
+
+CB3D19 与 CB3D18 不同，**在 `cases/` 下建正式算例目录**：两根各 24 个
+共转 `BEAM` 单元组成 Williams toggle 型刚接框架（端部铰支、顶点刚接），
+顶点 `-Y` 参考荷载，用球面弧长法跟踪完整荷载–位移路径，
+与 ANSYS `BEAM188 + NLGEOM + ARCLEN` 两个 job 对标。`.frame` /
+`model.json` / FEM CSV / 对比报告 / manifest / run_log / 2 份 APDL /
+`.out` / CSV 全部归档在 `CB3D19_frame_postbuckling_arc_length/`，
+并同步冻结到 FEM-Eigen `tests/benchmark/frame_postbuckling_3d/cases/`。
+
+- **同源唯一数据源**：`ansys_bridge_frame.py::FRAME_CFG` 同时生成
+  `*.frame`（FEM）与 `*.inp`（ANSYS）；`linear_frame_stiffness()` 是
+  BridgeStudio 侧第二套纯 Python 线性刚架刚度锚点。
+- **第 21 项 CTest**：12513 项黄金值、4 个字符串、37 条 criteria、
+  6 个 case；`compare_frame_postbuckling_3d.py` 离线重跑
+  `frame_probe.exe` 逐值复现，`--live-ansys` 只写临时目录。
+- **仍 `P` 不 `Y`**：这是独立 `frame_probe.exe` 探针，不是成桥态
+  闭环 / 施工阶段链路已具备全过程稳定分析；把两者接通属于后续
+  a 阶段，边界见 `B类后续项接入规格.md` §2.5。
 
 ## 归档规则
 

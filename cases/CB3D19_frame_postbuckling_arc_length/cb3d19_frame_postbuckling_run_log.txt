@@ -1,0 +1,8 @@
+CB3D19 run log
+============================================================
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j fr_fine -i fr_fine.inp -o fr_fine_ansys.out
+[fr_fine] exit=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j fr_coarse -i fr_coarse.inp -o fr_coarse_ansys.out
+[fr_coarse] exit=0
+$ D:\AI-work\FEM-Eigen\build\frame_probe.exe cb3d19_frame_postbuckling.frame cb3d19_frame_postbuckling_fem.csv
+[frame_probe] exit=0

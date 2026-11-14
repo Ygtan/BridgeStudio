@@ -1,0 +1,73 @@
+CB3D19 manifest - CR beam frame post-buckling
+case_id = cb3d19_frame_postbuckling
+params  = cb3d19_frame_postbuckling.frame
+fem_exe = frame_probe.exe
+E = 210000000000.0
+G = 81000000000000.0
+A = 0.001
+IY = 1e-06
+IZ = 1e-06
+J = 2e-06
+B = 2.0
+H = 0.5
+NELEM = 24
+PREF = 4000000.0
+VMAX = 0.95
+TOL = 1e-09
+MAXSTEPS = 3000
+MAXITER = 40
+DSMAX = 0.01
+DSMIN = 1e-08
+TIME_END = 1.0
+MINARC = 1e-07
+NEQIT = 60
+PRXY = 0.3
+apex_node = 25 ; right_node = 49 ; nodes = 49
+k0_analytic = 1.211946322189e+07
+
+FEM cases:
+  fine         group=g1    DS=0.005 PSI=1 primary ANSYS counterpart
+  coarse       group=g1    DS=0.01 PSI=1 arc-length step sensitivity
+  psi_half     group=g1    DS=0.005 PSI=0.5 arc-length lambda weight sensitivity
+  bad_noload   group=gbad  DS=0.005 PSI=1 NEG:zero_reference_load
+ANSYS cases:
+  fr_fine      maxarc=0.002 nsub=1200 fem=fine
+  fr_coarse    maxarc=0.008 nsub=500 fem=coarse
+
+Files (frozen as benchmark evidence):
+  cb3d19_frame_postbuckling.frame
+  cb3d19_frame_postbuckling.model.json
+  cb3d19_frame_postbuckling_compare_report.txt
+  cb3d19_frame_postbuckling_fem.csv
+  cb3d19_frame_postbuckling_manifest.txt
+  cb3d19_frame_postbuckling_run_log.txt
+  fr_coarse.DSP
+  fr_coarse.arc
+  fr_coarse.db
+  fr_coarse.err
+  fr_coarse.esav
+  fr_coarse.full
+  fr_coarse.inp
+  fr_coarse.ldhi
+  fr_coarse.log
+  fr_coarse.mntr
+  fr_coarse.r001
+  fr_coarse.rdb
+  fr_coarse.rst
+  fr_coarse_ansys.out
+  fr_coarse_curve.csv
+  fr_fine.DSP
+  fr_fine.arc
+  fr_fine.db
+  fr_fine.err
+  fr_fine.esav
+  fr_fine.full
+  fr_fine.inp
+  fr_fine.ldhi
+  fr_fine.log
+  fr_fine.mntr
+  fr_fine.r001
+  fr_fine.rdb
+  fr_fine.rst
+  fr_fine_ansys.out
+  fr_fine_curve.csv
