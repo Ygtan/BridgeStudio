@@ -1,0 +1,99 @@
+{
+  "id": "cb3d14_cable_sag",
+  "kind": "single CABLE element / segmented LINK180 chain",
+  "units": {
+    "E": "Pa",
+    "A": "m2",
+    "W": "N/m",
+    "LH": "m",
+    "L0": "m",
+    "T": "N",
+    "f": "m",
+    "Eeq": "Pa"
+  },
+  "material": {
+    "E": 195000000000.0,
+    "dens": 7850.0
+  },
+  "real": {
+    "A": 0.006,
+    "W": 462.05100000000004
+  },
+  "geometry": {
+    "LH": 100.0,
+    "NSEG": 80,
+    "perturb_amp": 0.2
+  },
+  "T_target": 1000000.0,
+  "cases": [
+    {
+      "id": "sag_01",
+      "W": 462.05100000000004,
+      "L0": 99.919490770642,
+      "amp": 0.2,
+      "group": "sag",
+      "note": "L0 sweep -0.0040 m"
+    },
+    {
+      "id": "sag_02",
+      "W": 462.05100000000004,
+      "L0": 99.92149077064201,
+      "amp": 0.2,
+      "group": "sag",
+      "note": "L0 sweep -0.0020 m"
+    },
+    {
+      "id": "sag_03",
+      "W": 462.05100000000004,
+      "L0": 99.923490770642,
+      "amp": 0.2,
+      "group": "sag",
+      "note": "L0 sweep +0.0000 m"
+    },
+    {
+      "id": "sag_04",
+      "W": 462.05100000000004,
+      "L0": 99.925490770642,
+      "amp": 0.2,
+      "group": "sag",
+      "note": "L0 sweep +0.0020 m"
+    },
+    {
+      "id": "sag_05",
+      "W": 462.05100000000004,
+      "L0": 99.92749077064201,
+      "amp": 0.2,
+      "group": "sag",
+      "note": "L0 sweep +0.0040 m"
+    },
+    {
+      "id": "rod_00",
+      "W": 0.0,
+      "L0": 99.923490770642,
+      "amp": 0.0,
+      "group": "rod",
+      "note": "W=0 straight rod, Eeq/E must be 1"
+    },
+    {
+      "id": "sag_half",
+      "W": 231.02550000000002,
+      "L0": 99.91682487028646,
+      "amp": 0.2,
+      "group": "sag",
+      "note": "half line weight, checks (V/H)^2 scaling"
+    }
+  ],
+  "ansys": {
+    "element": "LINK180",
+    "KEYOPT_2": 0,
+    "KEYOPT_3": 0,
+    "NLGEOM": "ON",
+    "NSUBST": [
+      100,
+      500,
+      20
+    ],
+    "NEQIT": 200,
+    "initial_state": "INISTATE,SET,DTYP,EPEL + per-element EPEL,X"
+  }
+}

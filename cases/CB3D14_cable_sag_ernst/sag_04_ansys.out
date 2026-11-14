@@ -1,0 +1,3086 @@
+
+ ANSYS Multiphysics                                
+
+
+ *------------------------------------------------------------------*
+ |                                                                  |
+ |   W E L C O M E   T O   T H E   A N S Y S (R)  P R O G R A M     |
+ |                                                                  |
+ *------------------------------------------------------------------*
+
+
+
+
+ ***************************************************************
+ *            ANSYS Release 18.0     LEGAL NOTICES             *
+ ***************************************************************
+ *                                                             *
+ * Copyright 2016 SAS IP, Inc.  All rights reserved.           *
+ * Unauthorized use, distribution or duplication is            *
+ * prohibited.                                                 *
+ *                                                             *
+ * Ansys is a registered trademark of ANSYS, Inc. or its       *
+ * subsidiaries in the United States or other countries.       *
+ * See the ANSYS, Inc. online documentation or the ANSYS, Inc. *
+ * documentation CD or online help for the complete Legal      *
+ * Notice.                                                     *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * THIS ANSYS SOFTWARE PRODUCT AND PROGRAM DOCUMENTATION       *
+ * INCLUDE TRADE SECRETS AND CONFIDENTIAL AND PROPRIETARY      *
+ * PRODUCTS OF ANSYS, INC., ITS SUBSIDIARIES, OR LICENSORS.    *
+ * The software products and documentation are furnished by    *
+ * ANSYS, Inc. or its subsidiaries under a software license    *
+ * agreement that contains provisions concerning               *
+ * non-disclosure, copying, length and nature of use,          *
+ * compliance with exporting laws, warranties, disclaimers,    *
+ * limitations of liability, and remedies, and other           *
+ * provisions.  The software products and documentation may be *
+ * used, disclosed, transferred, or copied only in accordance  *
+ * with the terms and conditions of that software license      *
+ * agreement.                                                  *
+ *                                                             *
+ * ANSYS, Inc. is a UL registered                              *
+ * ISO 9001:2008 company.                                      *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * This product is subject to U.S. laws governing export and   *
+ * re-export.                                                  *
+ *                                                             *
+ * For U.S. Government users, except as specifically granted   *
+ * by the ANSYS, Inc. software license agreement, the use,     *
+ * duplication, or disclosure by the United States Government  *
+ * is subject to restrictions stated in the ANSYS, Inc.        *
+ * software license agreement and FAR 12.212 (for non-DOD      *
+ * licenses).                                                  *
+ *                                                             *
+ ***************************************************************
+
+ Release 18.0
+     
+ Point Releases and Patches installed:   
+     
+ ANSYS, Inc. Products Release 18.0   
+ ANSYS Mechanical Products Release 18.0  
+ ANSYS Autodyn Release 18.0  
+ ANSYS LS-DYNA Release 18.0  
+ ANSYS AIM Release 18.0  
+ ANSYS CFX (includes ANSYS CFD-Post) Release 18.0
+ ANSYS Fluent (includes ANSYS CFD-Post) Release 18.0 
+ ANSYS TurboGrid Release 18.0
+ ANSYS FENSAP-ICE Release 18.0   
+ ANSYS Polyflow (includes ANSYS CFD-Post) Release 18.0   
+ ANSYS Forte Release 18.0
+ ANSYS Chemkin Release 18.0  
+ ANSYS ICEM CFD Release 18.0 
+ ANSYS Aqwa Release 18.0 
+ ANSYS Icepak (includes ANSYS CFD-Post) Release 18.0 
+ AutoCAD Release 18.0
+ ACIS Release 18.0   
+ Catia, Version 4 Release 18.0   
+ Catia, Version 6 Release 18.0   
+ Creo Elements/Direct Modeling Release 18.0  
+ Inventor Release 18.0   
+ JTOpen Release 18.0 
+ NX Release 18.0 
+ Parasolid Release 18.0  
+ Creo Parametric (formerly Pro/ENGINEER) Release 18.0
+ Solid Edge Release 18.0 
+ SolidWorks Release 18.0 
+ ANSYS, Inc. License Manager Release 18.0
+
+
+          *****  ANSYS COMMAND LINE ARGUMENTS  *****
+  INITIAL JOBNAME              = sag_04                                                                                                                                                                                                                                                  
+  BATCH MODE REQUESTED (-b)    = LIST
+  INPUT FILE COPY MODE (-c)    = COPY
+
+ RELEASE= Release 18.0         BUILD= 18.0      UP20161219   VERSION=WINDOWS x64 
+ CURRENT JOBNAME=sag_04  17:47:57  NOV 14, 2026 CP=      0.219
+
+     1  /TITLE,CB3D14 cable sag Ernst probe - sag_04
+     2  /PREP7  
+     3  ET,1,LINK180
+     4  KEYOPT,1,2,0
+     5  ! KEYOPT(3)=0: every segment stays in tension, no on/off switching  
+     6  R,1,0.006   
+     7  MP,EX,1,195000000000
+     8  N,1, 0,0,0  
+     9  N,2, 1.25,0,-0.00785196315181372
+    10  N,3, 2.5,0,-0.015691819145569   
+    11  N,4, 3.75,0,-0.0235074794915675 
+    12  N,5, 5,0,-0.0312868930080462
+    13  N,6, 6.25,0,-0.0390180644032257 
+    14  N,7, 7.5,0,-0.0466890727711811  
+    15  N,8, 8.75,0,-0.0542880899730149 
+    16  N,9, 10,0,-0.0618033988749895   
+    17  N,10, 11.25,0,-0.0692234114154986   
+    18  N,11, 12.5,0,-0.076536686473018 
+    19  N,12, 13.75,0,-0.0837319475074856   
+    20  N,13, 15,0,-0.0907980999479094  
+    21  N,14, 16.25,0,-0.097724248299391
+    22  N,15, 17.5,0,-0.10449971294319  
+    23  N,16, 18.75,0,-0.11111404660392 
+    24  N,17, 20,0,-0.117557050458495   
+    25  N,18, 21.25,0,-0.123818789861967
+    26  N,19, 22.5,0,-0.129889609666037 
+    27  N,20, 23.75,0,-0.135760149106588
+    28  N,21, 25,0,-0.14142135623731
+    29  N,22, 26.25,0,-0.146864501887137
+    30  N,23, 27.5,0,-0.152081193120006 
+    31  N,24, 28.75,0,-0.157063386176149
+    32  N,25, 30,0,-0.16180339887499
+    33  N,26, 31.25,0,-0.166293922460509
+    34  N,27, 32.5,0,-0.170528032870818 
+    35  N,28, 33.75,0,-0.174499201414559
+    36  N,29, 35,0,-0.178201304837674   
+    37  N,30, 36.25,0,-0.181628634765016
+    38  N,31, 37.5,0,-0.184775906502257 
+    39  N,32, 38.75,0,-0.187638267184497
+    40  N,33, 40,0,-0.190211303259031   
+    41  N,34, 41.25,0,-0.192491047290729
+    42  N,35, 42.5,0,-0.194473984079535 
+    43  N,36, 43.75,0,-0.196157056080646
+    44  N,37, 45,0,-0.197537668119028   
+    45  N,38, 46.25,0,-0.198613691390985
+    46  N,39, 47.5,0,-0.199383466746626 
+    47  N,40, 48.75,0,-0.199845807248145
+    48  N,41, 50,0,-0.2 
+    49  N,42, 51.25,0,-0.199845807248145
+    50  N,43, 52.5,0,-0.199383466746626 
+    51  N,44, 53.75,0,-0.198613691390985
+    52  N,45, 55,0,-0.197537668119028   
+    53  N,46, 56.25,0,-0.196157056080646
+    54  N,47, 57.5,0,-0.194473984079535 
+    55  N,48, 58.75,0,-0.192491047290729
+    56  N,49, 60,0,-0.190211303259031   
+    57  N,50, 61.25,0,-0.187638267184497
+    58  N,51, 62.5,0,-0.184775906502257 
+    59  N,52, 63.75,0,-0.181628634765016
+    60  N,53, 65,0,-0.178201304837674   
+    61  N,54, 66.25,0,-0.174499201414559
+    62  N,55, 67.5,0,-0.170528032870818 
+    63  N,56, 68.75,0,-0.166293922460509
+    64  N,57, 70,0,-0.16180339887499
+    65  N,58, 71.25,0,-0.157063386176149
+    66  N,59, 72.5,0,-0.152081193120006 
+    67  N,60, 73.75,0,-0.146864501887137
+    68  N,61, 75,0,-0.14142135623731
+    69  N,62, 76.25,0,-0.135760149106588
+    70  N,63, 77.5,0,-0.129889609666037 
+    71  N,64, 78.75,0,-0.123818789861967
+    72  N,65, 80,0,-0.117557050458495   
+    73  N,66, 81.25,0,-0.111114046603921
+    74  N,67, 82.5,0,-0.10449971294319  
+    75  N,68, 83.75,0,-0.0977242482993911   
+    76  N,69, 85,0,-0.0907980999479094  
+    77  N,70, 86.25,0,-0.0837319475074856   
+    78  N,71, 87.5,0,-0.076536686473018 
+    79  N,72, 88.75,0,-0.0692234114154986   
+    80  N,73, 90,0,-0.0618033988749895  
+    81  N,74, 91.25,0,-0.0542880899730149   
+    82  N,75, 92.5,0,-0.0466890727711811
+    83  N,76, 93.75,0,-0.0390180644032257   
+    84  N,77, 95,0,-0.0312868930080462  
+    85  N,78, 96.25,0,-0.0235074794915675   
+    86  N,79, 97.5,0,-0.015691819145569 
+    87  N,80, 98.75,0,-0.0078519631518137   
+    88  N,81, 100,0,-2.44929359829471e-17   
+    89  E,1,2   
+    90  E,2,3   
+    91  E,3,4   
+    92  E,4,5   
+    93  E,5,6   
+    94  E,6,7   
+    95  E,7,8   
+    96  E,8,9   
+    97  E,9,10  
+    98  E,10,11 
+    99  E,11,12 
+   100  E,12,13 
+   101  E,13,14 
+   102  E,14,15 
+   103  E,15,16 
+   104  E,16,17 
+   105  E,17,18 
+   106  E,18,19 
+   107  E,19,20 
+   108  E,20,21 
+   109  E,21,22 
+   110  E,22,23 
+   111  E,23,24 
+   112  E,24,25 
+   113  E,25,26 
+   114  E,26,27 
+   115  E,27,28 
+   116  E,28,29 
+   117  E,29,30 
+   118  E,30,31 
+   119  E,31,32 
+   120  E,32,33 
+   121  E,33,34 
+   122  E,34,35 
+   123  E,35,36 
+   124  E,36,37 
+   125  E,37,38 
+   126  E,38,39 
+   127  E,39,40 
+   128  E,40,41 
+   129  E,41,42 
+   130  E,42,43 
+   131  E,43,44 
+   132  E,44,45 
+   133  E,45,46 
+   134  E,46,47 
+   135  E,47,48 
+   136  E,48,49 
+   137  E,49,50 
+   138  E,50,51 
+   139  E,51,52 
+   140  E,52,53 
+   141  E,53,54 
+   142  E,54,55 
+   143  E,55,56 
+   144  E,56,57 
+   145  E,57,58 
+   146  E,58,59 
+   147  E,59,60 
+   148  E,60,61 
+   149  E,61,62 
+   150  E,62,63 
+   151  E,63,64 
+   152  E,64,65 
+   153  E,65,66 
+   154  E,66,67 
+   155  E,67,68 
+   156  E,68,69 
+   157  E,69,70 
+   158  E,70,71 
+   159  E,71,72 
+   160  E,72,73 
+   161  E,73,74 
+   162  E,74,75 
+   163  E,75,76 
+   164  E,76,77 
+   165  E,77,78 
+   166  E,78,79 
+   167  E,79,80 
+   168  E,80,81 
+   169  ! Both ends fixed in X/Z; out-of-plane UY fixed everywhere  
+   170  D,ALL,UY,0  
+   171  D,1,UX,0
+   172  D,1,UZ,0
+   173  D,81,UX,0   
+   174  D,81,UZ,0   
+   175  INISTATE,SET,DTYP,EPEL  
+   176  INISTATE,DEFINE,1,,EPEL,X,0.000765391450344932  
+   177  INISTATE,DEFINE,2,,EPEL,X,0.000765330611544934  
+   178  INISTATE,DEFINE,3,,EPEL,X,0.000765209309025128  
+   179  INISTATE,DEFINE,4,,EPEL,X,0.000765028290634406  
+   180  INISTATE,DEFINE,5,,EPEL,X,0.000764788672378947  
+   181  INISTATE,DEFINE,6,,EPEL,X,0.000764491931543709  
+   182  INISTATE,DEFINE,7,,EPEL,X,0.000764139897584615  
+   183  INISTATE,DEFINE,8,,EPEL,X,0.000763734740851341  
+   184  INISTATE,DEFINE,9,,EPEL,X,0.000763278959206692  
+   185  INISTATE,DEFINE,10,,EPEL,X,0.00076277536262892  
+   186  INISTATE,DEFINE,11,,EPEL,X,0.000762227055888687 
+   187  INISTATE,DEFINE,12,,EPEL,X,0.000761637419408823 
+   188  INISTATE,DEFINE,13,,EPEL,X,0.000761010088424774 
+   189  INISTATE,DEFINE,14,,EPEL,X,0.000760348930573418 
+   190  INISTATE,DEFINE,15,,EPEL,X,0.000759658022050136 
+   191  INISTATE,DEFINE,16,,EPEL,X,0.000758941622478249 
+   192  INISTATE,DEFINE,17,,EPEL,X,0.000758204148649577 
+   193  INISTATE,DEFINE,18,,EPEL,X,0.000757450147294225 
+   194  INISTATE,DEFINE,19,,EPEL,X,0.000756684267049001 
+   195  INISTATE,DEFINE,20,,EPEL,X,0.000755911229798567 
+   196  INISTATE,DEFINE,21,,EPEL,X,0.000755135801563611 
+   197  INISTATE,DEFINE,22,,EPEL,X,0.000754362763117244 
+   198  INISTATE,DEFINE,23,,EPEL,X,0.000753596880509244 
+   199  INISTATE,DEFINE,24,,EPEL,X,0.000752842875682669 
+   200  INISTATE,DEFINE,25,,EPEL,X,0.000752105397359815 
+   201  INISTATE,DEFINE,26,,EPEL,X,0.000751388992381363 
+   202  INISTATE,DEFINE,27,,EPEL,X,0.000750698077671919 
+   203  INISTATE,DEFINE,28,,EPEL,X,0.000750036913008012 
+   204  INISTATE,DEFINE,29,,EPEL,X,0.000749409574752002 
+   205  INISTATE,DEFINE,30,,EPEL,X,0.000748819930720179 
+   206  INISTATE,DEFINE,31,,EPEL,X,0.000748271616334062 
+   207  INISTATE,DEFINE,32,,EPEL,X,0.000747768012204109 
+   208  INISTATE,DEFINE,33,,EPEL,X,0.0007473122232875   
+   209  INISTATE,DEFINE,34,,EPEL,X,0.000746907059741231 
+   210  INISTATE,DEFINE,35,,EPEL,X,0.000746555019596418 
+   211  INISTATE,DEFINE,36,,EPEL,X,0.000746258273354616 
+   212  INISTATE,DEFINE,37,,EPEL,X,0.000746018650604974 
+   213  INISTATE,DEFINE,38,,EPEL,X,0.000745837628742807 
+   214  INISTATE,DEFINE,39,,EPEL,X,0.000745716323860224 
+   215  INISTATE,DEFINE,40,,EPEL,X,0.000745655483864072 
+   216  INISTATE,DEFINE,41,,EPEL,X,0.000745655483864072 
+   217  INISTATE,DEFINE,42,,EPEL,X,0.000745716323860224 
+   218  INISTATE,DEFINE,43,,EPEL,X,0.000745837628742807 
+   219  INISTATE,DEFINE,44,,EPEL,X,0.000746018650604974 
+   220  INISTATE,DEFINE,45,,EPEL,X,0.000746258273354616 
+   221  INISTATE,DEFINE,46,,EPEL,X,0.000746555019596418 
+   222  INISTATE,DEFINE,47,,EPEL,X,0.000746907059741231 
+   223  INISTATE,DEFINE,48,,EPEL,X,0.0007473122232875   
+   224  INISTATE,DEFINE,49,,EPEL,X,0.000747768012204109 
+   225  INISTATE,DEFINE,50,,EPEL,X,0.000748271616334062 
+   226  INISTATE,DEFINE,51,,EPEL,X,0.000748819930720179 
+   227  INISTATE,DEFINE,52,,EPEL,X,0.000749409574752002 
+   228  INISTATE,DEFINE,53,,EPEL,X,0.000750036913008012 
+   229  INISTATE,DEFINE,54,,EPEL,X,0.000750698077671919 
+   230  INISTATE,DEFINE,55,,EPEL,X,0.000751388992381363 
+   231  INISTATE,DEFINE,56,,EPEL,X,0.000752105397359815 
+   232  INISTATE,DEFINE,57,,EPEL,X,0.000752842875682669 
+   233  INISTATE,DEFINE,58,,EPEL,X,0.000753596880509244 
+   234  INISTATE,DEFINE,59,,EPEL,X,0.000754362763117244 
+   235  INISTATE,DEFINE,60,,EPEL,X,0.000755135801563611 
+   236  INISTATE,DEFINE,61,,EPEL,X,0.000755911229798567 
+   237  INISTATE,DEFINE,62,,EPEL,X,0.000756684267049001 
+   238  INISTATE,DEFINE,63,,EPEL,X,0.000757450147294225 
+   239  INISTATE,DEFINE,64,,EPEL,X,0.000758204148649577 
+   240  INISTATE,DEFINE,65,,EPEL,X,0.000758941622478249 
+   241  INISTATE,DEFINE,66,,EPEL,X,0.000759658022050136 
+   242  INISTATE,DEFINE,67,,EPEL,X,0.000760348930573418 
+   243  INISTATE,DEFINE,68,,EPEL,X,0.000761010088424774 
+   244  INISTATE,DEFINE,69,,EPEL,X,0.000761637419408823 
+   245  INISTATE,DEFINE,70,,EPEL,X,0.000762227055888687 
+   246  INISTATE,DEFINE,71,,EPEL,X,0.00076277536262892  
+   247  INISTATE,DEFINE,72,,EPEL,X,0.000763278959206692 
+   248  INISTATE,DEFINE,73,,EPEL,X,0.000763734740851341 
+   249  INISTATE,DEFINE,74,,EPEL,X,0.000764139897584615 
+   250  INISTATE,DEFINE,75,,EPEL,X,0.000764491931543709 
+   251  INISTATE,DEFINE,76,,EPEL,X,0.000764788672378947 
+   252  INISTATE,DEFINE,77,,EPEL,X,0.000765028290634406 
+   253  INISTATE,DEFINE,78,,EPEL,X,0.000765209309025128 
+   254  INISTATE,DEFINE,79,,EPEL,X,0.000765330611544934 
+   255  INISTATE,DEFINE,80,,EPEL,X,0.000765391450344932 
+   256  /SOLU   
+   257  ANTYPE,STATIC   
+   258  NLGEOM,ON   
+   259  NSUBST,100,500,20   
+   260  NEQIT,200   
+   261  OUTRES,ALL,LAST 
+   262  ! Horizontal-uniform self weight, downward = -FZ
+   263  F,1,FZ,-288.781875  
+   264  F,2,FZ,-577.56375   
+   265  F,3,FZ,-577.56375   
+   266  F,4,FZ,-577.56375   
+   267  F,5,FZ,-577.56375   
+   268  F,6,FZ,-577.56375   
+   269  F,7,FZ,-577.56375   
+   270  F,8,FZ,-577.56375   
+   271  F,9,FZ,-577.56375   
+   272  F,10,FZ,-577.56375  
+   273  F,11,FZ,-577.56375  
+   274  F,12,FZ,-577.56375  
+   275  F,13,FZ,-577.56375  
+   276  F,14,FZ,-577.56375  
+   277  F,15,FZ,-577.56375  
+   278  F,16,FZ,-577.56375  
+   279  F,17,FZ,-577.56375  
+   280  F,18,FZ,-577.56375  
+   281  F,19,FZ,-577.56375  
+   282  F,20,FZ,-577.56375  
+   283  F,21,FZ,-577.56375  
+   284  F,22,FZ,-577.56375  
+   285  F,23,FZ,-577.56375  
+   286  F,24,FZ,-577.56375  
+   287  F,25,FZ,-577.56375  
+   288  F,26,FZ,-577.56375  
+   289  F,27,FZ,-577.56375  
+   290  F,28,FZ,-577.56375  
+   291  F,29,FZ,-577.56375  
+   292  F,30,FZ,-577.56375  
+   293  F,31,FZ,-577.56375  
+   294  F,32,FZ,-577.56375  
+   295  F,33,FZ,-577.56375  
+   296  F,34,FZ,-577.56375  
+   297  F,35,FZ,-577.56375  
+   298  F,36,FZ,-577.56375  
+   299  F,37,FZ,-577.56375  
+   300  F,38,FZ,-577.56375  
+   301  F,39,FZ,-577.56375  
+   302  F,40,FZ,-577.56375  
+   303  F,41,FZ,-577.56375  
+   304  F,42,FZ,-577.56375  
+   305  F,43,FZ,-577.56375  
+   306  F,44,FZ,-577.56375  
+   307  F,45,FZ,-577.56375  
+   308  F,46,FZ,-577.56375  
+   309  F,47,FZ,-577.56375  
+   310  F,48,FZ,-577.56375  
+   311  F,49,FZ,-577.56375  
+   312  F,50,FZ,-577.56375  
+   313  F,51,FZ,-577.56375  
+   314  F,52,FZ,-577.56375  
+   315  F,53,FZ,-577.56375  
+   316  F,54,FZ,-577.56375  
+   317  F,55,FZ,-577.56375  
+   318  F,56,FZ,-577.56375  
+   319  F,57,FZ,-577.56375  
+   320  F,58,FZ,-577.56375  
+   321  F,59,FZ,-577.56375  
+   322  F,60,FZ,-577.56375  
+   323  F,61,FZ,-577.56375  
+   324  F,62,FZ,-577.56375  
+   325  F,63,FZ,-577.56375  
+   326  F,64,FZ,-577.56375  
+   327  F,65,FZ,-577.56375  
+   328  F,66,FZ,-577.56375  
+   329  F,67,FZ,-577.56375  
+   330  F,68,FZ,-577.56375  
+   331  F,69,FZ,-577.56375  
+   332  F,70,FZ,-577.56375  
+   333  F,71,FZ,-577.56375  
+   334  F,72,FZ,-577.56375  
+   335  F,73,FZ,-577.56375  
+   336  F,74,FZ,-577.56375  
+   337  F,75,FZ,-577.56375  
+   338  F,76,FZ,-577.56375  
+   339  F,77,FZ,-577.56375  
+   340  F,78,FZ,-577.56375  
+   341  F,79,FZ,-577.56375  
+   342  F,80,FZ,-577.56375  
+   343  F,81,FZ,-288.781875 
+   344  SOLVE   
+   345  /POST1  
+   346  SET,LAST
+   347  *DIM,ADSP,ARRAY,81,4
+   348   ADSP(1,1)=1
+   349   *GET,ADSP(1,2),NODE,1,U,X  
+   350   *GET,ADSP(1,3),NODE,1,U,Y  
+   351   *GET,ADSP(1,4),NODE,1,U,Z  
+   352   ADSP(2,1)=2
+   353   *GET,ADSP(2,2),NODE,2,U,X  
+   354   *GET,ADSP(2,3),NODE,2,U,Y  
+   355   *GET,ADSP(2,4),NODE,2,U,Z  
+   356   ADSP(3,1)=3
+   357   *GET,ADSP(3,2),NODE,3,U,X  
+   358   *GET,ADSP(3,3),NODE,3,U,Y  
+   359   *GET,ADSP(3,4),NODE,3,U,Z  
+   360   ADSP(4,1)=4
+   361   *GET,ADSP(4,2),NODE,4,U,X  
+   362   *GET,ADSP(4,3),NODE,4,U,Y  
+   363   *GET,ADSP(4,4),NODE,4,U,Z  
+   364   ADSP(5,1)=5
+   365   *GET,ADSP(5,2),NODE,5,U,X  
+   366   *GET,ADSP(5,3),NODE,5,U,Y  
+   367   *GET,ADSP(5,4),NODE,5,U,Z  
+   368   ADSP(6,1)=6
+   369   *GET,ADSP(6,2),NODE,6,U,X  
+   370   *GET,ADSP(6,3),NODE,6,U,Y  
+   371   *GET,ADSP(6,4),NODE,6,U,Z  
+   372   ADSP(7,1)=7
+   373   *GET,ADSP(7,2),NODE,7,U,X  
+   374   *GET,ADSP(7,3),NODE,7,U,Y  
+   375   *GET,ADSP(7,4),NODE,7,U,Z  
+   376   ADSP(8,1)=8
+   377   *GET,ADSP(8,2),NODE,8,U,X  
+   378   *GET,ADSP(8,3),NODE,8,U,Y  
+   379   *GET,ADSP(8,4),NODE,8,U,Z  
+   380   ADSP(9,1)=9
+   381   *GET,ADSP(9,2),NODE,9,U,X  
+   382   *GET,ADSP(9,3),NODE,9,U,Y  
+   383   *GET,ADSP(9,4),NODE,9,U,Z  
+   384   ADSP(10,1)=10  
+   385   *GET,ADSP(10,2),NODE,10,U,X
+   386   *GET,ADSP(10,3),NODE,10,U,Y
+   387   *GET,ADSP(10,4),NODE,10,U,Z
+   388   ADSP(11,1)=11  
+   389   *GET,ADSP(11,2),NODE,11,U,X
+   390   *GET,ADSP(11,3),NODE,11,U,Y
+   391   *GET,ADSP(11,4),NODE,11,U,Z
+   392   ADSP(12,1)=12  
+   393   *GET,ADSP(12,2),NODE,12,U,X
+   394   *GET,ADSP(12,3),NODE,12,U,Y
+   395   *GET,ADSP(12,4),NODE,12,U,Z
+   396   ADSP(13,1)=13  
+   397   *GET,ADSP(13,2),NODE,13,U,X
+   398   *GET,ADSP(13,3),NODE,13,U,Y
+   399   *GET,ADSP(13,4),NODE,13,U,Z
+   400   ADSP(14,1)=14  
+   401   *GET,ADSP(14,2),NODE,14,U,X
+   402   *GET,ADSP(14,3),NODE,14,U,Y
+   403   *GET,ADSP(14,4),NODE,14,U,Z
+   404   ADSP(15,1)=15  
+   405   *GET,ADSP(15,2),NODE,15,U,X
+   406   *GET,ADSP(15,3),NODE,15,U,Y
+   407   *GET,ADSP(15,4),NODE,15,U,Z
+   408   ADSP(16,1)=16  
+   409   *GET,ADSP(16,2),NODE,16,U,X
+   410   *GET,ADSP(16,3),NODE,16,U,Y
+   411   *GET,ADSP(16,4),NODE,16,U,Z
+   412   ADSP(17,1)=17  
+   413   *GET,ADSP(17,2),NODE,17,U,X
+   414   *GET,ADSP(17,3),NODE,17,U,Y
+   415   *GET,ADSP(17,4),NODE,17,U,Z
+   416   ADSP(18,1)=18  
+   417   *GET,ADSP(18,2),NODE,18,U,X
+   418   *GET,ADSP(18,3),NODE,18,U,Y
+   419   *GET,ADSP(18,4),NODE,18,U,Z
+   420   ADSP(19,1)=19  
+   421   *GET,ADSP(19,2),NODE,19,U,X
+   422   *GET,ADSP(19,3),NODE,19,U,Y
+   423   *GET,ADSP(19,4),NODE,19,U,Z
+   424   ADSP(20,1)=20  
+   425   *GET,ADSP(20,2),NODE,20,U,X
+   426   *GET,ADSP(20,3),NODE,20,U,Y
+   427   *GET,ADSP(20,4),NODE,20,U,Z
+   428   ADSP(21,1)=21  
+   429   *GET,ADSP(21,2),NODE,21,U,X
+   430   *GET,ADSP(21,3),NODE,21,U,Y
+   431   *GET,ADSP(21,4),NODE,21,U,Z
+   432   ADSP(22,1)=22  
+   433   *GET,ADSP(22,2),NODE,22,U,X
+   434   *GET,ADSP(22,3),NODE,22,U,Y
+   435   *GET,ADSP(22,4),NODE,22,U,Z
+   436   ADSP(23,1)=23  
+   437   *GET,ADSP(23,2),NODE,23,U,X
+   438   *GET,ADSP(23,3),NODE,23,U,Y
+   439   *GET,ADSP(23,4),NODE,23,U,Z
+   440   ADSP(24,1)=24  
+   441   *GET,ADSP(24,2),NODE,24,U,X
+   442   *GET,ADSP(24,3),NODE,24,U,Y
+   443   *GET,ADSP(24,4),NODE,24,U,Z
+   444   ADSP(25,1)=25  
+   445   *GET,ADSP(25,2),NODE,25,U,X
+   446   *GET,ADSP(25,3),NODE,25,U,Y
+   447   *GET,ADSP(25,4),NODE,25,U,Z
+   448   ADSP(26,1)=26  
+   449   *GET,ADSP(26,2),NODE,26,U,X
+   450   *GET,ADSP(26,3),NODE,26,U,Y
+   451   *GET,ADSP(26,4),NODE,26,U,Z
+   452   ADSP(27,1)=27  
+   453   *GET,ADSP(27,2),NODE,27,U,X
+   454   *GET,ADSP(27,3),NODE,27,U,Y
+   455   *GET,ADSP(27,4),NODE,27,U,Z
+   456   ADSP(28,1)=28  
+   457   *GET,ADSP(28,2),NODE,28,U,X
+   458   *GET,ADSP(28,3),NODE,28,U,Y
+   459   *GET,ADSP(28,4),NODE,28,U,Z
+   460   ADSP(29,1)=29  
+   461   *GET,ADSP(29,2),NODE,29,U,X
+   462   *GET,ADSP(29,3),NODE,29,U,Y
+   463   *GET,ADSP(29,4),NODE,29,U,Z
+   464   ADSP(30,1)=30  
+   465   *GET,ADSP(30,2),NODE,30,U,X
+   466   *GET,ADSP(30,3),NODE,30,U,Y
+   467   *GET,ADSP(30,4),NODE,30,U,Z
+   468   ADSP(31,1)=31  
+   469   *GET,ADSP(31,2),NODE,31,U,X
+   470   *GET,ADSP(31,3),NODE,31,U,Y
+   471   *GET,ADSP(31,4),NODE,31,U,Z
+   472   ADSP(32,1)=32  
+   473   *GET,ADSP(32,2),NODE,32,U,X
+   474   *GET,ADSP(32,3),NODE,32,U,Y
+   475   *GET,ADSP(32,4),NODE,32,U,Z
+   476   ADSP(33,1)=33  
+   477   *GET,ADSP(33,2),NODE,33,U,X
+   478   *GET,ADSP(33,3),NODE,33,U,Y
+   479   *GET,ADSP(33,4),NODE,33,U,Z
+   480   ADSP(34,1)=34  
+   481   *GET,ADSP(34,2),NODE,34,U,X
+   482   *GET,ADSP(34,3),NODE,34,U,Y
+   483   *GET,ADSP(34,4),NODE,34,U,Z
+   484   ADSP(35,1)=35  
+   485   *GET,ADSP(35,2),NODE,35,U,X
+   486   *GET,ADSP(35,3),NODE,35,U,Y
+   487   *GET,ADSP(35,4),NODE,35,U,Z
+   488   ADSP(36,1)=36  
+   489   *GET,ADSP(36,2),NODE,36,U,X
+   490   *GET,ADSP(36,3),NODE,36,U,Y
+   491   *GET,ADSP(36,4),NODE,36,U,Z
+   492   ADSP(37,1)=37  
+   493   *GET,ADSP(37,2),NODE,37,U,X
+   494   *GET,ADSP(37,3),NODE,37,U,Y
+   495   *GET,ADSP(37,4),NODE,37,U,Z
+   496   ADSP(38,1)=38  
+   497   *GET,ADSP(38,2),NODE,38,U,X
+   498   *GET,ADSP(38,3),NODE,38,U,Y
+   499   *GET,ADSP(38,4),NODE,38,U,Z
+   500   ADSP(39,1)=39  
+   501   *GET,ADSP(39,2),NODE,39,U,X
+   502   *GET,ADSP(39,3),NODE,39,U,Y
+   503   *GET,ADSP(39,4),NODE,39,U,Z
+   504   ADSP(40,1)=40  
+   505   *GET,ADSP(40,2),NODE,40,U,X
+   506   *GET,ADSP(40,3),NODE,40,U,Y
+   507   *GET,ADSP(40,4),NODE,40,U,Z
+   508   ADSP(41,1)=41  
+   509   *GET,ADSP(41,2),NODE,41,U,X
+   510   *GET,ADSP(41,3),NODE,41,U,Y
+   511   *GET,ADSP(41,4),NODE,41,U,Z
+   512   ADSP(42,1)=42  
+   513   *GET,ADSP(42,2),NODE,42,U,X
+   514   *GET,ADSP(42,3),NODE,42,U,Y
+   515   *GET,ADSP(42,4),NODE,42,U,Z
+   516   ADSP(43,1)=43  
+   517   *GET,ADSP(43,2),NODE,43,U,X
+   518   *GET,ADSP(43,3),NODE,43,U,Y
+   519   *GET,ADSP(43,4),NODE,43,U,Z
+   520   ADSP(44,1)=44  
+   521   *GET,ADSP(44,2),NODE,44,U,X
+   522   *GET,ADSP(44,3),NODE,44,U,Y
+   523   *GET,ADSP(44,4),NODE,44,U,Z
+   524   ADSP(45,1)=45  
+   525   *GET,ADSP(45,2),NODE,45,U,X
+   526   *GET,ADSP(45,3),NODE,45,U,Y
+   527   *GET,ADSP(45,4),NODE,45,U,Z
+   528   ADSP(46,1)=46  
+   529   *GET,ADSP(46,2),NODE,46,U,X
+   530   *GET,ADSP(46,3),NODE,46,U,Y
+   531   *GET,ADSP(46,4),NODE,46,U,Z
+   532   ADSP(47,1)=47  
+   533   *GET,ADSP(47,2),NODE,47,U,X
+   534   *GET,ADSP(47,3),NODE,47,U,Y
+   535   *GET,ADSP(47,4),NODE,47,U,Z
+   536   ADSP(48,1)=48  
+   537   *GET,ADSP(48,2),NODE,48,U,X
+   538   *GET,ADSP(48,3),NODE,48,U,Y
+   539   *GET,ADSP(48,4),NODE,48,U,Z
+   540   ADSP(49,1)=49  
+   541   *GET,ADSP(49,2),NODE,49,U,X
+   542   *GET,ADSP(49,3),NODE,49,U,Y
+   543   *GET,ADSP(49,4),NODE,49,U,Z
+   544   ADSP(50,1)=50  
+   545   *GET,ADSP(50,2),NODE,50,U,X
+   546   *GET,ADSP(50,3),NODE,50,U,Y
+   547   *GET,ADSP(50,4),NODE,50,U,Z
+   548   ADSP(51,1)=51  
+   549   *GET,ADSP(51,2),NODE,51,U,X
+   550   *GET,ADSP(51,3),NODE,51,U,Y
+   551   *GET,ADSP(51,4),NODE,51,U,Z
+   552   ADSP(52,1)=52  
+   553   *GET,ADSP(52,2),NODE,52,U,X
+   554   *GET,ADSP(52,3),NODE,52,U,Y
+   555   *GET,ADSP(52,4),NODE,52,U,Z
+   556   ADSP(53,1)=53  
+   557   *GET,ADSP(53,2),NODE,53,U,X
+   558   *GET,ADSP(53,3),NODE,53,U,Y
+   559   *GET,ADSP(53,4),NODE,53,U,Z
+   560   ADSP(54,1)=54  
+   561   *GET,ADSP(54,2),NODE,54,U,X
+   562   *GET,ADSP(54,3),NODE,54,U,Y
+   563   *GET,ADSP(54,4),NODE,54,U,Z
+   564   ADSP(55,1)=55  
+   565   *GET,ADSP(55,2),NODE,55,U,X
+   566   *GET,ADSP(55,3),NODE,55,U,Y
+   567   *GET,ADSP(55,4),NODE,55,U,Z
+   568   ADSP(56,1)=56  
+   569   *GET,ADSP(56,2),NODE,56,U,X
+   570   *GET,ADSP(56,3),NODE,56,U,Y
+   571   *GET,ADSP(56,4),NODE,56,U,Z
+   572   ADSP(57,1)=57  
+   573   *GET,ADSP(57,2),NODE,57,U,X
+   574   *GET,ADSP(57,3),NODE,57,U,Y
+   575   *GET,ADSP(57,4),NODE,57,U,Z
+   576   ADSP(58,1)=58  
+   577   *GET,ADSP(58,2),NODE,58,U,X
+   578   *GET,ADSP(58,3),NODE,58,U,Y
+   579   *GET,ADSP(58,4),NODE,58,U,Z
+   580   ADSP(59,1)=59  
+   581   *GET,ADSP(59,2),NODE,59,U,X
+   582   *GET,ADSP(59,3),NODE,59,U,Y
+   583   *GET,ADSP(59,4),NODE,59,U,Z
+   584   ADSP(60,1)=60  
+   585   *GET,ADSP(60,2),NODE,60,U,X
+   586   *GET,ADSP(60,3),NODE,60,U,Y
+   587   *GET,ADSP(60,4),NODE,60,U,Z
+   588   ADSP(61,1)=61  
+   589   *GET,ADSP(61,2),NODE,61,U,X
+   590   *GET,ADSP(61,3),NODE,61,U,Y
+   591   *GET,ADSP(61,4),NODE,61,U,Z
+   592   ADSP(62,1)=62  
+   593   *GET,ADSP(62,2),NODE,62,U,X
+   594   *GET,ADSP(62,3),NODE,62,U,Y
+   595   *GET,ADSP(62,4),NODE,62,U,Z
+   596   ADSP(63,1)=63  
+   597   *GET,ADSP(63,2),NODE,63,U,X
+   598   *GET,ADSP(63,3),NODE,63,U,Y
+   599   *GET,ADSP(63,4),NODE,63,U,Z
+   600   ADSP(64,1)=64  
+   601   *GET,ADSP(64,2),NODE,64,U,X
+   602   *GET,ADSP(64,3),NODE,64,U,Y
+   603   *GET,ADSP(64,4),NODE,64,U,Z
+   604   ADSP(65,1)=65  
+   605   *GET,ADSP(65,2),NODE,65,U,X
+   606   *GET,ADSP(65,3),NODE,65,U,Y
+   607   *GET,ADSP(65,4),NODE,65,U,Z
+   608   ADSP(66,1)=66  
+   609   *GET,ADSP(66,2),NODE,66,U,X
+   610   *GET,ADSP(66,3),NODE,66,U,Y
+   611   *GET,ADSP(66,4),NODE,66,U,Z
+   612   ADSP(67,1)=67  
+   613   *GET,ADSP(67,2),NODE,67,U,X
+   614   *GET,ADSP(67,3),NODE,67,U,Y
+   615   *GET,ADSP(67,4),NODE,67,U,Z
+   616   ADSP(68,1)=68  
+   617   *GET,ADSP(68,2),NODE,68,U,X
+   618   *GET,ADSP(68,3),NODE,68,U,Y
+   619   *GET,ADSP(68,4),NODE,68,U,Z
+   620   ADSP(69,1)=69  
+   621   *GET,ADSP(69,2),NODE,69,U,X
+   622   *GET,ADSP(69,3),NODE,69,U,Y
+   623   *GET,ADSP(69,4),NODE,69,U,Z
+   624   ADSP(70,1)=70  
+   625   *GET,ADSP(70,2),NODE,70,U,X
+   626   *GET,ADSP(70,3),NODE,70,U,Y
+   627   *GET,ADSP(70,4),NODE,70,U,Z
+   628   ADSP(71,1)=71  
+   629   *GET,ADSP(71,2),NODE,71,U,X
+   630   *GET,ADSP(71,3),NODE,71,U,Y
+   631   *GET,ADSP(71,4),NODE,71,U,Z
+   632   ADSP(72,1)=72  
+   633   *GET,ADSP(72,2),NODE,72,U,X
+   634   *GET,ADSP(72,3),NODE,72,U,Y
+   635   *GET,ADSP(72,4),NODE,72,U,Z
+   636   ADSP(73,1)=73  
+   637   *GET,ADSP(73,2),NODE,73,U,X
+   638   *GET,ADSP(73,3),NODE,73,U,Y
+   639   *GET,ADSP(73,4),NODE,73,U,Z
+   640   ADSP(74,1)=74  
+   641   *GET,ADSP(74,2),NODE,74,U,X
+   642   *GET,ADSP(74,3),NODE,74,U,Y
+   643   *GET,ADSP(74,4),NODE,74,U,Z
+   644   ADSP(75,1)=75  
+   645   *GET,ADSP(75,2),NODE,75,U,X
+   646   *GET,ADSP(75,3),NODE,75,U,Y
+   647   *GET,ADSP(75,4),NODE,75,U,Z
+   648   ADSP(76,1)=76  
+   649   *GET,ADSP(76,2),NODE,76,U,X
+   650   *GET,ADSP(76,3),NODE,76,U,Y
+   651   *GET,ADSP(76,4),NODE,76,U,Z
+   652   ADSP(77,1)=77  
+   653   *GET,ADSP(77,2),NODE,77,U,X
+   654   *GET,ADSP(77,3),NODE,77,U,Y
+   655   *GET,ADSP(77,4),NODE,77,U,Z
+   656   ADSP(78,1)=78  
+   657   *GET,ADSP(78,2),NODE,78,U,X
+   658   *GET,ADSP(78,3),NODE,78,U,Y
+   659   *GET,ADSP(78,4),NODE,78,U,Z
+   660   ADSP(79,1)=79  
+   661   *GET,ADSP(79,2),NODE,79,U,X
+   662   *GET,ADSP(79,3),NODE,79,U,Y
+   663   *GET,ADSP(79,4),NODE,79,U,Z
+   664   ADSP(80,1)=80  
+   665   *GET,ADSP(80,2),NODE,80,U,X
+   666   *GET,ADSP(80,3),NODE,80,U,Y
+   667   *GET,ADSP(80,4),NODE,80,U,Z
+   668   ADSP(81,1)=81  
+   669   *GET,ADSP(81,2),NODE,81,U,X
+   670   *GET,ADSP(81,3),NODE,81,U,Y
+   671   *GET,ADSP(81,4),NODE,81,U,Z
+   672  *CFOPEN,sag_04_disp,csv 
+   673  *VWRITE,ADSP(1,1),ADSP(1,2),ADSP(1,3),ADSP(1,4) 
+   674   (1X,F8.0,3(1X,E18.10)) 
+   675  *CFCLOS 
+   676  ETABLE,LKN,SMISC,1  
+   677  *DIM,ALK,ARRAY,80,2 
+   678   ALK(1,1)=1 
+   679   *GET,ALK(1,2),ELEM,1,ETAB,LKN  
+   680   ALK(2,1)=2 
+   681   *GET,ALK(2,2),ELEM,2,ETAB,LKN  
+   682   ALK(3,1)=3 
+   683   *GET,ALK(3,2),ELEM,3,ETAB,LKN  
+   684   ALK(4,1)=4 
+   685   *GET,ALK(4,2),ELEM,4,ETAB,LKN  
+   686   ALK(5,1)=5 
+   687   *GET,ALK(5,2),ELEM,5,ETAB,LKN  
+   688   ALK(6,1)=6 
+   689   *GET,ALK(6,2),ELEM,6,ETAB,LKN  
+   690   ALK(7,1)=7 
+   691   *GET,ALK(7,2),ELEM,7,ETAB,LKN  
+   692   ALK(8,1)=8 
+   693   *GET,ALK(8,2),ELEM,8,ETAB,LKN  
+   694   ALK(9,1)=9 
+   695   *GET,ALK(9,2),ELEM,9,ETAB,LKN  
+   696   ALK(10,1)=10   
+   697   *GET,ALK(10,2),ELEM,10,ETAB,LKN
+   698   ALK(11,1)=11   
+   699   *GET,ALK(11,2),ELEM,11,ETAB,LKN
+   700   ALK(12,1)=12   
+   701   *GET,ALK(12,2),ELEM,12,ETAB,LKN
+   702   ALK(13,1)=13   
+   703   *GET,ALK(13,2),ELEM,13,ETAB,LKN
+   704   ALK(14,1)=14   
+   705   *GET,ALK(14,2),ELEM,14,ETAB,LKN
+   706   ALK(15,1)=15   
+   707   *GET,ALK(15,2),ELEM,15,ETAB,LKN
+   708   ALK(16,1)=16   
+   709   *GET,ALK(16,2),ELEM,16,ETAB,LKN
+   710   ALK(17,1)=17   
+   711   *GET,ALK(17,2),ELEM,17,ETAB,LKN
+   712   ALK(18,1)=18   
+   713   *GET,ALK(18,2),ELEM,18,ETAB,LKN
+   714   ALK(19,1)=19   
+   715   *GET,ALK(19,2),ELEM,19,ETAB,LKN
+   716   ALK(20,1)=20   
+   717   *GET,ALK(20,2),ELEM,20,ETAB,LKN
+   718   ALK(21,1)=21   
+   719   *GET,ALK(21,2),ELEM,21,ETAB,LKN
+   720   ALK(22,1)=22   
+   721   *GET,ALK(22,2),ELEM,22,ETAB,LKN
+   722   ALK(23,1)=23   
+   723   *GET,ALK(23,2),ELEM,23,ETAB,LKN
+   724   ALK(24,1)=24   
+   725   *GET,ALK(24,2),ELEM,24,ETAB,LKN
+   726   ALK(25,1)=25   
+   727   *GET,ALK(25,2),ELEM,25,ETAB,LKN
+   728   ALK(26,1)=26   
+   729   *GET,ALK(26,2),ELEM,26,ETAB,LKN
+   730   ALK(27,1)=27   
+   731   *GET,ALK(27,2),ELEM,27,ETAB,LKN
+   732   ALK(28,1)=28   
+   733   *GET,ALK(28,2),ELEM,28,ETAB,LKN
+   734   ALK(29,1)=29   
+   735   *GET,ALK(29,2),ELEM,29,ETAB,LKN
+   736   ALK(30,1)=30   
+   737   *GET,ALK(30,2),ELEM,30,ETAB,LKN
+   738   ALK(31,1)=31   
+   739   *GET,ALK(31,2),ELEM,31,ETAB,LKN
+   740   ALK(32,1)=32   
+   741   *GET,ALK(32,2),ELEM,32,ETAB,LKN
+   742   ALK(33,1)=33   
+   743   *GET,ALK(33,2),ELEM,33,ETAB,LKN
+   744   ALK(34,1)=34   
+   745   *GET,ALK(34,2),ELEM,34,ETAB,LKN
+   746   ALK(35,1)=35   
+   747   *GET,ALK(35,2),ELEM,35,ETAB,LKN
+   748   ALK(36,1)=36   
+   749   *GET,ALK(36,2),ELEM,36,ETAB,LKN
+   750   ALK(37,1)=37   
+   751   *GET,ALK(37,2),ELEM,37,ETAB,LKN
+   752   ALK(38,1)=38   
+   753   *GET,ALK(38,2),ELEM,38,ETAB,LKN
+   754   ALK(39,1)=39   
+   755   *GET,ALK(39,2),ELEM,39,ETAB,LKN
+   756   ALK(40,1)=40   
+   757   *GET,ALK(40,2),ELEM,40,ETAB,LKN
+   758   ALK(41,1)=41   
+   759   *GET,ALK(41,2),ELEM,41,ETAB,LKN
+   760   ALK(42,1)=42   
+   761   *GET,ALK(42,2),ELEM,42,ETAB,LKN
+   762   ALK(43,1)=43   
+   763   *GET,ALK(43,2),ELEM,43,ETAB,LKN
+   764   ALK(44,1)=44   
+   765   *GET,ALK(44,2),ELEM,44,ETAB,LKN
+   766   ALK(45,1)=45   
+   767   *GET,ALK(45,2),ELEM,45,ETAB,LKN
+   768   ALK(46,1)=46   
+   769   *GET,ALK(46,2),ELEM,46,ETAB,LKN
+   770   ALK(47,1)=47   
+   771   *GET,ALK(47,2),ELEM,47,ETAB,LKN
+   772   ALK(48,1)=48   
+   773   *GET,ALK(48,2),ELEM,48,ETAB,LKN
+   774   ALK(49,1)=49   
+   775   *GET,ALK(49,2),ELEM,49,ETAB,LKN
+   776   ALK(50,1)=50   
+   777   *GET,ALK(50,2),ELEM,50,ETAB,LKN
+   778   ALK(51,1)=51   
+   779   *GET,ALK(51,2),ELEM,51,ETAB,LKN
+   780   ALK(52,1)=52   
+   781   *GET,ALK(52,2),ELEM,52,ETAB,LKN
+   782   ALK(53,1)=53   
+   783   *GET,ALK(53,2),ELEM,53,ETAB,LKN
+   784   ALK(54,1)=54   
+   785   *GET,ALK(54,2),ELEM,54,ETAB,LKN
+   786   ALK(55,1)=55   
+   787   *GET,ALK(55,2),ELEM,55,ETAB,LKN
+   788   ALK(56,1)=56   
+   789   *GET,ALK(56,2),ELEM,56,ETAB,LKN
+   790   ALK(57,1)=57   
+   791   *GET,ALK(57,2),ELEM,57,ETAB,LKN
+   792   ALK(58,1)=58   
+   793   *GET,ALK(58,2),ELEM,58,ETAB,LKN
+   794   ALK(59,1)=59   
+   795   *GET,ALK(59,2),ELEM,59,ETAB,LKN
+   796   ALK(60,1)=60   
+   797   *GET,ALK(60,2),ELEM,60,ETAB,LKN
+   798   ALK(61,1)=61   
+   799   *GET,ALK(61,2),ELEM,61,ETAB,LKN
+   800   ALK(62,1)=62   
+   801   *GET,ALK(62,2),ELEM,62,ETAB,LKN
+   802   ALK(63,1)=63   
+   803   *GET,ALK(63,2),ELEM,63,ETAB,LKN
+   804   ALK(64,1)=64   
+   805   *GET,ALK(64,2),ELEM,64,ETAB,LKN
+   806   ALK(65,1)=65   
+   807   *GET,ALK(65,2),ELEM,65,ETAB,LKN
+   808   ALK(66,1)=66   
+   809   *GET,ALK(66,2),ELEM,66,ETAB,LKN
+   810   ALK(67,1)=67   
+   811   *GET,ALK(67,2),ELEM,67,ETAB,LKN
+   812   ALK(68,1)=68   
+   813   *GET,ALK(68,2),ELEM,68,ETAB,LKN
+   814   ALK(69,1)=69   
+   815   *GET,ALK(69,2),ELEM,69,ETAB,LKN
+   816   ALK(70,1)=70   
+   817   *GET,ALK(70,2),ELEM,70,ETAB,LKN
+   818   ALK(71,1)=71   
+   819   *GET,ALK(71,2),ELEM,71,ETAB,LKN
+   820   ALK(72,1)=72   
+   821   *GET,ALK(72,2),ELEM,72,ETAB,LKN
+   822   ALK(73,1)=73   
+   823   *GET,ALK(73,2),ELEM,73,ETAB,LKN
+   824   ALK(74,1)=74   
+   825   *GET,ALK(74,2),ELEM,74,ETAB,LKN
+   826   ALK(75,1)=75   
+   827   *GET,ALK(75,2),ELEM,75,ETAB,LKN
+   828   ALK(76,1)=76   
+   829   *GET,ALK(76,2),ELEM,76,ETAB,LKN
+   830   ALK(77,1)=77   
+   831   *GET,ALK(77,2),ELEM,77,ETAB,LKN
+   832   ALK(78,1)=78   
+   833   *GET,ALK(78,2),ELEM,78,ETAB,LKN
+   834   ALK(79,1)=79   
+   835   *GET,ALK(79,2),ELEM,79,ETAB,LKN
+   836   ALK(80,1)=80   
+   837   *GET,ALK(80,2),ELEM,80,ETAB,LKN
+   838  *CFOPEN,sag_04_link,csv 
+   839  *VWRITE,ALK(1,1),ALK(1,2)   
+   840   (1X,F8.0,1(1X,E18.10)) 
+   841  *CFCLOS 
+   842  FINISH  
+
+ RUN SETUP PROCEDURE FROM FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans
+
+ /INPUT FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans  LINE=       0
+
+ TITLE= 
+ CB3D14 cable sag Ernst probe - sag_04                                         
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   17:47:57  NOV 14, 2026 CP=      0.281
+
+ CB3D14 cable sag Ernst probe - sag_04                                         
+
+
+
+          ***** ANSYS ANALYSIS DEFINITION (PREP7) *****
+
+ ELEMENT TYPE       1 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ  
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       1 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ  
+  THREE-DIMENSIONAL MODEL
+
+ REAL CONSTANT SET       1  ITEMS   1 TO   6
+   0.60000E-02   0.0000       0.0000       0.0000       0.0000       0.0000    
+
+ MATERIAL         1     EX   =  0.1950000E+12  
+
+ NODE         1  KCS=      0  X,Y,Z=  0.0000       0.0000       0.0000     
+
+ NODE         2  KCS=      0  X,Y,Z=  1.2500       0.0000     -0.78520E-002
+
+ NODE         3  KCS=      0  X,Y,Z=  2.5000       0.0000     -0.15692E-001
+
+ NODE         4  KCS=      0  X,Y,Z=  3.7500       0.0000     -0.23507E-001
+
+ NODE         5  KCS=      0  X,Y,Z=  5.0000       0.0000     -0.31287E-001
+
+ NODE         6  KCS=      0  X,Y,Z=  6.2500       0.0000     -0.39018E-001
+
+ NODE         7  KCS=      0  X,Y,Z=  7.5000       0.0000     -0.46689E-001
+
+ NODE         8  KCS=      0  X,Y,Z=  8.7500       0.0000     -0.54288E-001
+
+ NODE         9  KCS=      0  X,Y,Z=  10.000       0.0000     -0.61803E-001
+
+ NODE        10  KCS=      0  X,Y,Z=  11.250       0.0000     -0.69223E-001
+
+ NODE        11  KCS=      0  X,Y,Z=  12.500       0.0000     -0.76537E-001
+
+ NODE        12  KCS=      0  X,Y,Z=  13.750       0.0000     -0.83732E-001
+
+ NODE        13  KCS=      0  X,Y,Z=  15.000       0.0000     -0.90798E-001
+
+ NODE        14  KCS=      0  X,Y,Z=  16.250       0.0000     -0.97724E-001
+
+ NODE        15  KCS=      0  X,Y,Z=  17.500       0.0000     -0.10450     
+
+ NODE        16  KCS=      0  X,Y,Z=  18.750       0.0000     -0.11111     
+
+ NODE        17  KCS=      0  X,Y,Z=  20.000       0.0000     -0.11756     
+
+ NODE        18  KCS=      0  X,Y,Z=  21.250       0.0000     -0.12382     
+
+ NODE        19  KCS=      0  X,Y,Z=  22.500       0.0000     -0.12989     
+
+ NODE        20  KCS=      0  X,Y,Z=  23.750       0.0000     -0.13576     
+
+ NODE        21  KCS=      0  X,Y,Z=  25.000       0.0000     -0.14142     
+
+ NODE        22  KCS=      0  X,Y,Z=  26.250       0.0000     -0.14686     
+
+ NODE        23  KCS=      0  X,Y,Z=  27.500       0.0000     -0.15208     
+
+ NODE        24  KCS=      0  X,Y,Z=  28.750       0.0000     -0.15706     
+
+ NODE        25  KCS=      0  X,Y,Z=  30.000       0.0000     -0.16180     
+
+ NODE        26  KCS=      0  X,Y,Z=  31.250       0.0000     -0.16629     
+
+ NODE        27  KCS=      0  X,Y,Z=  32.500       0.0000     -0.17053     
+
+ NODE        28  KCS=      0  X,Y,Z=  33.750       0.0000     -0.17450     
+
+ NODE        29  KCS=      0  X,Y,Z=  35.000       0.0000     -0.17820     
+
+ NODE        30  KCS=      0  X,Y,Z=  36.250       0.0000     -0.18163     
+
+ NODE        31  KCS=      0  X,Y,Z=  37.500       0.0000     -0.18478     
+
+ NODE        32  KCS=      0  X,Y,Z=  38.750       0.0000     -0.18764     
+
+ NODE        33  KCS=      0  X,Y,Z=  40.000       0.0000     -0.19021     
+
+ NODE        34  KCS=      0  X,Y,Z=  41.250       0.0000     -0.19249     
+
+ NODE        35  KCS=      0  X,Y,Z=  42.500       0.0000     -0.19447     
+
+ NODE        36  KCS=      0  X,Y,Z=  43.750       0.0000     -0.19616     
+
+ NODE        37  KCS=      0  X,Y,Z=  45.000       0.0000     -0.19754     
+
+ NODE        38  KCS=      0  X,Y,Z=  46.250       0.0000     -0.19861     
+
+ NODE        39  KCS=      0  X,Y,Z=  47.500       0.0000     -0.19938     
+
+ NODE        40  KCS=      0  X,Y,Z=  48.750       0.0000     -0.19985     
+
+ NODE        41  KCS=      0  X,Y,Z=  50.000       0.0000     -0.20000     
+
+ NODE        42  KCS=      0  X,Y,Z=  51.250       0.0000     -0.19985     
+
+ NODE        43  KCS=      0  X,Y,Z=  52.500       0.0000     -0.19938     
+
+ NODE        44  KCS=      0  X,Y,Z=  53.750       0.0000     -0.19861     
+
+ NODE        45  KCS=      0  X,Y,Z=  55.000       0.0000     -0.19754     
+
+ NODE        46  KCS=      0  X,Y,Z=  56.250       0.0000     -0.19616     
+
+ NODE        47  KCS=      0  X,Y,Z=  57.500       0.0000     -0.19447     
+
+ NODE        48  KCS=      0  X,Y,Z=  58.750       0.0000     -0.19249     
+
+ NODE        49  KCS=      0  X,Y,Z=  60.000       0.0000     -0.19021     
+
+ NODE        50  KCS=      0  X,Y,Z=  61.250       0.0000     -0.18764     
+
+ NODE        51  KCS=      0  X,Y,Z=  62.500       0.0000     -0.18478     
+
+ NODE        52  KCS=      0  X,Y,Z=  63.750       0.0000     -0.18163     
+
+ NODE        53  KCS=      0  X,Y,Z=  65.000       0.0000     -0.17820     
+
+ NODE        54  KCS=      0  X,Y,Z=  66.250       0.0000     -0.17450     
+
+ NODE        55  KCS=      0  X,Y,Z=  67.500       0.0000     -0.17053     
+
+ NODE        56  KCS=      0  X,Y,Z=  68.750       0.0000     -0.16629     
+
+ NODE        57  KCS=      0  X,Y,Z=  70.000       0.0000     -0.16180     
+
+ NODE        58  KCS=      0  X,Y,Z=  71.250       0.0000     -0.15706     
+
+ NODE        59  KCS=      0  X,Y,Z=  72.500       0.0000     -0.15208     
+
+ NODE        60  KCS=      0  X,Y,Z=  73.750       0.0000     -0.14686     
+
+ NODE        61  KCS=      0  X,Y,Z=  75.000       0.0000     -0.14142     
+
+ NODE        62  KCS=      0  X,Y,Z=  76.250       0.0000     -0.13576     
+
+ NODE        63  KCS=      0  X,Y,Z=  77.500       0.0000     -0.12989     
+
+ NODE        64  KCS=      0  X,Y,Z=  78.750       0.0000     -0.12382     
+
+ NODE        65  KCS=      0  X,Y,Z=  80.000       0.0000     -0.11756     
+
+ NODE        66  KCS=      0  X,Y,Z=  81.250       0.0000     -0.11111     
+
+ NODE        67  KCS=      0  X,Y,Z=  82.500       0.0000     -0.10450     
+
+ NODE        68  KCS=      0  X,Y,Z=  83.750       0.0000     -0.97724E-001
+
+ NODE        69  KCS=      0  X,Y,Z=  85.000       0.0000     -0.90798E-001
+
+ NODE        70  KCS=      0  X,Y,Z=  86.250       0.0000     -0.83732E-001
+
+ NODE        71  KCS=      0  X,Y,Z=  87.500       0.0000     -0.76537E-001
+
+ NODE        72  KCS=      0  X,Y,Z=  88.750       0.0000     -0.69223E-001
+
+ NODE        73  KCS=      0  X,Y,Z=  90.000       0.0000     -0.61803E-001
+
+ NODE        74  KCS=      0  X,Y,Z=  91.250       0.0000     -0.54288E-001
+
+ NODE        75  KCS=      0  X,Y,Z=  92.500       0.0000     -0.46689E-001
+
+ NODE        76  KCS=      0  X,Y,Z=  93.750       0.0000     -0.39018E-001
+
+ NODE        77  KCS=      0  X,Y,Z=  95.000       0.0000     -0.31287E-001
+
+ NODE        78  KCS=      0  X,Y,Z=  96.250       0.0000     -0.23507E-001
+
+ NODE        79  KCS=      0  X,Y,Z=  97.500       0.0000     -0.15692E-001
+
+ NODE        80  KCS=      0  X,Y,Z=  98.750       0.0000     -0.78520E-002
+
+ NODE        81  KCS=      0  X,Y,Z=  100.00       0.0000     -0.24493E-016
+
+ ELEMENT      1       1      2
+
+ ELEMENT      2       2      3
+
+ ELEMENT      3       3      4
+
+ ELEMENT      4       4      5
+
+ ELEMENT      5       5      6
+
+ ELEMENT      6       6      7
+
+ ELEMENT      7       7      8
+
+ ELEMENT      8       8      9
+
+ ELEMENT      9       9     10
+
+ ELEMENT     10      10     11
+
+ ELEMENT     11      11     12
+
+ ELEMENT     12      12     13
+
+ ELEMENT     13      13     14
+
+ ELEMENT     14      14     15
+
+ ELEMENT     15      15     16
+
+ ELEMENT     16      16     17
+
+ ELEMENT     17      17     18
+
+ ELEMENT     18      18     19
+
+ ELEMENT     19      19     20
+
+ ELEMENT     20      20     21
+
+ ELEMENT     21      21     22
+
+ ELEMENT     22      22     23
+
+ ELEMENT     23      23     24
+
+ ELEMENT     24      24     25
+
+ ELEMENT     25      25     26
+
+ ELEMENT     26      26     27
+
+ ELEMENT     27      27     28
+
+ ELEMENT     28      28     29
+
+ ELEMENT     29      29     30
+
+ ELEMENT     30      30     31
+
+ ELEMENT     31      31     32
+
+ ELEMENT     32      32     33
+
+ ELEMENT     33      33     34
+
+ ELEMENT     34      34     35
+
+ ELEMENT     35      35     36
+
+ ELEMENT     36      36     37
+
+ ELEMENT     37      37     38
+
+ ELEMENT     38      38     39
+
+ ELEMENT     39      39     40
+
+ ELEMENT     40      40     41
+
+ ELEMENT     41      41     42
+
+ ELEMENT     42      42     43
+
+ ELEMENT     43      43     44
+
+ ELEMENT     44      44     45
+
+ ELEMENT     45      45     46
+
+ ELEMENT     46      46     47
+
+ ELEMENT     47      47     48
+
+ ELEMENT     48      48     49
+
+ ELEMENT     49      49     50
+
+ ELEMENT     50      50     51
+
+ ELEMENT     51      51     52
+
+ ELEMENT     52      52     53
+
+ ELEMENT     53      53     54
+
+ ELEMENT     54      54     55
+
+ ELEMENT     55      55     56
+
+ ELEMENT     56      56     57
+
+ ELEMENT     57      57     58
+
+ ELEMENT     58      58     59
+
+ ELEMENT     59      59     60
+
+ ELEMENT     60      60     61
+
+ ELEMENT     61      61     62
+
+ ELEMENT     62      62     63
+
+ ELEMENT     63      63     64
+
+ ELEMENT     64      64     65
+
+ ELEMENT     65      65     66
+
+ ELEMENT     66      66     67
+
+ ELEMENT     67      67     68
+
+ ELEMENT     68      68     69
+
+ ELEMENT     69      69     70
+
+ ELEMENT     70      70     71
+
+ ELEMENT     71      71     72
+
+ ELEMENT     72      72     73
+
+ ELEMENT     73      73     74
+
+ ELEMENT     74      74     75
+
+ ELEMENT     75      75     76
+
+ ELEMENT     76      76     77
+
+ ELEMENT     77      77     78
+
+ ELEMENT     78      78     79
+
+ ELEMENT     79      79     80
+
+ ELEMENT     80      80     81
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES            1 TO          81 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES            1 TO           1 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES            1 TO           1 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES           81 TO          81 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES           81 TO          81 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+ The INISTATE,SET command was successfully executed.
+ The INISTATE,DEFINE command successfully executed for element           1
+ The INISTATE,DEFINE command successfully executed for element           2
+ The INISTATE,DEFINE command successfully executed for element           3
+ The INISTATE,DEFINE command successfully executed for element           4
+ The INISTATE,DEFINE command successfully executed for element           5
+ The INISTATE,DEFINE command successfully executed for element           6
+ The INISTATE,DEFINE command successfully executed for element           7
+ The INISTATE,DEFINE command successfully executed for element           8
+ The INISTATE,DEFINE command successfully executed for element           9
+ The INISTATE,DEFINE command successfully executed for element          10
+ The INISTATE,DEFINE command successfully executed for element          11
+ The INISTATE,DEFINE command successfully executed for element          12
+ The INISTATE,DEFINE command successfully executed for element          13
+ The INISTATE,DEFINE command successfully executed for element          14
+ The INISTATE,DEFINE command successfully executed for element          15
+ The INISTATE,DEFINE command successfully executed for element          16
+ The INISTATE,DEFINE command successfully executed for element          17
+ The INISTATE,DEFINE command successfully executed for element          18
+ The INISTATE,DEFINE command successfully executed for element          19
+ The INISTATE,DEFINE command successfully executed for element          20
+ The INISTATE,DEFINE command successfully executed for element          21
+ The INISTATE,DEFINE command successfully executed for element          22
+ The INISTATE,DEFINE command successfully executed for element          23
+ The INISTATE,DEFINE command successfully executed for element          24
+ The INISTATE,DEFINE command successfully executed for element          25
+ The INISTATE,DEFINE command successfully executed for element          26
+ The INISTATE,DEFINE command successfully executed for element          27
+ The INISTATE,DEFINE command successfully executed for element          28
+ The INISTATE,DEFINE command successfully executed for element          29
+ The INISTATE,DEFINE command successfully executed for element          30
+ The INISTATE,DEFINE command successfully executed for element          31
+ The INISTATE,DEFINE command successfully executed for element          32
+ The INISTATE,DEFINE command successfully executed for element          33
+ The INISTATE,DEFINE command successfully executed for element          34
+ The INISTATE,DEFINE command successfully executed for element          35
+ The INISTATE,DEFINE command successfully executed for element          36
+ The INISTATE,DEFINE command successfully executed for element          37
+ The INISTATE,DEFINE command successfully executed for element          38
+ The INISTATE,DEFINE command successfully executed for element          39
+ The INISTATE,DEFINE command successfully executed for element          40
+ The INISTATE,DEFINE command successfully executed for element          41
+ The INISTATE,DEFINE command successfully executed for element          42
+ The INISTATE,DEFINE command successfully executed for element          43
+ The INISTATE,DEFINE command successfully executed for element          44
+ The INISTATE,DEFINE command successfully executed for element          45
+ The INISTATE,DEFINE command successfully executed for element          46
+ The INISTATE,DEFINE command successfully executed for element          47
+ The INISTATE,DEFINE command successfully executed for element          48
+ The INISTATE,DEFINE command successfully executed for element          49
+ The INISTATE,DEFINE command successfully executed for element          50
+ The INISTATE,DEFINE command successfully executed for element          51
+ The INISTATE,DEFINE command successfully executed for element          52
+ The INISTATE,DEFINE command successfully executed for element          53
+ The INISTATE,DEFINE command successfully executed for element          54
+ The INISTATE,DEFINE command successfully executed for element          55
+ The INISTATE,DEFINE command successfully executed for element          56
+ The INISTATE,DEFINE command successfully executed for element          57
+ The INISTATE,DEFINE command successfully executed for element          58
+ The INISTATE,DEFINE command successfully executed for element          59
+ The INISTATE,DEFINE command successfully executed for element          60
+ The INISTATE,DEFINE command successfully executed for element          61
+ The INISTATE,DEFINE command successfully executed for element          62
+ The INISTATE,DEFINE command successfully executed for element          63
+ The INISTATE,DEFINE command successfully executed for element          64
+ The INISTATE,DEFINE command successfully executed for element          65
+ The INISTATE,DEFINE command successfully executed for element          66
+ The INISTATE,DEFINE command successfully executed for element          67
+ The INISTATE,DEFINE command successfully executed for element          68
+ The INISTATE,DEFINE command successfully executed for element          69
+ The INISTATE,DEFINE command successfully executed for element          70
+ The INISTATE,DEFINE command successfully executed for element          71
+ The INISTATE,DEFINE command successfully executed for element          72
+ The INISTATE,DEFINE command successfully executed for element          73
+ The INISTATE,DEFINE command successfully executed for element          74
+ The INISTATE,DEFINE command successfully executed for element          75
+ The INISTATE,DEFINE command successfully executed for element          76
+ The INISTATE,DEFINE command successfully executed for element          77
+ The INISTATE,DEFINE command successfully executed for element          78
+ The INISTATE,DEFINE command successfully executed for element          79
+ The INISTATE,DEFINE command successfully executed for element          80
+
+
+ ***** ROUTINE COMPLETED *****  CP =         0.297
+
+
+
+ *****  ANSYS SOLUTION ROUTINE  *****
+
+
+ PERFORM A STATIC ANALYSIS
+  THIS WILL BE A NEW ANALYSIS
+
+ LARGE DEFORMATION ANALYSIS
+
+ USE     100 SUBSTEPS INITIALLY THIS LOAD STEP FOR ALL  DEGREES OF FREEDOM
+ FOR AUTOMATIC TIME STEPPING:
+   USE    500 SUBSTEPS AS A MAXIMUM
+   USE     20 SUBSTEPS AS A MINIMUM
+
+ USE A MAXIMUM OF   200 EQUILIBRIUM ITERATIONS EACH SUBSTEP
+
+ WRITE ALL  ITEMS TO THE DATABASE WITH A FREQUENCY OF LAST
+   FOR ALL APPLICABLE ENTITIES
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         1 TO        1 BY        1
+  REAL= -288.781875       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         2 TO        2 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         3 TO        3 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         4 TO        4 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         5 TO        5 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         6 TO        6 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         7 TO        7 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         8 TO        8 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         9 TO        9 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        10 TO       10 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        11 TO       11 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        12 TO       12 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        13 TO       13 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        14 TO       14 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        15 TO       15 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        16 TO       16 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        17 TO       17 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        18 TO       18 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        19 TO       19 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        20 TO       20 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        21 TO       21 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        22 TO       22 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        23 TO       23 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        24 TO       24 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        25 TO       25 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        26 TO       26 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        27 TO       27 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        28 TO       28 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        29 TO       29 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        30 TO       30 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        31 TO       31 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        32 TO       32 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        33 TO       33 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        34 TO       34 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        35 TO       35 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        36 TO       36 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        37 TO       37 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        38 TO       38 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        39 TO       39 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        40 TO       40 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        41 TO       41 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        42 TO       42 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        43 TO       43 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        44 TO       44 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        45 TO       45 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        46 TO       46 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        47 TO       47 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        48 TO       48 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        49 TO       49 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        50 TO       50 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        51 TO       51 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        52 TO       52 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        53 TO       53 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        54 TO       54 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        55 TO       55 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        56 TO       56 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        57 TO       57 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        58 TO       58 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        59 TO       59 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        60 TO       60 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        61 TO       61 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        62 TO       62 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        63 TO       63 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        64 TO       64 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        65 TO       65 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        66 TO       66 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        67 TO       67 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        68 TO       68 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        69 TO       69 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        70 TO       70 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        71 TO       71 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        72 TO       72 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        73 TO       73 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        74 TO       74 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        75 TO       75 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        76 TO       76 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        77 TO       77 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        78 TO       78 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        79 TO       79 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        80 TO       80 BY        1
+  REAL= -577.563750       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        81 TO       81 BY        1
+  REAL= -288.781875       IMAG=  0.00000000    
+
+ *****  ANSYS SOLVE    COMMAND  *****
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   17:47:57  NOV 14, 2026 CP=      0.297
+
+ CB3D14 cable sag Ernst probe - sag_04                                         
+
+
+
+                       S O L U T I O N   O P T I O N S
+
+   PROBLEM DIMENSIONALITY. . . . . . . . . . . . .3-D                  
+   DEGREES OF FREEDOM. . . . . . UX   UY   UZ  
+   ANALYSIS TYPE . . . . . . . . . . . . . . . . .STATIC (STEADY-STATE)
+   NONLINEAR GEOMETRIC EFFECTS . . . . . . . . . .ON
+   NEWTON-RAPHSON OPTION . . . . . . . . . . . . .PROGRAM CHOSEN   
+   GLOBALLY ASSEMBLED MATRIX . . . . . . . . . . .SYMMETRIC  
+
+ *** NOTE ***                            CP =       0.297   TIME= 17:47:57
+ Present time 0 is less than or equal to the previous time.  Time will   
+ default to 1.                                                           
+
+ *** NOTE ***                            CP =       0.297   TIME= 17:47:57
+ This nonlinear analysis defaults to using the full Newton-Raphson       
+ solution procedure.  This can be modified using the NROPT command.      
+
+ SOLCONTROL,ON uses sparse matrix direct solver
+
+ *** NOTE ***                            CP =       0.297   TIME= 17:47:57
+ The conditions for direct assembly have been met.  No .emat or .erot    
+ files will be produced.                                                 
+
+                      L O A D   S T E P   O P T I O N S
+
+   LOAD STEP NUMBER. . . . . . . . . . . . . . . .     1
+   TIME AT END OF THE LOAD STEP. . . . . . . . . .  1.0000    
+   AUTOMATIC TIME STEPPING . . . . . . . . . . . .    ON
+      INITIAL NUMBER OF SUBSTEPS . . . . . . . . .   100
+      MAXIMUM NUMBER OF SUBSTEPS . . . . . . . . .   500
+      MINIMUM NUMBER OF SUBSTEPS . . . . . . . . .    20
+   MAXIMUM NUMBER OF EQUILIBRIUM ITERATIONS. . . .   200
+   STEP CHANGE BOUNDARY CONDITIONS . . . . . . . .    NO
+   STRESS-STIFFENING . . . . . . . . . . . . . . .    ON
+   TERMINATE ANALYSIS IF NOT CONVERGED . . . . . .YES (EXIT)  
+   CONVERGENCE CONTROLS. . . . . . . . . . . . . .USE DEFAULTS
+   PRINT OUTPUT CONTROLS . . . . . . . . . . . . .NO PRINTOUT
+   DATABASE OUTPUT CONTROLS
+      ITEM     FREQUENCY   COMPONENT
+       ALL       LAST               
+
+
+ SOLUTION MONITORING INFO IS WRITTEN TO FILE= sag_04.mntr                                                                                                                                                                                                                                                         
+
+
+ Range of element maximum matrix coefficients in global coordinates
+ Maximum = 935999979 at element 41.                                      
+ Minimum = 935944632 at element 80.                                      
+
+   *** ELEMENT MATRIX FORMULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        80  LINK180       0.000   0.000000
+ Time at end of element matrix formulation CP = 0.453125.                
+
+ ALL CURRENT ANSYS DATA WRITTEN TO FILE NAME= sag_04.rdb
+  FOR POSSIBLE RESUME FROM THIS POINT
+     FORCE CONVERGENCE VALUE  =   5889.      CRITERION=   6461.    
+
+ SPARSE MATRIX DIRECT SOLVER.
+  Number of equations =         158,    Maximum wavefront =      6
+  Memory allocated for solver              =     7.731 MB
+  Memory required for in-core solution     =     0.098 MB
+  Memory required for out-of-core solution =     0.090 MB
+
+ *** NOTE ***                            CP =       0.531   TIME= 17:47:57
+ The Sparse Matrix Solver is currently running in the in-core memory     
+ mode.  This memory mode uses the most amount of memory in order to      
+ avoid using the hard drive as much as possible, which most often        
+ results in the fastest solution time.  This mode is recommended if      
+ enough physical memory is present to accommodate all of the solver      
+ data.                                                                   
+ Sparse solver maximum pivot= 1.871999787E+09 at node 42 UX.             
+ Sparse solver minimum pivot= 41969.4834 at node 56 UZ.                  
+ Sparse solver minimum pivot in absolute value= 41969.4834 at node 56    
+ UZ.                                                                     
+     DISP CONVERGENCE VALUE   =  0.1878      CRITERION=  0.9581E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1878    
+     FORCE CONVERGENCE VALUE  =   4919.      CRITERION=   6494.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.5569E-02  CRITERION=  0.1007E-01 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC =  0.5569E-02
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+
+   *** ELEMENT RESULT CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        80  LINK180       0.000   0.000000
+
+   *** NODAL LOAD CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        80  LINK180       0.000   0.000000
+ *** LOAD STEP     1   SUBSTEP     1  COMPLETED.    CUM ITER =      2
+ *** TIME =  0.100000E-01     TIME INC =  0.100000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   5080.      CRITERION=   6434.    
+     DISP CONVERGENCE VALUE   =  0.1947      CRITERION=  0.9865E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1947    
+     FORCE CONVERGENCE VALUE  =   5346.      CRITERION=   6502.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.5252E-02  CRITERION=  0.1007E-01 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.5252E-02
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     2  COMPLETED.    CUM ITER =      4
+ *** TIME =  0.200000E-01     TIME INC =  0.100000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.15000E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =   45.08      CRITERION=   6297.    
+     DISP CONVERGENCE VALUE   =  0.1409E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1409E-03
+     FORCE CONVERGENCE VALUE  =  0.5149E-01  CRITERION=   6425.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     3  COMPLETED.    CUM ITER =      5
+ *** TIME =  0.350000E-01     TIME INC =  0.150000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.22500E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =   75.83      CRITERION=   6300.    
+     DISP CONVERGENCE VALUE   =  0.6098E-04  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.6098E-04
+     FORCE CONVERGENCE VALUE  =  0.5959E-01  CRITERION=   6427.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     4  COMPLETED.    CUM ITER =      6
+ *** TIME =  0.575000E-01     TIME INC =  0.225000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.33750E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =   196.7      CRITERION=   6307.    
+     DISP CONVERGENCE VALUE   =  0.3595E-04  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3595E-04
+     FORCE CONVERGENCE VALUE  =  0.1471      CRITERION=   6432.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     5  COMPLETED.    CUM ITER =      7
+ *** TIME =  0.912500E-01     TIME INC =  0.337500E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.50000E-01  INCREASED (FACTOR = 1.4815)
+
+     FORCE CONVERGENCE VALUE  =   432.6      CRITERION=   6322.    
+     DISP CONVERGENCE VALUE   =  0.1238E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1238E-03
+     FORCE CONVERGENCE VALUE  =  0.3270      CRITERION=   6443.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     6  COMPLETED.    CUM ITER =      8
+ *** TIME =  0.141250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   512.8      CRITERION=   6340.    
+     DISP CONVERGENCE VALUE   =  0.2125E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2125E-03
+     FORCE CONVERGENCE VALUE  =  0.3950      CRITERION=   6460.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     7  COMPLETED.    CUM ITER =      9
+ *** TIME =  0.191250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   506.1      CRITERION=   6361.    
+     DISP CONVERGENCE VALUE   =  0.2806E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2806E-03
+     FORCE CONVERGENCE VALUE  =  0.3993      CRITERION=   6481.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     8  COMPLETED.    CUM ITER =     10
+ *** TIME =  0.241250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   497.4      CRITERION=   6386.    
+     DISP CONVERGENCE VALUE   =  0.3427E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3427E-03
+     FORCE CONVERGENCE VALUE  =  0.4034      CRITERION=   6507.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     9  COMPLETED.    CUM ITER =     11
+ *** TIME =  0.291250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   486.9      CRITERION=   6415.    
+     DISP CONVERGENCE VALUE   =  0.3980E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3980E-03
+     FORCE CONVERGENCE VALUE  =  0.4069      CRITERION=   6537.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    10  COMPLETED.    CUM ITER =     12
+ *** TIME =  0.341250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   474.9      CRITERION=   6448.    
+     DISP CONVERGENCE VALUE   =  0.4460E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.4460E-03
+     FORCE CONVERGENCE VALUE  =  0.4093      CRITERION=   6571.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    11  COMPLETED.    CUM ITER =     13
+ *** TIME =  0.391250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   461.6      CRITERION=   6486.    
+     DISP CONVERGENCE VALUE   =  0.4864E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.4864E-03
+     FORCE CONVERGENCE VALUE  =  0.4101      CRITERION=   6609.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    12  COMPLETED.    CUM ITER =     14
+ *** TIME =  0.441250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   447.3      CRITERION=   6526.    
+     DISP CONVERGENCE VALUE   =  0.5193E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5193E-03
+     FORCE CONVERGENCE VALUE  =  0.4092      CRITERION=   6650.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    13  COMPLETED.    CUM ITER =     15
+ *** TIME =  0.491250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   432.3      CRITERION=   6570.    
+     DISP CONVERGENCE VALUE   =  0.5449E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5449E-03
+     FORCE CONVERGENCE VALUE  =  0.4063      CRITERION=   6695.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    14  COMPLETED.    CUM ITER =     16
+ *** TIME =  0.541250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   416.8      CRITERION=   6617.    
+     DISP CONVERGENCE VALUE   =  0.5638E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5638E-03
+     FORCE CONVERGENCE VALUE  =  0.4016      CRITERION=   6743.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    15  COMPLETED.    CUM ITER =     17
+ *** TIME =  0.591250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   401.1      CRITERION=   6666.    
+     DISP CONVERGENCE VALUE   =  0.5766E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5766E-03
+     FORCE CONVERGENCE VALUE  =  0.3951      CRITERION=   6794.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    16  COMPLETED.    CUM ITER =     18
+ *** TIME =  0.641250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   385.4      CRITERION=   6718.    
+     DISP CONVERGENCE VALUE   =  0.5839E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5839E-03
+     FORCE CONVERGENCE VALUE  =  0.3871      CRITERION=   6847.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    17  COMPLETED.    CUM ITER =     19
+ *** TIME =  0.691250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   369.7      CRITERION=   6773.    
+     DISP CONVERGENCE VALUE   =  0.5865E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5865E-03
+     FORCE CONVERGENCE VALUE  =  0.3778      CRITERION=   6903.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    18  COMPLETED.    CUM ITER =     20
+ *** TIME =  0.741250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   354.3      CRITERION=   6829.    
+     DISP CONVERGENCE VALUE   =  0.5850E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5850E-03
+     FORCE CONVERGENCE VALUE  =  0.3674      CRITERION=   6961.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    19  COMPLETED.    CUM ITER =     21
+ *** TIME =  0.791250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   339.3      CRITERION=   6887.    
+     DISP CONVERGENCE VALUE   =  0.5801E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5801E-03
+     FORCE CONVERGENCE VALUE  =  0.3563      CRITERION=   7020.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    20  COMPLETED.    CUM ITER =     22
+ *** TIME =  0.841250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   324.7      CRITERION=   6948.    
+     DISP CONVERGENCE VALUE   =  0.5725E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5725E-03
+     FORCE CONVERGENCE VALUE  =  0.3446      CRITERION=   7082.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    21  COMPLETED.    CUM ITER =     23
+ *** TIME =  0.891250         TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   310.6      CRITERION=   7009.    
+     DISP CONVERGENCE VALUE   =  0.5625E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5625E-03
+     FORCE CONVERGENCE VALUE  =  0.3327      CRITERION=   7145.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    22  COMPLETED.    CUM ITER =     24
+ *** TIME =  0.941250         TIME INC =  0.500000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.29375E-01  DECREASED (FACTOR = 0.5875)
+
+     FORCE CONVERGENCE VALUE  =   138.7      CRITERION=   7042.    
+     DISP CONVERGENCE VALUE   =  0.2579E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2579E-03
+     FORCE CONVERGENCE VALUE  =  0.1315      CRITERION=   7183.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    23  COMPLETED.    CUM ITER =     25
+ *** TIME =  0.970625         TIME INC =  0.293750E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.29375E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   98.80      CRITERION=   7079.    
+     DISP CONVERGENCE VALUE   =  0.1874E-03  CRITERION=  0.9865E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1874E-03
+     FORCE CONVERGENCE VALUE  =  0.9111E-01  CRITERION=   7221.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    24  COMPLETED.    CUM ITER =     26
+ *** TIME =   1.00000         TIME INC =  0.293750E-01
+
+
+ *** ANSYS BINARY FILE STATISTICS
+  BUFFER SIZE USED= 16384
+        0.125 MB WRITTEN ON ELEMENT SAVED DATA FILE: sag_04.esav
+        0.062 MB WRITTEN ON ASSEMBLED MATRIX FILE: sag_04.full
+        0.375 MB WRITTEN ON RESULTS FILE: sag_04.rst
+
+ FINISH SOLUTION PROCESSING
+
+
+ ***** ROUTINE COMPLETED *****  CP =         3.219
+
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   17:47:59  NOV 14, 2026 CP=      3.219
+
+ CB3D14 cable sag Ernst probe - sag_04                                         
+
+
+
+          ***** ANSYS RESULTS INTERPRETATION (POST1) *****
+
+ *** NOTE ***                            CP =       3.219   TIME= 17:47:59
+ Reading results into the database (SET command) will update the current 
+ displacement and force boundary conditions in the database with the     
+ values from the results file for that load set.  Note that any          
+ subsequent solutions will use these values unless action is taken to    
+ either SAVE the current values or not overwrite them (/EXIT,NOSAVE).    
+
+
+ USE LAST SUBSTEP ON RESULT FILE  FOR LOAD CASE 0 
+
+ SET COMMAND GOT LOAD STEP=     1  SUBSTEP=    24  CUMULATIVE ITERATION=    26
+   TIME/FREQUENCY=  1.0000    
+ TITLE= CB3D14 cable sag Ernst probe - sag_04                                   
+
+ SET PARAMETER DIMENSIONS ON  ADSP TYPE=ARRA  DIMENSIONS=    81     4     1
+
+ PARAMETER ADSP(1,1) =     1.000000000    
+
+ *GET  ADSP      FROM  NODE      1  ITEM=U    X     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      1  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      1  ITEM=U    Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(2,1) =     2.000000000    
+
+ *GET  ADSP      FROM  NODE      2  ITEM=U    X     VALUE=-0.222476232E-03
+
+ *GET  ADSP      FROM  NODE      2  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      2  ITEM=U    Z     VALUE=-0.212280980E-01
+
+ PARAMETER ADSP(3,1) =     3.000000000    
+
+ *GET  ADSP      FROM  NODE      3  ITEM=U    X     VALUE=-0.428062049E-03
+
+ *GET  ADSP      FROM  NODE      3  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      3  ITEM=U    Z     VALUE=-0.417324820E-01
+
+ PARAMETER ADSP(4,1) =     4.000000000    
+
+ *GET  ADSP      FROM  NODE      4  ITEM=U    X     VALUE=-0.617189756E-03
+
+ *GET  ADSP      FROM  NODE      4  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      4  ITEM=U    Z     VALUE=-0.615252110E-01
+
+ PARAMETER ADSP(5,1) =     5.000000000    
+
+ *GET  ADSP      FROM  NODE      5  ITEM=U    X     VALUE=-0.790291710E-03
+
+ *GET  ADSP      FROM  NODE      5  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      5  ITEM=U    Z     VALUE=-0.806183075E-01
+
+ PARAMETER ADSP(6,1) =     6.000000000    
+
+ *GET  ADSP      FROM  NODE      6  ITEM=U    X     VALUE=-0.947800320E-03
+
+ *GET  ADSP      FROM  NODE      6  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      6  ITEM=U    Z     VALUE=-0.990237389E-01
+
+ PARAMETER ADSP(7,1) =     7.000000000    
+
+ *GET  ADSP      FROM  NODE      7  ITEM=U    X     VALUE=-0.109014805E-02
+
+ *GET  ADSP      FROM  NODE      7  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      7  ITEM=U    Z     VALUE=-0.116753399    
+
+ PARAMETER ADSP(8,1) =     8.000000000    
+
+ *GET  ADSP      FROM  NODE      8  ITEM=U    X     VALUE=-0.121776741E-02
+
+ *GET  ADSP      FROM  NODE      8  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      8  ITEM=U    Z     VALUE=-0.133819090    
+
+ PARAMETER ADSP(9,1) =     9.000000000    
+
+ *GET  ADSP      FROM  NODE      9  ITEM=U    X     VALUE=-0.133109095E-02
+
+ *GET  ADSP      FROM  NODE      9  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      9  ITEM=U    Z     VALUE=-0.150232502    
+
+ PARAMETER ADSP(10,1) =     10.00000000    
+
+ *GET  ADSP      FROM  NODE     10  ITEM=U    X     VALUE=-0.143055131E-02
+
+ *GET  ADSP      FROM  NODE     10  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     10  ITEM=U    Z     VALUE=-0.166005200    
+
+ PARAMETER ADSP(11,1) =     11.00000000    
+
+ *GET  ADSP      FROM  NODE     11  ITEM=U    X     VALUE=-0.151658113E-02
+
+ *GET  ADSP      FROM  NODE     11  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     11  ITEM=U    Z     VALUE=-0.181148599    
+
+ PARAMETER ADSP(12,1) =     12.00000000    
+
+ *GET  ADSP      FROM  NODE     12  ITEM=U    X     VALUE=-0.158961312E-02
+
+ *GET  ADSP      FROM  NODE     12  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     12  ITEM=U    Z     VALUE=-0.195673954    
+
+ PARAMETER ADSP(13,1) =     13.00000000    
+
+ *GET  ADSP      FROM  NODE     13  ITEM=U    X     VALUE=-0.165008004E-02
+
+ *GET  ADSP      FROM  NODE     13  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     13  ITEM=U    Z     VALUE=-0.209592337    
+
+ PARAMETER ADSP(14,1) =     14.00000000    
+
+ *GET  ADSP      FROM  NODE     14  ITEM=U    X     VALUE=-0.169841470E-02
+
+ *GET  ADSP      FROM  NODE     14  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     14  ITEM=U    Z     VALUE=-0.222914621    
+
+ PARAMETER ADSP(15,1) =     15.00000000    
+
+ *GET  ADSP      FROM  NODE     15  ITEM=U    X     VALUE=-0.173504994E-02
+
+ *GET  ADSP      FROM  NODE     15  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     15  ITEM=U    Z     VALUE=-0.235651464    
+
+ PARAMETER ADSP(16,1) =     16.00000000    
+
+ *GET  ADSP      FROM  NODE     16  ITEM=U    X     VALUE=-0.176041865E-02
+
+ *GET  ADSP      FROM  NODE     16  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     16  ITEM=U    Z     VALUE=-0.247813294    
+
+ PARAMETER ADSP(17,1) =     17.00000000    
+
+ *GET  ADSP      FROM  NODE     17  ITEM=U    X     VALUE=-0.177495378E-02
+
+ *GET  ADSP      FROM  NODE     17  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     17  ITEM=U    Z     VALUE=-0.259410289    
+
+ PARAMETER ADSP(18,1) =     18.00000000    
+
+ *GET  ADSP      FROM  NODE     18  ITEM=U    X     VALUE=-0.177908830E-02
+
+ *GET  ADSP      FROM  NODE     18  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     18  ITEM=U    Z     VALUE=-0.270452367    
+
+ PARAMETER ADSP(19,1) =     19.00000000    
+
+ *GET  ADSP      FROM  NODE     19  ITEM=U    X     VALUE=-0.177325523E-02
+
+ *GET  ADSP      FROM  NODE     19  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     19  ITEM=U    Z     VALUE=-0.280949164    
+
+ PARAMETER ADSP(20,1) =     20.00000000    
+
+ *GET  ADSP      FROM  NODE     20  ITEM=U    X     VALUE=-0.175788764E-02
+
+ *GET  ADSP      FROM  NODE     20  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     20  ITEM=U    Z     VALUE=-0.290910023    
+
+ PARAMETER ADSP(21,1) =     21.00000000    
+
+ *GET  ADSP      FROM  NODE     21  ITEM=U    X     VALUE=-0.173341863E-02
+
+ *GET  ADSP      FROM  NODE     21  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     21  ITEM=U    Z     VALUE=-0.300343980    
+
+ PARAMETER ADSP(22,1) =     22.00000000    
+
+ *GET  ADSP      FROM  NODE     22  ITEM=U    X     VALUE=-0.170028134E-02
+
+ *GET  ADSP      FROM  NODE     22  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     22  ITEM=U    Z     VALUE=-0.309259749    
+
+ PARAMETER ADSP(23,1) =     23.00000000    
+
+ *GET  ADSP      FROM  NODE     23  ITEM=U    X     VALUE=-0.165890893E-02
+
+ *GET  ADSP      FROM  NODE     23  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     23  ITEM=U    Z     VALUE=-0.317665707    
+
+ PARAMETER ADSP(24,1) =     24.00000000    
+
+ *GET  ADSP      FROM  NODE     24  ITEM=U    X     VALUE=-0.160973463E-02
+
+ *GET  ADSP      FROM  NODE     24  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     24  ITEM=U    Z     VALUE=-0.325569885    
+
+ PARAMETER ADSP(25,1) =     25.00000000    
+
+ *GET  ADSP      FROM  NODE     25  ITEM=U    X     VALUE=-0.155319167E-02
+
+ *GET  ADSP      FROM  NODE     25  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     25  ITEM=U    Z     VALUE=-0.332979950    
+
+ PARAMETER ADSP(26,1) =     26.00000000    
+
+ *GET  ADSP      FROM  NODE     26  ITEM=U    X     VALUE=-0.148971334E-02
+
+ *GET  ADSP      FROM  NODE     26  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     26  ITEM=U    Z     VALUE=-0.339903199    
+
+ PARAMETER ADSP(27,1) =     27.00000000    
+
+ *GET  ADSP      FROM  NODE     27  ITEM=U    X     VALUE=-0.141973293E-02
+
+ *GET  ADSP      FROM  NODE     27  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     27  ITEM=U    Z     VALUE=-0.346346545    
+
+ PARAMETER ADSP(28,1) =     28.00000000    
+
+ *GET  ADSP      FROM  NODE     28  ITEM=U    X     VALUE=-0.134368379E-02
+
+ *GET  ADSP      FROM  NODE     28  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     28  ITEM=U    Z     VALUE=-0.352316504    
+
+ PARAMETER ADSP(29,1) =     29.00000000    
+
+ *GET  ADSP      FROM  NODE     29  ITEM=U    X     VALUE=-0.126199928E-02
+
+ *GET  ADSP      FROM  NODE     29  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     29  ITEM=U    Z     VALUE=-0.357819191    
+
+ PARAMETER ADSP(30,1) =     30.00000000    
+
+ *GET  ADSP      FROM  NODE     30  ITEM=U    X     VALUE=-0.117511279E-02
+
+ *GET  ADSP      FROM  NODE     30  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     30  ITEM=U    Z     VALUE=-0.362860302    
+
+ PARAMETER ADSP(31,1) =     31.00000000    
+
+ *GET  ADSP      FROM  NODE     31  ITEM=U    X     VALUE=-0.108345774E-02
+
+ *GET  ADSP      FROM  NODE     31  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     31  ITEM=U    Z     VALUE=-0.367445115    
+
+ PARAMETER ADSP(32,1) =     32.00000000    
+
+ *GET  ADSP      FROM  NODE     32  ITEM=U    X     VALUE=-0.987467543E-03
+
+ *GET  ADSP      FROM  NODE     32  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     32  ITEM=U    Z     VALUE=-0.371578475    
+
+ PARAMETER ADSP(33,1) =     33.00000000    
+
+ *GET  ADSP      FROM  NODE     33  ITEM=U    X     VALUE=-0.887575672E-03
+
+ *GET  ADSP      FROM  NODE     33  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     33  ITEM=U    Z     VALUE=-0.375264787    
+
+ PARAMETER ADSP(34,1) =     34.00000000    
+
+ *GET  ADSP      FROM  NODE     34  ITEM=U    X     VALUE=-0.784215596E-03
+
+ *GET  ADSP      FROM  NODE     34  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     34  ITEM=U    Z     VALUE=-0.378508012    
+
+ PARAMETER ADSP(35,1) =     35.00000000    
+
+ *GET  ADSP      FROM  NODE     35  ITEM=U    X     VALUE=-0.677820805E-03
+
+ *GET  ADSP      FROM  NODE     35  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     35  ITEM=U    Z     VALUE=-0.381311661    
+
+ PARAMETER ADSP(36,1) =     36.00000000    
+
+ *GET  ADSP      FROM  NODE     36  ITEM=U    X     VALUE=-0.568824802E-03
+
+ *GET  ADSP      FROM  NODE     36  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     36  ITEM=U    Z     VALUE=-0.383678785    
+
+ PARAMETER ADSP(37,1) =     37.00000000    
+
+ *GET  ADSP      FROM  NODE     37  ITEM=U    X     VALUE=-0.457661103E-03
+
+ *GET  ADSP      FROM  NODE     37  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     37  ITEM=U    Z     VALUE=-0.385611975    
+
+ PARAMETER ADSP(38,1) =     38.00000000    
+
+ *GET  ADSP      FROM  NODE     38  ITEM=U    X     VALUE=-0.344763236E-03
+
+ *GET  ADSP      FROM  NODE     38  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     38  ITEM=U    Z     VALUE=-0.387113357    
+
+ PARAMETER ADSP(39,1) =     39.00000000    
+
+ *GET  ADSP      FROM  NODE     39  ITEM=U    X     VALUE=-0.230564735E-03
+
+ *GET  ADSP      FROM  NODE     39  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     39  ITEM=U    Z     VALUE=-0.388184588    
+
+ PARAMETER ADSP(40,1) =     40.00000000    
+
+ *GET  ADSP      FROM  NODE     40  ITEM=U    X     VALUE=-0.115499141E-03
+
+ *GET  ADSP      FROM  NODE     40  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     40  ITEM=U    Z     VALUE=-0.388826851    
+
+ PARAMETER ADSP(41,1) =     41.00000000    
+
+ *GET  ADSP      FROM  NODE     41  ITEM=U    X     VALUE= 0.186225942E-14
+
+ *GET  ADSP      FROM  NODE     41  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     41  ITEM=U    Z     VALUE=-0.389040860    
+
+ PARAMETER ADSP(42,1) =     42.00000000    
+
+ *GET  ADSP      FROM  NODE     42  ITEM=U    X     VALUE= 0.115499141E-03
+
+ *GET  ADSP      FROM  NODE     42  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     42  ITEM=U    Z     VALUE=-0.388826851    
+
+ PARAMETER ADSP(43,1) =     43.00000000    
+
+ *GET  ADSP      FROM  NODE     43  ITEM=U    X     VALUE= 0.230564735E-03
+
+ *GET  ADSP      FROM  NODE     43  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     43  ITEM=U    Z     VALUE=-0.388184588    
+
+ PARAMETER ADSP(44,1) =     44.00000000    
+
+ *GET  ADSP      FROM  NODE     44  ITEM=U    X     VALUE= 0.344763236E-03
+
+ *GET  ADSP      FROM  NODE     44  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     44  ITEM=U    Z     VALUE=-0.387113357    
+
+ PARAMETER ADSP(45,1) =     45.00000000    
+
+ *GET  ADSP      FROM  NODE     45  ITEM=U    X     VALUE= 0.457661103E-03
+
+ *GET  ADSP      FROM  NODE     45  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     45  ITEM=U    Z     VALUE=-0.385611975    
+
+ PARAMETER ADSP(46,1) =     46.00000000    
+
+ *GET  ADSP      FROM  NODE     46  ITEM=U    X     VALUE= 0.568824802E-03
+
+ *GET  ADSP      FROM  NODE     46  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     46  ITEM=U    Z     VALUE=-0.383678785    
+
+ PARAMETER ADSP(47,1) =     47.00000000    
+
+ *GET  ADSP      FROM  NODE     47  ITEM=U    X     VALUE= 0.677820805E-03
+
+ *GET  ADSP      FROM  NODE     47  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     47  ITEM=U    Z     VALUE=-0.381311661    
+
+ PARAMETER ADSP(48,1) =     48.00000000    
+
+ *GET  ADSP      FROM  NODE     48  ITEM=U    X     VALUE= 0.784215596E-03
+
+ *GET  ADSP      FROM  NODE     48  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     48  ITEM=U    Z     VALUE=-0.378508012    
+
+ PARAMETER ADSP(49,1) =     49.00000000    
+
+ *GET  ADSP      FROM  NODE     49  ITEM=U    X     VALUE= 0.887575672E-03
+
+ *GET  ADSP      FROM  NODE     49  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     49  ITEM=U    Z     VALUE=-0.375264787    
+
+ PARAMETER ADSP(50,1) =     50.00000000    
+
+ *GET  ADSP      FROM  NODE     50  ITEM=U    X     VALUE= 0.987467543E-03
+
+ *GET  ADSP      FROM  NODE     50  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     50  ITEM=U    Z     VALUE=-0.371578475    
+
+ PARAMETER ADSP(51,1) =     51.00000000    
+
+ *GET  ADSP      FROM  NODE     51  ITEM=U    X     VALUE= 0.108345774E-02
+
+ *GET  ADSP      FROM  NODE     51  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     51  ITEM=U    Z     VALUE=-0.367445115    
+
+ PARAMETER ADSP(52,1) =     52.00000000    
+
+ *GET  ADSP      FROM  NODE     52  ITEM=U    X     VALUE= 0.117511279E-02
+
+ *GET  ADSP      FROM  NODE     52  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     52  ITEM=U    Z     VALUE=-0.362860302    
+
+ PARAMETER ADSP(53,1) =     53.00000000    
+
+ *GET  ADSP      FROM  NODE     53  ITEM=U    X     VALUE= 0.126199928E-02
+
+ *GET  ADSP      FROM  NODE     53  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     53  ITEM=U    Z     VALUE=-0.357819191    
+
+ PARAMETER ADSP(54,1) =     54.00000000    
+
+ *GET  ADSP      FROM  NODE     54  ITEM=U    X     VALUE= 0.134368379E-02
+
+ *GET  ADSP      FROM  NODE     54  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     54  ITEM=U    Z     VALUE=-0.352316504    
+
+ PARAMETER ADSP(55,1) =     55.00000000    
+
+ *GET  ADSP      FROM  NODE     55  ITEM=U    X     VALUE= 0.141973293E-02
+
+ *GET  ADSP      FROM  NODE     55  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     55  ITEM=U    Z     VALUE=-0.346346545    
+
+ PARAMETER ADSP(56,1) =     56.00000000    
+
+ *GET  ADSP      FROM  NODE     56  ITEM=U    X     VALUE= 0.148971334E-02
+
+ *GET  ADSP      FROM  NODE     56  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     56  ITEM=U    Z     VALUE=-0.339903199    
+
+ PARAMETER ADSP(57,1) =     57.00000000    
+
+ *GET  ADSP      FROM  NODE     57  ITEM=U    X     VALUE= 0.155319167E-02
+
+ *GET  ADSP      FROM  NODE     57  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     57  ITEM=U    Z     VALUE=-0.332979950    
+
+ PARAMETER ADSP(58,1) =     58.00000000    
+
+ *GET  ADSP      FROM  NODE     58  ITEM=U    X     VALUE= 0.160973463E-02
+
+ *GET  ADSP      FROM  NODE     58  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     58  ITEM=U    Z     VALUE=-0.325569885    
+
+ PARAMETER ADSP(59,1) =     59.00000000    
+
+ *GET  ADSP      FROM  NODE     59  ITEM=U    X     VALUE= 0.165890893E-02
+
+ *GET  ADSP      FROM  NODE     59  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     59  ITEM=U    Z     VALUE=-0.317665707    
+
+ PARAMETER ADSP(60,1) =     60.00000000    
+
+ *GET  ADSP      FROM  NODE     60  ITEM=U    X     VALUE= 0.170028134E-02
+
+ *GET  ADSP      FROM  NODE     60  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     60  ITEM=U    Z     VALUE=-0.309259749    
+
+ PARAMETER ADSP(61,1) =     61.00000000    
+
+ *GET  ADSP      FROM  NODE     61  ITEM=U    X     VALUE= 0.173341863E-02
+
+ *GET  ADSP      FROM  NODE     61  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     61  ITEM=U    Z     VALUE=-0.300343980    
+
+ PARAMETER ADSP(62,1) =     62.00000000    
+
+ *GET  ADSP      FROM  NODE     62  ITEM=U    X     VALUE= 0.175788764E-02
+
+ *GET  ADSP      FROM  NODE     62  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     62  ITEM=U    Z     VALUE=-0.290910023    
+
+ PARAMETER ADSP(63,1) =     63.00000000    
+
+ *GET  ADSP      FROM  NODE     63  ITEM=U    X     VALUE= 0.177325523E-02
+
+ *GET  ADSP      FROM  NODE     63  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     63  ITEM=U    Z     VALUE=-0.280949164    
+
+ PARAMETER ADSP(64,1) =     64.00000000    
+
+ *GET  ADSP      FROM  NODE     64  ITEM=U    X     VALUE= 0.177908830E-02
+
+ *GET  ADSP      FROM  NODE     64  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     64  ITEM=U    Z     VALUE=-0.270452367    
+
+ PARAMETER ADSP(65,1) =     65.00000000    
+
+ *GET  ADSP      FROM  NODE     65  ITEM=U    X     VALUE= 0.177495378E-02
+
+ *GET  ADSP      FROM  NODE     65  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     65  ITEM=U    Z     VALUE=-0.259410289    
+
+ PARAMETER ADSP(66,1) =     66.00000000    
+
+ *GET  ADSP      FROM  NODE     66  ITEM=U    X     VALUE= 0.176041865E-02
+
+ *GET  ADSP      FROM  NODE     66  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     66  ITEM=U    Z     VALUE=-0.247813294    
+
+ PARAMETER ADSP(67,1) =     67.00000000    
+
+ *GET  ADSP      FROM  NODE     67  ITEM=U    X     VALUE= 0.173504994E-02
+
+ *GET  ADSP      FROM  NODE     67  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     67  ITEM=U    Z     VALUE=-0.235651464    
+
+ PARAMETER ADSP(68,1) =     68.00000000    
+
+ *GET  ADSP      FROM  NODE     68  ITEM=U    X     VALUE= 0.169841470E-02
+
+ *GET  ADSP      FROM  NODE     68  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     68  ITEM=U    Z     VALUE=-0.222914621    
+
+ PARAMETER ADSP(69,1) =     69.00000000    
+
+ *GET  ADSP      FROM  NODE     69  ITEM=U    X     VALUE= 0.165008004E-02
+
+ *GET  ADSP      FROM  NODE     69  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     69  ITEM=U    Z     VALUE=-0.209592337    
+
+ PARAMETER ADSP(70,1) =     70.00000000    
+
+ *GET  ADSP      FROM  NODE     70  ITEM=U    X     VALUE= 0.158961312E-02
+
+ *GET  ADSP      FROM  NODE     70  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     70  ITEM=U    Z     VALUE=-0.195673954    
+
+ PARAMETER ADSP(71,1) =     71.00000000    
+
+ *GET  ADSP      FROM  NODE     71  ITEM=U    X     VALUE= 0.151658113E-02
+
+ *GET  ADSP      FROM  NODE     71  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     71  ITEM=U    Z     VALUE=-0.181148599    
+
+ PARAMETER ADSP(72,1) =     72.00000000    
+
+ *GET  ADSP      FROM  NODE     72  ITEM=U    X     VALUE= 0.143055131E-02
+
+ *GET  ADSP      FROM  NODE     72  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     72  ITEM=U    Z     VALUE=-0.166005200    
+
+ PARAMETER ADSP(73,1) =     73.00000000    
+
+ *GET  ADSP      FROM  NODE     73  ITEM=U    X     VALUE= 0.133109095E-02
+
+ *GET  ADSP      FROM  NODE     73  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     73  ITEM=U    Z     VALUE=-0.150232502    
+
+ PARAMETER ADSP(74,1) =     74.00000000    
+
+ *GET  ADSP      FROM  NODE     74  ITEM=U    X     VALUE= 0.121776741E-02
+
+ *GET  ADSP      FROM  NODE     74  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     74  ITEM=U    Z     VALUE=-0.133819090    
+
+ PARAMETER ADSP(75,1) =     75.00000000    
+
+ *GET  ADSP      FROM  NODE     75  ITEM=U    X     VALUE= 0.109014805E-02
+
+ *GET  ADSP      FROM  NODE     75  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     75  ITEM=U    Z     VALUE=-0.116753399    
+
+ PARAMETER ADSP(76,1) =     76.00000000    
+
+ *GET  ADSP      FROM  NODE     76  ITEM=U    X     VALUE= 0.947800320E-03
+
+ *GET  ADSP      FROM  NODE     76  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     76  ITEM=U    Z     VALUE=-0.990237389E-01
+
+ PARAMETER ADSP(77,1) =     77.00000000    
+
+ *GET  ADSP      FROM  NODE     77  ITEM=U    X     VALUE= 0.790291710E-03
+
+ *GET  ADSP      FROM  NODE     77  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     77  ITEM=U    Z     VALUE=-0.806183075E-01
+
+ PARAMETER ADSP(78,1) =     78.00000000    
+
+ *GET  ADSP      FROM  NODE     78  ITEM=U    X     VALUE= 0.617189756E-03
+
+ *GET  ADSP      FROM  NODE     78  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     78  ITEM=U    Z     VALUE=-0.615252110E-01
+
+ PARAMETER ADSP(79,1) =     79.00000000    
+
+ *GET  ADSP      FROM  NODE     79  ITEM=U    X     VALUE= 0.428062049E-03
+
+ *GET  ADSP      FROM  NODE     79  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     79  ITEM=U    Z     VALUE=-0.417324820E-01
+
+ PARAMETER ADSP(80,1) =     80.00000000    
+
+ *GET  ADSP      FROM  NODE     80  ITEM=U    X     VALUE= 0.222476232E-03
+
+ *GET  ADSP      FROM  NODE     80  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     80  ITEM=U    Z     VALUE=-0.212280980E-01
+
+ PARAMETER ADSP(81,1) =     81.00000000    
+
+ *GET  ADSP      FROM  NODE     81  ITEM=U    X     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     81  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     81  ITEM=U    Z     VALUE=  0.00000000    
+
+ OPENED FILE= sag_04_disp.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ STORE LKN      FROM ITEM=SMIS COMP=   1  FOR ALL SELECTED ELEMENTS
+
+ SET PARAMETER DIMENSIONS ON  ALK TYPE=ARRA  DIMENSIONS=    80     2     1
+
+ PARAMETER ALK(1,1) =     1.000000000    
+
+ *GET  ALK       FROM  ELEM       1  ITEM=ETAB LKN       VALUE=  980736.000    
+
+ PARAMETER ALK(2,1) =     2.000000000    
+
+ *GET  ALK       FROM  ELEM       2  ITEM=ETAB LKN       VALUE=  980722.750    
+
+ PARAMETER ALK(3,1) =     3.000000000    
+
+ *GET  ALK       FROM  ELEM       3  ITEM=ETAB LKN       VALUE=  980709.812    
+
+ PARAMETER ALK(4,1) =     4.000000000    
+
+ *GET  ALK       FROM  ELEM       4  ITEM=ETAB LKN       VALUE=  980697.188    
+
+ PARAMETER ALK(5,1) =     5.000000000    
+
+ *GET  ALK       FROM  ELEM       5  ITEM=ETAB LKN       VALUE=  980684.938    
+
+ PARAMETER ALK(6,1) =     6.000000000    
+
+ *GET  ALK       FROM  ELEM       6  ITEM=ETAB LKN       VALUE=  980673.000    
+
+ PARAMETER ALK(7,1) =     7.000000000    
+
+ *GET  ALK       FROM  ELEM       7  ITEM=ETAB LKN       VALUE=  980661.438    
+
+ PARAMETER ALK(8,1) =     8.000000000    
+
+ *GET  ALK       FROM  ELEM       8  ITEM=ETAB LKN       VALUE=  980650.188    
+
+ PARAMETER ALK(9,1) =     9.000000000    
+
+ *GET  ALK       FROM  ELEM       9  ITEM=ETAB LKN       VALUE=  980639.312    
+
+ PARAMETER ALK(10,1) =     10.00000000    
+
+ *GET  ALK       FROM  ELEM      10  ITEM=ETAB LKN       VALUE=  980628.750    
+
+ PARAMETER ALK(11,1) =     11.00000000    
+
+ *GET  ALK       FROM  ELEM      11  ITEM=ETAB LKN       VALUE=  980618.500    
+
+ PARAMETER ALK(12,1) =     12.00000000    
+
+ *GET  ALK       FROM  ELEM      12  ITEM=ETAB LKN       VALUE=  980608.625    
+
+ PARAMETER ALK(13,1) =     13.00000000    
+
+ *GET  ALK       FROM  ELEM      13  ITEM=ETAB LKN       VALUE=  980599.125    
+
+ PARAMETER ALK(14,1) =     14.00000000    
+
+ *GET  ALK       FROM  ELEM      14  ITEM=ETAB LKN       VALUE=  980589.875    
+
+ PARAMETER ALK(15,1) =     15.00000000    
+
+ *GET  ALK       FROM  ELEM      15  ITEM=ETAB LKN       VALUE=  980581.062    
+
+ PARAMETER ALK(16,1) =     16.00000000    
+
+ *GET  ALK       FROM  ELEM      16  ITEM=ETAB LKN       VALUE=  980572.562    
+
+ PARAMETER ALK(17,1) =     17.00000000    
+
+ *GET  ALK       FROM  ELEM      17  ITEM=ETAB LKN       VALUE=  980564.375    
+
+ PARAMETER ALK(18,1) =     18.00000000    
+
+ *GET  ALK       FROM  ELEM      18  ITEM=ETAB LKN       VALUE=  980556.500    
+
+ PARAMETER ALK(19,1) =     19.00000000    
+
+ *GET  ALK       FROM  ELEM      19  ITEM=ETAB LKN       VALUE=  980549.000    
+
+ PARAMETER ALK(20,1) =     20.00000000    
+
+ *GET  ALK       FROM  ELEM      20  ITEM=ETAB LKN       VALUE=  980541.875    
+
+ PARAMETER ALK(21,1) =     21.00000000    
+
+ *GET  ALK       FROM  ELEM      21  ITEM=ETAB LKN       VALUE=  980535.062    
+
+ PARAMETER ALK(22,1) =     22.00000000    
+
+ *GET  ALK       FROM  ELEM      22  ITEM=ETAB LKN       VALUE=  980528.562    
+
+ PARAMETER ALK(23,1) =     23.00000000    
+
+ *GET  ALK       FROM  ELEM      23  ITEM=ETAB LKN       VALUE=  980522.438    
+
+ PARAMETER ALK(24,1) =     24.00000000    
+
+ *GET  ALK       FROM  ELEM      24  ITEM=ETAB LKN       VALUE=  980516.688    
+
+ PARAMETER ALK(25,1) =     25.00000000    
+
+ *GET  ALK       FROM  ELEM      25  ITEM=ETAB LKN       VALUE=  980511.188    
+
+ PARAMETER ALK(26,1) =     26.00000000    
+
+ *GET  ALK       FROM  ELEM      26  ITEM=ETAB LKN       VALUE=  980506.125    
+
+ PARAMETER ALK(27,1) =     27.00000000    
+
+ *GET  ALK       FROM  ELEM      27  ITEM=ETAB LKN       VALUE=  980501.312    
+
+ PARAMETER ALK(28,1) =     28.00000000    
+
+ *GET  ALK       FROM  ELEM      28  ITEM=ETAB LKN       VALUE=  980496.938    
+
+ PARAMETER ALK(29,1) =     29.00000000    
+
+ *GET  ALK       FROM  ELEM      29  ITEM=ETAB LKN       VALUE=  980492.812    
+
+ PARAMETER ALK(30,1) =     30.00000000    
+
+ *GET  ALK       FROM  ELEM      30  ITEM=ETAB LKN       VALUE=  980489.062    
+
+ PARAMETER ALK(31,1) =     31.00000000    
+
+ *GET  ALK       FROM  ELEM      31  ITEM=ETAB LKN       VALUE=  980485.688    
+
+ PARAMETER ALK(32,1) =     32.00000000    
+
+ *GET  ALK       FROM  ELEM      32  ITEM=ETAB LKN       VALUE=  980482.625    
+
+ PARAMETER ALK(33,1) =     33.00000000    
+
+ *GET  ALK       FROM  ELEM      33  ITEM=ETAB LKN       VALUE=  980479.875    
+
+ PARAMETER ALK(34,1) =     34.00000000    
+
+ *GET  ALK       FROM  ELEM      34  ITEM=ETAB LKN       VALUE=  980477.500    
+
+ PARAMETER ALK(35,1) =     35.00000000    
+
+ *GET  ALK       FROM  ELEM      35  ITEM=ETAB LKN       VALUE=  980475.438    
+
+ PARAMETER ALK(36,1) =     36.00000000    
+
+ *GET  ALK       FROM  ELEM      36  ITEM=ETAB LKN       VALUE=  980473.750    
+
+ PARAMETER ALK(37,1) =     37.00000000    
+
+ *GET  ALK       FROM  ELEM      37  ITEM=ETAB LKN       VALUE=  980472.375    
+
+ PARAMETER ALK(38,1) =     38.00000000    
+
+ *GET  ALK       FROM  ELEM      38  ITEM=ETAB LKN       VALUE=  980471.375    
+
+ PARAMETER ALK(39,1) =     39.00000000    
+
+ *GET  ALK       FROM  ELEM      39  ITEM=ETAB LKN       VALUE=  980470.688    
+
+ PARAMETER ALK(40,1) =     40.00000000    
+
+ *GET  ALK       FROM  ELEM      40  ITEM=ETAB LKN       VALUE=  980470.312    
+
+ PARAMETER ALK(41,1) =     41.00000000    
+
+ *GET  ALK       FROM  ELEM      41  ITEM=ETAB LKN       VALUE=  980470.312    
+
+ PARAMETER ALK(42,1) =     42.00000000    
+
+ *GET  ALK       FROM  ELEM      42  ITEM=ETAB LKN       VALUE=  980470.688    
+
+ PARAMETER ALK(43,1) =     43.00000000    
+
+ *GET  ALK       FROM  ELEM      43  ITEM=ETAB LKN       VALUE=  980471.375    
+
+ PARAMETER ALK(44,1) =     44.00000000    
+
+ *GET  ALK       FROM  ELEM      44  ITEM=ETAB LKN       VALUE=  980472.375    
+
+ PARAMETER ALK(45,1) =     45.00000000    
+
+ *GET  ALK       FROM  ELEM      45  ITEM=ETAB LKN       VALUE=  980473.750    
+
+ PARAMETER ALK(46,1) =     46.00000000    
+
+ *GET  ALK       FROM  ELEM      46  ITEM=ETAB LKN       VALUE=  980475.438    
+
+ PARAMETER ALK(47,1) =     47.00000000    
+
+ *GET  ALK       FROM  ELEM      47  ITEM=ETAB LKN       VALUE=  980477.500    
+
+ PARAMETER ALK(48,1) =     48.00000000    
+
+ *GET  ALK       FROM  ELEM      48  ITEM=ETAB LKN       VALUE=  980479.875    
+
+ PARAMETER ALK(49,1) =     49.00000000    
+
+ *GET  ALK       FROM  ELEM      49  ITEM=ETAB LKN       VALUE=  980482.625    
+
+ PARAMETER ALK(50,1) =     50.00000000    
+
+ *GET  ALK       FROM  ELEM      50  ITEM=ETAB LKN       VALUE=  980485.688    
+
+ PARAMETER ALK(51,1) =     51.00000000    
+
+ *GET  ALK       FROM  ELEM      51  ITEM=ETAB LKN       VALUE=  980489.062    
+
+ PARAMETER ALK(52,1) =     52.00000000    
+
+ *GET  ALK       FROM  ELEM      52  ITEM=ETAB LKN       VALUE=  980492.812    
+
+ PARAMETER ALK(53,1) =     53.00000000    
+
+ *GET  ALK       FROM  ELEM      53  ITEM=ETAB LKN       VALUE=  980496.938    
+
+ PARAMETER ALK(54,1) =     54.00000000    
+
+ *GET  ALK       FROM  ELEM      54  ITEM=ETAB LKN       VALUE=  980501.312    
+
+ PARAMETER ALK(55,1) =     55.00000000    
+
+ *GET  ALK       FROM  ELEM      55  ITEM=ETAB LKN       VALUE=  980506.125    
+
+ PARAMETER ALK(56,1) =     56.00000000    
+
+ *GET  ALK       FROM  ELEM      56  ITEM=ETAB LKN       VALUE=  980511.188    
+
+ PARAMETER ALK(57,1) =     57.00000000    
+
+ *GET  ALK       FROM  ELEM      57  ITEM=ETAB LKN       VALUE=  980516.688    
+
+ PARAMETER ALK(58,1) =     58.00000000    
+
+ *GET  ALK       FROM  ELEM      58  ITEM=ETAB LKN       VALUE=  980522.438    
+
+ PARAMETER ALK(59,1) =     59.00000000    
+
+ *GET  ALK       FROM  ELEM      59  ITEM=ETAB LKN       VALUE=  980528.562    
+
+ PARAMETER ALK(60,1) =     60.00000000    
+
+ *GET  ALK       FROM  ELEM      60  ITEM=ETAB LKN       VALUE=  980535.062    
+
+ PARAMETER ALK(61,1) =     61.00000000    
+
+ *GET  ALK       FROM  ELEM      61  ITEM=ETAB LKN       VALUE=  980541.875    
+
+ PARAMETER ALK(62,1) =     62.00000000    
+
+ *GET  ALK       FROM  ELEM      62  ITEM=ETAB LKN       VALUE=  980549.000    
+
+ PARAMETER ALK(63,1) =     63.00000000    
+
+ *GET  ALK       FROM  ELEM      63  ITEM=ETAB LKN       VALUE=  980556.500    
+
+ PARAMETER ALK(64,1) =     64.00000000    
+
+ *GET  ALK       FROM  ELEM      64  ITEM=ETAB LKN       VALUE=  980564.375    
+
+ PARAMETER ALK(65,1) =     65.00000000    
+
+ *GET  ALK       FROM  ELEM      65  ITEM=ETAB LKN       VALUE=  980572.562    
+
+ PARAMETER ALK(66,1) =     66.00000000    
+
+ *GET  ALK       FROM  ELEM      66  ITEM=ETAB LKN       VALUE=  980581.062    
+
+ PARAMETER ALK(67,1) =     67.00000000    
+
+ *GET  ALK       FROM  ELEM      67  ITEM=ETAB LKN       VALUE=  980589.875    
+
+ PARAMETER ALK(68,1) =     68.00000000    
+
+ *GET  ALK       FROM  ELEM      68  ITEM=ETAB LKN       VALUE=  980599.125    
+
+ PARAMETER ALK(69,1) =     69.00000000    
+
+ *GET  ALK       FROM  ELEM      69  ITEM=ETAB LKN       VALUE=  980608.625    
+
+ PARAMETER ALK(70,1) =     70.00000000    
+
+ *GET  ALK       FROM  ELEM      70  ITEM=ETAB LKN       VALUE=  980618.500    
+
+ PARAMETER ALK(71,1) =     71.00000000    
+
+ *GET  ALK       FROM  ELEM      71  ITEM=ETAB LKN       VALUE=  980628.750    
+
+ PARAMETER ALK(72,1) =     72.00000000    
+
+ *GET  ALK       FROM  ELEM      72  ITEM=ETAB LKN       VALUE=  980639.312    
+
+ PARAMETER ALK(73,1) =     73.00000000    
+
+ *GET  ALK       FROM  ELEM      73  ITEM=ETAB LKN       VALUE=  980650.188    
+
+ PARAMETER ALK(74,1) =     74.00000000    
+
+ *GET  ALK       FROM  ELEM      74  ITEM=ETAB LKN       VALUE=  980661.438    
+
+ PARAMETER ALK(75,1) =     75.00000000    
+
+ *GET  ALK       FROM  ELEM      75  ITEM=ETAB LKN       VALUE=  980673.000    
+
+ PARAMETER ALK(76,1) =     76.00000000    
+
+ *GET  ALK       FROM  ELEM      76  ITEM=ETAB LKN       VALUE=  980684.938    
+
+ PARAMETER ALK(77,1) =     77.00000000    
+
+ *GET  ALK       FROM  ELEM      77  ITEM=ETAB LKN       VALUE=  980697.188    
+
+ PARAMETER ALK(78,1) =     78.00000000    
+
+ *GET  ALK       FROM  ELEM      78  ITEM=ETAB LKN       VALUE=  980709.812    
+
+ PARAMETER ALK(79,1) =     79.00000000    
+
+ *GET  ALK       FROM  ELEM      79  ITEM=ETAB LKN       VALUE=  980722.750    
+
+ PARAMETER ALK(80,1) =     80.00000000    
+
+ *GET  ALK       FROM  ELEM      80  ITEM=ETAB LKN       VALUE=  980736.000    
+
+ OPENED FILE= sag_04_link.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ EXIT THE ANSYS POST1 DATABASE PROCESSOR
+
+
+ ***** ROUTINE COMPLETED *****  CP =         3.297
+
+
+
+ ***** END OF INPUT ENCOUNTERED *****
+
+ PURGE ALL SOLUTION AND POST DATA
+ SAVE ALL MODEL DATA
+
+ ALL CURRENT ANSYS DATA WRITTEN TO FILE NAME= sag_04.db
+  FOR POSSIBLE RESUME FROM THIS POINT
+
+
+ NUMBER OF WARNING MESSAGES ENCOUNTERED=          0
+ NUMBER OF ERROR   MESSAGES ENCOUNTERED=          0
+
++--------------------- A N S Y S   S T A T I S T I C S ------------------------+
+
+Release: Release 18.0       Build: 18.0       Update: UP20161219   Platform: WINDOWS x64 
+Date Run: 11/14/2026   Time: 17:47     Process ID: 11640
+Operating System: Windows 10  (Build: 19045)
+
+Processor Model:         Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
+
+Compiler: Intel(R) FORTRAN Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) C/C++ Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) Math Kernel Library Version 11.3.3 Product Build 20160413
+
+Number of machines requested            :    1
+Total number of cores available         :    8
+Number of physical cores available      :    4
+Number of processes requested           :    1
+Number of threads per process requested :    2
+Total number of cores requested         :    2 (Shared Memory Parallel)                    
+
+GPU Acceleration: Not Requested
+
+Job Name: sag_04
+Working Directory: D:\AI-work\BridgeStudio\cases\CB3D14_cable_sag_ernst
+
+Total CPU time for main thread                    :        1.9 seconds
+Total CPU time summed for all threads             :        3.3 seconds
+
+Elapsed time spent pre-processing model (/PREP7)  :        0.0 seconds
+Elapsed time spent solution - preprocessing       :        0.0 seconds
+Elapsed time spent computing solution             :        1.6 seconds
+Elapsed time spent solution - postprocessing      :        0.0 seconds
+Elapsed time spent post-processing model (/POST1) :        0.0 seconds
+ 
+Equation solver used                              :            Sparse (symmetric)
+
+Maximum total memory used                         :       14.0 MB
+Maximum total memory allocated                    :     2112.0 MB
+Total physical memory available                   :         16 GB
+
++------------------ E N D   A N S Y S   S T A T I S T I C S -------------------+
+
+
+ *---------------------------------------------------------------------------*
+ |                                                                           |
+ |                            ANSYS RUN COMPLETED                            |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Ansys Release 18.0          Build 18.0         UP20161219     WINDOWS x64 |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Database Requested(-db)  1024 MB    Scratch Memory Requested      1024 MB |
+ | Maximum Database Used       1 MB    Maximum Scratch Memory Used     13 MB |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ |        CP Time      (sec) =          3.328       Time  =  17:47:59        |
+ |        Elapsed Time (sec) =          6.000       Date  =  11/14/2026      |
+ |                                                                           |
+ *---------------------------------------------------------------------------*

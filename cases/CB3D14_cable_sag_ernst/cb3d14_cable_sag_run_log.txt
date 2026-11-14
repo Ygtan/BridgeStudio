@@ -1,0 +1,24 @@
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j sag_01 -i sag_01.inp -o sag_01_ansys.out
+[ANSYS-sag_01] exit=0
+[ANSYS-sag_01] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j sag_02 -i sag_02.inp -o sag_02_ansys.out
+[ANSYS-sag_02] exit=0
+[ANSYS-sag_02] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j sag_03 -i sag_03.inp -o sag_03_ansys.out
+[ANSYS-sag_03] exit=0
+[ANSYS-sag_03] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j sag_04 -i sag_04.inp -o sag_04_ansys.out
+[ANSYS-sag_04] exit=0
+[ANSYS-sag_04] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j sag_05 -i sag_05.inp -o sag_05_ansys.out
+[ANSYS-sag_05] exit=0
+[ANSYS-sag_05] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j rod_00 -i rod_00.inp -o rod_00_ansys.out
+[ANSYS-rod_00] exit=0
+[ANSYS-rod_00] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j sag_half -i sag_half.inp -o sag_half_ansys.out
+[ANSYS-sag_half] exit=0
+[ANSYS-sag_half] errors=0 warnings=0
+$ D:\AI-work\FEM-Eigen\build\cable_sag_probe.exe D:\AI-work\BridgeStudio\cases\CB3D14_cable_sag_ernst\cb3d14_cable_sag.sag D:\AI-work\BridgeStudio\cases\CB3D14_cable_sag_ernst\cb3d14_cable_sag_fem.csv
+[FEM-PROBE] exit=0
+[SYNC] copied 38 files to D:\AI-work\FEM-Eigen\tests\benchmark\cable_sag_ansys_3d\cases

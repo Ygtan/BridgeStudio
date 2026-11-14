@@ -1,0 +1,14 @@
+# CB3D14 cable sag / Ernst probe
+# Single source: BridgeStudio/ansys_bridge_sag.py::SAG_CFG
+# Consumed by FEM-Eigen cable_sag_probe.exe (kernel closed-form).
+E=195000000000
+A=0.006
+LH=100
+NSEG=80
+C sag_01 462.051 99.919490770642 0.2
+C sag_02 462.051 99.921490770642 0.2
+C sag_03 462.051 99.923490770642 0.2
+C sag_04 462.051 99.925490770642 0.2
+C sag_05 462.051 99.927490770642 0.2
+C rod_00 0 99.923490770642 0
+C sag_half 231.0255 99.9168248702865 0.2

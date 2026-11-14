@@ -30,10 +30,19 @@ ANSYS APDL（`.inp`）、模型快照（`.model.json`）、ANSYS 批处理输出
 | CB3D11 | `CB3D11_suspension_earth_anchored` | 地锚式悬索桥找形 | `run_cases_susp.py` | `suspension_ansys_3d` |
 | CB3D12 | `CB3D12_suspension_self_anchored` | 自锚式悬索桥找形（手动 40 m 边跨） | `run_cases_susp.py` | `suspension_ansys_3d` |
 | CB3D13 | `CB3D13_suspension_balanced_erection` | 自锚式**自动平衡边跨 71.414 m** + 5 个施工阶段找形 | `run_cases_erection.py` | `suspension_erection_3d` |
+| CB3D14 | `CB3D14_cable_sag_ernst` | 单索垂度 / **Ernst 等效弹模** vs ANSYS 80 段 LINK180 索链（7 个 job） | `run_cases_sag.py` | `cable_sag_ansys_3d` |
+| CB3D15 | `CB3D15_suspension_cable_selfweight` | 与 CB3D13 同参数但 `cable_dens=7850`（`W>0`），验证**空缆态不再退化** | `run_cases_sag.py` | `cable_sag_ansys_3d` |
 
 CB3D13 除全桥 APDL 外还归档 5 份阶段 APDL（`*_stage1..5.inp`）与对应
 ANSYS CSV；三层验证口径见 `ansys_bridge_erection.py` 模块头与
 FEM-Eigen `tests/benchmark/suspension_erection_3d/README.md`。
+CB3D14/15 的口径与实测数字见 `ansys_bridge_sag.py` 模块头及
+FEM-Eigen `tests/benchmark/cable_sag_ansys_3d/README.md`。
+
+> CB3D14 是**单元级本构探针**：`.sag` 参数文件与 7 份 APDL 都从
+> `ansys_bridge_sag.py::SAG_CFG` 同源生成，FEM 侧由 `cable_sag_probe.exe`
+> 直接调用内核闭式；不走全桥 `ModelSpec3D.to_dat()`。`.model.json` 是可
+> 追溯的参数快照，不参与求解。
 
 ## 同源导出约定
 

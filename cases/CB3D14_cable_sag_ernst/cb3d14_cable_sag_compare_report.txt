@@ -1,0 +1,39 @@
+====================================================================================================
+CB3D14  cable sag / Ernst modulus: FEM kernel closed-form vs ANSYS segmented LINK180
+====================================================================================================
+FEM  : cable_sag_probe.exe -> fem_3d.hpp::cableTensionFromChord +
+       fem_3d_nl.hpp::cableErnstModulus (same code as cable_solver.exe)
+ANSYS: 80 LINK180 segments, NLGEOM,ON, horizontal-uniform nodal self weight,
+       INISTATE,EPEL per segment, initial geometry = straight + 0.20 m sine
+Tolerance: rtol=2e-3 on each group scale (same as H/I stages)
+
+case              W         L0 (m)      T_fem (N)      Eeq/E     H_ansys        dT/T    state
+sag_01      462.051   99.919490771    1039172.830   0.843427 1038952.066   2.124e-04     PASS
+sag_02      462.051   99.921490771    1019493.327   0.835705 1019268.963   2.201e-04     PASS
+sag_03      462.051   99.923490771    1000000.000   0.827600  999772.054   2.279e-04     PASS
+sag_04      462.051   99.925490771     980701.933   0.819102  980470.412   2.361e-04     PASS
+sag_05      462.051   99.927490771     961608.453   0.810200  961373.392   2.444e-04     PASS
+rod_00        0.000   99.923490771     895843.386   1.000000  895843.375   1.268e-08     PASS
+sag_half    231.026   99.916824870    1000000.000   0.950496  999950.664   4.934e-05     PASS
+
+case          f_fem (m)  f_ansys (m)       df/f    T_min (N)    T_max (N)    state
+sag_01      0.555791812  0.555887087  1.714e-04  1038952.000  1039202.750     PASS
+sag_02      0.566520383  0.566620918  1.775e-04  1019268.875  1019524.500     PASS
+sag_03      0.577563750  0.577669830  1.837e-04   999772.000  1000032.562     PASS
+sag_04      0.588928940  0.589040860  1.900e-04   980470.312   980736.000     PASS
+sag_05      0.600622580  0.600740647  1.966e-04   961373.312   961644.250     PASS
+sag_half    0.288781875  0.288792917  3.824e-05   999950.625  1000015.812     PASS
+
+Ernst tangent dT/dL0 (finite difference of ANSYS H over L0 sweep):
+  ANSYS_fd = -9.699638e+06 N/m
+  FEM_Ernst= -9.698616e+06 N/m   (Eeq*A/L0 with Eeq/E=0.827600)
+  relative = 1.053e-04   [PASS]
+
+W=0 straight-rod degeneration: Eeq/E = 1.000000000 (must be 1)  [PASS]
+
+Known difference: FEM closed form is a shallow-sag first-order model
+(single T instead of tension varying along the cable); the ANSYS chain
+is a finer discrete solution.  The gap scales with (V/H)^2 and is
+~2e-4 here, three orders below the 17%-68% Ernst correction.
+
+CB3D14 CABLE SAG CASE PASSED

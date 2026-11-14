@@ -1,0 +1,17 @@
+============================================================================================
+CB3D15  self-anchored suspension WITH cable self-weight (W>0)
+============================================================================================
+stage 0 (empty cable): H=354.451 kN   sag=11.7321108 m   midz=5.26789 m
+kernel H bisection lower bound = 0.1 kN (cable_solver.cpp: lo=1e2)
+[PASS] empty-cable stage is a real catenary, not the degenerate straight state
+
+stage   name      H (kN)        sag (m)       midz (m)
+   0    空缆              354.451     11.7321108       5.26789
+   1    吊装              592.345     14.6172602       2.38274
+   2    吊装               1495.3      14.818766       2.18123
+   3    吊装              2080.67     14.2543059       2.74569
+   4    合拢              2607.53     11.9494314       5.05057
+   5    铺装              3346.54             12             5
+
+W=0 reference (CB3D13 caliber): stage 0 H=0.1 kN, sag=0 m
+final stage H: W>0 = 3346.54 kN, W=0 = 3000 kN, delta = +11.55 %
