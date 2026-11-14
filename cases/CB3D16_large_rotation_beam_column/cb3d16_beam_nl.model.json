@@ -1,0 +1,101 @@
+{
+  "groups": {
+    "cir": {
+      "E": 210000000000.0,
+      "G": 81000000000.0,
+      "L": 10.0,
+      "A": 0.02,
+      "IY": 0.05,
+      "IZ": 0.0002,
+      "J": 0.01,
+      "NELEM": 8,
+      "LOADSTEPS": 40,
+      "MAXITER": 40,
+      "TOL": 1e-08,
+      "Q": 0.0,
+      "keyopt3": 0,
+      "nsubst": 100,
+      "cnvtol_f": 0.01,
+      "desc": "Cantilever end-moment roll-up (pure finite rotation)"
+    },
+    "pd": {
+      "E": 210000000000.0,
+      "G": 81000000000000.0,
+      "L": 10.0,
+      "A": 20.0,
+      "IY": 0.05,
+      "IZ": 0.0002,
+      "J": 0.001,
+      "NELEM": 64,
+      "LOADSTEPS": 20,
+      "MAXITER": 40,
+      "TOL": 1e-10,
+      "Q": 20000.0,
+      "keyopt3": 2,
+      "nsubst": 60,
+      "cnvtol_f": null,
+      "desc": "Simply supported beam-column (analytic geometric stiffness)"
+    }
+  },
+  "cases": [
+    {
+      "id": "cir025",
+      "group": "cir",
+      "kind": "CIRCLE",
+      "lam": 0.25,
+      "desc": "quarter circle, theta=pi/2"
+    },
+    {
+      "id": "cir050",
+      "group": "cir",
+      "kind": "CIRCLE",
+      "lam": 0.5,
+      "desc": "half circle, theta=pi"
+    },
+    {
+      "id": "cir075",
+      "group": "cir",
+      "kind": "CIRCLE",
+      "lam": 0.75,
+      "desc": "three-quarter circle, theta=3pi/2"
+    },
+    {
+      "id": "cir100",
+      "group": "cir",
+      "kind": "CIRCLE",
+      "lam": 1.0,
+      "desc": "full circle, theta=2pi, tip returns to root"
+    },
+    {
+      "id": "pd000",
+      "group": "pd",
+      "kind": "PDELTA",
+      "lam": 0.0,
+      "desc": "no axial force, linear EB baseline"
+    },
+    {
+      "id": "pd025",
+      "group": "pd",
+      "kind": "PDELTA",
+      "lam": 0.25,
+      "desc": "P/Pcr=0.25, mild P-Delta"
+    },
+    {
+      "id": "pd050",
+      "group": "pd",
+      "kind": "PDELTA",
+      "lam": 0.5,
+      "desc": "P/Pcr=0.50, matches test_3d_nl.cpp beam-column"
+    },
+    {
+      "id": "pd075",
+      "group": "pd",
+      "kind": "PDELTA",
+      "lam": 0.75,
+      "desc": "P/Pcr=0.75, strong P-Delta amplification"
+    }
+  ],
+  "source": "ansys_bridge_beamnl.py::BNL_GROUPS / BNL_CASES",
+  "ansys_element": "BEAM188",
+  "nlgeom": true
+}

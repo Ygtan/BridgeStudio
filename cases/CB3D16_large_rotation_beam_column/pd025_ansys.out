@@ -1,0 +1,1142 @@
+
+ ANSYS Multiphysics                                
+
+
+ *------------------------------------------------------------------*
+ |                                                                  |
+ |   W E L C O M E   T O   T H E   A N S Y S (R)  P R O G R A M     |
+ |                                                                  |
+ *------------------------------------------------------------------*
+
+
+
+
+ ***************************************************************
+ *            ANSYS Release 18.0     LEGAL NOTICES             *
+ ***************************************************************
+ *                                                             *
+ * Copyright 2016 SAS IP, Inc.  All rights reserved.           *
+ * Unauthorized use, distribution or duplication is            *
+ * prohibited.                                                 *
+ *                                                             *
+ * Ansys is a registered trademark of ANSYS, Inc. or its       *
+ * subsidiaries in the United States or other countries.       *
+ * See the ANSYS, Inc. online documentation or the ANSYS, Inc. *
+ * documentation CD or online help for the complete Legal      *
+ * Notice.                                                     *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * THIS ANSYS SOFTWARE PRODUCT AND PROGRAM DOCUMENTATION       *
+ * INCLUDE TRADE SECRETS AND CONFIDENTIAL AND PROPRIETARY      *
+ * PRODUCTS OF ANSYS, INC., ITS SUBSIDIARIES, OR LICENSORS.    *
+ * The software products and documentation are furnished by    *
+ * ANSYS, Inc. or its subsidiaries under a software license    *
+ * agreement that contains provisions concerning               *
+ * non-disclosure, copying, length and nature of use,          *
+ * compliance with exporting laws, warranties, disclaimers,    *
+ * limitations of liability, and remedies, and other           *
+ * provisions.  The software products and documentation may be *
+ * used, disclosed, transferred, or copied only in accordance  *
+ * with the terms and conditions of that software license      *
+ * agreement.                                                  *
+ *                                                             *
+ * ANSYS, Inc. is a UL registered                              *
+ * ISO 9001:2008 company.                                      *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * This product is subject to U.S. laws governing export and   *
+ * re-export.                                                  *
+ *                                                             *
+ * For U.S. Government users, except as specifically granted   *
+ * by the ANSYS, Inc. software license agreement, the use,     *
+ * duplication, or disclosure by the United States Government  *
+ * is subject to restrictions stated in the ANSYS, Inc.        *
+ * software license agreement and FAR 12.212 (for non-DOD      *
+ * licenses).                                                  *
+ *                                                             *
+ ***************************************************************
+
+ Release 18.0
+     
+ Point Releases and Patches installed:   
+     
+ ANSYS, Inc. Products Release 18.0   
+ ANSYS Mechanical Products Release 18.0  
+ ANSYS Autodyn Release 18.0  
+ ANSYS LS-DYNA Release 18.0  
+ ANSYS AIM Release 18.0  
+ ANSYS CFX (includes ANSYS CFD-Post) Release 18.0
+ ANSYS Fluent (includes ANSYS CFD-Post) Release 18.0 
+ ANSYS TurboGrid Release 18.0
+ ANSYS FENSAP-ICE Release 18.0   
+ ANSYS Polyflow (includes ANSYS CFD-Post) Release 18.0   
+ ANSYS Forte Release 18.0
+ ANSYS Chemkin Release 18.0  
+ ANSYS ICEM CFD Release 18.0 
+ ANSYS Aqwa Release 18.0 
+ ANSYS Icepak (includes ANSYS CFD-Post) Release 18.0 
+ AutoCAD Release 18.0
+ ACIS Release 18.0   
+ Catia, Version 4 Release 18.0   
+ Catia, Version 6 Release 18.0   
+ Creo Elements/Direct Modeling Release 18.0  
+ Inventor Release 18.0   
+ JTOpen Release 18.0 
+ NX Release 18.0 
+ Parasolid Release 18.0  
+ Creo Parametric (formerly Pro/ENGINEER) Release 18.0
+ Solid Edge Release 18.0 
+ SolidWorks Release 18.0 
+ ANSYS, Inc. License Manager Release 18.0
+
+
+          *****  ANSYS COMMAND LINE ARGUMENTS  *****
+  INITIAL JOBNAME              = pd025                                                                                                                                                                                                                                                   
+  BATCH MODE REQUESTED (-b)    = LIST
+  INPUT FILE COPY MODE (-c)    = COPY
+
+ RELEASE= Release 18.0         BUILD= 18.0      UP20161219   VERSION=WINDOWS x64 
+ CURRENT JOBNAME=pd025  19:08:29  NOV 14, 2026 CP=      0.250
+
+     1  /BATCH  
+     2  /TITLE,CB3D16 large-rotation beam-column - PD025
+     3  /PREP7  
+     4  ET,1,BEAM188
+     5  KEYOPT,1,1,0
+     6  KEYOPT,1,3,2
+     7  ! ASEC: integrated section properties, no ANSYS I/J recompute   
+     8  SECTYPE,1,BEAM,ASEC 
+     9  SECDATA,2.000000000000E+01,5.000000000000E-02,0,2.000000000000E-04,0,1.000000000000E-03,0,0,0,0 
+    10  SECNUM,1
+    11  MP,EX,1,2.100000000000E+11  
+    12  MP,PRXY,1,0.3   
+    13  MP,GXY,1,8.100000000000E+13 
+    14  ! ---- nodes: straight beam along global X ---- 
+    15  N,1,0.000000000000E+00,0,0  
+    16  N,2,1.562500000000E-01,0,0  
+    17  N,3,3.125000000000E-01,0,0  
+    18  N,4,4.687500000000E-01,0,0  
+    19  N,5,6.250000000000E-01,0,0  
+    20  N,6,7.812500000000E-01,0,0  
+    21  N,7,9.375000000000E-01,0,0  
+    22  N,8,1.093750000000E+00,0,0  
+    23  N,9,1.250000000000E+00,0,0  
+    24  N,10,1.406250000000E+00,0,0 
+    25  N,11,1.562500000000E+00,0,0 
+    26  N,12,1.718750000000E+00,0,0 
+    27  N,13,1.875000000000E+00,0,0 
+    28  N,14,2.031250000000E+00,0,0 
+    29  N,15,2.187500000000E+00,0,0 
+    30  N,16,2.343750000000E+00,0,0 
+    31  N,17,2.500000000000E+00,0,0 
+    32  N,18,2.656250000000E+00,0,0 
+    33  N,19,2.812500000000E+00,0,0 
+    34  N,20,2.968750000000E+00,0,0 
+    35  N,21,3.125000000000E+00,0,0 
+    36  N,22,3.281250000000E+00,0,0 
+    37  N,23,3.437500000000E+00,0,0 
+    38  N,24,3.593750000000E+00,0,0 
+    39  N,25,3.750000000000E+00,0,0 
+    40  N,26,3.906250000000E+00,0,0 
+    41  N,27,4.062500000000E+00,0,0 
+    42  N,28,4.218750000000E+00,0,0 
+    43  N,29,4.375000000000E+00,0,0 
+    44  N,30,4.531250000000E+00,0,0 
+    45  N,31,4.687500000000E+00,0,0 
+    46  N,32,4.843750000000E+00,0,0 
+    47  N,33,5.000000000000E+00,0,0 
+    48  N,34,5.156250000000E+00,0,0 
+    49  N,35,5.312500000000E+00,0,0 
+    50  N,36,5.468750000000E+00,0,0 
+    51  N,37,5.625000000000E+00,0,0 
+    52  N,38,5.781250000000E+00,0,0 
+    53  N,39,5.937500000000E+00,0,0 
+    54  N,40,6.093750000000E+00,0,0 
+    55  N,41,6.250000000000E+00,0,0 
+    56  N,42,6.406250000000E+00,0,0 
+    57  N,43,6.562500000000E+00,0,0 
+    58  N,44,6.718750000000E+00,0,0 
+    59  N,45,6.875000000000E+00,0,0 
+    60  N,46,7.031250000000E+00,0,0 
+    61  N,47,7.187500000000E+00,0,0 
+    62  N,48,7.343750000000E+00,0,0 
+    63  N,49,7.500000000000E+00,0,0 
+    64  N,50,7.656250000000E+00,0,0 
+    65  N,51,7.812500000000E+00,0,0 
+    66  N,52,7.968750000000E+00,0,0 
+    67  N,53,8.125000000000E+00,0,0 
+    68  N,54,8.281250000000E+00,0,0 
+    69  N,55,8.437500000000E+00,0,0 
+    70  N,56,8.593750000000E+00,0,0 
+    71  N,57,8.750000000000E+00,0,0 
+    72  N,58,8.906250000000E+00,0,0 
+    73  N,59,9.062500000000E+00,0,0 
+    74  N,60,9.218750000000E+00,0,0 
+    75  N,61,9.375000000000E+00,0,0 
+    76  N,62,9.531250000000E+00,0,0 
+    77  N,63,9.687500000000E+00,0,0 
+    78  N,64,9.843750000000E+00,0,0 
+    79  N,65,1.000000000000E+01,0,0 
+    80  TYPE,1  
+    81  MAT,1   
+    82  E,1,2   
+    83  E,2,3   
+    84  E,3,4   
+    85  E,4,5   
+    86  E,5,6   
+    87  E,6,7   
+    88  E,7,8   
+    89  E,8,9   
+    90  E,9,10  
+    91  E,10,11 
+    92  E,11,12 
+    93  E,12,13 
+    94  E,13,14 
+    95  E,14,15 
+    96  E,15,16 
+    97  E,16,17 
+    98  E,17,18 
+    99  E,18,19 
+   100  E,19,20 
+   101  E,20,21 
+   102  E,21,22 
+   103  E,22,23 
+   104  E,23,24 
+   105  E,24,25 
+   106  E,25,26 
+   107  E,26,27 
+   108  E,27,28 
+   109  E,28,29 
+   110  E,29,30 
+   111  E,30,31 
+   112  E,31,32 
+   113  E,32,33 
+   114  E,33,34 
+   115  E,34,35 
+   116  E,35,36 
+   117  E,36,37 
+   118  E,37,38 
+   119  E,38,39 
+   120  E,39,40 
+   121  E,40,41 
+   122  E,41,42 
+   123  E,42,43 
+   124  E,43,44 
+   125  E,44,45 
+   126  E,45,46 
+   127  E,46,47 
+   128  E,47,48 
+   129  E,48,49 
+   130  E,49,50 
+   131  E,50,51 
+   132  E,51,52 
+   133  E,52,53 
+   134  E,53,54 
+   135  E,54,55 
+   136  E,55,56 
+   137  E,56,57 
+   138  E,57,58 
+   139  E,58,59 
+   140  E,59,60 
+   141  E,60,61 
+   142  E,61,62 
+   143  E,62,63 
+   144  E,63,64 
+   145  E,64,65 
+   146  ! ---- boundary conditions ---- 
+   147  D,1,UX,0
+   148  D,1,UY,0
+   149  D,1,UZ,0
+   150  D,1,ROTX,0  
+   151  D,65,UY,0   
+   152  D,65,UZ,0   
+   153  ! ---- nodal loads (dead load, same global direction as FEM *CLOAD) ----
+   154  F,65,FX,-1.036308462114E+06 
+   155  F,33,FY,-2.000000000000E+04 
+   156  FINISH  
+   157  /SOLU   
+   158  ANTYPE,STATIC   
+   159  NLGEOM,ON   
+   160  NSUBST,60,300,10
+   161  NEQIT,200   
+   162  OUTRES,ALL,LAST 
+   163  SOLVE   
+   164  FINISH  
+   165  ! ---- post-processing: machine-readable CSV ----   
+   166  /POST1  
+   167  SET,LAST
+   168  *DIM,ADSP,ARRAY,65,7
+   169  *DO,I,1,65  
+   170   ADSP(I,1)=I
+   171   *GET,TMP,NODE,I,U,X
+   172   ADSP(I,2)=TMP  
+   173   *GET,TMP,NODE,I,U,Y
+   174   ADSP(I,3)=TMP  
+   175   *GET,TMP,NODE,I,U,Z
+   176   ADSP(I,4)=TMP  
+   177   *GET,TMP,NODE,I,ROT,X  
+   178   ADSP(I,5)=TMP  
+   179   *GET,TMP,NODE,I,ROT,Y  
+   180   ADSP(I,6)=TMP  
+   181   *GET,TMP,NODE,I,ROT,Z  
+   182   ADSP(I,7)=TMP  
+   183  *ENDDO  
+   184  *CFOPEN,pd025_disp,csv  
+   185  *VWRITE,ADSP(1,1),ADSP(1,2),ADSP(1,3),ADSP(1,4),ADSP(1,5),ADSP(1,6),ADSP(1,7)   
+   186   (1X,F8.0,6(1X,E18.10)) 
+   187  *CFCLOS 
+   188  FINISH  
+   189  /EXIT,NOSAVE
+
+ RUN SETUP PROCEDURE FROM FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans
+
+ /INPUT FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans  LINE=       0
+
+ TITLE= 
+ CB3D16 large-rotation beam-column - PD025                                     
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   19:08:29  NOV 14, 2026 CP=      0.312
+
+ CB3D16 large-rotation beam-column - PD025                                     
+
+
+
+          ***** ANSYS ANALYSIS DEFINITION (PREP7) *****
+
+ ELEMENT TYPE       1 IS BEAM188      3-D 2-NODE BEAM             
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       1 IS BEAM188      3-D 2-NODE BEAM             
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       1 IS BEAM188      3-D 2-NODE BEAM             
+  KEYOPT( 1- 6)=        0      0      2        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+                                   
+   INPUT SECTION ID NUMBER                1
+   INPUT SECTION TYPE                 BEAM
+   INPUT BEAM SECTION SUBTYPE         User Integrated 
+   INPUT BEAM SECTION NAME                    
+                     
+   SECTION ID NUMBER IS:         1
+   BEAM SECTION TYPE IS:     User Integrated 
+   BEAM SECTION NAME IS:             
+   COMPUTED BEAM SECTION DATA SUMMARY:
+    Area                 =  20.000    
+    Iyy                  = 0.50000E-01
+    Iyz                  =  0.0000    
+    Izz                  = 0.20000E-03
+    Warping Constant     =  0.0000    
+    Torsion Constant     = 0.10000E-02
+    Centroid Y           =  0.0000    
+    Centroid Z           =  0.0000    
+    Shear Center Y       =  0.0000    
+    Shear Center Z       =  0.0000    
+    Shear Correction-yy  =  1.0000    
+    Shear Correction-yz  =  0.0000    
+    Shear Correction-zz  =  1.0000    
+                 
+    Beam Section is offset to CENTROID of cross section
+
+ SECTION ID NUMBER=        1
+
+ MATERIAL         1     EX   =  0.2100000E+12  
+
+ MATERIAL         1     PRXY =  0.3000000      
+
+ MATERIAL         1     GXY  =  0.8100000E+14  
+
+ NODE         1  KCS=      0  X,Y,Z=  0.0000       0.0000       0.0000     
+
+ NODE         2  KCS=      0  X,Y,Z= 0.15625       0.0000       0.0000     
+
+ NODE         3  KCS=      0  X,Y,Z= 0.31250       0.0000       0.0000     
+
+ NODE         4  KCS=      0  X,Y,Z= 0.46875       0.0000       0.0000     
+
+ NODE         5  KCS=      0  X,Y,Z= 0.62500       0.0000       0.0000     
+
+ NODE         6  KCS=      0  X,Y,Z= 0.78125       0.0000       0.0000     
+
+ NODE         7  KCS=      0  X,Y,Z= 0.93750       0.0000       0.0000     
+
+ NODE         8  KCS=      0  X,Y,Z=  1.0938       0.0000       0.0000     
+
+ NODE         9  KCS=      0  X,Y,Z=  1.2500       0.0000       0.0000     
+
+ NODE        10  KCS=      0  X,Y,Z=  1.4062       0.0000       0.0000     
+
+ NODE        11  KCS=      0  X,Y,Z=  1.5625       0.0000       0.0000     
+
+ NODE        12  KCS=      0  X,Y,Z=  1.7188       0.0000       0.0000     
+
+ NODE        13  KCS=      0  X,Y,Z=  1.8750       0.0000       0.0000     
+
+ NODE        14  KCS=      0  X,Y,Z=  2.0312       0.0000       0.0000     
+
+ NODE        15  KCS=      0  X,Y,Z=  2.1875       0.0000       0.0000     
+
+ NODE        16  KCS=      0  X,Y,Z=  2.3438       0.0000       0.0000     
+
+ NODE        17  KCS=      0  X,Y,Z=  2.5000       0.0000       0.0000     
+
+ NODE        18  KCS=      0  X,Y,Z=  2.6562       0.0000       0.0000     
+
+ NODE        19  KCS=      0  X,Y,Z=  2.8125       0.0000       0.0000     
+
+ NODE        20  KCS=      0  X,Y,Z=  2.9688       0.0000       0.0000     
+
+ NODE        21  KCS=      0  X,Y,Z=  3.1250       0.0000       0.0000     
+
+ NODE        22  KCS=      0  X,Y,Z=  3.2812       0.0000       0.0000     
+
+ NODE        23  KCS=      0  X,Y,Z=  3.4375       0.0000       0.0000     
+
+ NODE        24  KCS=      0  X,Y,Z=  3.5938       0.0000       0.0000     
+
+ NODE        25  KCS=      0  X,Y,Z=  3.7500       0.0000       0.0000     
+
+ NODE        26  KCS=      0  X,Y,Z=  3.9062       0.0000       0.0000     
+
+ NODE        27  KCS=      0  X,Y,Z=  4.0625       0.0000       0.0000     
+
+ NODE        28  KCS=      0  X,Y,Z=  4.2188       0.0000       0.0000     
+
+ NODE        29  KCS=      0  X,Y,Z=  4.3750       0.0000       0.0000     
+
+ NODE        30  KCS=      0  X,Y,Z=  4.5313       0.0000       0.0000     
+
+ NODE        31  KCS=      0  X,Y,Z=  4.6875       0.0000       0.0000     
+
+ NODE        32  KCS=      0  X,Y,Z=  4.8438       0.0000       0.0000     
+
+ NODE        33  KCS=      0  X,Y,Z=  5.0000       0.0000       0.0000     
+
+ NODE        34  KCS=      0  X,Y,Z=  5.1562       0.0000       0.0000     
+
+ NODE        35  KCS=      0  X,Y,Z=  5.3125       0.0000       0.0000     
+
+ NODE        36  KCS=      0  X,Y,Z=  5.4688       0.0000       0.0000     
+
+ NODE        37  KCS=      0  X,Y,Z=  5.6250       0.0000       0.0000     
+
+ NODE        38  KCS=      0  X,Y,Z=  5.7813       0.0000       0.0000     
+
+ NODE        39  KCS=      0  X,Y,Z=  5.9375       0.0000       0.0000     
+
+ NODE        40  KCS=      0  X,Y,Z=  6.0938       0.0000       0.0000     
+
+ NODE        41  KCS=      0  X,Y,Z=  6.2500       0.0000       0.0000     
+
+ NODE        42  KCS=      0  X,Y,Z=  6.4063       0.0000       0.0000     
+
+ NODE        43  KCS=      0  X,Y,Z=  6.5625       0.0000       0.0000     
+
+ NODE        44  KCS=      0  X,Y,Z=  6.7188       0.0000       0.0000     
+
+ NODE        45  KCS=      0  X,Y,Z=  6.8750       0.0000       0.0000     
+
+ NODE        46  KCS=      0  X,Y,Z=  7.0313       0.0000       0.0000     
+
+ NODE        47  KCS=      0  X,Y,Z=  7.1875       0.0000       0.0000     
+
+ NODE        48  KCS=      0  X,Y,Z=  7.3438       0.0000       0.0000     
+
+ NODE        49  KCS=      0  X,Y,Z=  7.5000       0.0000       0.0000     
+
+ NODE        50  KCS=      0  X,Y,Z=  7.6562       0.0000       0.0000     
+
+ NODE        51  KCS=      0  X,Y,Z=  7.8125       0.0000       0.0000     
+
+ NODE        52  KCS=      0  X,Y,Z=  7.9688       0.0000       0.0000     
+
+ NODE        53  KCS=      0  X,Y,Z=  8.1250       0.0000       0.0000     
+
+ NODE        54  KCS=      0  X,Y,Z=  8.2812       0.0000       0.0000     
+
+ NODE        55  KCS=      0  X,Y,Z=  8.4375       0.0000       0.0000     
+
+ NODE        56  KCS=      0  X,Y,Z=  8.5938       0.0000       0.0000     
+
+ NODE        57  KCS=      0  X,Y,Z=  8.7500       0.0000       0.0000     
+
+ NODE        58  KCS=      0  X,Y,Z=  8.9062       0.0000       0.0000     
+
+ NODE        59  KCS=      0  X,Y,Z=  9.0625       0.0000       0.0000     
+
+ NODE        60  KCS=      0  X,Y,Z=  9.2187       0.0000       0.0000     
+
+ NODE        61  KCS=      0  X,Y,Z=  9.3750       0.0000       0.0000     
+
+ NODE        62  KCS=      0  X,Y,Z=  9.5312       0.0000       0.0000     
+
+ NODE        63  KCS=      0  X,Y,Z=  9.6875       0.0000       0.0000     
+
+ NODE        64  KCS=      0  X,Y,Z=  9.8438       0.0000       0.0000     
+
+ NODE        65  KCS=      0  X,Y,Z=  10.000       0.0000       0.0000     
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ ELEMENT      1       1      2      0
+
+ ELEMENT      2       2      3      0
+
+ ELEMENT      3       3      4      0
+
+ ELEMENT      4       4      5      0
+
+ ELEMENT      5       5      6      0
+
+ ELEMENT      6       6      7      0
+
+ ELEMENT      7       7      8      0
+
+ ELEMENT      8       8      9      0
+
+ ELEMENT      9       9     10      0
+
+ ELEMENT     10      10     11      0
+
+ ELEMENT     11      11     12      0
+
+ ELEMENT     12      12     13      0
+
+ ELEMENT     13      13     14      0
+
+ ELEMENT     14      14     15      0
+
+ ELEMENT     15      15     16      0
+
+ ELEMENT     16      16     17      0
+
+ ELEMENT     17      17     18      0
+
+ ELEMENT     18      18     19      0
+
+ ELEMENT     19      19     20      0
+
+ ELEMENT     20      20     21      0
+
+ ELEMENT     21      21     22      0
+
+ ELEMENT     22      22     23      0
+
+ ELEMENT     23      23     24      0
+
+ ELEMENT     24      24     25      0
+
+ ELEMENT     25      25     26      0
+
+ ELEMENT     26      26     27      0
+
+ ELEMENT     27      27     28      0
+
+ ELEMENT     28      28     29      0
+
+ ELEMENT     29      29     30      0
+
+ ELEMENT     30      30     31      0
+
+ ELEMENT     31      31     32      0
+
+ ELEMENT     32      32     33      0
+
+ ELEMENT     33      33     34      0
+
+ ELEMENT     34      34     35      0
+
+ ELEMENT     35      35     36      0
+
+ ELEMENT     36      36     37      0
+
+ ELEMENT     37      37     38      0
+
+ ELEMENT     38      38     39      0
+
+ ELEMENT     39      39     40      0
+
+ ELEMENT     40      40     41      0
+
+ ELEMENT     41      41     42      0
+
+ ELEMENT     42      42     43      0
+
+ ELEMENT     43      43     44      0
+
+ ELEMENT     44      44     45      0
+
+ ELEMENT     45      45     46      0
+
+ ELEMENT     46      46     47      0
+
+ ELEMENT     47      47     48      0
+
+ ELEMENT     48      48     49      0
+
+ ELEMENT     49      49     50      0
+
+ ELEMENT     50      50     51      0
+
+ ELEMENT     51      51     52      0
+
+ ELEMENT     52      52     53      0
+
+ ELEMENT     53      53     54      0
+
+ ELEMENT     54      54     55      0
+
+ ELEMENT     55      55     56      0
+
+ ELEMENT     56      56     57      0
+
+ ELEMENT     57      57     58      0
+
+ ELEMENT     58      58     59      0
+
+ ELEMENT     59      59     60      0
+
+ ELEMENT     60      60     61      0
+
+ ELEMENT     61      61     62      0
+
+ ELEMENT     62      62     63      0
+
+ ELEMENT     63      63     64      0
+
+ ELEMENT     64      64     65      0
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES            1 TO           1 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES            1 TO           1 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES            1 TO           1 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES            1 TO           1 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES           65 TO          65 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES           65 TO          65 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FX   FOR SELECTED NODES        65 TO       65 BY        1
+  REAL= -1036308.46       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FY   FOR SELECTED NODES        33 TO       33 BY        1
+  REAL= -20000.0000       IMAG=  0.00000000    
+
+
+ ***** ROUTINE COMPLETED *****  CP =         0.312
+
+
+
+ *****  ANSYS SOLUTION ROUTINE  *****
+
+
+ PERFORM A STATIC ANALYSIS
+  THIS WILL BE A NEW ANALYSIS
+
+ LARGE DEFORMATION ANALYSIS
+
+ USE      60 SUBSTEPS INITIALLY THIS LOAD STEP FOR ALL  DEGREES OF FREEDOM
+ FOR AUTOMATIC TIME STEPPING:
+   USE    300 SUBSTEPS AS A MAXIMUM
+   USE     10 SUBSTEPS AS A MINIMUM
+
+ USE A MAXIMUM OF   200 EQUILIBRIUM ITERATIONS EACH SUBSTEP
+
+ WRITE ALL  ITEMS TO THE DATABASE WITH A FREQUENCY OF LAST
+   FOR ALL APPLICABLE ENTITIES
+
+ *****  ANSYS SOLVE    COMMAND  *****
+
+ *** SELECTION OF ELEMENT TECHNOLOGIES FOR APPLICABLE ELEMENTS ***
+                ---GIVE SUGGESTIONS ONLY---
+
+ ELEMENT TYPE    1 IS BEAM188 . KEYOPT(1)=1 IS SUGGESTED FOR NON-CIRCULAR CROSS
+ SECTIONS AND KEYOPT(3) IS ALREADY SET AS SUGGESTED.
+
+ ELEMENT TYPE    1 IS BEAM188 . KEYOPT(15) IS ALREADY SET AS SUGGESTED.
+
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   19:08:29  NOV 14, 2026 CP=      0.328
+
+ CB3D16 large-rotation beam-column - PD025                                     
+
+
+
+                       S O L U T I O N   O P T I O N S
+
+   PROBLEM DIMENSIONALITY. . . . . . . . . . . . .3-D                  
+   DEGREES OF FREEDOM. . . . . . UX   UY   UZ   ROTX ROTY ROTZ
+   ANALYSIS TYPE . . . . . . . . . . . . . . . . .STATIC (STEADY-STATE)
+   NONLINEAR GEOMETRIC EFFECTS . . . . . . . . . .ON
+   NEWTON-RAPHSON OPTION . . . . . . . . . . . . .PROGRAM CHOSEN   
+   GLOBALLY ASSEMBLED MATRIX . . . . . . . . . . .SYMMETRIC  
+
+ *** NOTE ***                            CP =       0.328   TIME= 19:08:29
+ Present time 0 is less than or equal to the previous time.  Time will   
+ default to 1.                                                           
+
+ *** NOTE ***                            CP =       0.328   TIME= 19:08:29
+ This nonlinear analysis defaults to using the full Newton-Raphson       
+ solution procedure.  This can be modified using the NROPT command.      
+
+ SOLCONTROL,ON uses sparse matrix direct solver
+
+ *** NOTE ***                            CP =       0.328   TIME= 19:08:29
+ The conditions for direct assembly have been met.  No .emat or .erot    
+ files will be produced.                                                 
+
+ *** NOTE ***                            CP =       0.328   TIME= 19:08:29
+ Internal nodes from 66 to 129 are created.                              
+ 64 internal nodes are used for quadratic and/or cubic options of        
+ BEAM188, PIPE288, and/or SHELL208.                                      
+
+                      L O A D   S T E P   O P T I O N S
+
+   LOAD STEP NUMBER. . . . . . . . . . . . . . . .     1
+   TIME AT END OF THE LOAD STEP. . . . . . . . . .  1.0000    
+   AUTOMATIC TIME STEPPING . . . . . . . . . . . .    ON
+      INITIAL NUMBER OF SUBSTEPS . . . . . . . . .    60
+      MAXIMUM NUMBER OF SUBSTEPS . . . . . . . . .   300
+      MINIMUM NUMBER OF SUBSTEPS . . . . . . . . .    10
+   MAXIMUM NUMBER OF EQUILIBRIUM ITERATIONS. . . .   200
+   STEP CHANGE BOUNDARY CONDITIONS . . . . . . . .    NO
+   STRESS-STIFFENING . . . . . . . . . . . . . . .    ON
+   TERMINATE ANALYSIS IF NOT CONVERGED . . . . . .YES (EXIT)  
+   CONVERGENCE CONTROLS. . . . . . . . . . . . . .USE DEFAULTS
+   PRINT OUTPUT CONTROLS . . . . . . . . . . . . .NO PRINTOUT
+   DATABASE OUTPUT CONTROLS
+      ITEM     FREQUENCY   COMPONENT
+       ALL       LAST               
+
+
+ SOLUTION MONITORING INFO IS WRITTEN TO FILE= pd025.mntr                                                                                                                                                                                                                                                          
+
+ *** NOTE ***                            CP =       0.438   TIME= 19:08:29
+ Predictor is ON by default for structural elements with rotational      
+ degrees of freedom.  Use the PRED,OFF command to turn the predictor     
+ OFF if it adversely affects the convergence.                            
+
+
+ Range of element maximum matrix coefficients in global coordinates
+ Maximum = 5.529571875E+16 at element 56.                                
+ Minimum = 5.529571875E+16 at element 62.                                
+
+   *** ELEMENT MATRIX FORMULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        64  BEAM188       0.062   0.000977
+ Time at end of element matrix formulation CP = 0.46875.                 
+
+ ALL CURRENT ANSYS DATA WRITTEN TO FILE NAME= pd025.rdb
+  FOR POSSIBLE RESUME FROM THIS POINT
+     FORCE CONVERGENCE VALUE  =  0.1728E+05  CRITERION=   88.14    
+     MOMENT CONVERGENCE VALUE =   0.000      CRITERION=  0.5102E-04
+
+ SPARSE MATRIX DIRECT SOLVER.
+  Number of equations =         768,    Maximum wavefront =     24
+  Memory allocated for solver              =     8.251 MB
+  Memory required for in-core solution     =     0.603 MB
+  Memory required for out-of-core solution =     0.459 MB
+
+ *** NOTE ***                            CP =       0.547   TIME= 19:08:29
+ The Sparse Matrix Solver is currently running in the in-core memory     
+ mode.  This memory mode uses the most amount of memory in order to      
+ avoid using the hard drive as much as possible, which most often        
+ results in the fastest solution time.  This mode is recommended if      
+ enough physical memory is present to accommodate all of the solver      
+ data.                                                                   
+ Sparse solver maximum pivot= 6.585050187E+13 at node 51 UZ.             
+ Sparse solver minimum pivot= 7041276.32 at node 48 UY.                  
+ Sparse solver minimum pivot in absolute value= 7041276.32 at node 48    
+ UY.                                                                     
+     DISP CONVERGENCE VALUE   =  0.1653E-03  CRITERION=  0.8436E-05
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1653E-03
+     FORCE CONVERGENCE VALUE  =   5275.      CRITERION=   109.9    
+     MOMENT CONVERGENCE VALUE =   190.5      CRITERION=   1.648    
+     DISP CONVERGENCE VALUE   =  0.6890E-06  CRITERION=  0.8644E-05 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.6890E-06
+     FORCE CONVERGENCE VALUE  =   1.043      CRITERION=   129.8     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.2295      CRITERION=   1.947     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+
+   *** ELEMENT RESULT CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        64  BEAM188       0.000   0.000000
+
+   *** NODAL LOAD CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        64  BEAM188       0.000   0.000000
+ *** LOAD STEP     1   SUBSTEP     1  COMPLETED.    CUM ITER =      2
+ *** TIME =  0.166667E-01     TIME INC =  0.166667E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.16667E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.1064E+05  CRITERION=   215.1    
+     MOMENT CONVERGENCE VALUE =   348.9      CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.1376E-05  CRITERION=  0.8541E-05 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1376E-05
+     FORCE CONVERGENCE VALUE  =   1.286      CRITERION=   254.4     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.9244      CRITERION=   3.815     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     2  COMPLETED.    CUM ITER =      3
+ *** TIME =  0.333333E-01     TIME INC =  0.166667E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.25000E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =  0.2030E+05  CRITERION=   371.6    
+     MOMENT CONVERGENCE VALUE =   594.0      CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.2616E-05  CRITERION=  0.1294E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2616E-05
+     FORCE CONVERGENCE VALUE  =   2.386      CRITERION=   445.1     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   3.353      CRITERION=   6.677     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     3  COMPLETED.    CUM ITER =      4
+ *** TIME =  0.583333E-01     TIME INC =  0.250000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.37500E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =  0.4667E+05  CRITERION=   576.1    
+     MOMENT CONVERGENCE VALUE =   1060.      CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.5983E-05  CRITERION=  0.1972E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.5983E-05
+     FORCE CONVERGENCE VALUE  =   10.46      CRITERION=   731.3     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   17.62      CRITERION=   10.97    
+     DISP CONVERGENCE VALUE   =  0.5206E-07  CRITERION=  0.2013E-04 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.5206E-07
+     FORCE CONVERGENCE VALUE  =   1.204      CRITERION=   746.2     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.2923E-02  CRITERION=   11.19     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     4  COMPLETED.    CUM ITER =      6
+ *** TIME =  0.958333E-01     TIME INC =  0.375000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.56250E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =  0.1085E+06  CRITERION=   845.9    
+     MOMENT CONVERGENCE VALUE =   1553.      CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.1366E-04  CRITERION=  0.3028E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1366E-04
+     FORCE CONVERGENCE VALUE  =   54.12      CRITERION=   1160.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   93.41      CRITERION=   17.41    
+     DISP CONVERGENCE VALUE   =  0.2799E-06  CRITERION=  0.3092E-04 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2799E-06
+     FORCE CONVERGENCE VALUE  =   1.017      CRITERION=   1184.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.4712E-02  CRITERION=   17.76     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     5  COMPLETED.    CUM ITER =      8
+ *** TIME =  0.152083         TIME INC =  0.562500E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.84375E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =  0.2565E+06  CRITERION=   1251.    
+     MOMENT CONVERGENCE VALUE =   4155.      CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.3132E-04  CRITERION=  0.4705E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3132E-04
+     FORCE CONVERGENCE VALUE  =   288.4      CRITERION=   1804.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   505.7      CRITERION=   27.06    
+     DISP CONVERGENCE VALUE   =  0.1549E-05  CRITERION=  0.4809E-04 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1549E-05
+     FORCE CONVERGENCE VALUE  =   1.240      CRITERION=   1841.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.2137E-01  CRITERION=   27.62     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     6  COMPLETED.    CUM ITER =     10
+ *** TIME =  0.236458         TIME INC =  0.843750E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.10000      INCREASED (FACTOR = 1.1852)
+
+     FORCE CONVERGENCE VALUE  =  0.4298E+06  CRITERION=   1824.    
+     MOMENT CONVERGENCE VALUE =  0.1276E+05  CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.5017E-04  CRITERION=  0.5841E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.5017E-04
+     FORCE CONVERGENCE VALUE  =   754.8      CRITERION=   2566.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   1355.      CRITERION=   38.49    
+     DISP CONVERGENCE VALUE   =  0.4257E-05  CRITERION=  0.5983E-04 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4257E-05
+     FORCE CONVERGENCE VALUE  =   4.452      CRITERION=   2620.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.1410      CRITERION=   39.30     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     7  COMPLETED.    CUM ITER =     12
+ *** TIME =  0.336458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.5157E+06  CRITERION=   2337.    
+     MOMENT CONVERGENCE VALUE =  0.1942E+05  CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.5771E-04  CRITERION=  0.6157E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.5771E-04
+     FORCE CONVERGENCE VALUE  =   1020.      CRITERION=   3328.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   1866.      CRITERION=   49.93    
+     DISP CONVERGENCE VALUE   =  0.6035E-05  CRITERION=  0.6314E-04 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.6035E-05
+     FORCE CONVERGENCE VALUE  =   8.378      CRITERION=   3399.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.2649      CRITERION=   50.98     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     8  COMPLETED.    CUM ITER =     14
+ *** TIME =  0.436458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.5768E+06  CRITERION=   2855.    
+     MOMENT CONVERGENCE VALUE =  0.2488E+05  CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.6184E-04  CRITERION=  0.6504E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.6184E-04
+     FORCE CONVERGENCE VALUE  =   1198.      CRITERION=   4091.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   2234.      CRITERION=   61.37    
+     DISP CONVERGENCE VALUE   =  0.7423E-05  CRITERION=  0.6675E-04 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.7423E-05
+     FORCE CONVERGENCE VALUE  =   12.64      CRITERION=   4177.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.3701      CRITERION=   62.66     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     9  COMPLETED.    CUM ITER =     16
+ *** TIME =  0.536458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.6471E+06  CRITERION=   3393.    
+     MOMENT CONVERGENCE VALUE =  0.3169E+05  CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.6626E-04  CRITERION=  0.6880E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.6626E-04
+     FORCE CONVERGENCE VALUE  =   1411.      CRITERION=   4854.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   2681.      CRITERION=   72.81    
+     DISP CONVERGENCE VALUE   =  0.9172E-05  CRITERION=  0.7068E-04 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.9172E-05
+     FORCE CONVERGENCE VALUE  =   19.27      CRITERION=   4956.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.5237      CRITERION=   74.34     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP    10  COMPLETED.    CUM ITER =     18
+ *** TIME =  0.636458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.7282E+06  CRITERION=   3937.    
+     MOMENT CONVERGENCE VALUE =  0.4019E+05  CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.7098E-04  CRITERION=  0.7289E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.7098E-04
+     FORCE CONVERGENCE VALUE  =   1665.      CRITERION=   5617.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   3227.      CRITERION=   84.25    
+     DISP CONVERGENCE VALUE   =  0.1138E-04  CRITERION=  0.7497E-04 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1138E-04
+     FORCE CONVERGENCE VALUE  =   29.77      CRITERION=   5735.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.7404      CRITERION=   86.02     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP    11  COMPLETED.    CUM ITER =     20
+ *** TIME =  0.736458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.8224E+06  CRITERION=   4482.    
+     MOMENT CONVERGENCE VALUE =  0.5084E+05  CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.7599E-04  CRITERION=  0.7734E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.7599E-04
+     FORCE CONVERGENCE VALUE  =   1970.      CRITERION=   6380.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   3895.      CRITERION=   95.69    
+     DISP CONVERGENCE VALUE   =  0.1417E-04  CRITERION=  0.7966E-04 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1417E-04
+     FORCE CONVERGENCE VALUE  =   45.90      CRITERION=   6513.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   1.048      CRITERION=   97.70     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP    12  COMPLETED.    CUM ITER =     22
+ *** TIME =  0.836458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.9321E+06  CRITERION=   5029.    
+     MOMENT CONVERGENCE VALUE =  0.6423E+05  CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.8128E-04  CRITERION=  0.8221E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.8128E-04
+     FORCE CONVERGENCE VALUE  =   2336.      CRITERION=   7142.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   4714.      CRITERION=   107.1    
+     DISP CONVERGENCE VALUE   =  0.1770E-04  CRITERION=  0.8481E-04 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1770E-04
+     FORCE CONVERGENCE VALUE  =   71.18      CRITERION=   7292.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   1.481      CRITERION=   109.4     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP    13  COMPLETED.    CUM ITER =     24
+ *** TIME =  0.936458         TIME INC =  0.100000    
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.63542E-01  DECREASED (FACTOR = 0.6354)
+
+     FORCE CONVERGENCE VALUE  =  0.5508E+06  CRITERION=   5874.    
+     MOMENT CONVERGENCE VALUE =  0.2886E+05  CRITERION=  0.5102E-04
+     DISP CONVERGENCE VALUE   =  0.4945E-04  CRITERION=  0.8312E-04 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4945E-04
+     FORCE CONVERGENCE VALUE  =   852.4      CRITERION=   7629.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   1697.      CRITERION=   114.4    
+     DISP CONVERGENCE VALUE   =  0.6504E-05  CRITERION=  0.8481E-04 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.6504E-05
+     FORCE CONVERGENCE VALUE  =   9.885      CRITERION=   7787.     <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.2097      CRITERION=   116.8     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP    14  COMPLETED.    CUM ITER =     26
+ *** TIME =   1.00000         TIME INC =  0.635417E-01
+
+
+ *** ANSYS BINARY FILE STATISTICS
+  BUFFER SIZE USED= 16384
+        0.250 MB WRITTEN ON ELEMENT SAVED DATA FILE: pd025.esav
+        0.125 MB WRITTEN ON ASSEMBLED MATRIX FILE: pd025.full
+        0.375 MB WRITTEN ON RESULTS FILE: pd025.rst
+
+ FINISH SOLUTION PROCESSING
+
+
+ ***** ROUTINE COMPLETED *****  CP =         3.203
+
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   19:08:30  NOV 14, 2026 CP=      3.234
+
+ CB3D16 large-rotation beam-column - PD025                                     
+
+
+
+          ***** ANSYS RESULTS INTERPRETATION (POST1) *****
+
+ *** NOTE ***                            CP =       3.234   TIME= 19:08:30
+ Reading results into the database (SET command) will update the current 
+ displacement and force boundary conditions in the database with the     
+ values from the results file for that load set.  Note that any          
+ subsequent solutions will use these values unless action is taken to    
+ either SAVE the current values or not overwrite them (/EXIT,NOSAVE).    
+
+
+ USE LAST SUBSTEP ON RESULT FILE  FOR LOAD CASE 0 
+
+ SET COMMAND GOT LOAD STEP=     1  SUBSTEP=    14  CUMULATIVE ITERATION=    26
+   TIME/FREQUENCY=  1.0000    
+ TITLE= CB3D16 large-rotation beam-column - PD025                               
+
+ SET PARAMETER DIMENSIONS ON  ADSP TYPE=ARRA  DIMENSIONS=    65     7     1
+
+ *DO LOOP ON PARAMETER= I FROM  1.0000     TO  65.000     BY  1.0000    
+
+ PARAMETER ADSP(I,1) =     1.000000000    
+
+ *GET  TMP       FROM  NODE      1  ITEM=U    X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(I,2) =     0.000000000    
+
+ *GET  TMP       FROM  NODE      1  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(I,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE      1  ITEM=U    Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(I,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE      1  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(I,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE      1  ITEM=ROT  Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(I,6) =     0.000000000    
+
+ *GET  TMP       FROM  NODE      1  ITEM=ROT  Z     VALUE=-0.399698170E-02
+
+ PARAMETER ADSP(I,7) =   -0.3996981702E-02
+
+ *ENDDO  INDEX= I                               
+
+ OPENED FILE= pd025_disp.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ EXIT THE ANSYS POST1 DATABASE PROCESSOR
+
+
+ ***** ROUTINE COMPLETED *****  CP =         3.266
+
+
+
+ EXIT ANSYS WITHOUT SAVING DATABASE
+
+
+ NUMBER OF WARNING MESSAGES ENCOUNTERED=          0
+ NUMBER OF ERROR   MESSAGES ENCOUNTERED=          0
+
++--------------------- A N S Y S   S T A T I S T I C S ------------------------+
+
+Release: Release 18.0       Build: 18.0       Update: UP20161219   Platform: WINDOWS x64 
+Date Run: 11/14/2026   Time: 19:08     Process ID: 4880
+Operating System: Windows 10  (Build: 19045)
+
+Processor Model:         Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
+
+Compiler: Intel(R) FORTRAN Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) C/C++ Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) Math Kernel Library Version 11.3.3 Product Build 20160413
+
+Number of machines requested            :    1
+Total number of cores available         :    8
+Number of physical cores available      :    4
+Number of processes requested           :    1
+Number of threads per process requested :    2
+Total number of cores requested         :    2 (Shared Memory Parallel)                    
+
+GPU Acceleration: Not Requested
+
+Job Name: pd025
+Working Directory: D:\AI-work\BridgeStudio\cases\CB3D16_large_rotation_beam_column
+
+Total CPU time for main thread                    :        1.8 seconds
+Total CPU time summed for all threads             :        3.3 seconds
+
+Elapsed time spent pre-processing model (/PREP7)  :        0.0 seconds
+Elapsed time spent solution - preprocessing       :        0.0 seconds
+Elapsed time spent computing solution             :        1.5 seconds
+Elapsed time spent solution - postprocessing      :        0.0 seconds
+Elapsed time spent post-processing model (/POST1) :        0.0 seconds
+ 
+Equation solver used                              :            Sparse (symmetric)
+
+Maximum total memory used                         :       15.0 MB
+Maximum total memory allocated                    :     2112.0 MB
+Total physical memory available                   :         16 GB
+
++------------------ E N D   A N S Y S   S T A T I S T I C S -------------------+
+
+
+ *---------------------------------------------------------------------------*
+ |                                                                           |
+ |                            ANSYS RUN COMPLETED                            |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Ansys Release 18.0          Build 18.0         UP20161219     WINDOWS x64 |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Database Requested(-db)  1024 MB    Scratch Memory Requested      1024 MB |
+ | Maximum Database Used       1 MB    Maximum Scratch Memory Used     14 MB |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ |        CP Time      (sec) =          3.312       Time  =  19:08:30        |
+ |        Elapsed Time (sec) =          5.000       Date  =  11/14/2026      |
+ |                                                                           |
+ *---------------------------------------------------------------------------*

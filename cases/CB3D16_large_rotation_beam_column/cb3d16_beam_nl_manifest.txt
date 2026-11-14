@@ -1,0 +1,45 @@
+================================================================================================
+CB3D16  大转动梁柱效应算例归档
+================================================================================================
+
+唯一数据源: BridgeStudio/ansys_bridge_beamnl.py::BNL_GROUPS / BNL_CASES
+同一份参数导出 *.beam (FEM-Eigen beam_nl_probe.exe) 与 8 份 BEAM188 APDL。
+
+[cir] Cantilever end-moment roll-up (pure finite rotation)
+  E=210000000000.0 Pa  G=81000000000.0 Pa  L=10.0 m  A=0.02 m2
+  IY=0.05  IZ=0.0002  J=0.01  NELEM=8  Q=0.0 N
+  LOADSTEPS=40  MAXITER=40  TOL=1e-08
+  KEYOPT(3)=0  NSUBST=100  CNVTOL_F=0.01
+[pd] Simply supported beam-column (analytic geometric stiffness)
+  E=210000000000.0 Pa  G=81000000000000.0 Pa  L=10.0 m  A=20.0 m2
+  IY=0.05  IZ=0.0002  J=0.001  NELEM=64  Q=20000.0 N
+  LOADSTEPS=20  MAXITER=40  TOL=1e-10
+  KEYOPT(3)=2  NSUBST=60  CNVTOL_F=None
+
+工况 8 个：
+  cir025    CIRCLE  lambda=0.25   # quarter circle, theta=pi/2
+  cir050    CIRCLE  lambda=0.50   # half circle, theta=pi
+  cir075    CIRCLE  lambda=0.75   # three-quarter circle, theta=3pi/2
+  cir100    CIRCLE  lambda=1.00   # full circle, theta=2pi, tip returns to root
+  pd000     PDELTA  lambda=0.00   # no axial force, linear EB baseline
+  pd025     PDELTA  lambda=0.25   # P/Pcr=0.25, mild P-Delta
+  pd050     PDELTA  lambda=0.50   # P/Pcr=0.50, matches test_3d_nl.cpp beam-column
+  pd075     PDELTA  lambda=0.75   # P/Pcr=0.75, strong P-Delta amplification
+
+ANSYS 18.0 作业日志（errors/warnings）：
+  cir025       errors=0 warnings=0
+  cir050       errors=0 warnings=0
+  cir075       errors=0 warnings=0
+  cir100       errors=0 warnings=0
+  pd000        errors=0 warnings=0
+  pd025        errors=0 warnings=0
+  pd050        errors=0 warnings=0
+  pd075        errors=0 warnings=0
+
+口径说明：BEAM188 是 Timoshenko 单元，FEM CR 梁是 Euler-Bernoulli。
+  PDELTA 组用 KEYOPT(3)=2 三次插值消除剪切锁定、G 提高 1000 倍消除
+  剪切柔度；CIRCLE 组为纯弯矩、无横向剪力，保持默认即可。
+  诊断数据见 FEM-Eigen/tests/benchmark/beam_nl_ansys_3d/README.md。
+
+保留 .beam / .inp / .csv / .txt / .out / .json 作为归档证据；
+ANSYS 二进制与数据库产物由 .gitignore 排除。

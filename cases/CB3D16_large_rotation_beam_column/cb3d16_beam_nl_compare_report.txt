@@ -1,0 +1,41 @@
+========================================================================================================
+CB3D16  large-rotation beam-column: FEM CR kernel (fem_3d_nl.hpp) vs ANSYS BEAM188+NLGEOM
+========================================================================================================
+FEM  : beam_nl_probe.exe -> solveModel3DNonlinear (co-rotational triad,
+       analytic geometric stiffness crBeamTangent12, Newton + load steps)
+ANSYS: BEAM188 + NLGEOM,ON + NSUBST/NEQIT, ASEC section, LAST-result CSV
+  CIRCLE group: pure end moment, default linear interpolation (no shear)
+  PDELTA group: KEYOPT(3)=2 cubic + G*1000 -> remove shear locking / shear
+                flexibility, so BEAM188 degenerates to Euler-Bernoulli
+Tolerance: |dU| <= ATOL + RTOL*per-DOF scale, ATOL=1.0e-08 RTOL=2.0e-03
+
+case      kind        max|dU|     max|dR| worst d/tol     state  physics
+cir025    CIRCLE   3.8140e-10  2.0510e-10  6.5285e-08      PASS  quarter circle, theta=pi/2
+cir050    CIRCLE   5.0400e-10  4.9360e-10  7.8559e-08      PASS  half circle, theta=pi
+cir075    CIRCLE   3.7700e-09  3.8470e-10  1.5510e-07      PASS  three-quarter circle, theta=3pi/2
+cir100    CIRCLE   3.6090e-10  4.1020e-10  4.0626e-08      PASS  full circle, theta=2pi, tip returns to root
+pd000     PDELTA   4.8074e-09  2.0416e-10  8.3986e-02      PASS  no axial force, linear EB baseline
+pd025     PDELTA   8.7494e-07  2.6746e-07  1.4223e-01      PASS  P/Pcr=0.25, mild P-Delta
+pd050     PDELTA   3.5556e-06  1.0985e-06  2.3084e-01      PASS  P/Pcr=0.50, matches test_3d_nl.cpp beam-column
+pd075     PDELTA   2.3436e-05  7.3381e-06  6.7657e-01      PASS  P/Pcr=0.75, strong P-Delta amplification
+
+--- CIRCLE: finite rotation, analytic circular elastica ---
+case          theta     xtip_ansys     xtip_exact     ytip_ansys     ytip_exact   rot_error
+cir025      1.57080    6.376435773    6.366197724    6.376435773    6.366197724   1.306e-10
+cir050      3.14159    0.000000000    0.000000000    6.407288619    6.366197724   1.306e-10
+cir075      4.71239   -2.153058870   -2.122065908    2.153058873    2.122065908   8.163e-11
+cir100      6.28319    0.000000000   -0.000000000    0.000000000    0.000000000   2.858e-11
+  full-circle closure |tip-root| = 2.6301e-12 m   [PASS]
+  NOTE: the ~1e-2..4e-2 m gap between FEM/ANSYS and the exact arc is the
+  8-segment chord discretisation (O(theta^2/n^2)); FEM and ANSYS share it,
+  while their mutual difference stays at 1e-9 m / 1e-10 rad.
+
+--- PDELTA: analytic geometric stiffness (Timoshenko beam-column) ---
+case           P/Pcr       ymid_fem     ymid_ansys        y_exact    amp_fem     amp_ex
+pd000           0.00    0.009920595    0.009920595    0.009920635    1.00000    1.00000
+pd025           0.25    0.013182320    0.013183195    0.013183311    1.32878    1.32888
+pd050           0.50    0.019700852    0.019704408    0.019705236    1.98585    1.98629
+pd075           0.75    0.039235063    0.039258499    0.039263554    3.95489    3.95777
+  amplification factor monotonically increases 1 -> 3.957   [PASS]
+
+CB3D16 LARGE-ROTATION BEAM-COLUMN CASE PASSED

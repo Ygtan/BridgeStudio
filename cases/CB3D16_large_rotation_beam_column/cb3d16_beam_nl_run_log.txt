@@ -1,0 +1,27 @@
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cir025 -i cir025.inp -o cir025_ansys.out
+[ANSYS-cir025] exit=0
+[ANSYS-cir025] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cir050 -i cir050.inp -o cir050_ansys.out
+[ANSYS-cir050] exit=0
+[ANSYS-cir050] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cir075 -i cir075.inp -o cir075_ansys.out
+[ANSYS-cir075] exit=0
+[ANSYS-cir075] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cir100 -i cir100.inp -o cir100_ansys.out
+[ANSYS-cir100] exit=0
+[ANSYS-cir100] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j pd000 -i pd000.inp -o pd000_ansys.out
+[ANSYS-pd000] exit=0
+[ANSYS-pd000] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j pd025 -i pd025.inp -o pd025_ansys.out
+[ANSYS-pd025] exit=0
+[ANSYS-pd025] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j pd050 -i pd050.inp -o pd050_ansys.out
+[ANSYS-pd050] exit=0
+[ANSYS-pd050] errors=0 warnings=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j pd075 -i pd075.inp -o pd075_ansys.out
+[ANSYS-pd075] exit=0
+[ANSYS-pd075] errors=0 warnings=0
+$ D:\AI-work\FEM-Eigen\build\beam_nl_probe.exe D:\AI-work\BridgeStudio\cases\CB3D16_large_rotation_beam_column\cb3d16_beam_nl.beam D:\AI-work\BridgeStudio\cases\CB3D16_large_rotation_beam_column\cb3d16_beam_nl_fem.csv
+[FEM-BEAMNL] exit=0
+[SYNC] copied 30 files to D:\AI-work\FEM-Eigen\tests\benchmark\beam_nl_ansys_3d\cases

@@ -5,7 +5,7 @@
 ANSYS APDL（`.inp`）、模型快照（`.model.json`）、ANSYS 批处理输出
 （`.out` / CSV）与对比报告（`.txt`），可离线复查，不需要再跑 ANSYS。
 
-命名规则：`CB01~CB05` 为 2D 连续梁，`CB3D01~CB3D13` 为 3D 算例；
+命名规则：`CB01~CB05` 为 2D 连续梁，`CB3D01~CB3D16` 为 3D 算例；
 编号按接入顺序递增，与 FEM-Eigen 侧 `tests/benchmark/` 的回归套件一一对应。
 
 ## 算例清单
@@ -32,17 +32,26 @@ ANSYS APDL（`.inp`）、模型快照（`.model.json`）、ANSYS 批处理输出
 | CB3D13 | `CB3D13_suspension_balanced_erection` | 自锚式**自动平衡边跨 71.414 m** + 5 个施工阶段找形 | `run_cases_erection.py` | `suspension_erection_3d` |
 | CB3D14 | `CB3D14_cable_sag_ernst` | 单索垂度 / **Ernst 等效弹模** vs ANSYS 80 段 LINK180 索链（7 个 job） | `run_cases_sag.py` | `cable_sag_ansys_3d` |
 | CB3D15 | `CB3D15_suspension_cable_selfweight` | 与 CB3D13 同参数但 `cable_dens=7850`（`W>0`），验证**空缆态不再退化** | `run_cases_sag.py` | `cable_sag_ansys_3d` |
+| CB3D16 | `CB3D16_large_rotation_beam_column` | 共转 CR 梁**大转动卷圆**（至 2π）+ **梁柱 P-Δ 放大** vs ANSYS `BEAM188 + NLGEOM`（8 个 job） | `run_cases_beamnl.py` | `beam_nl_ansys_3d` |
 
 CB3D13 除全桥 APDL 外还归档 5 份阶段 APDL（`*_stage1..5.inp`）与对应
 ANSYS CSV；三层验证口径见 `ansys_bridge_erection.py` 模块头与
 FEM-Eigen `tests/benchmark/suspension_erection_3d/README.md`。
 CB3D14/15 的口径与实测数字见 `ansys_bridge_sag.py` 模块头及
 FEM-Eigen `tests/benchmark/cable_sag_ansys_3d/README.md`。
+CB3D16 是首个同时启用 `BEAM188` 与 `NLGEOM` 的算例，另有 BEAM188
+剪切锁定 / 剪切柔度的实测诊断，见 `ansys_bridge_beamnl.py` 模块头及
+FEM-Eigen `tests/benchmark/beam_nl_ansys_3d/README.md`。
 
 > CB3D14 是**单元级本构探针**：`.sag` 参数文件与 7 份 APDL 都从
 > `ansys_bridge_sag.py::SAG_CFG` 同源生成，FEM 侧由 `cable_sag_probe.exe`
 > 直接调用内核闭式；不走全桥 `ModelSpec3D.to_dat()`。`.model.json` 是可
 > 追溯的参数快照，不参与求解。
+>
+> CB3D16 同理是**梁单元级探针**：`.beam` 参数文件与 8 份 APDL 都从
+> `ansys_bridge_beamnl.py::BNL_GROUPS / BNL_CASES` 同源生成，FEM 侧由
+> `beam_nl_probe.exe` 直接调 `fem_3d_nl.hpp::solveModel3DNonlinear`；
+> 也不走 `ModelSpec3D.to_dat()`。
 
 ## 同源导出约定
 
