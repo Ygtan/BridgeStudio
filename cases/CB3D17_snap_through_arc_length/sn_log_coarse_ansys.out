@@ -1,0 +1,1320 @@
+
+ ANSYS Multiphysics                                
+
+
+ *------------------------------------------------------------------*
+ |                                                                  |
+ |   W E L C O M E   T O   T H E   A N S Y S (R)  P R O G R A M     |
+ |                                                                  |
+ *------------------------------------------------------------------*
+
+
+
+
+ ***************************************************************
+ *            ANSYS Release 18.0     LEGAL NOTICES             *
+ ***************************************************************
+ *                                                             *
+ * Copyright 2016 SAS IP, Inc.  All rights reserved.           *
+ * Unauthorized use, distribution or duplication is            *
+ * prohibited.                                                 *
+ *                                                             *
+ * Ansys is a registered trademark of ANSYS, Inc. or its       *
+ * subsidiaries in the United States or other countries.       *
+ * See the ANSYS, Inc. online documentation or the ANSYS, Inc. *
+ * documentation CD or online help for the complete Legal      *
+ * Notice.                                                     *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * THIS ANSYS SOFTWARE PRODUCT AND PROGRAM DOCUMENTATION       *
+ * INCLUDE TRADE SECRETS AND CONFIDENTIAL AND PROPRIETARY      *
+ * PRODUCTS OF ANSYS, INC., ITS SUBSIDIARIES, OR LICENSORS.    *
+ * The software products and documentation are furnished by    *
+ * ANSYS, Inc. or its subsidiaries under a software license    *
+ * agreement that contains provisions concerning               *
+ * non-disclosure, copying, length and nature of use,          *
+ * compliance with exporting laws, warranties, disclaimers,    *
+ * limitations of liability, and remedies, and other           *
+ * provisions.  The software products and documentation may be *
+ * used, disclosed, transferred, or copied only in accordance  *
+ * with the terms and conditions of that software license      *
+ * agreement.                                                  *
+ *                                                             *
+ * ANSYS, Inc. is a UL registered                              *
+ * ISO 9001:2008 company.                                      *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * This product is subject to U.S. laws governing export and   *
+ * re-export.                                                  *
+ *                                                             *
+ * For U.S. Government users, except as specifically granted   *
+ * by the ANSYS, Inc. software license agreement, the use,     *
+ * duplication, or disclosure by the United States Government  *
+ * is subject to restrictions stated in the ANSYS, Inc.        *
+ * software license agreement and FAR 12.212 (for non-DOD      *
+ * licenses).                                                  *
+ *                                                             *
+ ***************************************************************
+
+ Release 18.0
+     
+ Point Releases and Patches installed:   
+     
+ ANSYS, Inc. Products Release 18.0   
+ ANSYS Mechanical Products Release 18.0  
+ ANSYS Autodyn Release 18.0  
+ ANSYS LS-DYNA Release 18.0  
+ ANSYS AIM Release 18.0  
+ ANSYS CFX (includes ANSYS CFD-Post) Release 18.0
+ ANSYS Fluent (includes ANSYS CFD-Post) Release 18.0 
+ ANSYS TurboGrid Release 18.0
+ ANSYS FENSAP-ICE Release 18.0   
+ ANSYS Polyflow (includes ANSYS CFD-Post) Release 18.0   
+ ANSYS Forte Release 18.0
+ ANSYS Chemkin Release 18.0  
+ ANSYS ICEM CFD Release 18.0 
+ ANSYS Aqwa Release 18.0 
+ ANSYS Icepak (includes ANSYS CFD-Post) Release 18.0 
+ AutoCAD Release 18.0
+ ACIS Release 18.0   
+ Catia, Version 4 Release 18.0   
+ Catia, Version 6 Release 18.0   
+ Creo Elements/Direct Modeling Release 18.0  
+ Inventor Release 18.0   
+ JTOpen Release 18.0 
+ NX Release 18.0 
+ Parasolid Release 18.0  
+ Creo Parametric (formerly Pro/ENGINEER) Release 18.0
+ Solid Edge Release 18.0 
+ SolidWorks Release 18.0 
+ ANSYS, Inc. License Manager Release 18.0
+
+
+          *****  ANSYS COMMAND LINE ARGUMENTS  *****
+  INITIAL JOBNAME              = sn_log_coarse                                                                                                                                                                                                                                           
+  BATCH MODE REQUESTED (-b)    = LIST
+  INPUT FILE COPY MODE (-c)    = COPY
+
+ RELEASE= Release 18.0         BUILD= 18.0      UP20161219   VERSION=WINDOWS x64 
+ CURRENT JOBNAME=sn_log_coarse  20:25:43  NOV 14, 2026 CP=      0.250
+
+     1  /TITLE,von Mises truss snap-through - sn_log_coarse 
+     2  /PREP7  
+     3  ET,1,LINK180
+     4  KEYOPT,1,2,1
+     5  KEYOPT,1,3,0
+     6  R,1,1.000000000000E-03  
+     7  MP,EX,1,2.100000000000E+11  
+     8  MP,PRXY,1,3.000000000000E-01
+     9  MP,DENS,1,0 
+    10  N,1,-2.000000000000E+00,0.000000000000E+00,0
+    11  N,2,0.000000000000E+00,5.000000000000E-01,0 
+    12  N,3,2.000000000000E+00,0.000000000000E+00,0 
+    13  E,1,2   
+    14  E,2,3   
+    15  D,1,ALL,0   
+    16  D,3,ALL,0   
+    17  D,2,UZ,0
+    18  FINISH  
+    19  /SOLU   
+    20  ANTYPE,STATIC   
+    21  NLGEOM,ON   
+    22  AUTOTS,OFF  
+    23  ARCLEN,ON,2.000000000000E-02,1.000000000000E-07 
+    24  NSUBST,500,2500,20  
+    25  NEQIT,60
+    26  TIME,1.000000000000E+00 
+    27  OUTRES,ALL,ALL  
+    28  F,2,FY,-2.000000000000E+06  
+    29  ARCTRM,U,1.000000000000E+00,2,UY
+    30  SOLVE   
+    31  FINISH  
+    32  /POST1  
+    33  *GET,NSET,ACTIVE,0,SET,NSET 
+    34  *DIM,CURV,ARRAY,NSET,5  
+    35  *DO,I,1,NSET
+    36   SET,,,,,,,I
+    37   *GET,VY,NODE,2,U,Y 
+    38   *GET,R1,NODE,1,RF,FY   
+    39   *GET,R3,NODE,3,RF,FY   
+    40   *GET,TNOW,ACTIVE,0,SET,TIME
+    41   CURV(I,1)=I
+    42   CURV(I,2)=VY   
+    43   CURV(I,3)=R1   
+    44   CURV(I,4)=R3   
+    45   CURV(I,5)=TNOW 
+    46  *ENDDO  
+    47  *CFOPEN,sn_log_coarse_curve,csv 
+    48  *VWRITE,CURV(1,1),CURV(1,2),CURV(1,3),CURV(1,4),CURV(1,5)   
+    49   (1X,F8.0,4(1X,E20.12)) 
+    50  *CFCLOS 
+    51  FINISH  
+    52  /EXIT,NOSAVE
+
+ RUN SETUP PROCEDURE FROM FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans
+
+ /INPUT FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans  LINE=       0
+
+ TITLE= 
+ von Mises truss snap-through - sn_log_coarse                                  
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   20:25:43  NOV 14, 2026 CP=      0.297
+
+ von Mises truss snap-through - sn_log_coarse                                  
+
+
+
+          ***** ANSYS ANALYSIS DEFINITION (PREP7) *****
+
+ ELEMENT TYPE       1 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ  
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       1 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      1      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ  
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       1 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      1      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ  
+  THREE-DIMENSIONAL MODEL
+
+ REAL CONSTANT SET       1  ITEMS   1 TO   6
+   0.10000E-02   0.0000       0.0000       0.0000       0.0000       0.0000    
+
+ MATERIAL         1     EX   =  0.2100000E+12  
+
+ MATERIAL         1     PRXY =  0.3000000      
+
+ MATERIAL         1     DENS =   0.000000      
+
+ NODE         1  KCS=      0  X,Y,Z= -2.0000       0.0000       0.0000     
+
+ NODE         2  KCS=      0  X,Y,Z=  0.0000      0.50000       0.0000     
+
+ NODE         3  KCS=      0  X,Y,Z=  2.0000       0.0000       0.0000     
+
+ ELEMENT      1       1      2
+
+ ELEMENT      2       2      3
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES            1 TO           1 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+ ADDITIONAL DOFS=  UY    UZ  
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES            3 TO           3 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+ ADDITIONAL DOFS=  UY    UZ  
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES            2 TO           2 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+
+ ***** ROUTINE COMPLETED *****  CP =         0.297
+
+
+
+ *****  ANSYS SOLUTION ROUTINE  *****
+
+
+ PERFORM A STATIC ANALYSIS
+  THIS WILL BE A NEW ANALYSIS
+
+ LARGE DEFORMATION ANALYSIS
+
+ DO NOT USE AUTOMATIC TIME STEPPING THIS LOAD STEP
+
+ USE THE ARC-LENGTH  METHOD
+
+ *** NOTE ***                            CP =       0.297   TIME= 20:25:43
+ The maximum multiplier of the reference arc-length radius must be       
+ greater than 1.  It has been reset to a default value of 25.            
+  USE MINIMUM MULTIPLIER OF  0.10000E-06 FOR THE ARC-LENGTH RADIUS
+
+ USE     500 SUBSTEPS INITIALLY THIS LOAD STEP FOR ALL  DEGREES OF FREEDOM
+ FOR AUTOMATIC TIME STEPPING:
+   USE   2500 SUBSTEPS AS A MAXIMUM
+   USE     20 SUBSTEPS AS A MINIMUM
+
+ USE A MAXIMUM OF    60 EQUILIBRIUM ITERATIONS EACH SUBSTEP
+
+ TIME=  1.0000    
+
+ WRITE ALL  ITEMS TO THE DATABASE WITH A FREQUENCY OF ALL 
+   FOR ALL APPLICABLE ENTITIES
+
+ SPECIFIED NODAL LOAD FY   FOR SELECTED NODES         2 TO        2 BY        1
+  REAL= -2000000.00       IMAG=  0.00000000    
+
+ TERMINATE THE ANALYSIS IF THE MAXIMUM DISPLACEMENT
+  AT NODE     2  UY   IS GREATER THAN  1.0000    
+
+
+ *****  ANSYS SOLVE    COMMAND  *****
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   20:25:43  NOV 14, 2026 CP=      0.297
+
+ von Mises truss snap-through - sn_log_coarse                                  
+
+
+
+                       S O L U T I O N   O P T I O N S
+
+   PROBLEM DIMENSIONALITY. . . . . . . . . . . . .3-D                  
+   DEGREES OF FREEDOM. . . . . . UX   UY   UZ  
+   ANALYSIS TYPE . . . . . . . . . . . . . . . . .STATIC (STEADY-STATE)
+   NONLINEAR GEOMETRIC EFFECTS . . . . . . . . . .ON
+   NEWTON-RAPHSON OPTION . . . . . . . . . . . . .PROGRAM CHOSEN   
+   GLOBALLY ASSEMBLED MATRIX . . . . . . . . . . .SYMMETRIC  
+
+ *** NOTE ***                            CP =       0.312   TIME= 20:25:43
+ This nonlinear analysis defaults to using the full Newton-Raphson       
+ solution procedure.  This can be modified using the NROPT command.      
+
+ SOLCONTROL,ON uses sparse matrix direct solver
+
+ *** NOTE ***                            CP =       0.312   TIME= 20:25:43
+ The conditions for direct assembly have been met.  No .emat or .erot    
+ files will be produced.                                                 
+
+                      L O A D   S T E P   O P T I O N S
+
+   LOAD STEP NUMBER. . . . . . . . . . . . . . . .     1
+   TIME AT END OF THE LOAD STEP. . . . . . . . . .  1.0000    
+   NUMBER OF SUBSTEPS. . . . . . . . . . . . . . .   500
+   MAXIMUM NUMBER OF EQUILIBRIUM ITERATIONS. . . .    60
+   ARC-LENGTH . . . . .  . . . . . . . . . . . . .    ON
+   STEP CHANGE BOUNDARY CONDITIONS . . . . . . . .    NO
+   STRESS-STIFFENING . . . . . . . . . . . . . . .    ON
+   TERMINATE ANALYSIS IF NOT CONVERGED . . . . . .YES (EXIT)  
+   CONVERGENCE CONTROLS. . . . . . . . . . . . . .USE DEFAULTS
+   PRINT OUTPUT CONTROLS . . . . . . . . . . . . .NO PRINTOUT
+   DATABASE OUTPUT CONTROLS
+      ITEM     FREQUENCY   COMPONENT
+       ALL        ALL               
+
+
+ SOLUTION MONITORING INFO IS WRITTEN TO FILE= sn_log_coarse.mntr                                                                                                                                                                                                                                                  
+
+
+ Range of element maximum matrix coefficients in global coordinates
+ Maximum = 95872905.9 at element 2.                                      
+ Minimum = 95872905.9 at element 2.                                      
+
+   *** ELEMENT MATRIX FORMULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1         2  LINK180       0.000   0.000000
+ Time at end of element matrix formulation CP = 0.421875.                
+
+ ALL CURRENT ANSYS DATA WRITTEN TO FILE NAME= sn_log_coarse.rdb
+  FOR POSSIBLE RESUME FROM THIS POINT
+     FORCE CONVERGENCE VALUE  =   4000.      CRITERION=   20.41    
+
+ SPARSE MATRIX DIRECT SOLVER.
+  Number of equations =           2,    Maximum wavefront =      3
+  Memory allocated for solver              =     0.060 MB
+  Memory required for in-core solution     =     0.058 MB
+  Memory required for out-of-core solution =     0.050 MB
+
+ *** NOTE ***                            CP =       0.500   TIME= 20:25:43
+ The Sparse Matrix Solver is currently running in the in-core memory     
+ mode.  This memory mode uses the most amount of memory in order to      
+ avoid using the hard drive as much as possible, which most often        
+ results in the fastest solution time.  This mode is recommended if      
+ enough physical memory is present to accommodate all of the solver      
+ data.                                                                   
+ Sparse solver maximum pivot= 191745812 at node 2 UX.                    
+ Sparse solver minimum pivot= 11984113.2 at node 2 UY.                   
+ Sparse solver minimum pivot in absolute value= 11984113.2 at node 2 UY. 
+     ARCLEN NEW TIME =  0.20000E-02 ARC-LENGTH =  0.33378E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3338E-03
+     FORCE CONVERGENCE VALUE  =   3.691      CRITERION=   64.17     <<< CONVERGED
+     FORCE CONVERGENCE VALUE  =   3.691      CRITERION=   65.48     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+
+   *** ELEMENT RESULT CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1         2  LINK180       0.000   0.000000
+
+   *** NODAL LOAD CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1         2  LINK180       0.000   0.000000
+ *** LOAD STEP     1   SUBSTEP     1  COMPLETED.    CUM ITER =      2
+ *** TIME =  0.200000E-02  TIME INC =  0.200000E-02  MAX DISPLACEMENT =   -0.3338E-03
+
+     FORCE CONVERGENCE VALUE  =   4004.      CRITERION=   72.14    
+     ARCLEN NEW TIME =  0.40000E-02 ARC-LENGTH =  0.33378E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3347E-03
+     FORCE CONVERGENCE VALUE  =   3.710      CRITERION=   128.5     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     2  COMPLETED.    CUM ITER =      3
+ *** TIME =  0.400000E-02  TIME INC =  0.299584E-02  MAX DISPLACEMENT =   -0.6685E-03
+
+     FORCE CONVERGENCE VALUE  =   1.061      CRITERION=   220.4    
+     ARCLEN NEW TIME =  0.69956E-02 ARC-LENGTH =  0.70903E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4427E-07
+     FORCE CONVERGENCE VALUE  =  0.7057E-07  CRITERION=   225.0     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     3  COMPLETED.    CUM ITER =      4
+ *** TIME =  0.699557E-02  TIME INC =  0.448943E-02  MAX DISPLACEMENT =   -0.1171E-02
+
+     FORCE CONVERGENCE VALUE  =   10.21      CRITERION=   362.2    
+     ARCLEN NEW TIME =  0.11482E-01 ARC-LENGTH =  0.10635E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4265E-06
+     FORCE CONVERGENCE VALUE  =  0.6008E-05  CRITERION=   369.7     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     4  COMPLETED.    CUM ITER =      5
+ *** TIME =  0.114824E-01  TIME INC =  0.672575E-02  MAX DISPLACEMENT =   -0.1927E-02
+
+     FORCE CONVERGENCE VALUE  =   52.79      CRITERION=   574.9    
+     ARCLEN NEW TIME =  0.18195E-01 ARC-LENGTH =  0.15953E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2208E-05
+     FORCE CONVERGENCE VALUE  =  0.1609E-03  CRITERION=   587.0     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     5  COMPLETED.    CUM ITER =      6
+ *** TIME =  0.181948E-01  TIME INC =  0.100368E-01  MAX DISPLACEMENT =   -0.3062E-02
+
+     FORCE CONVERGENCE VALUE  =   34.96      CRITERION=   894.6    
+     ARCLEN NEW TIME =  0.28223E-01 ARC-LENGTH =  0.23930E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1462E-05
+     FORCE CONVERGENCE VALUE  =  0.7043E-04  CRITERION=   913.1     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     6  COMPLETED.    CUM ITER =      7
+ *** TIME =  0.282226E-01  TIME INC =  0.149800E-01  MAX DISPLACEMENT =   -0.4773E-02
+
+     FORCE CONVERGENCE VALUE  =   121.5      CRITERION=   1374.    
+     ARCLEN NEW TIME =  0.43171E-01 ARC-LENGTH =  0.35895E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.5088E-05
+     FORCE CONVERGENCE VALUE  =  0.8502E-03  CRITERION=   1403.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     7  COMPLETED.    CUM ITER =      8
+ *** TIME =  0.431711E-01  TIME INC =  0.222809E-01  MAX DISPLACEMENT =   -0.7354E-02
+
+     FORCE CONVERGENCE VALUE  =   276.9      CRITERION=   2095.    
+     ARCLEN NEW TIME =  0.65379E-01 ARC-LENGTH =  0.53845E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1162E-04
+     FORCE CONVERGENCE VALUE  =  0.4409E-02  CRITERION=   2139.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     8  COMPLETED.    CUM ITER =      9
+ *** TIME =  0.653789E-01  TIME INC =  0.329816E-01  MAX DISPLACEMENT =   -0.1126E-01
+
+     FORCE CONVERGENCE VALUE  =   635.2      CRITERION=   3177.    
+     ARCLEN NEW TIME =  0.98188E-01 ARC-LENGTH =  0.80775E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2670E-04
+     FORCE CONVERGENCE VALUE  =  0.2311E-01  CRITERION=   3246.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     9  COMPLETED.    CUM ITER =     10
+ *** TIME =  0.981878E-01  TIME INC =  0.471724E-01  MAX DISPLACEMENT =   -0.1720E-01
+
+     FORCE CONVERGENCE VALUE  =   1367.      CRITERION=   4763.    
+     ARCLEN NEW TIME =  0.14497     ARC-LENGTH =  0.11803E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.5750E-04
+     FORCE CONVERGENCE VALUE  =  0.1060      CRITERION=   4869.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    10  COMPLETED.    CUM ITER =     11
+ *** TIME =  0.144972      TIME INC =  0.455576E-01  MAX DISPLACEMENT =   -0.2605E-01
+
+     FORCE CONVERGENCE VALUE  =   807.0      CRITERION=   6363.    
+     ARCLEN NEW TIME =  0.19029     ARC-LENGTH =  0.11807E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3361E-04
+     FORCE CONVERGENCE VALUE  =  0.3574E-01  CRITERION=   6498.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    11  COMPLETED.    CUM ITER =     12
+ *** TIME =  0.190290      TIME INC =  0.435144E-01  MAX DISPLACEMENT =   -0.3512E-01
+
+     FORCE CONVERGENCE VALUE  =   684.2      CRITERION=   7972.    
+     ARCLEN NEW TIME =  0.23402     ARC-LENGTH =  0.11812E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2800E-04
+     FORCE CONVERGENCE VALUE  =  0.2448E-01  CRITERION=   8131.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    12  COMPLETED.    CUM ITER =     13
+ *** TIME =  0.234018      TIME INC =  0.419851E-01  MAX DISPLACEMENT =   -0.4441E-01
+
+     FORCE CONVERGENCE VALUE  =   18.98      CRITERION=   9571.    
+     ARCLEN NEW TIME =  0.27600     ARC-LENGTH =  0.11812E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.7655E-06
+     FORCE CONVERGENCE VALUE  =  0.1805E-04  CRITERION=   9767.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    13  COMPLETED.    CUM ITER =     14
+ *** TIME =  0.275997      TIME INC =  0.400966E-01  MAX DISPLACEMENT =   -0.5392E-01
+
+     FORCE CONVERGENCE VALUE  =   13.91      CRITERION=  0.1117E+05
+     ARCLEN NEW TIME =  0.31609     ARC-LENGTH =  0.11813E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.5481E-06
+     FORCE CONVERGENCE VALUE  =  0.9108E-05  CRITERION=  0.1140E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    14  COMPLETED.    CUM ITER =     15
+ *** TIME =  0.316089      TIME INC =  0.380572E-01  MAX DISPLACEMENT =   -0.6365E-01
+
+     FORCE CONVERGENCE VALUE  =   13.72      CRITERION=  0.1278E+05
+     ARCLEN NEW TIME =  0.35414     ARC-LENGTH =  0.11814E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.5248E-06
+     FORCE CONVERGENCE VALUE  =  0.8216E-05  CRITERION=  0.1304E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    15  COMPLETED.    CUM ITER =     16
+ *** TIME =  0.354141      TIME INC =  0.358580E-01  MAX DISPLACEMENT =   -0.7361E-01
+
+     FORCE CONVERGENCE VALUE  =   9.670      CRITERION=  0.1437E+05
+     ARCLEN NEW TIME =  0.39000     ARC-LENGTH =  0.11816E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3563E-06
+     FORCE CONVERGENCE VALUE  =  0.3734E-05  CRITERION=  0.1467E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    16  COMPLETED.    CUM ITER =     17
+ *** TIME =  0.389996      TIME INC =  0.334971E-01  MAX DISPLACEMENT =   -0.8380E-01
+
+     FORCE CONVERGENCE VALUE  =   5.245      CRITERION=  0.1596E+05
+     ARCLEN NEW TIME =  0.42349     ARC-LENGTH =  0.11817E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1843E-06
+     FORCE CONVERGENCE VALUE  =  0.9733E-06  CRITERION=  0.1629E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    17  COMPLETED.    CUM ITER =     18
+ *** TIME =  0.423491      TIME INC =  0.309745E-01  MAX DISPLACEMENT =   -0.9421E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1309      CRITERION=  0.1754E+05
+     ARCLEN NEW TIME =  0.45447     ARC-LENGTH =  0.11819E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.4339E-08
+     FORCE CONVERGENCE VALUE  =  0.4540E-08  CRITERION=  0.1790E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    18  COMPLETED.    CUM ITER =     19
+ *** TIME =  0.454465      TIME INC =  0.282949E-01  MAX DISPLACEMENT =   -0.1048    
+
+     FORCE CONVERGENCE VALUE  =   6.311      CRITERION=  0.1910E+05
+     ARCLEN NEW TIME =  0.48276     ARC-LENGTH =  0.11821E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1947E-06
+     FORCE CONVERGENCE VALUE  =  0.1037E-05  CRITERION=  0.1949E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    19  COMPLETED.    CUM ITER =     20
+ *** TIME =  0.482763      TIME INC =  0.254681E-01  MAX DISPLACEMENT =   -0.1157    
+
+     FORCE CONVERGENCE VALUE  =   13.07      CRITERION=  0.2065E+05
+     ARCLEN NEW TIME =  0.50824     ARC-LENGTH =  0.11822E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3691E-06
+     FORCE CONVERGENCE VALUE  =  0.3688E-05  CRITERION=  0.2107E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    20  COMPLETED.    CUM ITER =     21
+ *** TIME =  0.508237      TIME INC =  0.225093E-01  MAX DISPLACEMENT =   -0.1267    
+
+     FORCE CONVERGENCE VALUE  =   20.07      CRITERION=  0.2217E+05
+     ARCLEN NEW TIME =  0.53076     ARC-LENGTH =  0.11824E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5084E-06
+     FORCE CONVERGENCE VALUE  =  0.6815E-05  CRITERION=  0.2262E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    21  COMPLETED.    CUM ITER =     22
+ *** TIME =  0.530755      TIME INC =  0.194397E-01  MAX DISPLACEMENT =   -0.1379    
+
+     FORCE CONVERGENCE VALUE  =   26.82      CRITERION=  0.2366E+05
+     ARCLEN NEW TIME =  0.55021     ARC-LENGTH =  0.11825E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5945E-06
+     FORCE CONVERGENCE VALUE  =  0.9097E-05  CRITERION=  0.2414E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    22  COMPLETED.    CUM ITER =     23
+ *** TIME =  0.550207      TIME INC =  0.162857E-01  MAX DISPLACEMENT =   -0.1493    
+
+     FORCE CONVERGENCE VALUE  =   32.80      CRITERION=  0.2512E+05
+     ARCLEN NEW TIME =  0.56651     ARC-LENGTH =  0.11825E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.6158E-06
+     FORCE CONVERGENCE VALUE  =  0.9493E-05  CRITERION=  0.2563E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    23  COMPLETED.    CUM ITER =     24
+ *** TIME =  0.566509      TIME INC =  0.130784E-01  MAX DISPLACEMENT =   -0.1608    
+
+     FORCE CONVERGENCE VALUE  =   37.44      CRITERION=  0.2654E+05
+     ARCLEN NEW TIME =  0.57961     ARC-LENGTH =  0.11826E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5696E-06
+     FORCE CONVERGENCE VALUE  =  0.7898E-05  CRITERION=  0.2708E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    24  COMPLETED.    CUM ITER =     25
+ *** TIME =  0.579605      TIME INC =  0.985126E-02  MAX DISPLACEMENT =   -0.1724    
+
+     FORCE CONVERGENCE VALUE  =   40.30      CRITERION=  0.2792E+05
+     ARCLEN NEW TIME =  0.58948     ARC-LENGTH =  0.11826E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.4649E-06
+     FORCE CONVERGENCE VALUE  =  0.5116E-05  CRITERION=  0.2849E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    25  COMPLETED.    CUM ITER =     26
+ *** TIME =  0.589476      TIME INC =  0.663923E-02  MAX DISPLACEMENT =   -0.1841    
+
+     FORCE CONVERGENCE VALUE  =   41.06      CRITERION=  0.2925E+05
+     ARCLEN NEW TIME =  0.59614     ARC-LENGTH =  0.11825E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3208E-06
+     FORCE CONVERGENCE VALUE  =  0.2360E-05  CRITERION=  0.2985E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    26  COMPLETED.    CUM ITER =     27
+ *** TIME =  0.596136      TIME INC =  0.347610E-02  MAX DISPLACEMENT =   -0.1959    
+
+     FORCE CONVERGENCE VALUE  =   39.66      CRITERION=  0.3054E+05
+     ARCLEN NEW TIME =  0.59963     ARC-LENGTH =  0.11825E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1628E-06
+     FORCE CONVERGENCE VALUE  =  0.5928E-06  CRITERION=  0.3116E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    27  COMPLETED.    CUM ITER =     28
+ *** TIME =  0.599632      TIME INC =  0.392975E-03  MAX DISPLACEMENT =   -0.2077    
+
+     FORCE CONVERGENCE VALUE  =   36.29      CRITERION=  0.3177E+05
+
+ *** WARNING ***                         CP =       3.656   TIME= 20:25:45
+ One indefinite tangent matrix is detected for TIME = 0.600024716.       
+ Previous converged TIME is = 0.599631742.                               
+     ARCLEN NEW TIME =  0.60004     ARC-LENGTH =  0.11823E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1718E-07
+     FORCE CONVERGENCE VALUE  =  0.9779E-08  CRITERION=  0.3242E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    28  COMPLETED.    CUM ITER =     29
+ *** TIME =  0.600043      TIME INC =  0.392975E-03  MAX DISPLACEMENT =   -0.2195    
+
+     FORCE CONVERGENCE VALUE  =   5927.      CRITERION=  0.3296E+05
+     ARCLEN NEW TIME =  0.59747     ARC-LENGTH =  0.11824E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.4724E-05
+     FORCE CONVERGENCE VALUE  =  0.4584E-03  CRITERION=  0.3362E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    29  COMPLETED.    CUM ITER =     30
+ *** TIME =  0.597474      TIME INC = -0.102743E-01  MAX DISPLACEMENT =   -0.2314    
+
+     FORCE CONVERGENCE VALUE  =   9686.      CRITERION=  0.3407E+05
+     ARCLEN NEW TIME =  0.59199     ARC-LENGTH =  0.11931E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.8872E-04
+     FORCE CONVERGENCE VALUE  =  0.1554      CRITERION=  0.3478E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    30  COMPLETED.    CUM ITER =     31
+ *** TIME =  0.591991      TIME INC = -0.627478E-02  MAX DISPLACEMENT =   -0.2433    
+
+     FORCE CONVERGENCE VALUE  =   3778.      CRITERION=  0.3516E+05
+     ARCLEN NEW TIME =  0.58385     ARC-LENGTH =  0.11805E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3185E-04
+     FORCE CONVERGENCE VALUE  =  0.1919E-01  CRITERION=  0.3587E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    31  COMPLETED.    CUM ITER =     32
+ *** TIME =  0.583853      TIME INC = -0.103355E-01  MAX DISPLACEMENT =   -0.2550    
+
+     FORCE CONVERGENCE VALUE  =   727.8      CRITERION=  0.3616E+05
+     ARCLEN NEW TIME =  0.57316     ARC-LENGTH =  0.11813E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.8892E-05
+     FORCE CONVERGENCE VALUE  =  0.1431E-02  CRITERION=  0.3690E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    32  COMPLETED.    CUM ITER =     33
+ *** TIME =  0.573163      TIME INC = -0.130629E-01  MAX DISPLACEMENT =   -0.2667    
+
+     FORCE CONVERGENCE VALUE  =   29.63      CRITERION=  0.3712E+05
+     ARCLEN NEW TIME =  0.56009     ARC-LENGTH =  0.11815E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.4472E-06
+     FORCE CONVERGENCE VALUE  =  0.3450E-05  CRITERION=  0.3787E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    33  COMPLETED.    CUM ITER =     34
+ *** TIME =  0.560086      TIME INC = -0.152971E-01  MAX DISPLACEMENT =   -0.2783    
+
+     FORCE CONVERGENCE VALUE  =   1.955      CRITERION=  0.3802E+05
+     ARCLEN NEW TIME =  0.54479     ARC-LENGTH =  0.11813E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3430E-07
+     FORCE CONVERGENCE VALUE  =  0.2841E-07  CRITERION=  0.3879E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    34  COMPLETED.    CUM ITER =     35
+ *** TIME =  0.544789      TIME INC = -0.173491E-01  MAX DISPLACEMENT =   -0.2898    
+
+     FORCE CONVERGENCE VALUE  =   3.121      CRITERION=  0.3886E+05
+     ARCLEN NEW TIME =  0.52744     ARC-LENGTH =  0.11812E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.6168E-07
+     FORCE CONVERGENCE VALUE  =  0.5565E-07  CRITERION=  0.3965E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    35  COMPLETED.    CUM ITER =     36
+ *** TIME =  0.527439      TIME INC = -0.192407E-01  MAX DISPLACEMENT =   -0.3013    
+
+     FORCE CONVERGENCE VALUE  =   7.224      CRITERION=  0.3965E+05
+     ARCLEN NEW TIME =  0.50819     ARC-LENGTH =  0.11810E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1571E-06
+     FORCE CONVERGENCE VALUE  =  0.3611E-06  CRITERION=  0.4046E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    36  COMPLETED.    CUM ITER =     37
+ *** TIME =  0.508195      TIME INC = -0.209775E-01  MAX DISPLACEMENT =   -0.3126    
+
+     FORCE CONVERGENCE VALUE  =   9.878      CRITERION=  0.4039E+05
+     ARCLEN NEW TIME =  0.48721     ARC-LENGTH =  0.11809E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2325E-06
+     FORCE CONVERGENCE VALUE  =  0.7484E-06  CRITERION=  0.4121E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    37  COMPLETED.    CUM ITER =     38
+ *** TIME =  0.487213      TIME INC = -0.225659E-01  MAX DISPLACEMENT =   -0.3239    
+
+     FORCE CONVERGENCE VALUE  =   11.68      CRITERION=  0.4107E+05
+     ARCLEN NEW TIME =  0.46464     ARC-LENGTH =  0.11808E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2935E-06
+     FORCE CONVERGENCE VALUE  =  0.1124E-05  CRITERION=  0.4191E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    38  COMPLETED.    CUM ITER =     39
+ *** TIME =  0.464642      TIME INC = -0.240132E-01  MAX DISPLACEMENT =   -0.3351    
+
+     FORCE CONVERGENCE VALUE  =   12.78      CRITERION=  0.4171E+05
+     ARCLEN NEW TIME =  0.44062     ARC-LENGTH =  0.11806E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3392E-06
+     FORCE CONVERGENCE VALUE  =  0.1411E-05  CRITERION=  0.4256E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    39  COMPLETED.    CUM ITER =     40
+ *** TIME =  0.440623      TIME INC = -0.253271E-01  MAX DISPLACEMENT =   -0.3462    
+
+     FORCE CONVERGENCE VALUE  =   13.30      CRITERION=  0.4229E+05
+     ARCLEN NEW TIME =  0.41529     ARC-LENGTH =  0.11806E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3696E-06
+     FORCE CONVERGENCE VALUE  =  0.1558E-05  CRITERION=  0.4315E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    40  COMPLETED.    CUM ITER =     41
+ *** TIME =  0.415290      TIME INC = -0.265150E-01  MAX DISPLACEMENT =   -0.3572    
+
+     FORCE CONVERGENCE VALUE  =   13.35      CRITERION=  0.4283E+05
+     ARCLEN NEW TIME =  0.38877     ARC-LENGTH =  0.11805E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3859E-06
+     FORCE CONVERGENCE VALUE  =  0.1567E-05  CRITERION=  0.4370E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    41  COMPLETED.    CUM ITER =     42
+ *** TIME =  0.388769      TIME INC = -0.275845E-01  MAX DISPLACEMENT =   -0.3682    
+
+     FORCE CONVERGENCE VALUE  =   13.05      CRITERION=  0.4332E+05
+     ARCLEN NEW TIME =  0.36118     ARC-LENGTH =  0.11804E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3899E-06
+     FORCE CONVERGENCE VALUE  =  0.1475E-05  CRITERION=  0.4420E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    42  COMPLETED.    CUM ITER =     43
+ *** TIME =  0.361179      TIME INC = -0.285425E-01  MAX DISPLACEMENT =   -0.3790    
+
+     FORCE CONVERGENCE VALUE  =   12.49      CRITERION=  0.4377E+05
+     ARCLEN NEW TIME =  0.33263     ARC-LENGTH =  0.11803E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3836E-06
+     FORCE CONVERGENCE VALUE  =  0.1301E-05  CRITERION=  0.4466E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    43  COMPLETED.    CUM ITER =     44
+ *** TIME =  0.332632      TIME INC = -0.293954E-01  MAX DISPLACEMENT =   -0.3898    
+
+     FORCE CONVERGENCE VALUE  =   11.73      CRITERION=  0.4417E+05
+     ARCLEN NEW TIME =  0.30323     ARC-LENGTH =  0.11803E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3690E-06
+     FORCE CONVERGENCE VALUE  =  0.1088E-05  CRITERION=  0.4507E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    44  COMPLETED.    CUM ITER =     45
+ *** TIME =  0.303231      TIME INC = -0.301494E-01  MAX DISPLACEMENT =   -0.4006    
+
+     FORCE CONVERGENCE VALUE  =   10.84      CRITERION=  0.4453E+05
+     ARCLEN NEW TIME =  0.27308     ARC-LENGTH =  0.11802E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3480E-06
+     FORCE CONVERGENCE VALUE  =  0.8636E-06  CRITERION=  0.4544E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    45  COMPLETED.    CUM ITER =     46
+ *** TIME =  0.273077      TIME INC = -0.308096E-01  MAX DISPLACEMENT =   -0.4112    
+
+     FORCE CONVERGENCE VALUE  =   9.869      CRITERION=  0.4484E+05
+     ARCLEN NEW TIME =  0.24226     ARC-LENGTH =  0.11802E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3222E-06
+     FORCE CONVERGENCE VALUE  =  0.6553E-06  CRITERION=  0.4576E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    46  COMPLETED.    CUM ITER =     47
+ *** TIME =  0.242264      TIME INC = -0.313809E-01  MAX DISPLACEMENT =   -0.4219    
+
+     FORCE CONVERGENCE VALUE  =   8.843      CRITERION=  0.4512E+05
+     ARCLEN NEW TIME =  0.21088     ARC-LENGTH =  0.11802E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2929E-06
+     FORCE CONVERGENCE VALUE  =  0.4667E-06  CRITERION=  0.4604E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    47  COMPLETED.    CUM ITER =     48
+ *** TIME =  0.210879      TIME INC = -0.318675E-01  MAX DISPLACEMENT =   -0.4324    
+
+     FORCE CONVERGENCE VALUE  =   7.789      CRITERION=  0.4535E+05
+     ARCLEN NEW TIME =  0.17901     ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2610E-06
+     FORCE CONVERGENCE VALUE  =  0.3150E-06  CRITERION=  0.4628E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    48  COMPLETED.    CUM ITER =     49
+ *** TIME =  0.179009      TIME INC = -0.322729E-01  MAX DISPLACEMENT =   -0.4430    
+
+     FORCE CONVERGENCE VALUE  =   6.725      CRITERION=  0.4554E+05
+     ARCLEN NEW TIME =  0.14673     ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2276E-06
+     FORCE CONVERGENCE VALUE  =  0.1946E-06  CRITERION=  0.4647E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    49  COMPLETED.    CUM ITER =     50
+ *** TIME =  0.146733      TIME INC = -0.326001E-01  MAX DISPLACEMENT =   -0.4535    
+
+     FORCE CONVERGENCE VALUE  =   5.661      CRITERION=  0.4570E+05
+     ARCLEN NEW TIME =  0.11413     ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1930E-06
+     FORCE CONVERGENCE VALUE  =  0.1086E-06  CRITERION=  0.4663E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    50  COMPLETED.    CUM ITER =     51
+ *** TIME =  0.114131      TIME INC = -0.328515E-01  MAX DISPLACEMENT =   -0.4639    
+
+     FORCE CONVERGENCE VALUE  =   4.604      CRITERION=  0.4581E+05
+     ARCLEN NEW TIME =  0.81278E-01 ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1579E-06
+     FORCE CONVERGENCE VALUE  =  0.5180E-07  CRITERION=  0.4675E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    51  COMPLETED.    CUM ITER =     52
+ *** TIME =  0.812776E-01  TIME INC = -0.330289E-01  MAX DISPLACEMENT =   -0.4744    
+
+     FORCE CONVERGENCE VALUE  =   3.556      CRITERION=  0.4589E+05
+     ARCLEN NEW TIME =  0.48247E-01 ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1225E-06
+     FORCE CONVERGENCE VALUE  =  0.1857E-07  CRITERION=  0.4683E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    52  COMPLETED.    CUM ITER =     53
+ *** TIME =  0.482473E-01  TIME INC = -0.331337E-01  MAX DISPLACEMENT =   -0.4848    
+
+     FORCE CONVERGENCE VALUE  =   2.519      CRITERION=  0.4593E+05
+     ARCLEN NEW TIME =  0.15113E-01 ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.8698E-07
+     FORCE CONVERGENCE VALUE  =  0.2794E-08  CRITERION=  0.4686E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    53  COMPLETED.    CUM ITER =     54
+ *** TIME =  0.151126E-01  TIME INC = -0.331667E-01  MAX DISPLACEMENT =   -0.4953    
+
+     FORCE CONVERGENCE VALUE  =   1.490      CRITERION=  0.4592E+05
+     ARCLEN NEW TIME = -0.18055E-01 ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.5149E-07
+     FORCE CONVERGENCE VALUE  =  0.9532E-09  CRITERION=  0.4686E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    54  COMPLETED.    CUM ITER =     55
+ *** TIME = -0.180547E-01  TIME INC = -0.331673E-01  MAX DISPLACEMENT =   -0.5057    
+
+     FORCE CONVERGENCE VALUE  =   99.99      CRITERION=  0.4588E+05
+     ARCLEN NEW TIME = -0.51183E-01 ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3457E-05
+     FORCE CONVERGENCE VALUE  =  0.1560E-04  CRITERION=  0.4682E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    55  COMPLETED.    CUM ITER =     56
+ *** TIME = -0.511830E-01  TIME INC = -0.330828E-01  MAX DISPLACEMENT =   -0.5161    
+
+     FORCE CONVERGENCE VALUE  =   167.7      CRITERION=  0.4580E+05
+     ARCLEN NEW TIME = -0.84200E-01 ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.5788E-05
+     FORCE CONVERGENCE VALUE  =  0.7208E-04  CRITERION=  0.4674E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    56  COMPLETED.    CUM ITER =     57
+ *** TIME = -0.842002E-01  TIME INC = -0.328342E-01  MAX DISPLACEMENT =   -0.5265    
+
+     FORCE CONVERGENCE VALUE  =   1.578      CRITERION=  0.4569E+05
+     ARCLEN NEW TIME = -0.11703     ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.5421E-07
+     FORCE CONVERGENCE VALUE  =  0.7887E-08  CRITERION=  0.4662E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    57  COMPLETED.    CUM ITER =     58
+ *** TIME = -0.117034      TIME INC = -0.325769E-01  MAX DISPLACEMENT =   -0.5370    
+
+     FORCE CONVERGENCE VALUE  =   2.607      CRITERION=  0.4553E+05
+     ARCLEN NEW TIME = -0.14961     ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.8905E-07
+     FORCE CONVERGENCE VALUE  =  0.3062E-07  CRITERION=  0.4646E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    58  COMPLETED.    CUM ITER =     59
+ *** TIME = -0.149610      TIME INC = -0.322436E-01  MAX DISPLACEMENT =   -0.5475    
+
+     FORCE CONVERGENCE VALUE  =   3.642      CRITERION=  0.4533E+05
+     ARCLEN NEW TIME = -0.18185     ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1235E-06
+     FORCE CONVERGENCE VALUE  =  0.7084E-07  CRITERION=  0.4626E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    59  COMPLETED.    CUM ITER =     60
+ *** TIME = -0.181852      TIME INC = -0.318319E-01  MAX DISPLACEMENT =   -0.5580    
+
+     FORCE CONVERGENCE VALUE  =   4.689      CRITERION=  0.4509E+05
+     ARCLEN NEW TIME = -0.21368     ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1576E-06
+     FORCE CONVERGENCE VALUE  =  0.1373E-06  CRITERION=  0.4601E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    60  COMPLETED.    CUM ITER =     61
+ *** TIME = -0.213682      TIME INC = -0.313387E-01  MAX DISPLACEMENT =   -0.5685    
+
+     FORCE CONVERGENCE VALUE  =   5.746      CRITERION=  0.4482E+05
+     ARCLEN NEW TIME = -0.24502     ARC-LENGTH =  0.11801E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1909E-06
+     FORCE CONVERGENCE VALUE  =  0.2339E-06  CRITERION=  0.4573E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    61  COMPLETED.    CUM ITER =     62
+ *** TIME = -0.245018      TIME INC = -0.307604E-01  MAX DISPLACEMENT =   -0.5791    
+
+     FORCE CONVERGENCE VALUE  =   6.812      CRITERION=  0.4450E+05
+     ARCLEN NEW TIME = -0.27578     ARC-LENGTH =  0.11802E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2232E-06
+     FORCE CONVERGENCE VALUE  =  0.3645E-06  CRITERION=  0.4540E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    62  COMPLETED.    CUM ITER =     63
+ *** TIME = -0.275776      TIME INC = -0.300928E-01  MAX DISPLACEMENT =   -0.5897    
+
+     FORCE CONVERGENCE VALUE  =   7.882      CRITERION=  0.4413E+05
+     ARCLEN NEW TIME = -0.30587     ARC-LENGTH =  0.11802E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2540E-06
+     FORCE CONVERGENCE VALUE  =  0.5208E-06  CRITERION=  0.4503E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    63  COMPLETED.    CUM ITER =     64
+ *** TIME = -0.305865      TIME INC = -0.293310E-01  MAX DISPLACEMENT =   -0.6004    
+
+     FORCE CONVERGENCE VALUE  =   8.948      CRITERION=  0.4373E+05
+     ARCLEN NEW TIME = -0.33519     ARC-LENGTH =  0.11802E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2826E-06
+     FORCE CONVERGENCE VALUE  =  0.7130E-06  CRITERION=  0.4462E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    64  COMPLETED.    CUM ITER =     65
+ *** TIME = -0.335193      TIME INC = -0.284697E-01  MAX DISPLACEMENT =   -0.6111    
+
+     FORCE CONVERGENCE VALUE  =   9.994      CRITERION=  0.4328E+05
+     ARCLEN NEW TIME = -0.36366     ARC-LENGTH =  0.11803E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3083E-06
+     FORCE CONVERGENCE VALUE  =  0.9262E-06  CRITERION=  0.4416E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    65  COMPLETED.    CUM ITER =     66
+ *** TIME = -0.363658      TIME INC = -0.275028E-01  MAX DISPLACEMENT =   -0.6219    
+
+     FORCE CONVERGENCE VALUE  =   11.00      CRITERION=  0.4278E+05
+     ARCLEN NEW TIME = -0.39116     ARC-LENGTH =  0.11803E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3299E-06
+     FORCE CONVERGENCE VALUE  =  0.1151E-05  CRITERION=  0.4366E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    66  COMPLETED.    CUM ITER =     67
+ *** TIME = -0.391156      TIME INC = -0.264236E-01  MAX DISPLACEMENT =   -0.6328    
+
+     FORCE CONVERGENCE VALUE  =   11.94      CRITERION=  0.4224E+05
+     ARCLEN NEW TIME = -0.41757     ARC-LENGTH =  0.11804E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3464E-06
+     FORCE CONVERGENCE VALUE  =  0.1377E-05  CRITERION=  0.4310E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    67  COMPLETED.    CUM ITER =     68
+ *** TIME = -0.417575      TIME INC = -0.252252E-01  MAX DISPLACEMENT =   -0.6438    
+
+     FORCE CONVERGENCE VALUE  =   12.76      CRITERION=  0.4165E+05
+     ARCLEN NEW TIME = -0.44279     ARC-LENGTH =  0.11804E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3561E-06
+     FORCE CONVERGENCE VALUE  =  0.1561E-05  CRITERION=  0.4250E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    68  COMPLETED.    CUM ITER =     69
+ *** TIME = -0.442794      TIME INC = -0.239000E-01  MAX DISPLACEMENT =   -0.6548    
+
+     FORCE CONVERGENCE VALUE  =   13.42      CRITERION=  0.4101E+05
+     ARCLEN NEW TIME = -0.46669     ARC-LENGTH =  0.11805E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3575E-06
+     FORCE CONVERGENCE VALUE  =  0.1678E-05  CRITERION=  0.4185E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    69  COMPLETED.    CUM ITER =     70
+ *** TIME = -0.466688      TIME INC = -0.224404E-01  MAX DISPLACEMENT =   -0.6659    
+
+     FORCE CONVERGENCE VALUE  =   13.85      CRITERION=  0.4032E+05
+     ARCLEN NEW TIME = -0.48912     ARC-LENGTH =  0.11806E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3490E-06
+     FORCE CONVERGENCE VALUE  =  0.1709E-05  CRITERION=  0.4115E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    70  COMPLETED.    CUM ITER =     71
+ *** TIME = -0.489123      TIME INC = -0.208387E-01  MAX DISPLACEMENT =   -0.6771    
+
+     FORCE CONVERGENCE VALUE  =   13.97      CRITERION=  0.3958E+05
+     ARCLEN NEW TIME = -0.50995     ARC-LENGTH =  0.11807E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3293E-06
+     FORCE CONVERGENCE VALUE  =  0.1606E-05  CRITERION=  0.4039E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    71  COMPLETED.    CUM ITER =     72
+ *** TIME = -0.509955      TIME INC = -0.190875E-01  MAX DISPLACEMENT =   -0.6884    
+
+     FORCE CONVERGENCE VALUE  =   13.66      CRITERION=  0.3879E+05
+     ARCLEN NEW TIME = -0.52904     ARC-LENGTH =  0.11808E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2973E-06
+     FORCE CONVERGENCE VALUE  =  0.1381E-05  CRITERION=  0.3958E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    72  COMPLETED.    CUM ITER =     73
+ *** TIME = -0.529036      TIME INC = -0.171802E-01  MAX DISPLACEMENT =   -0.6997    
+
+     FORCE CONVERGENCE VALUE  =   12.83      CRITERION=  0.3794E+05
+     ARCLEN NEW TIME = -0.54621     ARC-LENGTH =  0.11809E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2531E-06
+     FORCE CONVERGENCE VALUE  =  0.1060E-05  CRITERION=  0.3871E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    73  COMPLETED.    CUM ITER =     74
+ *** TIME = -0.546210      TIME INC = -0.151115E-01  MAX DISPLACEMENT =   -0.7112    
+
+     FORCE CONVERGENCE VALUE  =   11.35      CRITERION=  0.3704E+05
+     ARCLEN NEW TIME = -0.56132     ARC-LENGTH =  0.11811E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1982E-06
+     FORCE CONVERGENCE VALUE  =  0.6869E-06  CRITERION=  0.3779E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    74  COMPLETED.    CUM ITER =     75
+ *** TIME = -0.561316      TIME INC = -0.128778E-01  MAX DISPLACEMENT =   -0.7227    
+
+     FORCE CONVERGENCE VALUE  =   9.090      CRITERION=  0.3608E+05
+     ARCLEN NEW TIME = -0.57419     ARC-LENGTH =  0.11812E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1361E-06
+     FORCE CONVERGENCE VALUE  =  0.3341E-06  CRITERION=  0.3681E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    75  COMPLETED.    CUM ITER =     76
+ *** TIME = -0.574190      TIME INC = -0.104785E-01  MAX DISPLACEMENT =   -0.7344    
+
+     FORCE CONVERGENCE VALUE  =   5.951      CRITERION=  0.3506E+05
+     ARCLEN NEW TIME = -0.58467     ARC-LENGTH =  0.11814E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.7288E-07
+     FORCE CONVERGENCE VALUE  =  0.9337E-07  CRITERION=  0.3578E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    76  COMPLETED.    CUM ITER =     77
+ *** TIME = -0.584665      TIME INC = -0.791613E-02  MAX DISPLACEMENT =   -0.7460    
+
+     FORCE CONVERGENCE VALUE  =   1.866      CRITERION=  0.3399E+05
+     ARCLEN NEW TIME = -0.59258     ARC-LENGTH =  0.11816E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1733E-07
+     FORCE CONVERGENCE VALUE  =  0.9313E-09  CRITERION=  0.3468E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    77  COMPLETED.    CUM ITER =     78
+ *** TIME = -0.592581      TIME INC = -0.519766E-02  MAX DISPLACEMENT =   -0.7578    
+
+     FORCE CONVERGENCE VALUE  =   3.164      CRITERION=  0.3286E+05
+     ARCLEN NEW TIME = -0.59778     ARC-LENGTH =  0.11818E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1936E-07
+     FORCE CONVERGENCE VALUE  =  0.7451E-08  CRITERION=  0.3353E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    78  COMPLETED.    CUM ITER =     79
+ *** TIME = -0.597780      TIME INC = -0.233492E-02  MAX DISPLACEMENT =   -0.7696    
+
+     FORCE CONVERGENCE VALUE  =   9.039      CRITERION=  0.3168E+05
+     ARCLEN NEW TIME = -0.60012     ARC-LENGTH =  0.11819E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2489E-07
+     FORCE CONVERGENCE VALUE  =  0.2468E-07  CRITERION=  0.3232E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    79  COMPLETED.    CUM ITER =     80
+ *** TIME = -0.600119      TIME INC =  0.654876E-03  MAX DISPLACEMENT =   -0.7814    
+
+     FORCE CONVERGENCE VALUE  =   15.54      CRITERION=  0.3044E+05
+     ARCLEN NEW TIME = -0.59947     ARC-LENGTH =  0.11821E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1191E-07
+     FORCE CONVERGENCE VALUE  =  0.3260E-08  CRITERION=  0.3106E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    80  COMPLETED.    CUM ITER =     81
+ *** TIME = -0.599472      TIME INC =  0.374911E-02  MAX DISPLACEMENT =   -0.7932    
+
+     FORCE CONVERGENCE VALUE  =   22.30      CRITERION=  0.2915E+05
+     ARCLEN NEW TIME = -0.59573     ARC-LENGTH =  0.11823E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.9809E-07
+     FORCE CONVERGENCE VALUE  =  0.2303E-06  CRITERION=  0.2975E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    81  COMPLETED.    CUM ITER =     82
+ *** TIME = -0.595734      TIME INC =  0.692017E-02  MAX DISPLACEMENT =   -0.8050    
+
+     FORCE CONVERGENCE VALUE  =   28.85      CRITERION=  0.2782E+05
+     ARCLEN NEW TIME = -0.58883     ARC-LENGTH =  0.11824E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2333E-06
+     FORCE CONVERGENCE VALUE  =  0.1285E-05  CRITERION=  0.2838E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    82  COMPLETED.    CUM ITER =     83
+ *** TIME = -0.588828      TIME INC =  0.101364E-01  MAX DISPLACEMENT =   -0.8168    
+
+     FORCE CONVERGENCE VALUE  =   34.63      CRITERION=  0.2643E+05
+     ARCLEN NEW TIME = -0.57871     ARC-LENGTH =  0.11825E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4074E-06
+     FORCE CONVERGENCE VALUE  =  0.4044E-05  CRITERION=  0.2697E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    83  COMPLETED.    CUM ITER =     84
+ *** TIME = -0.578709      TIME INC =  0.133638E-01  MAX DISPLACEMENT =   -0.8285    
+
+     FORCE CONVERGENCE VALUE  =   39.05      CRITERION=  0.2501E+05
+     ARCLEN NEW TIME = -0.56536     ARC-LENGTH =  0.11826E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.6004E-06
+     FORCE CONVERGENCE VALUE  =  0.9054E-05  CRITERION=  0.2552E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    84  COMPLETED.    CUM ITER =     85
+ *** TIME = -0.565364      TIME INC =  0.165674E-01  MAX DISPLACEMENT =   -0.8401    
+
+     FORCE CONVERGENCE VALUE  =   41.64      CRITERION=  0.2355E+05
+     ARCLEN NEW TIME = -0.54882     ARC-LENGTH =  0.11826E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.7850E-06
+     FORCE CONVERGENCE VALUE  =  0.1590E-04  CRITERION=  0.2403E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    85  COMPLETED.    CUM ITER =     86
+ *** TIME = -0.548816      TIME INC =  0.197137E-01  MAX DISPLACEMENT =   -0.8516    
+
+     FORCE CONVERGENCE VALUE  =   42.08      CRITERION=  0.2205E+05
+     ARCLEN NEW TIME = -0.52912     ARC-LENGTH =  0.11826E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.9317E-06
+     FORCE CONVERGENCE VALUE  =  0.2294E-04  CRITERION=  0.2250E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    86  COMPLETED.    CUM ITER =     87
+ *** TIME = -0.529121      TIME INC =  0.227725E-01  MAX DISPLACEMENT =   -0.8630    
+
+     FORCE CONVERGENCE VALUE  =   40.30      CRITERION=  0.2053E+05
+     ARCLEN NEW TIME = -0.50637     ARC-LENGTH =  0.11825E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1015E-05
+     FORCE CONVERGENCE VALUE  =  0.2791E-04  CRITERION=  0.2095E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    87  COMPLETED.    CUM ITER =     88
+ *** TIME = -0.506367      TIME INC =  0.257180E-01  MAX DISPLACEMENT =   -0.8742    
+
+     FORCE CONVERGENCE VALUE  =   36.47      CRITERION=  0.1898E+05
+     ARCLEN NEW TIME = -0.48066     ARC-LENGTH =  0.11824E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1020E-05
+     FORCE CONVERGENCE VALUE  =  0.2883E-04  CRITERION=  0.1937E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    88  COMPLETED.    CUM ITER =     89
+ *** TIME = -0.480665      TIME INC =  0.285297E-01  MAX DISPLACEMENT =   -0.8852    
+
+     FORCE CONVERGENCE VALUE  =   30.99      CRITERION=  0.1742E+05
+     ARCLEN NEW TIME = -0.45215     ARC-LENGTH =  0.11823E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.9444E-06
+     FORCE CONVERGENCE VALUE  =  0.2521E-04  CRITERION=  0.1777E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    89  COMPLETED.    CUM ITER =     90
+ *** TIME = -0.452148      TIME INC =  0.311930E-01  MAX DISPLACEMENT =   -0.8960    
+
+     FORCE CONVERGENCE VALUE  =   24.39      CRITERION=  0.1584E+05
+     ARCLEN NEW TIME = -0.42096     ARC-LENGTH =  0.11821E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.7967E-06
+     FORCE CONVERGENCE VALUE  =  0.1830E-04  CRITERION=  0.1616E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    90  COMPLETED.    CUM ITER =     91
+ *** TIME = -0.420964      TIME INC =  0.336990E-01  MAX DISPLACEMENT =   -0.9066    
+
+     FORCE CONVERGENCE VALUE  =   17.24      CRITERION=  0.1425E+05
+     ARCLEN NEW TIME = -0.38727     ARC-LENGTH =  0.11820E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.5958E-06
+     FORCE CONVERGENCE VALUE  =  0.1043E-04  CRITERION=  0.1454E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    91  COMPLETED.    CUM ITER =     92
+ *** TIME = -0.387272      TIME INC =  0.360436E-01  MAX DISPLACEMENT =   -0.9170    
+
+     FORCE CONVERGENCE VALUE  =   10.09      CRITERION=  0.1265E+05
+     ARCLEN NEW TIME = -0.35123     ARC-LENGTH =  0.11818E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3647E-06
+     FORCE CONVERGENCE VALUE  =  0.3976E-05  CRITERION=  0.1291E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    92  COMPLETED.    CUM ITER =     93
+ *** TIME = -0.351232      TIME INC =  0.382270E-01  MAX DISPLACEMENT =   -0.9272    
+
+     FORCE CONVERGENCE VALUE  =   3.353      CRITERION=  0.1105E+05
+     ARCLEN NEW TIME = -0.31301     ARC-LENGTH =  0.11817E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1257E-06
+     FORCE CONVERGENCE VALUE  =  0.4637E-06  CRITERION=  0.1127E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    93  COMPLETED.    CUM ITER =     94
+ *** TIME = -0.313006      TIME INC =  0.402526E-01  MAX DISPLACEMENT =   -0.9371    
+
+     FORCE CONVERGENCE VALUE  =   2.649      CRITERION=   9445.    
+     ARCLEN NEW TIME = -0.27275     ARC-LENGTH =  0.11815E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1022E-06
+     FORCE CONVERGENCE VALUE  =  0.2976E-06  CRITERION=   9638.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    94  COMPLETED.    CUM ITER =     95
+ *** TIME = -0.272753      TIME INC =  0.421264E-01  MAX DISPLACEMENT =   -0.9468    
+
+     FORCE CONVERGENCE VALUE  =   7.745      CRITERION=   7842.    
+     ARCLEN NEW TIME = -0.23062     ARC-LENGTH =  0.11814E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3055E-06
+     FORCE CONVERGENCE VALUE  =  0.2906E-05  CRITERION=   8002.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    95  COMPLETED.    CUM ITER =     96
+ *** TIME = -0.230624      TIME INC =  0.438561E-01  MAX DISPLACEMENT =   -0.9563    
+
+     FORCE CONVERGENCE VALUE  =   11.87      CRITERION=   6241.    
+     ARCLEN NEW TIME = -0.18676     ARC-LENGTH =  0.11812E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.4761E-06
+     FORCE CONVERGENCE VALUE  =  0.7181E-05  CRITERION=   6369.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    96  COMPLETED.    CUM ITER =     97
+ *** TIME = -0.186764      TIME INC =  0.454504E-01  MAX DISPLACEMENT =   -0.9656    
+
+     FORCE CONVERGENCE VALUE  =   15.05      CRITERION=   4645.    
+     ARCLEN NEW TIME = -0.14131     ARC-LENGTH =  0.11811E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.6110E-06
+     FORCE CONVERGENCE VALUE  =  0.1197E-04  CRITERION=   4740.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    97  COMPLETED.    CUM ITER =     98
+ *** TIME = -0.141310      TIME INC =  0.469187E-01  MAX DISPLACEMENT =   -0.9747    
+
+     FORCE CONVERGENCE VALUE  =   17.36      CRITERION=   3054.    
+     ARCLEN NEW TIME = -0.94386E-01 ARC-LENGTH =  0.11810E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.7106E-06
+     FORCE CONVERGENCE VALUE  =  0.1639E-04  CRITERION=   3116.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    98  COMPLETED.    CUM ITER =     99
+ *** TIME = -0.943860E-01  TIME INC =  0.482703E-01  MAX DISPLACEMENT =   -0.9835    
+
+     FORCE CONVERGENCE VALUE  =   18.91      CRITERION=   1470.    
+     ARCLEN NEW TIME = -0.46111E-01 ARC-LENGTH =  0.11809E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.7781E-06
+     FORCE CONVERGENCE VALUE  =  0.1987E-04  CRITERION=   1500.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    99  COMPLETED.    CUM ITER =    100
+ *** TIME = -0.461108E-01  TIME INC =  0.495144E-01  MAX DISPLACEMENT =   -0.9921    
+
+     FORCE CONVERGENCE VALUE  =   19.83      CRITERION=   107.2    
+     ARCLEN NEW TIME =  0.34087E-02 ARC-LENGTH =  0.11808E-01
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.8177E-06
+     FORCE CONVERGENCE VALUE  =  0.2217E-04  CRITERION=   109.3     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP   100  COMPLETED.    CUM ITER =    101
+ *** TIME =  0.340865E-02  TIME INC =  0.506602E-01  MAX DISPLACEMENT =    -1.001    
+
+ *** NOTE ***                            CP =      12.922   TIME= 20:25:51
+ Maximum displacement of -1.00056797 was reached at node 2.              
+  Maximum displacement specified in ARCTRM command was 1                 
+  Terminate the analysis at user request.                                
+
+
+
+
+         R E S T A R T   I N F O R M A T I O N
+
+ REASON FOR TERMINATION. . . . . . . . . .MAX. DISP. WAS REACHED (ARCTRM COM.)    
+ FILES NEEDED FOR RESTARTING . . . . . . .  sn_log_coarse.esav
+                                            sn_log_coarse.db
+
+ TIME OF LAST SOLUTION . . . . . . . . . . 0.34087E-02
+    TIME AT START OF THE LOAD STEP . . . .  0.0000    
+    TIME AT END OF THE LOAD STEP . . . . .  1.0000    
+
+ ALL CURRENT ANSYS DATA WRITTEN TO FILE NAME= sn_log_coarse.db
+  FOR POSSIBLE RESUME FROM THIS POINT
+
+
+
+
+
+ ***** ROUTINE COMPLETED *****  CP =        12.953
+
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   20:25:51  NOV 14, 2026 CP=     12.969
+
+ von Mises truss snap-through - sn_log_coarse                                  
+
+
+
+          ***** ANSYS RESULTS INTERPRETATION (POST1) *****
+
+ *** NOTE ***                            CP =      12.969   TIME= 20:25:51
+ Reading results into the database (SET command) will update the current 
+ displacement and force boundary conditions in the database with the     
+ values from the results file for that load set.  Note that any          
+ subsequent solutions will use these values unless action is taken to    
+ either SAVE the current values or not overwrite them (/EXIT,NOSAVE).    
+
+ *GET  NSET      FROM  ACTI  ITEM=SET  NSET  VALUE=  100.000000    
+
+ SET PARAMETER DIMENSIONS ON  CURV TYPE=ARRA  DIMENSIONS=   100     5     1
+
+ *DO LOOP ON PARAMETER= I FROM  1.0000     TO  100.00     BY  1.0000    
+
+
+ USE DATA SET     1 ON RESULT FILE  FOR LOAD CASE 0 
+
+ SET COMMAND GOT LOAD STEP=     1  SUBSTEP=     1  CUMULATIVE ITERATION=     2
+   TIME/FREQUENCY= 0.20000E-02
+ TITLE= von Mises truss snap-through - sn_log_coarse                            
+
+ *GET  VY        FROM  NODE      2  ITEM=U    Y     VALUE=-0.333775217E-03
+
+ *GET  R1        FROM  NODE       1  ITEM=RF   FY    VALUE=  1998.15467     
+
+ *GET  R3        FROM  NODE       3  ITEM=RF   FY    VALUE=  1998.15467     
+
+ *GET  TNOW      FROM  ACTI  ITEM=SET  TIME  VALUE= 0.200000000E-02
+
+ PARAMETER CURV(I,1) =     1.000000000    
+
+ PARAMETER CURV(I,2) =   -0.3337752173E-03
+
+ PARAMETER CURV(I,3) =     1998.154667    
+
+ PARAMETER CURV(I,4) =     1998.154667    
+
+ PARAMETER CURV(I,5) =    0.2000000000E-02
+
+ *ENDDO  INDEX= I                               
+
+ OPENED FILE= sn_log_coarse_curve.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ EXIT THE ANSYS POST1 DATABASE PROCESSOR
+
+
+ ***** ROUTINE COMPLETED *****  CP =        13.141
+
+
+
+ EXIT ANSYS WITHOUT SAVING DATABASE
+
+
+ NUMBER OF WARNING MESSAGES ENCOUNTERED=          1
+ NUMBER OF ERROR   MESSAGES ENCOUNTERED=          0
+
++--------------------- A N S Y S   S T A T I S T I C S ------------------------+
+
+Release: Release 18.0       Build: 18.0       Update: UP20161219   Platform: WINDOWS x64 
+Date Run: 11/14/2026   Time: 20:25     Process ID: 12044
+Operating System: Windows 10  (Build: 19045)
+
+Processor Model:         Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
+
+Compiler: Intel(R) FORTRAN Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) C/C++ Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) Math Kernel Library Version 11.3.3 Product Build 20160413
+
+Number of machines requested            :    1
+Total number of cores available         :    8
+Number of physical cores available      :    4
+Number of processes requested           :    1
+Number of threads per process requested :    2
+Total number of cores requested         :    2 (Shared Memory Parallel)                    
+
+GPU Acceleration: Not Requested
+
+Job Name: sn_log_coarse
+Working Directory: D:\AI-work\BridgeStudio\cases\CB3D17_snap_through_arc_length
+
+Total CPU time for main thread                    :        6.3 seconds
+Total CPU time summed for all threads             :       13.4 seconds
+
+Elapsed time spent pre-processing model (/PREP7)  :        0.0 seconds
+Elapsed time spent solution - preprocessing       :        0.0 seconds
+Elapsed time spent computing solution             :        7.9 seconds
+Elapsed time spent solution - postprocessing      :        0.0 seconds
+Elapsed time spent post-processing model (/POST1) :        0.1 seconds
+ 
+Equation solver used                              :            Sparse (symmetric)
+
+Maximum total memory used                         :       10.0 MB
+Maximum total memory allocated                    :     2112.0 MB
+Total physical memory available                   :         16 GB
+
++------------------ E N D   A N S Y S   S T A T I S T I C S -------------------+
+
+
+ *---------------------------------------------------------------------------*
+ |                                                                           |
+ |                            ANSYS RUN COMPLETED                            |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Ansys Release 18.0          Build 18.0         UP20161219     WINDOWS x64 |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Database Requested(-db)  1024 MB    Scratch Memory Requested      1024 MB |
+ | Maximum Database Used       1 MB    Maximum Scratch Memory Used      9 MB |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ |        CP Time      (sec) =         13.359       Time  =  20:25:52        |
+ |        Elapsed Time (sec) =         13.000       Date  =  11/14/2026      |
+ |                                                                           |
+ *---------------------------------------------------------------------------*

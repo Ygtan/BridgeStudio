@@ -1,0 +1,5 @@
+G g1 E=2.1e+11 A=0.001 B=2 H=0.5 PREF=2e+06 TOL=1e-09 MAXSTEPS=2000 MAXITER=40 VMAX=1 DSMAX=0.01 DSMIN=1e-08
+C log_fine g1 DS=0.005 PSI=1 STRAIN=1 TAG=log_fine
+C log_coarse g1 DS=0.02 PSI=1 STRAIN=1 TAG=log_coarse
+C eng_fine g1 DS=0.005 PSI=1 STRAIN=0 TAG=eng_fine
+C eng_coarse g1 DS=0.02 PSI=1 STRAIN=0 TAG=eng_coarse

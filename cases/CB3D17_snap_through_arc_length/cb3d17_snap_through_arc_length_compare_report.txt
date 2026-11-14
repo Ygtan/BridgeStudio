@@ -1,0 +1,49 @@
+============================================================================================================
+CB3D17  post-buckling / snap-through: FEM spherical arc-length vs ANSYS LINK180 + ARCLEN
+============================================================================================================
+FEM  : snap_probe.exe -> stability_path_3d.hpp (Crisfield spherical constraint,
+       lambda as unknown, consistent tangent from fem_3d_nl.hpp CR elements)
+ANSYS: LINK180 + NLGEOM,ON + ARCLEN,ON + ARCTRM,U ; per-substep reaction CSV
+
+von Mises two-bar shallow truss: b=2.000 m  h=0.500 m  A=1.000e-03 m2  E=2.100e+11 Pa
+reference load P_ref=2.0000e+06 N (> analytic limit, otherwise ANSYS stops at lambda=1)
+independent analytic anchor P(v) = -2*N*(h-v)/L, L=sqrt(b^2+(h-v)^2)
+  engineering strain N=EA(L-L0)/L0 :  v_cr=0.214246422 m  P_cr=1188419.6440 N  lambda_cr=0.594209822
+  logarithmic  strain N=EA*ln(L/L0):  v_cr=0.215213664 m  P_cr=1200488.2463 N  lambda_cr=0.600244123
+  P(h)=0.0 N  P(2h)=0.0 N  (flat / fully inverted configurations)
+ANSYS LINK180 KEYOPT(2)=1 is exactly the logarithmic-strain measure;
+KEYOPT(2)=0 differs by ~2.3% and is archived as a strain-measure contrast only.
+
+--- ANSYS per-substep equilibrium path vs independent analytic anchor ---
+job                nset    worst|dP|N    lambda_max    lambda_min       v_max   |lamR-T|     state
+sn_log_fine         231    4.5940e-06     0.6002024    -0.6002107    1.002585  3.211e-07      PASS
+sn_log_coarse       100    3.3149e-06     0.6000429    -0.6001192    1.000568  1.855e-06      PASS
+sn_eng              231    2.7446e+04     0.6125744    -0.6125685    1.000182  3.068e-07       REF
+  TOL: worst|dP|<=1.0e-03 N, |lambda_reaction-TIME|<=1.0e-05
+  ANSYS limit point (quadratic fit): v*=0.215220115  lambda*=0.600243684  analytic=0.600244123  d=4.392e-07  [PASS]
+  descending branch: lambda_min_fit=-0.6002445 at v=0.784779 ; v_max=1.002585 (>=2h=1.0)  [PASS]
+
+--- FEM arc-length path vs independent analytic anchor ---
+case              npts  STRAIN    worst|dP|N   lam_max_fit      analytic      v_cr_fit     state
+log_fine           274       1    1.9063e-08    0.60024523    0.60024412    0.21526217      PASS
+log_coarse         269       1    2.6570e-08    0.60024296    0.60024412    0.21526225      PASS
+eng_fine           272       0    1.9092e-08    0.59420567    0.59420982    0.21426083      PASS
+eng_coarse         266       0    1.8976e-08    0.59421283    0.59420982    0.21428430      PASS
+  TOL: worst|dP|<=1.0e-03 N, |lambda_max_fit-analytic|<=1.0e-03
+
+--- FEM spherical arc-length path vs ANSYS ARCLEN path (same log-strain measure) ---
+fem            ansys                 lam*_fem    lam*_ansys    d(lambda*)   curve_max     state
+log_fine       sn_log_fine         0.60024523    0.60024368    1.5455e-06   3.303e-06      PASS
+log_coarse     sn_log_coarse       0.60024296    0.60023837    4.5959e-06   3.346e-06      PASS
+  TOL: |d(lambda*)|<=1.0e-03, per-substep |lambda_ansys-lambda_fem(v)|<=5.0e-05
+
+--- strain-measure contrast (documented, not a failure) ---
+  KEYOPT(2)=1 lambda_max=0.6002024  vs  KEYOPT(2)=0 lambda_max=0.6125744  relative difference=+2.061%
+  analytic: P_cr_log/P_cr_eng-1=+1.016%  -> KEYOPT(2)=1 is the log-strain
+  measure; the ~2% offset of KEYOPT(2)=0 is constitutive, not algorithmic.
+
+NOTE: the ANSYS 'indefinite tangent matrix' warning at the limit point is the
+physical signature of snap-through (tangent crosses zero); the run terminates
+by ARCTRM at v=2h after lambda has decreased through zero into negative loads.
+
+CB3D17 SNAP-THROUGH ARC-LENGTH CASE PASSED

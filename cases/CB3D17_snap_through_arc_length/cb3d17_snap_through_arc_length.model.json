@@ -1,0 +1,80 @@
+{
+  "config": {
+    "E": 210000000000.0,
+    "A": 0.001,
+    "B": 2.0,
+    "H": 0.5,
+    "PREF": 2000000.0,
+    "VMAX": 1.0,
+    "TOL": 1e-09,
+    "MAXSTEPS": 2000,
+    "MAXITER": 40,
+    "DSMAX": 0.01,
+    "DSMIN": 1e-08,
+    "TIME_END": 1.0,
+    "MINARC": 1e-07,
+    "NEQIT": 60,
+    "PRXY": 0.3
+  },
+  "fem_cases": [
+    {
+      "id": "log_fine",
+      "DS": 0.005,
+      "PSI": 1.0,
+      "STRAIN": 1,
+      "desc": "log strain, ds0=0.005 (primary ANSYS counterpart)"
+    },
+    {
+      "id": "log_coarse",
+      "DS": 0.02,
+      "PSI": 1.0,
+      "STRAIN": 1,
+      "desc": "log strain, ds0=0.02 (arc-length step sensitivity)"
+    },
+    {
+      "id": "eng_fine",
+      "DS": 0.005,
+      "PSI": 1.0,
+      "STRAIN": 0,
+      "desc": "engineering strain, kernel constitutive"
+    },
+    {
+      "id": "eng_coarse",
+      "DS": 0.02,
+      "PSI": 1.0,
+      "STRAIN": 0,
+      "desc": "engineering strain, ds0=0.02"
+    }
+  ],
+  "ansys_cases": [
+    {
+      "id": "sn_log_fine",
+      "keyopt2": 1,
+      "maxarc": 0.005,
+      "nsub": 1200,
+      "fem": "log_fine",
+      "desc": "LINK180 KEYOPT(2)=1, ARCLEN maxarc=0.005 (primary)"
+    },
+    {
+      "id": "sn_log_coarse",
+      "keyopt2": 1,
+      "maxarc": 0.02,
+      "nsub": 500,
+      "fem": "log_coarse",
+      "desc": "LINK180 KEYOPT(2)=1, ARCLEN maxarc=0.02"
+    },
+    {
+      "id": "sn_eng",
+      "keyopt2": 0,
+      "maxarc": 0.005,
+      "nsub": 1200,
+      "fem": null,
+      "desc": "LINK180 KEYOPT(2)=0, strain-measure contrast only"
+    }
+  ],
+  "source": "ansys_bridge_snap.py::SNAP_CFG / SNAP_*_CASES",
+  "ansys_element": "LINK180",
+  "arclen": true,
+  "nlgeom": true,
+  "path_method": "Crisfield spherical arc-length"
+}

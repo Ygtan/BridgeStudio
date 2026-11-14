@@ -1,0 +1,49 @@
+================================================================================================
+CB3D17  后屈曲 / snap-through 全过程算例归档
+================================================================================================
+
+唯一数据源: BridgeStudio/ansys_bridge_snap.py::SNAP_CFG /
+             SNAP_FEM_CASES / SNAP_ANSYS_CASES
+同一份参数导出 *.snap (FEM-Eigen snap_probe.exe) 与 3 份 LINK180+ARCLEN APDL。
+
+[公共参数]
+  E          = 210000000000.0
+  A          = 0.001
+  B          = 2.0
+  H          = 0.5
+  PREF       = 2000000.0
+  VMAX       = 1.0
+  TOL        = 1e-09
+  MAXSTEPS   = 2000
+  MAXITER    = 40
+  DSMAX      = 0.01
+  DSMIN      = 1e-08
+  TIME_END   = 1.0
+  MINARC     = 1e-07
+  NEQIT      = 60
+
+FEM 弧长法算例 4 个：
+  log_fine       DS=0.005   STRAIN=1  # log strain, ds0=0.005 (primary ANSYS counterpart)
+  log_coarse     DS=0.02    STRAIN=1  # log strain, ds0=0.02 (arc-length step sensitivity)
+  eng_fine       DS=0.005   STRAIN=0  # engineering strain, kernel constitutive
+  eng_coarse     DS=0.02    STRAIN=0  # engineering strain, ds0=0.02
+
+ANSYS 作业 3 个：
+  sn_log_fine      KEYOPT(2)=1  maxarc=0.005   nsub=1200  # LINK180 KEYOPT(2)=1, ARCLEN maxarc=0.005 (primary)
+  sn_log_coarse    KEYOPT(2)=1  maxarc=0.02    nsub=500   # LINK180 KEYOPT(2)=1, ARCLEN maxarc=0.02
+  sn_eng           KEYOPT(2)=0  maxarc=0.005   nsub=1200  # LINK180 KEYOPT(2)=0, strain-measure contrast only
+
+ANSYS 18.0 作业日志（errors/warnings）：
+  sn_eng             errors=0 warnings=1
+  sn_log_coarse      errors=0 warnings=1
+  sn_log_fine        errors=0 warnings=1
+
+口径说明：
+  - ANSYS LINK180 KEYOPT(2)=1 为对数应变，与 FEM STRAIN=1 严格同口径；
+    KEYOPT(2)=0 的作业只用于量化应变度量差异，不参与严格对标。
+  - 极限点处 ANSYS 会提示 indefinite tangent matrix，属物理标志。
+  - FEM 弧长求解器是独立新文件 stability_path_3d.hpp，未改主求解器；
+    B 类规格「主链路未接入非线性稳定全过程」的如实边界仍然成立。
+
+保留 .snap / .inp / .csv / .txt / .out / .json 作为归档证据；
+ANSYS 二进制与数据库产物由 .gitignore 排除。

@@ -1,0 +1,12 @@
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j sn_log_fine -i sn_log_fine.inp -o sn_log_fine_ansys.out
+[ANSYS-sn_log_fine] exit=0
+[ANSYS-sn_log_fine] errors=0 warnings=1
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j sn_log_coarse -i sn_log_coarse.inp -o sn_log_coarse_ansys.out
+[ANSYS-sn_log_coarse] exit=0
+[ANSYS-sn_log_coarse] errors=0 warnings=1
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j sn_eng -i sn_eng.inp -o sn_eng_ansys.out
+[ANSYS-sn_eng] exit=0
+[ANSYS-sn_eng] errors=0 warnings=1
+$ D:\AI-work\FEM-Eigen\build\snap_probe.exe D:\AI-work\BridgeStudio\cases\CB3D17_snap_through_arc_length\cb3d17_snap_through_arc_length.snap D:\AI-work\BridgeStudio\cases\CB3D17_snap_through_arc_length\cb3d17_snap_through_arc_length_fem.csv
+[FEM-SNAP] exit=0
+[SYNC] copied 15 files to D:\AI-work\FEM-Eigen\tests\benchmark\snap_through_ansys_3d\cases
