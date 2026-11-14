@@ -14,7 +14,7 @@ Data flow (single source of truth = one ModelSpec3D):
     ANSYS180 BEAM4                  -> *_disp/_reac/_elem.csv
     compare_3d_loads()              -> compare_report.txt
 
-ANSYS semantics calibrated by measurement (ansys_probe/sfbeam_probe.py):
+ANSYS semantics calibrated by measurement (FEM-Eigen/tests/benchmark/nonlinear_ansys_3d/probes/sfbeam_probe.py):
   * BEAM4 ``SFBEAM,ELEM,1,PRES,+q,+q`` produces a GLOBAL -Z UDL and gives
     exactly the Euler-Bernoulli closed form (consistent nodal loads incl. FEF).
   * ``MP,DENS`` + ``ACEL,0,0,9.81`` gives EXACTLY the same result as an

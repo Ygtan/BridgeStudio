@@ -23,7 +23,7 @@
   cb3d04_arch_bridge_ansys.out       ANSYS 作业日志
   compare_report.txt / manifest.txt / run_log.txt
 
-关键约定（本机 ANSYS v180 实测，见 ansys_probe/link_probe.py, arch_probe.py）:
+关键约定（本机 ANSYS v180 实测，见 FEM-Eigen/tests/benchmark/nonlinear_ansys_3d/probes/link_probe.py, arch_probe.py）:
   X 纵向 / Y 横向 / Z 竖向；竖向荷载 = DOF3(UZ) = ANSYS FZ
   FEM-Eigen 线性 3D 内核把 CABLE/TRUSS 都按 (EA/L)·c⊗c 轴向杆装配,
     不区分只拉不压、不读 L0、无垂度 -> ANSYS LINK180 口径一致

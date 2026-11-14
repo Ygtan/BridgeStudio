@@ -10,7 +10,7 @@ C 阶段已验证的任何文件。本模块专门处理「同一 ModelSpec3D �
                -> spec_mixed_to_apdl()           ANSYS 18.0 ``BEAM4 + LINK180``
                -> parse/compare                 三方对照报告
 
-单元语义（本机 ANSYS 18.0 实测，见 ansys_probe/link_probe.py、arch_probe.py）：
+单元语义（本机 ANSYS 18.0 实测，见 FEM-Eigen/tests/benchmark/nonlinear_ansys_3d/probes/link_probe.py、arch_probe.py）：
 
   * FEM-Eigen 线性 3D 内核 ``fem_3d.hpp`` 按 ``BEAM / BEAM7 / 其它`` 分派，
     ``CABLE`` 与 ``TRUSS`` 都走 ``truss3DStiffness``，即 ``(EA/L)·c⊗c``，
@@ -231,7 +231,7 @@ def _vertical_beam_orientations(
     全局 +Y 方向，ANSYS 的局部 z 就变成 +Y、局部 y 变成 +X，与 FEM 一致。
     本机 ANSYS 18.0 实测：IY=0.01/IZ=0.04 的竖直悬臂梁同时受 FX/FY 时，
     默认写法 UX/UY 与 FEM 对调，加 K(+Y) 后逐位一致、0 warning，
-    且 K 节点无需约束。详见 ansys_probe/vertical_beam_probe.py。
+    且 K 节点无需约束。详见 FEM-Eigen/tests/benchmark/nonlinear_ansys_3d/probes/vertical_beam_probe.py。
 
     水平/斜梁（含 X-Z 平面斜梁）两侧本就一致，不生成 K 节点，
     因此既有 CB3D03/CB3D04 的 APDL 输出逐字节不变。

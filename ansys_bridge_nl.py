@@ -15,8 +15,8 @@
              eps = (L_chord(ERECTED) - L0) / L0
         -> compare_nl() 位移 / 索力 / 反力逐项对比
 
-本机 ANSYS 18.0 实测语义（ansys_probe/link180_nl_probe.py、
-link180_inistrain_probe.py、vertical_beam_probe.py）：
+本机 ANSYS 18.0 实测语义（探测脚本与结论归档在
+FEM-Eigen/tests/benchmark/nonlinear_ansys_3d/probes/）：
   * LINK180 的 ``R,id,A,ISTRN`` 第 3 参数被静默忽略；初应变必须用
     ``INISTATE,SET,DTYP,EPEL`` + ``INISTATE,DEFINE,elem,,EPEL,X,eps``，
     零位移时给出 N0 = E*A*eps（NLGEOM 下同样成立）。

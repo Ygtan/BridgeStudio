@@ -13,7 +13,7 @@ readModel3D）可读的 .dat。本模块从**同一个 ModelSpec3D** 再导出�
   - BEAM188  ``SECTYPE,BEAM,ASEC`` + ``SECDATA``  （本轮目标，现代商业单元）
   - BEAM4    ``R`` + ``RMORE``，SHEARZ/SHEARY=0  （Euler-Bernoulli 严格基准）
 
-为什么需要两份（本机 ANSYS 18.0 实测，见 ansys_probe/beam188_probe*.py）：
+为什么需要两份（本机 ANSYS 18.0 实测，见 FEM-Eigen/tests/benchmark/nonlinear_ansys_3d/probes/beam188_probe*.py）：
 
   * FEM-Eigen 3D 内核是 12x12 **Euler-Bernoulli** 空间梁（三次 Hermitian 形函数）。
   * ANSYS BEAM188 基于**一阶剪切变形 Timoshenko 理论 + 线性形函数**：
