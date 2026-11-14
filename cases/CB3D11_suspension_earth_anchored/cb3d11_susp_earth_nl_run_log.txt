@@ -1,0 +1,4 @@
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d11_susp_earth_nl_ansys -i cb3d11_susp_earth_nl.inp -o cb3d11_susp_earth_nl_ansys.out
+[ANSYS-NLGEOM-SUSP] exit=0
+[ANSYS-LOG] errors=0 warnings=2
+[ANSYS-LOG] warning signature KEYOPT(3)=1 undocumented: present

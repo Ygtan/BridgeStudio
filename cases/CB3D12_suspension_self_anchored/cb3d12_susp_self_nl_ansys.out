@@ -1,0 +1,5525 @@
+
+ ANSYS Multiphysics                                
+
+
+ *------------------------------------------------------------------*
+ |                                                                  |
+ |   W E L C O M E   T O   T H E   A N S Y S (R)  P R O G R A M     |
+ |                                                                  |
+ *------------------------------------------------------------------*
+
+
+
+
+ ***************************************************************
+ *            ANSYS Release 18.0     LEGAL NOTICES             *
+ ***************************************************************
+ *                                                             *
+ * Copyright 2016 SAS IP, Inc.  All rights reserved.           *
+ * Unauthorized use, distribution or duplication is            *
+ * prohibited.                                                 *
+ *                                                             *
+ * Ansys is a registered trademark of ANSYS, Inc. or its       *
+ * subsidiaries in the United States or other countries.       *
+ * See the ANSYS, Inc. online documentation or the ANSYS, Inc. *
+ * documentation CD or online help for the complete Legal      *
+ * Notice.                                                     *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * THIS ANSYS SOFTWARE PRODUCT AND PROGRAM DOCUMENTATION       *
+ * INCLUDE TRADE SECRETS AND CONFIDENTIAL AND PROPRIETARY      *
+ * PRODUCTS OF ANSYS, INC., ITS SUBSIDIARIES, OR LICENSORS.    *
+ * The software products and documentation are furnished by    *
+ * ANSYS, Inc. or its subsidiaries under a software license    *
+ * agreement that contains provisions concerning               *
+ * non-disclosure, copying, length and nature of use,          *
+ * compliance with exporting laws, warranties, disclaimers,    *
+ * limitations of liability, and remedies, and other           *
+ * provisions.  The software products and documentation may be *
+ * used, disclosed, transferred, or copied only in accordance  *
+ * with the terms and conditions of that software license      *
+ * agreement.                                                  *
+ *                                                             *
+ * ANSYS, Inc. is a UL registered                              *
+ * ISO 9001:2008 company.                                      *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * This product is subject to U.S. laws governing export and   *
+ * re-export.                                                  *
+ *                                                             *
+ * For U.S. Government users, except as specifically granted   *
+ * by the ANSYS, Inc. software license agreement, the use,     *
+ * duplication, or disclosure by the United States Government  *
+ * is subject to restrictions stated in the ANSYS, Inc.        *
+ * software license agreement and FAR 12.212 (for non-DOD      *
+ * licenses).                                                  *
+ *                                                             *
+ ***************************************************************
+
+ Release 18.0
+     
+ Point Releases and Patches installed:   
+     
+ ANSYS, Inc. Products Release 18.0   
+ ANSYS Mechanical Products Release 18.0  
+ ANSYS Autodyn Release 18.0  
+ ANSYS LS-DYNA Release 18.0  
+ ANSYS AIM Release 18.0  
+ ANSYS CFX (includes ANSYS CFD-Post) Release 18.0
+ ANSYS Fluent (includes ANSYS CFD-Post) Release 18.0 
+ ANSYS TurboGrid Release 18.0
+ ANSYS FENSAP-ICE Release 18.0   
+ ANSYS Polyflow (includes ANSYS CFD-Post) Release 18.0   
+ ANSYS Forte Release 18.0
+ ANSYS Chemkin Release 18.0  
+ ANSYS ICEM CFD Release 18.0 
+ ANSYS Aqwa Release 18.0 
+ ANSYS Icepak (includes ANSYS CFD-Post) Release 18.0 
+ AutoCAD Release 18.0
+ ACIS Release 18.0   
+ Catia, Version 4 Release 18.0   
+ Catia, Version 6 Release 18.0   
+ Creo Elements/Direct Modeling Release 18.0  
+ Inventor Release 18.0   
+ JTOpen Release 18.0 
+ NX Release 18.0 
+ Parasolid Release 18.0  
+ Creo Parametric (formerly Pro/ENGINEER) Release 18.0
+ Solid Edge Release 18.0 
+ SolidWorks Release 18.0 
+ ANSYS, Inc. License Manager Release 18.0
+
+
+          *****  ANSYS COMMAND LINE ARGUMENTS  *****
+  INITIAL JOBNAME              = cb3d12_susp_self_nl_ansys                                                                                                                                                                                                                               
+  BATCH MODE REQUESTED (-b)    = LIST
+  INPUT FILE COPY MODE (-c)    = COPY
+
+ RELEASE= Release 18.0         BUILD= 18.0      UP20161219   VERSION=WINDOWS x64 
+ CURRENT JOBNAME=cb3d12_susp_self_nl_ansys  10:59:55  NOV 14, 2026 CP=      0.203
+
+     1  /BATCH  
+     2  /TITLE,CB3D12 Self-anchored suspension bridge vs ANSYS NLGEOM - BEAM4+LINK180 NLGEOM
+     3  /PREP7  
+     4  ET,1,BEAM4  
+     5  ET,2,BEAM4  
+     6  ET,3,LINK180
+     7  KEYOPT,3,2,0
+     8  KEYOPT,3,3,1
+     9  ET,4,LINK180
+    10  KEYOPT,4,2,0
+    11  KEYOPT,4,3,1
+    12  R,1,0.78976,0.784502555307,1.56900511061,3,1,0.0
+    13  RMORE,0.0,4.32621641527,0.0,0.0,0.0,0.0 
+    14  R,2,4,1.33333333333,1.33333333333,1,1,0.0   
+    15  RMORE,0.0,2.13333333333,0.0,0.0,0.0,0.0 
+    16  R,3,0.03
+    17  R,4,0.005   
+    18  MP,EX,1,206000000000
+    19  MP,PRXY,1,0.3   
+    20  MP,EX,2,34500000000 
+    21  MP,PRXY,2,0.3   
+    22  MP,EX,3,195000000000
+    23  MP,PRXY,3,0.3   
+    24  MP,GXY,1,79230769230.8  
+    25  MP,GXY,2,14375000000
+    26  ! ---- Nodes: FEM [ERECTED] manufactured geometry ----  
+    27  N,1001,0,0,0
+    28  N,1002,10.0000000001,0,0
+    29  N,1003,19.999999998,0,0 
+    30  N,1004,29.9999999963,0,0
+    31  N,1005,39.999999995,0,0 
+    32  N,1006,50.0000000038,0,0
+    33  N,1007,60.0000000027,0,0
+    34  N,1008,70.0000000018,0,0
+    35  N,1009,80.0000000011,0,0
+    36  N,1010,90.0000000005,0,0
+    37  N,1011,100,0,0  
+    38  N,1012,109.99999997,0,0 
+    39  N,1013,120.000000039,0,0
+    40  N,1014,130.000000008,0,0
+    41  N,1015,139.999999977,0,0
+    42  N,1016,150.000000046,0,0
+    43  N,1017,160.000000015,0,0
+    44  N,1018,169.999999984,0,0
+    45  N,1019,179.999999952,0,0
+    46  N,1020,190.00000002,0,0 
+    47  N,1021,199.999999987,0,4.440892099e-16  
+    48  N,2002,9.99999999968,0,3.2499999999 
+    49  N,2003,20.0000000021,0,7.16666666619
+    50  N,2004,30.0000000011,0,11.7499999953
+    51  N,2006,50.0000000009,0,13.3333333351
+    52  N,2007,60.0000000006,0,10.3333333304
+    53  N,2008,69.9999999992,0,7.99999999958
+    54  N,2009,80.000000004,0,6.33333333309 
+    55  N,2010,89.9999999957,0,5.33333333309
+    56  N,2011,100,0,5.00000000038  
+    57  N,2012,109.999999964,0,5.33333333309
+    58  N,2013,120.000000016,0,6.33333333309
+    59  N,2014,130.000000021,0,7.99999999958
+    60  N,2015,139.999999969,0,10.3333333304
+    61  N,2016,149.999999969,0,13.3333333351
+    62  N,2018,170.000000049,0,11.7499999953
+    63  N,2019,180.000000028,0,7.16666666619
+    64  N,2020,189.999999951,0,3.2499999999 
+    65  N,3001,40,0,-6  
+    66  N,3002,40.0000000021,0,-0.25000000001   
+    67  N,3003,39.9999999981,0,5.50000000019
+    68  N,3004,39.9999999984,0,11.2500000038
+    69  N,3005,40.0000000031,0,17.0000000011
+    70  N,4001,160,0,-6 
+    71  N,4002,160.000000008,0,-0.25000000001   
+    72  N,4003,160.000000002,0,5.50000000019
+    73  N,4004,160.000000012,0,11.2500000038
+    74  N,4005,159.999999977,0,17.0000000011
+    75  ! ---- Orientation nodes K (near-vertical BEAM4) ----   
+    76  N,4006,40,1,-6  
+    77  N,4007,40.0000000021,1,-0.25000000001   
+    78  N,4008,39.9999999981,1,5.50000000019
+    79  N,4009,39.9999999984,1,11.2500000038
+    80  N,4010,160,1,-6 
+    81  N,4011,160.000000008,1,-0.25000000001   
+    82  N,4012,160.000000002,1,5.50000000019
+    83  N,4013,160.000000012,1,11.2500000038
+    84  ! ---- Elements: ANSYS elem no. = creation order ----   
+    85  TYPE,1  
+    86  MAT,1   
+    87  REAL,1  
+    88  E,1001,1002 
+    89  TYPE,1  
+    90  MAT,1   
+    91  REAL,1  
+    92  E,1002,1003 
+    93  TYPE,1  
+    94  MAT,1   
+    95  REAL,1  
+    96  E,1003,1004 
+    97  TYPE,1  
+    98  MAT,1   
+    99  REAL,1  
+   100  E,1004,1005 
+   101  TYPE,1  
+   102  MAT,1   
+   103  REAL,1  
+   104  E,1005,1006 
+   105  TYPE,1  
+   106  MAT,1   
+   107  REAL,1  
+   108  E,1006,1007 
+   109  TYPE,1  
+   110  MAT,1   
+   111  REAL,1  
+   112  E,1007,1008 
+   113  TYPE,1  
+   114  MAT,1   
+   115  REAL,1  
+   116  E,1008,1009 
+   117  TYPE,1  
+   118  MAT,1   
+   119  REAL,1  
+   120  E,1009,1010 
+   121  TYPE,1  
+   122  MAT,1   
+   123  REAL,1  
+   124  E,1010,1011 
+   125  TYPE,1  
+   126  MAT,1   
+   127  REAL,1  
+   128  E,1011,1012 
+   129  TYPE,1  
+   130  MAT,1   
+   131  REAL,1  
+   132  E,1012,1013 
+   133  TYPE,1  
+   134  MAT,1   
+   135  REAL,1  
+   136  E,1013,1014 
+   137  TYPE,1  
+   138  MAT,1   
+   139  REAL,1  
+   140  E,1014,1015 
+   141  TYPE,1  
+   142  MAT,1   
+   143  REAL,1  
+   144  E,1015,1016 
+   145  TYPE,1  
+   146  MAT,1   
+   147  REAL,1  
+   148  E,1016,1017 
+   149  TYPE,1  
+   150  MAT,1   
+   151  REAL,1  
+   152  E,1017,1018 
+   153  TYPE,1  
+   154  MAT,1   
+   155  REAL,1  
+   156  E,1018,1019 
+   157  TYPE,1  
+   158  MAT,1   
+   159  REAL,1  
+   160  E,1019,1020 
+   161  TYPE,1  
+   162  MAT,1   
+   163  REAL,1  
+   164  E,1020,1021 
+   165  TYPE,2  
+   166  MAT,2   
+   167  REAL,2  
+   168  E,3001,3002,4006
+   169  TYPE,2  
+   170  MAT,2   
+   171  REAL,2  
+   172  E,3002,3003,4007
+   173  TYPE,2  
+   174  MAT,2   
+   175  REAL,2  
+   176  E,3003,3004,4008
+   177  TYPE,2  
+   178  MAT,2   
+   179  REAL,2  
+   180  E,3004,3005,4009
+   181  TYPE,2  
+   182  MAT,2   
+   183  REAL,2  
+   184  E,4001,4002,4010
+   185  TYPE,2  
+   186  MAT,2   
+   187  REAL,2  
+   188  E,4002,4003,4011
+   189  TYPE,2  
+   190  MAT,2   
+   191  REAL,2  
+   192  E,4003,4004,4012
+   193  TYPE,2  
+   194  MAT,2   
+   195  REAL,2  
+   196  E,4004,4005,4013
+   197  TYPE,3  
+   198  MAT,3   
+   199  REAL,3  
+   200  E,1001,2002 
+   201  TYPE,3  
+   202  MAT,3   
+   203  REAL,3  
+   204  E,2002,2003 
+   205  TYPE,3  
+   206  MAT,3   
+   207  REAL,3  
+   208  E,2003,2004 
+   209  TYPE,3  
+   210  MAT,3   
+   211  REAL,3  
+   212  E,2004,3005 
+   213  TYPE,3  
+   214  MAT,3   
+   215  REAL,3  
+   216  E,3005,2006 
+   217  TYPE,3  
+   218  MAT,3   
+   219  REAL,3  
+   220  E,2006,2007 
+   221  TYPE,3  
+   222  MAT,3   
+   223  REAL,3  
+   224  E,2007,2008 
+   225  TYPE,3  
+   226  MAT,3   
+   227  REAL,3  
+   228  E,2008,2009 
+   229  TYPE,3  
+   230  MAT,3   
+   231  REAL,3  
+   232  E,2009,2010 
+   233  TYPE,3  
+   234  MAT,3   
+   235  REAL,3  
+   236  E,2010,2011 
+   237  TYPE,3  
+   238  MAT,3   
+   239  REAL,3  
+   240  E,2011,2012 
+   241  TYPE,3  
+   242  MAT,3   
+   243  REAL,3  
+   244  E,2012,2013 
+   245  TYPE,3  
+   246  MAT,3   
+   247  REAL,3  
+   248  E,2013,2014 
+   249  TYPE,3  
+   250  MAT,3   
+   251  REAL,3  
+   252  E,2014,2015 
+   253  TYPE,3  
+   254  MAT,3   
+   255  REAL,3  
+   256  E,2015,2016 
+   257  TYPE,3  
+   258  MAT,3   
+   259  REAL,3  
+   260  E,2016,4005 
+   261  TYPE,3  
+   262  MAT,3   
+   263  REAL,3  
+   264  E,4005,2018 
+   265  TYPE,3  
+   266  MAT,3   
+   267  REAL,3  
+   268  E,2018,2019 
+   269  TYPE,3  
+   270  MAT,3   
+   271  REAL,3  
+   272  E,2019,2020 
+   273  TYPE,3  
+   274  MAT,3   
+   275  REAL,3  
+   276  E,2020,1021 
+   277  TYPE,4  
+   278  MAT,3   
+   279  REAL,4  
+   280  E,2002,1002 
+   281  TYPE,4  
+   282  MAT,3   
+   283  REAL,4  
+   284  E,2003,1003 
+   285  TYPE,4  
+   286  MAT,3   
+   287  REAL,4  
+   288  E,2004,1004 
+   289  TYPE,4  
+   290  MAT,3   
+   291  REAL,4  
+   292  E,2006,1006 
+   293  TYPE,4  
+   294  MAT,3   
+   295  REAL,4  
+   296  E,2007,1007 
+   297  TYPE,4  
+   298  MAT,3   
+   299  REAL,4  
+   300  E,2008,1008 
+   301  TYPE,4  
+   302  MAT,3   
+   303  REAL,4  
+   304  E,2009,1009 
+   305  TYPE,4  
+   306  MAT,3   
+   307  REAL,4  
+   308  E,2010,1010 
+   309  TYPE,4  
+   310  MAT,3   
+   311  REAL,4  
+   312  E,2011,1011 
+   313  TYPE,4  
+   314  MAT,3   
+   315  REAL,4  
+   316  E,2012,1012 
+   317  TYPE,4  
+   318  MAT,3   
+   319  REAL,4  
+   320  E,2013,1013 
+   321  TYPE,4  
+   322  MAT,3   
+   323  REAL,4  
+   324  E,2014,1014 
+   325  TYPE,4  
+   326  MAT,3   
+   327  REAL,4  
+   328  E,2015,1015 
+   329  TYPE,4  
+   330  MAT,3   
+   331  REAL,4  
+   332  E,2016,1016 
+   333  TYPE,4  
+   334  MAT,3   
+   335  REAL,4  
+   336  E,2018,1018 
+   337  TYPE,4  
+   338  MAT,3   
+   339  REAL,4  
+   340  E,2019,1019 
+   341  TYPE,4  
+   342  MAT,3   
+   343  REAL,4  
+   344  E,2020,1020 
+   345  ! ---- Cable initial strain from FEM unstrained length L0 ----  
+   346  INISTATE,SET,DTYP,EPEL  
+   347  INISTATE,DEFINE,29,,EPEL,X,0.000567830151924669 
+   348  INISTATE,DEFINE,30,,EPEL,X,0.000579972922876035 
+   349  INISTATE,DEFINE,31,,EPEL,X,0.000594053777531374 
+   350  INISTATE,DEFINE,32,,EPEL,X,0.000610033233963434 
+   351  INISTATE,DEFINE,33,,EPEL,X,0.000562323027096533 
+   352  INISTATE,DEFINE,34,,EPEL,X,0.000551131270696183 
+   353  INISTATE,DEFINE,35,,EPEL,X,0.000542069969115072 
+   354  INISTATE,DEFINE,36,,EPEL,X,0.000535175645044296 
+   355  INISTATE,DEFINE,37,,EPEL,X,0.000530528956008498 
+   356  INISTATE,DEFINE,38,,EPEL,X,0.000528192386961563 
+   357  INISTATE,DEFINE,39,,EPEL,X,0.00052818838928169  
+   358  INISTATE,DEFINE,40,,EPEL,X,0.000530534899762992 
+   359  INISTATE,DEFINE,41,,EPEL,X,0.000535175645045699 
+   360  INISTATE,DEFINE,42,,EPEL,X,0.000542065224710669 
+   361  INISTATE,DEFINE,43,,EPEL,X,0.000551131270683755 
+   362  INISTATE,DEFINE,44,,EPEL,X,0.000562323909100344 
+   363  INISTATE,DEFINE,45,,EPEL,X,0.000610038724809474 
+   364  INISTATE,DEFINE,46,,EPEL,X,0.000594052123752464 
+   365  INISTATE,DEFINE,47,,EPEL,X,0.000579966069605192 
+   366  INISTATE,DEFINE,48,,EPEL,X,0.000567833429306873 
+   367  INISTATE,DEFINE,49,,EPEL,X,0.000215992150202737 
+   368  INISTATE,DEFINE,50,,EPEL,X,0.00021602268267093  
+   369  INISTATE,DEFINE,51,,EPEL,X,0.000217251041016571 
+   370  INISTATE,DEFINE,52,,EPEL,X,0.000212377223860752 
+   371  INISTATE,DEFINE,53,,EPEL,X,0.000211157519424473 
+   372  INISTATE,DEFINE,54,,EPEL,X,0.000211121010161544 
+   373  INISTATE,DEFINE,55,,EPEL,X,0.000211111151326841 
+   374  INISTATE,DEFINE,56,,EPEL,X,0.000211106386469755 
+   375  INISTATE,DEFINE,57,,EPEL,X,0.000211105031996553 
+   376  INISTATE,DEFINE,58,,EPEL,X,0.000211106386469755 
+   377  INISTATE,DEFINE,59,,EPEL,X,0.000211111151326841 
+   378  INISTATE,DEFINE,60,,EPEL,X,0.000211121010161655 
+   379  INISTATE,DEFINE,61,,EPEL,X,0.000211157519424473 
+   380  INISTATE,DEFINE,62,,EPEL,X,0.000212377223860752 
+   381  INISTATE,DEFINE,63,,EPEL,X,0.000217251041016571 
+   382  INISTATE,DEFINE,64,,EPEL,X,0.000216022682672418 
+   383  INISTATE,DEFINE,65,,EPEL,X,0.00021599215020301  
+   384  ! ---- Boundary conditions ---- 
+   385  D,1001,UY,0 
+   386  D,1001,UZ,0 
+   387  D,1021,UY,0 
+   388  D,1021,UZ,0 
+   389  D,1005,UY,0 
+   390  D,1005,UZ,0 
+   391  D,1017,UY,0 
+   392  D,1017,UZ,0 
+   393  D,1001,ROTX,0   
+   394  D,1002,ROTX,0   
+   395  D,1003,ROTX,0   
+   396  D,1004,ROTX,0   
+   397  D,1005,ROTX,0   
+   398  D,1006,ROTX,0   
+   399  D,1007,ROTX,0   
+   400  D,1008,ROTX,0   
+   401  D,1009,ROTX,0   
+   402  D,1010,ROTX,0   
+   403  D,1011,ROTX,0   
+   404  D,1012,ROTX,0   
+   405  D,1013,ROTX,0   
+   406  D,1014,ROTX,0   
+   407  D,1015,ROTX,0   
+   408  D,1016,ROTX,0   
+   409  D,1017,ROTX,0   
+   410  D,1018,ROTX,0   
+   411  D,1019,ROTX,0   
+   412  D,1020,ROTX,0   
+   413  D,1021,ROTX,0   
+   414  D,2002,UY,0 
+   415  D,2003,UY,0 
+   416  D,2004,UY,0 
+   417  D,2006,UY,0 
+   418  D,2007,UY,0 
+   419  D,2008,UY,0 
+   420  D,2009,UY,0 
+   421  D,2010,UY,0 
+   422  D,2011,UY,0 
+   423  D,2012,UY,0 
+   424  D,2013,UY,0 
+   425  D,2014,UY,0 
+   426  D,2015,UY,0 
+   427  D,2016,UY,0 
+   428  D,2018,UY,0 
+   429  D,2019,UY,0 
+   430  D,2020,UY,0 
+   431  D,1011,UX,0 
+   432  D,3001,UX,0 
+   433  D,3001,UY,0 
+   434  D,3001,UZ,0 
+   435  D,3001,ROTX,0   
+   436  D,3001,ROTY,0   
+   437  D,3001,ROTZ,0   
+   438  D,4001,UX,0 
+   439  D,4001,UY,0 
+   440  D,4001,UZ,0 
+   441  D,4001,ROTX,0   
+   442  D,4001,ROTY,0   
+   443  D,4001,ROTZ,0   
+   444  ! ---- Nodal loads (merged *CLOAD; ANSYS F overwrites duplicates) ----  
+   445  F,1001,FZ,-100000   
+   446  F,1002,FZ,-200000   
+   447  F,1003,FZ,-200000   
+   448  F,1004,FZ,-200000   
+   449  F,1005,FZ,-200000   
+   450  F,1006,FZ,-200000   
+   451  F,1007,FZ,-200000   
+   452  F,1008,FZ,-200000   
+   453  F,1009,FZ,-200000   
+   454  F,1010,FZ,-200000   
+   455  F,1011,FZ,-200000   
+   456  F,1012,FZ,-200000   
+   457  F,1013,FZ,-200000   
+   458  F,1014,FZ,-200000   
+   459  F,1015,FZ,-200000   
+   460  F,1016,FZ,-200000   
+   461  F,1017,FZ,-200000   
+   462  F,1018,FZ,-200000   
+   463  F,1019,FZ,-200000   
+   464  F,1020,FZ,-200000   
+   465  F,1021,FZ,-100000   
+   466  F,3001,FZ,-282037.5 
+   467  F,3002,FZ,-564075   
+   468  F,3003,FZ,-564075   
+   469  F,3004,FZ,-564075   
+   470  F,3005,FZ,-282037.5 
+   471  F,4001,FZ,-282037.5 
+   472  F,4002,FZ,-564075   
+   473  F,4003,FZ,-564075   
+   474  F,4004,FZ,-564075   
+   475  F,4005,FZ,-282037.5 
+   476  FINISH  
+   477  /SOLU   
+   478  ANTYPE,STATIC   
+   479  NLGEOM,ON   
+   480  NSUBST,20,100,10
+   481  NEQIT,50
+   482  OUTRES,ALL,LAST 
+   483  SOLVE   
+   484  FINISH  
+   485  ! ---- Machine-readable results (first column = FEM id) ----
+   486  /POST1  
+   487  SET,LAST
+   488  *DIM,ADSP,ARRAY,48,7
+   489  *DIM,ARCT,ARRAY,48,7
+   490   ADSP(1,1)=1001 
+   491   ARCT(1,1)=1001 
+   492   *GET,TMP,NODE,1001,U,X 
+   493   ADSP(1,2)=TMP  
+   494   *GET,TMP,NODE,1001,U,Y 
+   495   ADSP(1,3)=TMP  
+   496   *GET,TMP,NODE,1001,U,Z 
+   497   ADSP(1,4)=TMP  
+   498   *GET,TMP,NODE,1001,ROT,X   
+   499   ADSP(1,5)=TMP  
+   500   *GET,TMP,NODE,1001,ROT,Y   
+   501   ADSP(1,6)=TMP  
+   502   *GET,TMP,NODE,1001,ROT,Z   
+   503   ADSP(1,7)=TMP  
+   504   *GET,TMP,NODE,1001,RF,FX   
+   505   ARCT(1,2)=TMP  
+   506   *GET,TMP,NODE,1001,RF,FY   
+   507   ARCT(1,3)=TMP  
+   508   *GET,TMP,NODE,1001,RF,FZ   
+   509   ARCT(1,4)=TMP  
+   510   *GET,TMP,NODE,1001,RF,MX   
+   511   ARCT(1,5)=TMP  
+   512   *GET,TMP,NODE,1001,RF,MY   
+   513   ARCT(1,6)=TMP  
+   514   *GET,TMP,NODE,1001,RF,MZ   
+   515   ARCT(1,7)=TMP  
+   516   ADSP(2,1)=1002 
+   517   ARCT(2,1)=1002 
+   518   *GET,TMP,NODE,1002,U,X 
+   519   ADSP(2,2)=TMP  
+   520   *GET,TMP,NODE,1002,U,Y 
+   521   ADSP(2,3)=TMP  
+   522   *GET,TMP,NODE,1002,U,Z 
+   523   ADSP(2,4)=TMP  
+   524   *GET,TMP,NODE,1002,ROT,X   
+   525   ADSP(2,5)=TMP  
+   526   *GET,TMP,NODE,1002,ROT,Y   
+   527   ADSP(2,6)=TMP  
+   528   *GET,TMP,NODE,1002,ROT,Z   
+   529   ADSP(2,7)=TMP  
+   530   *GET,TMP,NODE,1002,RF,FX   
+   531   ARCT(2,2)=TMP  
+   532   *GET,TMP,NODE,1002,RF,FY   
+   533   ARCT(2,3)=TMP  
+   534   *GET,TMP,NODE,1002,RF,FZ   
+   535   ARCT(2,4)=TMP  
+   536   *GET,TMP,NODE,1002,RF,MX   
+   537   ARCT(2,5)=TMP  
+   538   *GET,TMP,NODE,1002,RF,MY   
+   539   ARCT(2,6)=TMP  
+   540   *GET,TMP,NODE,1002,RF,MZ   
+   541   ARCT(2,7)=TMP  
+   542   ADSP(3,1)=1003 
+   543   ARCT(3,1)=1003 
+   544   *GET,TMP,NODE,1003,U,X 
+   545   ADSP(3,2)=TMP  
+   546   *GET,TMP,NODE,1003,U,Y 
+   547   ADSP(3,3)=TMP  
+   548   *GET,TMP,NODE,1003,U,Z 
+   549   ADSP(3,4)=TMP  
+   550   *GET,TMP,NODE,1003,ROT,X   
+   551   ADSP(3,5)=TMP  
+   552   *GET,TMP,NODE,1003,ROT,Y   
+   553   ADSP(3,6)=TMP  
+   554   *GET,TMP,NODE,1003,ROT,Z   
+   555   ADSP(3,7)=TMP  
+   556   *GET,TMP,NODE,1003,RF,FX   
+   557   ARCT(3,2)=TMP  
+   558   *GET,TMP,NODE,1003,RF,FY   
+   559   ARCT(3,3)=TMP  
+   560   *GET,TMP,NODE,1003,RF,FZ   
+   561   ARCT(3,4)=TMP  
+   562   *GET,TMP,NODE,1003,RF,MX   
+   563   ARCT(3,5)=TMP  
+   564   *GET,TMP,NODE,1003,RF,MY   
+   565   ARCT(3,6)=TMP  
+   566   *GET,TMP,NODE,1003,RF,MZ   
+   567   ARCT(3,7)=TMP  
+   568   ADSP(4,1)=1004 
+   569   ARCT(4,1)=1004 
+   570   *GET,TMP,NODE,1004,U,X 
+   571   ADSP(4,2)=TMP  
+   572   *GET,TMP,NODE,1004,U,Y 
+   573   ADSP(4,3)=TMP  
+   574   *GET,TMP,NODE,1004,U,Z 
+   575   ADSP(4,4)=TMP  
+   576   *GET,TMP,NODE,1004,ROT,X   
+   577   ADSP(4,5)=TMP  
+   578   *GET,TMP,NODE,1004,ROT,Y   
+   579   ADSP(4,6)=TMP  
+   580   *GET,TMP,NODE,1004,ROT,Z   
+   581   ADSP(4,7)=TMP  
+   582   *GET,TMP,NODE,1004,RF,FX   
+   583   ARCT(4,2)=TMP  
+   584   *GET,TMP,NODE,1004,RF,FY   
+   585   ARCT(4,3)=TMP  
+   586   *GET,TMP,NODE,1004,RF,FZ   
+   587   ARCT(4,4)=TMP  
+   588   *GET,TMP,NODE,1004,RF,MX   
+   589   ARCT(4,5)=TMP  
+   590   *GET,TMP,NODE,1004,RF,MY   
+   591   ARCT(4,6)=TMP  
+   592   *GET,TMP,NODE,1004,RF,MZ   
+   593   ARCT(4,7)=TMP  
+   594   ADSP(5,1)=1005 
+   595   ARCT(5,1)=1005 
+   596   *GET,TMP,NODE,1005,U,X 
+   597   ADSP(5,2)=TMP  
+   598   *GET,TMP,NODE,1005,U,Y 
+   599   ADSP(5,3)=TMP  
+   600   *GET,TMP,NODE,1005,U,Z 
+   601   ADSP(5,4)=TMP  
+   602   *GET,TMP,NODE,1005,ROT,X   
+   603   ADSP(5,5)=TMP  
+   604   *GET,TMP,NODE,1005,ROT,Y   
+   605   ADSP(5,6)=TMP  
+   606   *GET,TMP,NODE,1005,ROT,Z   
+   607   ADSP(5,7)=TMP  
+   608   *GET,TMP,NODE,1005,RF,FX   
+   609   ARCT(5,2)=TMP  
+   610   *GET,TMP,NODE,1005,RF,FY   
+   611   ARCT(5,3)=TMP  
+   612   *GET,TMP,NODE,1005,RF,FZ   
+   613   ARCT(5,4)=TMP  
+   614   *GET,TMP,NODE,1005,RF,MX   
+   615   ARCT(5,5)=TMP  
+   616   *GET,TMP,NODE,1005,RF,MY   
+   617   ARCT(5,6)=TMP  
+   618   *GET,TMP,NODE,1005,RF,MZ   
+   619   ARCT(5,7)=TMP  
+   620   ADSP(6,1)=1006 
+   621   ARCT(6,1)=1006 
+   622   *GET,TMP,NODE,1006,U,X 
+   623   ADSP(6,2)=TMP  
+   624   *GET,TMP,NODE,1006,U,Y 
+   625   ADSP(6,3)=TMP  
+   626   *GET,TMP,NODE,1006,U,Z 
+   627   ADSP(6,4)=TMP  
+   628   *GET,TMP,NODE,1006,ROT,X   
+   629   ADSP(6,5)=TMP  
+   630   *GET,TMP,NODE,1006,ROT,Y   
+   631   ADSP(6,6)=TMP  
+   632   *GET,TMP,NODE,1006,ROT,Z   
+   633   ADSP(6,7)=TMP  
+   634   *GET,TMP,NODE,1006,RF,FX   
+   635   ARCT(6,2)=TMP  
+   636   *GET,TMP,NODE,1006,RF,FY   
+   637   ARCT(6,3)=TMP  
+   638   *GET,TMP,NODE,1006,RF,FZ   
+   639   ARCT(6,4)=TMP  
+   640   *GET,TMP,NODE,1006,RF,MX   
+   641   ARCT(6,5)=TMP  
+   642   *GET,TMP,NODE,1006,RF,MY   
+   643   ARCT(6,6)=TMP  
+   644   *GET,TMP,NODE,1006,RF,MZ   
+   645   ARCT(6,7)=TMP  
+   646   ADSP(7,1)=1007 
+   647   ARCT(7,1)=1007 
+   648   *GET,TMP,NODE,1007,U,X 
+   649   ADSP(7,2)=TMP  
+   650   *GET,TMP,NODE,1007,U,Y 
+   651   ADSP(7,3)=TMP  
+   652   *GET,TMP,NODE,1007,U,Z 
+   653   ADSP(7,4)=TMP  
+   654   *GET,TMP,NODE,1007,ROT,X   
+   655   ADSP(7,5)=TMP  
+   656   *GET,TMP,NODE,1007,ROT,Y   
+   657   ADSP(7,6)=TMP  
+   658   *GET,TMP,NODE,1007,ROT,Z   
+   659   ADSP(7,7)=TMP  
+   660   *GET,TMP,NODE,1007,RF,FX   
+   661   ARCT(7,2)=TMP  
+   662   *GET,TMP,NODE,1007,RF,FY   
+   663   ARCT(7,3)=TMP  
+   664   *GET,TMP,NODE,1007,RF,FZ   
+   665   ARCT(7,4)=TMP  
+   666   *GET,TMP,NODE,1007,RF,MX   
+   667   ARCT(7,5)=TMP  
+   668   *GET,TMP,NODE,1007,RF,MY   
+   669   ARCT(7,6)=TMP  
+   670   *GET,TMP,NODE,1007,RF,MZ   
+   671   ARCT(7,7)=TMP  
+   672   ADSP(8,1)=1008 
+   673   ARCT(8,1)=1008 
+   674   *GET,TMP,NODE,1008,U,X 
+   675   ADSP(8,2)=TMP  
+   676   *GET,TMP,NODE,1008,U,Y 
+   677   ADSP(8,3)=TMP  
+   678   *GET,TMP,NODE,1008,U,Z 
+   679   ADSP(8,4)=TMP  
+   680   *GET,TMP,NODE,1008,ROT,X   
+   681   ADSP(8,5)=TMP  
+   682   *GET,TMP,NODE,1008,ROT,Y   
+   683   ADSP(8,6)=TMP  
+   684   *GET,TMP,NODE,1008,ROT,Z   
+   685   ADSP(8,7)=TMP  
+   686   *GET,TMP,NODE,1008,RF,FX   
+   687   ARCT(8,2)=TMP  
+   688   *GET,TMP,NODE,1008,RF,FY   
+   689   ARCT(8,3)=TMP  
+   690   *GET,TMP,NODE,1008,RF,FZ   
+   691   ARCT(8,4)=TMP  
+   692   *GET,TMP,NODE,1008,RF,MX   
+   693   ARCT(8,5)=TMP  
+   694   *GET,TMP,NODE,1008,RF,MY   
+   695   ARCT(8,6)=TMP  
+   696   *GET,TMP,NODE,1008,RF,MZ   
+   697   ARCT(8,7)=TMP  
+   698   ADSP(9,1)=1009 
+   699   ARCT(9,1)=1009 
+   700   *GET,TMP,NODE,1009,U,X 
+   701   ADSP(9,2)=TMP  
+   702   *GET,TMP,NODE,1009,U,Y 
+   703   ADSP(9,3)=TMP  
+   704   *GET,TMP,NODE,1009,U,Z 
+   705   ADSP(9,4)=TMP  
+   706   *GET,TMP,NODE,1009,ROT,X   
+   707   ADSP(9,5)=TMP  
+   708   *GET,TMP,NODE,1009,ROT,Y   
+   709   ADSP(9,6)=TMP  
+   710   *GET,TMP,NODE,1009,ROT,Z   
+   711   ADSP(9,7)=TMP  
+   712   *GET,TMP,NODE,1009,RF,FX   
+   713   ARCT(9,2)=TMP  
+   714   *GET,TMP,NODE,1009,RF,FY   
+   715   ARCT(9,3)=TMP  
+   716   *GET,TMP,NODE,1009,RF,FZ   
+   717   ARCT(9,4)=TMP  
+   718   *GET,TMP,NODE,1009,RF,MX   
+   719   ARCT(9,5)=TMP  
+   720   *GET,TMP,NODE,1009,RF,MY   
+   721   ARCT(9,6)=TMP  
+   722   *GET,TMP,NODE,1009,RF,MZ   
+   723   ARCT(9,7)=TMP  
+   724   ADSP(10,1)=1010
+   725   ARCT(10,1)=1010
+   726   *GET,TMP,NODE,1010,U,X 
+   727   ADSP(10,2)=TMP 
+   728   *GET,TMP,NODE,1010,U,Y 
+   729   ADSP(10,3)=TMP 
+   730   *GET,TMP,NODE,1010,U,Z 
+   731   ADSP(10,4)=TMP 
+   732   *GET,TMP,NODE,1010,ROT,X   
+   733   ADSP(10,5)=TMP 
+   734   *GET,TMP,NODE,1010,ROT,Y   
+   735   ADSP(10,6)=TMP 
+   736   *GET,TMP,NODE,1010,ROT,Z   
+   737   ADSP(10,7)=TMP 
+   738   *GET,TMP,NODE,1010,RF,FX   
+   739   ARCT(10,2)=TMP 
+   740   *GET,TMP,NODE,1010,RF,FY   
+   741   ARCT(10,3)=TMP 
+   742   *GET,TMP,NODE,1010,RF,FZ   
+   743   ARCT(10,4)=TMP 
+   744   *GET,TMP,NODE,1010,RF,MX   
+   745   ARCT(10,5)=TMP 
+   746   *GET,TMP,NODE,1010,RF,MY   
+   747   ARCT(10,6)=TMP 
+   748   *GET,TMP,NODE,1010,RF,MZ   
+   749   ARCT(10,7)=TMP 
+   750   ADSP(11,1)=1011
+   751   ARCT(11,1)=1011
+   752   *GET,TMP,NODE,1011,U,X 
+   753   ADSP(11,2)=TMP 
+   754   *GET,TMP,NODE,1011,U,Y 
+   755   ADSP(11,3)=TMP 
+   756   *GET,TMP,NODE,1011,U,Z 
+   757   ADSP(11,4)=TMP 
+   758   *GET,TMP,NODE,1011,ROT,X   
+   759   ADSP(11,5)=TMP 
+   760   *GET,TMP,NODE,1011,ROT,Y   
+   761   ADSP(11,6)=TMP 
+   762   *GET,TMP,NODE,1011,ROT,Z   
+   763   ADSP(11,7)=TMP 
+   764   *GET,TMP,NODE,1011,RF,FX   
+   765   ARCT(11,2)=TMP 
+   766   *GET,TMP,NODE,1011,RF,FY   
+   767   ARCT(11,3)=TMP 
+   768   *GET,TMP,NODE,1011,RF,FZ   
+   769   ARCT(11,4)=TMP 
+   770   *GET,TMP,NODE,1011,RF,MX   
+   771   ARCT(11,5)=TMP 
+   772   *GET,TMP,NODE,1011,RF,MY   
+   773   ARCT(11,6)=TMP 
+   774   *GET,TMP,NODE,1011,RF,MZ   
+   775   ARCT(11,7)=TMP 
+   776   ADSP(12,1)=1012
+   777   ARCT(12,1)=1012
+   778   *GET,TMP,NODE,1012,U,X 
+   779   ADSP(12,2)=TMP 
+   780   *GET,TMP,NODE,1012,U,Y 
+   781   ADSP(12,3)=TMP 
+   782   *GET,TMP,NODE,1012,U,Z 
+   783   ADSP(12,4)=TMP 
+   784   *GET,TMP,NODE,1012,ROT,X   
+   785   ADSP(12,5)=TMP 
+   786   *GET,TMP,NODE,1012,ROT,Y   
+   787   ADSP(12,6)=TMP 
+   788   *GET,TMP,NODE,1012,ROT,Z   
+   789   ADSP(12,7)=TMP 
+   790   *GET,TMP,NODE,1012,RF,FX   
+   791   ARCT(12,2)=TMP 
+   792   *GET,TMP,NODE,1012,RF,FY   
+   793   ARCT(12,3)=TMP 
+   794   *GET,TMP,NODE,1012,RF,FZ   
+   795   ARCT(12,4)=TMP 
+   796   *GET,TMP,NODE,1012,RF,MX   
+   797   ARCT(12,5)=TMP 
+   798   *GET,TMP,NODE,1012,RF,MY   
+   799   ARCT(12,6)=TMP 
+   800   *GET,TMP,NODE,1012,RF,MZ   
+   801   ARCT(12,7)=TMP 
+   802   ADSP(13,1)=1013
+   803   ARCT(13,1)=1013
+   804   *GET,TMP,NODE,1013,U,X 
+   805   ADSP(13,2)=TMP 
+   806   *GET,TMP,NODE,1013,U,Y 
+   807   ADSP(13,3)=TMP 
+   808   *GET,TMP,NODE,1013,U,Z 
+   809   ADSP(13,4)=TMP 
+   810   *GET,TMP,NODE,1013,ROT,X   
+   811   ADSP(13,5)=TMP 
+   812   *GET,TMP,NODE,1013,ROT,Y   
+   813   ADSP(13,6)=TMP 
+   814   *GET,TMP,NODE,1013,ROT,Z   
+   815   ADSP(13,7)=TMP 
+   816   *GET,TMP,NODE,1013,RF,FX   
+   817   ARCT(13,2)=TMP 
+   818   *GET,TMP,NODE,1013,RF,FY   
+   819   ARCT(13,3)=TMP 
+   820   *GET,TMP,NODE,1013,RF,FZ   
+   821   ARCT(13,4)=TMP 
+   822   *GET,TMP,NODE,1013,RF,MX   
+   823   ARCT(13,5)=TMP 
+   824   *GET,TMP,NODE,1013,RF,MY   
+   825   ARCT(13,6)=TMP 
+   826   *GET,TMP,NODE,1013,RF,MZ   
+   827   ARCT(13,7)=TMP 
+   828   ADSP(14,1)=1014
+   829   ARCT(14,1)=1014
+   830   *GET,TMP,NODE,1014,U,X 
+   831   ADSP(14,2)=TMP 
+   832   *GET,TMP,NODE,1014,U,Y 
+   833   ADSP(14,3)=TMP 
+   834   *GET,TMP,NODE,1014,U,Z 
+   835   ADSP(14,4)=TMP 
+   836   *GET,TMP,NODE,1014,ROT,X   
+   837   ADSP(14,5)=TMP 
+   838   *GET,TMP,NODE,1014,ROT,Y   
+   839   ADSP(14,6)=TMP 
+   840   *GET,TMP,NODE,1014,ROT,Z   
+   841   ADSP(14,7)=TMP 
+   842   *GET,TMP,NODE,1014,RF,FX   
+   843   ARCT(14,2)=TMP 
+   844   *GET,TMP,NODE,1014,RF,FY   
+   845   ARCT(14,3)=TMP 
+   846   *GET,TMP,NODE,1014,RF,FZ   
+   847   ARCT(14,4)=TMP 
+   848   *GET,TMP,NODE,1014,RF,MX   
+   849   ARCT(14,5)=TMP 
+   850   *GET,TMP,NODE,1014,RF,MY   
+   851   ARCT(14,6)=TMP 
+   852   *GET,TMP,NODE,1014,RF,MZ   
+   853   ARCT(14,7)=TMP 
+   854   ADSP(15,1)=1015
+   855   ARCT(15,1)=1015
+   856   *GET,TMP,NODE,1015,U,X 
+   857   ADSP(15,2)=TMP 
+   858   *GET,TMP,NODE,1015,U,Y 
+   859   ADSP(15,3)=TMP 
+   860   *GET,TMP,NODE,1015,U,Z 
+   861   ADSP(15,4)=TMP 
+   862   *GET,TMP,NODE,1015,ROT,X   
+   863   ADSP(15,5)=TMP 
+   864   *GET,TMP,NODE,1015,ROT,Y   
+   865   ADSP(15,6)=TMP 
+   866   *GET,TMP,NODE,1015,ROT,Z   
+   867   ADSP(15,7)=TMP 
+   868   *GET,TMP,NODE,1015,RF,FX   
+   869   ARCT(15,2)=TMP 
+   870   *GET,TMP,NODE,1015,RF,FY   
+   871   ARCT(15,3)=TMP 
+   872   *GET,TMP,NODE,1015,RF,FZ   
+   873   ARCT(15,4)=TMP 
+   874   *GET,TMP,NODE,1015,RF,MX   
+   875   ARCT(15,5)=TMP 
+   876   *GET,TMP,NODE,1015,RF,MY   
+   877   ARCT(15,6)=TMP 
+   878   *GET,TMP,NODE,1015,RF,MZ   
+   879   ARCT(15,7)=TMP 
+   880   ADSP(16,1)=1016
+   881   ARCT(16,1)=1016
+   882   *GET,TMP,NODE,1016,U,X 
+   883   ADSP(16,2)=TMP 
+   884   *GET,TMP,NODE,1016,U,Y 
+   885   ADSP(16,3)=TMP 
+   886   *GET,TMP,NODE,1016,U,Z 
+   887   ADSP(16,4)=TMP 
+   888   *GET,TMP,NODE,1016,ROT,X   
+   889   ADSP(16,5)=TMP 
+   890   *GET,TMP,NODE,1016,ROT,Y   
+   891   ADSP(16,6)=TMP 
+   892   *GET,TMP,NODE,1016,ROT,Z   
+   893   ADSP(16,7)=TMP 
+   894   *GET,TMP,NODE,1016,RF,FX   
+   895   ARCT(16,2)=TMP 
+   896   *GET,TMP,NODE,1016,RF,FY   
+   897   ARCT(16,3)=TMP 
+   898   *GET,TMP,NODE,1016,RF,FZ   
+   899   ARCT(16,4)=TMP 
+   900   *GET,TMP,NODE,1016,RF,MX   
+   901   ARCT(16,5)=TMP 
+   902   *GET,TMP,NODE,1016,RF,MY   
+   903   ARCT(16,6)=TMP 
+   904   *GET,TMP,NODE,1016,RF,MZ   
+   905   ARCT(16,7)=TMP 
+   906   ADSP(17,1)=1017
+   907   ARCT(17,1)=1017
+   908   *GET,TMP,NODE,1017,U,X 
+   909   ADSP(17,2)=TMP 
+   910   *GET,TMP,NODE,1017,U,Y 
+   911   ADSP(17,3)=TMP 
+   912   *GET,TMP,NODE,1017,U,Z 
+   913   ADSP(17,4)=TMP 
+   914   *GET,TMP,NODE,1017,ROT,X   
+   915   ADSP(17,5)=TMP 
+   916   *GET,TMP,NODE,1017,ROT,Y   
+   917   ADSP(17,6)=TMP 
+   918   *GET,TMP,NODE,1017,ROT,Z   
+   919   ADSP(17,7)=TMP 
+   920   *GET,TMP,NODE,1017,RF,FX   
+   921   ARCT(17,2)=TMP 
+   922   *GET,TMP,NODE,1017,RF,FY   
+   923   ARCT(17,3)=TMP 
+   924   *GET,TMP,NODE,1017,RF,FZ   
+   925   ARCT(17,4)=TMP 
+   926   *GET,TMP,NODE,1017,RF,MX   
+   927   ARCT(17,5)=TMP 
+   928   *GET,TMP,NODE,1017,RF,MY   
+   929   ARCT(17,6)=TMP 
+   930   *GET,TMP,NODE,1017,RF,MZ   
+   931   ARCT(17,7)=TMP 
+   932   ADSP(18,1)=1018
+   933   ARCT(18,1)=1018
+   934   *GET,TMP,NODE,1018,U,X 
+   935   ADSP(18,2)=TMP 
+   936   *GET,TMP,NODE,1018,U,Y 
+   937   ADSP(18,3)=TMP 
+   938   *GET,TMP,NODE,1018,U,Z 
+   939   ADSP(18,4)=TMP 
+   940   *GET,TMP,NODE,1018,ROT,X   
+   941   ADSP(18,5)=TMP 
+   942   *GET,TMP,NODE,1018,ROT,Y   
+   943   ADSP(18,6)=TMP 
+   944   *GET,TMP,NODE,1018,ROT,Z   
+   945   ADSP(18,7)=TMP 
+   946   *GET,TMP,NODE,1018,RF,FX   
+   947   ARCT(18,2)=TMP 
+   948   *GET,TMP,NODE,1018,RF,FY   
+   949   ARCT(18,3)=TMP 
+   950   *GET,TMP,NODE,1018,RF,FZ   
+   951   ARCT(18,4)=TMP 
+   952   *GET,TMP,NODE,1018,RF,MX   
+   953   ARCT(18,5)=TMP 
+   954   *GET,TMP,NODE,1018,RF,MY   
+   955   ARCT(18,6)=TMP 
+   956   *GET,TMP,NODE,1018,RF,MZ   
+   957   ARCT(18,7)=TMP 
+   958   ADSP(19,1)=1019
+   959   ARCT(19,1)=1019
+   960   *GET,TMP,NODE,1019,U,X 
+   961   ADSP(19,2)=TMP 
+   962   *GET,TMP,NODE,1019,U,Y 
+   963   ADSP(19,3)=TMP 
+   964   *GET,TMP,NODE,1019,U,Z 
+   965   ADSP(19,4)=TMP 
+   966   *GET,TMP,NODE,1019,ROT,X   
+   967   ADSP(19,5)=TMP 
+   968   *GET,TMP,NODE,1019,ROT,Y   
+   969   ADSP(19,6)=TMP 
+   970   *GET,TMP,NODE,1019,ROT,Z   
+   971   ADSP(19,7)=TMP 
+   972   *GET,TMP,NODE,1019,RF,FX   
+   973   ARCT(19,2)=TMP 
+   974   *GET,TMP,NODE,1019,RF,FY   
+   975   ARCT(19,3)=TMP 
+   976   *GET,TMP,NODE,1019,RF,FZ   
+   977   ARCT(19,4)=TMP 
+   978   *GET,TMP,NODE,1019,RF,MX   
+   979   ARCT(19,5)=TMP 
+   980   *GET,TMP,NODE,1019,RF,MY   
+   981   ARCT(19,6)=TMP 
+   982   *GET,TMP,NODE,1019,RF,MZ   
+   983   ARCT(19,7)=TMP 
+   984   ADSP(20,1)=1020
+   985   ARCT(20,1)=1020
+   986   *GET,TMP,NODE,1020,U,X 
+   987   ADSP(20,2)=TMP 
+   988   *GET,TMP,NODE,1020,U,Y 
+   989   ADSP(20,3)=TMP 
+   990   *GET,TMP,NODE,1020,U,Z 
+   991   ADSP(20,4)=TMP 
+   992   *GET,TMP,NODE,1020,ROT,X   
+   993   ADSP(20,5)=TMP 
+   994   *GET,TMP,NODE,1020,ROT,Y   
+   995   ADSP(20,6)=TMP 
+   996   *GET,TMP,NODE,1020,ROT,Z   
+   997   ADSP(20,7)=TMP 
+   998   *GET,TMP,NODE,1020,RF,FX   
+   999   ARCT(20,2)=TMP 
+  1000   *GET,TMP,NODE,1020,RF,FY   
+  1001   ARCT(20,3)=TMP 
+  1002   *GET,TMP,NODE,1020,RF,FZ   
+  1003   ARCT(20,4)=TMP 
+  1004   *GET,TMP,NODE,1020,RF,MX   
+  1005   ARCT(20,5)=TMP 
+  1006   *GET,TMP,NODE,1020,RF,MY   
+  1007   ARCT(20,6)=TMP 
+  1008   *GET,TMP,NODE,1020,RF,MZ   
+  1009   ARCT(20,7)=TMP 
+  1010   ADSP(21,1)=1021
+  1011   ARCT(21,1)=1021
+  1012   *GET,TMP,NODE,1021,U,X 
+  1013   ADSP(21,2)=TMP 
+  1014   *GET,TMP,NODE,1021,U,Y 
+  1015   ADSP(21,3)=TMP 
+  1016   *GET,TMP,NODE,1021,U,Z 
+  1017   ADSP(21,4)=TMP 
+  1018   *GET,TMP,NODE,1021,ROT,X   
+  1019   ADSP(21,5)=TMP 
+  1020   *GET,TMP,NODE,1021,ROT,Y   
+  1021   ADSP(21,6)=TMP 
+  1022   *GET,TMP,NODE,1021,ROT,Z   
+  1023   ADSP(21,7)=TMP 
+  1024   *GET,TMP,NODE,1021,RF,FX   
+  1025   ARCT(21,2)=TMP 
+  1026   *GET,TMP,NODE,1021,RF,FY   
+  1027   ARCT(21,3)=TMP 
+  1028   *GET,TMP,NODE,1021,RF,FZ   
+  1029   ARCT(21,4)=TMP 
+  1030   *GET,TMP,NODE,1021,RF,MX   
+  1031   ARCT(21,5)=TMP 
+  1032   *GET,TMP,NODE,1021,RF,MY   
+  1033   ARCT(21,6)=TMP 
+  1034   *GET,TMP,NODE,1021,RF,MZ   
+  1035   ARCT(21,7)=TMP 
+  1036   ADSP(22,1)=2002
+  1037   ARCT(22,1)=2002
+  1038   *GET,TMP,NODE,2002,U,X 
+  1039   ADSP(22,2)=TMP 
+  1040   *GET,TMP,NODE,2002,U,Y 
+  1041   ADSP(22,3)=TMP 
+  1042   *GET,TMP,NODE,2002,U,Z 
+  1043   ADSP(22,4)=TMP 
+  1044   ADSP(22,5)=0.0 
+  1045   ADSP(22,6)=0.0 
+  1046   ADSP(22,7)=0.0 
+  1047   *GET,TMP,NODE,2002,RF,FX   
+  1048   ARCT(22,2)=TMP 
+  1049   *GET,TMP,NODE,2002,RF,FY   
+  1050   ARCT(22,3)=TMP 
+  1051   *GET,TMP,NODE,2002,RF,FZ   
+  1052   ARCT(22,4)=TMP 
+  1053   ARCT(22,5)=0.0 
+  1054   ARCT(22,6)=0.0 
+  1055   ARCT(22,7)=0.0 
+  1056   ADSP(23,1)=2003
+  1057   ARCT(23,1)=2003
+  1058   *GET,TMP,NODE,2003,U,X 
+  1059   ADSP(23,2)=TMP 
+  1060   *GET,TMP,NODE,2003,U,Y 
+  1061   ADSP(23,3)=TMP 
+  1062   *GET,TMP,NODE,2003,U,Z 
+  1063   ADSP(23,4)=TMP 
+  1064   ADSP(23,5)=0.0 
+  1065   ADSP(23,6)=0.0 
+  1066   ADSP(23,7)=0.0 
+  1067   *GET,TMP,NODE,2003,RF,FX   
+  1068   ARCT(23,2)=TMP 
+  1069   *GET,TMP,NODE,2003,RF,FY   
+  1070   ARCT(23,3)=TMP 
+  1071   *GET,TMP,NODE,2003,RF,FZ   
+  1072   ARCT(23,4)=TMP 
+  1073   ARCT(23,5)=0.0 
+  1074   ARCT(23,6)=0.0 
+  1075   ARCT(23,7)=0.0 
+  1076   ADSP(24,1)=2004
+  1077   ARCT(24,1)=2004
+  1078   *GET,TMP,NODE,2004,U,X 
+  1079   ADSP(24,2)=TMP 
+  1080   *GET,TMP,NODE,2004,U,Y 
+  1081   ADSP(24,3)=TMP 
+  1082   *GET,TMP,NODE,2004,U,Z 
+  1083   ADSP(24,4)=TMP 
+  1084   ADSP(24,5)=0.0 
+  1085   ADSP(24,6)=0.0 
+  1086   ADSP(24,7)=0.0 
+  1087   *GET,TMP,NODE,2004,RF,FX   
+  1088   ARCT(24,2)=TMP 
+  1089   *GET,TMP,NODE,2004,RF,FY   
+  1090   ARCT(24,3)=TMP 
+  1091   *GET,TMP,NODE,2004,RF,FZ   
+  1092   ARCT(24,4)=TMP 
+  1093   ARCT(24,5)=0.0 
+  1094   ARCT(24,6)=0.0 
+  1095   ARCT(24,7)=0.0 
+  1096   ADSP(25,1)=2006
+  1097   ARCT(25,1)=2006
+  1098   *GET,TMP,NODE,2006,U,X 
+  1099   ADSP(25,2)=TMP 
+  1100   *GET,TMP,NODE,2006,U,Y 
+  1101   ADSP(25,3)=TMP 
+  1102   *GET,TMP,NODE,2006,U,Z 
+  1103   ADSP(25,4)=TMP 
+  1104   ADSP(25,5)=0.0 
+  1105   ADSP(25,6)=0.0 
+  1106   ADSP(25,7)=0.0 
+  1107   *GET,TMP,NODE,2006,RF,FX   
+  1108   ARCT(25,2)=TMP 
+  1109   *GET,TMP,NODE,2006,RF,FY   
+  1110   ARCT(25,3)=TMP 
+  1111   *GET,TMP,NODE,2006,RF,FZ   
+  1112   ARCT(25,4)=TMP 
+  1113   ARCT(25,5)=0.0 
+  1114   ARCT(25,6)=0.0 
+  1115   ARCT(25,7)=0.0 
+  1116   ADSP(26,1)=2007
+  1117   ARCT(26,1)=2007
+  1118   *GET,TMP,NODE,2007,U,X 
+  1119   ADSP(26,2)=TMP 
+  1120   *GET,TMP,NODE,2007,U,Y 
+  1121   ADSP(26,3)=TMP 
+  1122   *GET,TMP,NODE,2007,U,Z 
+  1123   ADSP(26,4)=TMP 
+  1124   ADSP(26,5)=0.0 
+  1125   ADSP(26,6)=0.0 
+  1126   ADSP(26,7)=0.0 
+  1127   *GET,TMP,NODE,2007,RF,FX   
+  1128   ARCT(26,2)=TMP 
+  1129   *GET,TMP,NODE,2007,RF,FY   
+  1130   ARCT(26,3)=TMP 
+  1131   *GET,TMP,NODE,2007,RF,FZ   
+  1132   ARCT(26,4)=TMP 
+  1133   ARCT(26,5)=0.0 
+  1134   ARCT(26,6)=0.0 
+  1135   ARCT(26,7)=0.0 
+  1136   ADSP(27,1)=2008
+  1137   ARCT(27,1)=2008
+  1138   *GET,TMP,NODE,2008,U,X 
+  1139   ADSP(27,2)=TMP 
+  1140   *GET,TMP,NODE,2008,U,Y 
+  1141   ADSP(27,3)=TMP 
+  1142   *GET,TMP,NODE,2008,U,Z 
+  1143   ADSP(27,4)=TMP 
+  1144   ADSP(27,5)=0.0 
+  1145   ADSP(27,6)=0.0 
+  1146   ADSP(27,7)=0.0 
+  1147   *GET,TMP,NODE,2008,RF,FX   
+  1148   ARCT(27,2)=TMP 
+  1149   *GET,TMP,NODE,2008,RF,FY   
+  1150   ARCT(27,3)=TMP 
+  1151   *GET,TMP,NODE,2008,RF,FZ   
+  1152   ARCT(27,4)=TMP 
+  1153   ARCT(27,5)=0.0 
+  1154   ARCT(27,6)=0.0 
+  1155   ARCT(27,7)=0.0 
+  1156   ADSP(28,1)=2009
+  1157   ARCT(28,1)=2009
+  1158   *GET,TMP,NODE,2009,U,X 
+  1159   ADSP(28,2)=TMP 
+  1160   *GET,TMP,NODE,2009,U,Y 
+  1161   ADSP(28,3)=TMP 
+  1162   *GET,TMP,NODE,2009,U,Z 
+  1163   ADSP(28,4)=TMP 
+  1164   ADSP(28,5)=0.0 
+  1165   ADSP(28,6)=0.0 
+  1166   ADSP(28,7)=0.0 
+  1167   *GET,TMP,NODE,2009,RF,FX   
+  1168   ARCT(28,2)=TMP 
+  1169   *GET,TMP,NODE,2009,RF,FY   
+  1170   ARCT(28,3)=TMP 
+  1171   *GET,TMP,NODE,2009,RF,FZ   
+  1172   ARCT(28,4)=TMP 
+  1173   ARCT(28,5)=0.0 
+  1174   ARCT(28,6)=0.0 
+  1175   ARCT(28,7)=0.0 
+  1176   ADSP(29,1)=2010
+  1177   ARCT(29,1)=2010
+  1178   *GET,TMP,NODE,2010,U,X 
+  1179   ADSP(29,2)=TMP 
+  1180   *GET,TMP,NODE,2010,U,Y 
+  1181   ADSP(29,3)=TMP 
+  1182   *GET,TMP,NODE,2010,U,Z 
+  1183   ADSP(29,4)=TMP 
+  1184   ADSP(29,5)=0.0 
+  1185   ADSP(29,6)=0.0 
+  1186   ADSP(29,7)=0.0 
+  1187   *GET,TMP,NODE,2010,RF,FX   
+  1188   ARCT(29,2)=TMP 
+  1189   *GET,TMP,NODE,2010,RF,FY   
+  1190   ARCT(29,3)=TMP 
+  1191   *GET,TMP,NODE,2010,RF,FZ   
+  1192   ARCT(29,4)=TMP 
+  1193   ARCT(29,5)=0.0 
+  1194   ARCT(29,6)=0.0 
+  1195   ARCT(29,7)=0.0 
+  1196   ADSP(30,1)=2011
+  1197   ARCT(30,1)=2011
+  1198   *GET,TMP,NODE,2011,U,X 
+  1199   ADSP(30,2)=TMP 
+  1200   *GET,TMP,NODE,2011,U,Y 
+  1201   ADSP(30,3)=TMP 
+  1202   *GET,TMP,NODE,2011,U,Z 
+  1203   ADSP(30,4)=TMP 
+  1204   ADSP(30,5)=0.0 
+  1205   ADSP(30,6)=0.0 
+  1206   ADSP(30,7)=0.0 
+  1207   *GET,TMP,NODE,2011,RF,FX   
+  1208   ARCT(30,2)=TMP 
+  1209   *GET,TMP,NODE,2011,RF,FY   
+  1210   ARCT(30,3)=TMP 
+  1211   *GET,TMP,NODE,2011,RF,FZ   
+  1212   ARCT(30,4)=TMP 
+  1213   ARCT(30,5)=0.0 
+  1214   ARCT(30,6)=0.0 
+  1215   ARCT(30,7)=0.0 
+  1216   ADSP(31,1)=2012
+  1217   ARCT(31,1)=2012
+  1218   *GET,TMP,NODE,2012,U,X 
+  1219   ADSP(31,2)=TMP 
+  1220   *GET,TMP,NODE,2012,U,Y 
+  1221   ADSP(31,3)=TMP 
+  1222   *GET,TMP,NODE,2012,U,Z 
+  1223   ADSP(31,4)=TMP 
+  1224   ADSP(31,5)=0.0 
+  1225   ADSP(31,6)=0.0 
+  1226   ADSP(31,7)=0.0 
+  1227   *GET,TMP,NODE,2012,RF,FX   
+  1228   ARCT(31,2)=TMP 
+  1229   *GET,TMP,NODE,2012,RF,FY   
+  1230   ARCT(31,3)=TMP 
+  1231   *GET,TMP,NODE,2012,RF,FZ   
+  1232   ARCT(31,4)=TMP 
+  1233   ARCT(31,5)=0.0 
+  1234   ARCT(31,6)=0.0 
+  1235   ARCT(31,7)=0.0 
+  1236   ADSP(32,1)=2013
+  1237   ARCT(32,1)=2013
+  1238   *GET,TMP,NODE,2013,U,X 
+  1239   ADSP(32,2)=TMP 
+  1240   *GET,TMP,NODE,2013,U,Y 
+  1241   ADSP(32,3)=TMP 
+  1242   *GET,TMP,NODE,2013,U,Z 
+  1243   ADSP(32,4)=TMP 
+  1244   ADSP(32,5)=0.0 
+  1245   ADSP(32,6)=0.0 
+  1246   ADSP(32,7)=0.0 
+  1247   *GET,TMP,NODE,2013,RF,FX   
+  1248   ARCT(32,2)=TMP 
+  1249   *GET,TMP,NODE,2013,RF,FY   
+  1250   ARCT(32,3)=TMP 
+  1251   *GET,TMP,NODE,2013,RF,FZ   
+  1252   ARCT(32,4)=TMP 
+  1253   ARCT(32,5)=0.0 
+  1254   ARCT(32,6)=0.0 
+  1255   ARCT(32,7)=0.0 
+  1256   ADSP(33,1)=2014
+  1257   ARCT(33,1)=2014
+  1258   *GET,TMP,NODE,2014,U,X 
+  1259   ADSP(33,2)=TMP 
+  1260   *GET,TMP,NODE,2014,U,Y 
+  1261   ADSP(33,3)=TMP 
+  1262   *GET,TMP,NODE,2014,U,Z 
+  1263   ADSP(33,4)=TMP 
+  1264   ADSP(33,5)=0.0 
+  1265   ADSP(33,6)=0.0 
+  1266   ADSP(33,7)=0.0 
+  1267   *GET,TMP,NODE,2014,RF,FX   
+  1268   ARCT(33,2)=TMP 
+  1269   *GET,TMP,NODE,2014,RF,FY   
+  1270   ARCT(33,3)=TMP 
+  1271   *GET,TMP,NODE,2014,RF,FZ   
+  1272   ARCT(33,4)=TMP 
+  1273   ARCT(33,5)=0.0 
+  1274   ARCT(33,6)=0.0 
+  1275   ARCT(33,7)=0.0 
+  1276   ADSP(34,1)=2015
+  1277   ARCT(34,1)=2015
+  1278   *GET,TMP,NODE,2015,U,X 
+  1279   ADSP(34,2)=TMP 
+  1280   *GET,TMP,NODE,2015,U,Y 
+  1281   ADSP(34,3)=TMP 
+  1282   *GET,TMP,NODE,2015,U,Z 
+  1283   ADSP(34,4)=TMP 
+  1284   ADSP(34,5)=0.0 
+  1285   ADSP(34,6)=0.0 
+  1286   ADSP(34,7)=0.0 
+  1287   *GET,TMP,NODE,2015,RF,FX   
+  1288   ARCT(34,2)=TMP 
+  1289   *GET,TMP,NODE,2015,RF,FY   
+  1290   ARCT(34,3)=TMP 
+  1291   *GET,TMP,NODE,2015,RF,FZ   
+  1292   ARCT(34,4)=TMP 
+  1293   ARCT(34,5)=0.0 
+  1294   ARCT(34,6)=0.0 
+  1295   ARCT(34,7)=0.0 
+  1296   ADSP(35,1)=2016
+  1297   ARCT(35,1)=2016
+  1298   *GET,TMP,NODE,2016,U,X 
+  1299   ADSP(35,2)=TMP 
+  1300   *GET,TMP,NODE,2016,U,Y 
+  1301   ADSP(35,3)=TMP 
+  1302   *GET,TMP,NODE,2016,U,Z 
+  1303   ADSP(35,4)=TMP 
+  1304   ADSP(35,5)=0.0 
+  1305   ADSP(35,6)=0.0 
+  1306   ADSP(35,7)=0.0 
+  1307   *GET,TMP,NODE,2016,RF,FX   
+  1308   ARCT(35,2)=TMP 
+  1309   *GET,TMP,NODE,2016,RF,FY   
+  1310   ARCT(35,3)=TMP 
+  1311   *GET,TMP,NODE,2016,RF,FZ   
+  1312   ARCT(35,4)=TMP 
+  1313   ARCT(35,5)=0.0 
+  1314   ARCT(35,6)=0.0 
+  1315   ARCT(35,7)=0.0 
+  1316   ADSP(36,1)=2018
+  1317   ARCT(36,1)=2018
+  1318   *GET,TMP,NODE,2018,U,X 
+  1319   ADSP(36,2)=TMP 
+  1320   *GET,TMP,NODE,2018,U,Y 
+  1321   ADSP(36,3)=TMP 
+  1322   *GET,TMP,NODE,2018,U,Z 
+  1323   ADSP(36,4)=TMP 
+  1324   ADSP(36,5)=0.0 
+  1325   ADSP(36,6)=0.0 
+  1326   ADSP(36,7)=0.0 
+  1327   *GET,TMP,NODE,2018,RF,FX   
+  1328   ARCT(36,2)=TMP 
+  1329   *GET,TMP,NODE,2018,RF,FY   
+  1330   ARCT(36,3)=TMP 
+  1331   *GET,TMP,NODE,2018,RF,FZ   
+  1332   ARCT(36,4)=TMP 
+  1333   ARCT(36,5)=0.0 
+  1334   ARCT(36,6)=0.0 
+  1335   ARCT(36,7)=0.0 
+  1336   ADSP(37,1)=2019
+  1337   ARCT(37,1)=2019
+  1338   *GET,TMP,NODE,2019,U,X 
+  1339   ADSP(37,2)=TMP 
+  1340   *GET,TMP,NODE,2019,U,Y 
+  1341   ADSP(37,3)=TMP 
+  1342   *GET,TMP,NODE,2019,U,Z 
+  1343   ADSP(37,4)=TMP 
+  1344   ADSP(37,5)=0.0 
+  1345   ADSP(37,6)=0.0 
+  1346   ADSP(37,7)=0.0 
+  1347   *GET,TMP,NODE,2019,RF,FX   
+  1348   ARCT(37,2)=TMP 
+  1349   *GET,TMP,NODE,2019,RF,FY   
+  1350   ARCT(37,3)=TMP 
+  1351   *GET,TMP,NODE,2019,RF,FZ   
+  1352   ARCT(37,4)=TMP 
+  1353   ARCT(37,5)=0.0 
+  1354   ARCT(37,6)=0.0 
+  1355   ARCT(37,7)=0.0 
+  1356   ADSP(38,1)=2020
+  1357   ARCT(38,1)=2020
+  1358   *GET,TMP,NODE,2020,U,X 
+  1359   ADSP(38,2)=TMP 
+  1360   *GET,TMP,NODE,2020,U,Y 
+  1361   ADSP(38,3)=TMP 
+  1362   *GET,TMP,NODE,2020,U,Z 
+  1363   ADSP(38,4)=TMP 
+  1364   ADSP(38,5)=0.0 
+  1365   ADSP(38,6)=0.0 
+  1366   ADSP(38,7)=0.0 
+  1367   *GET,TMP,NODE,2020,RF,FX   
+  1368   ARCT(38,2)=TMP 
+  1369   *GET,TMP,NODE,2020,RF,FY   
+  1370   ARCT(38,3)=TMP 
+  1371   *GET,TMP,NODE,2020,RF,FZ   
+  1372   ARCT(38,4)=TMP 
+  1373   ARCT(38,5)=0.0 
+  1374   ARCT(38,6)=0.0 
+  1375   ARCT(38,7)=0.0 
+  1376   ADSP(39,1)=3001
+  1377   ARCT(39,1)=3001
+  1378   *GET,TMP,NODE,3001,U,X 
+  1379   ADSP(39,2)=TMP 
+  1380   *GET,TMP,NODE,3001,U,Y 
+  1381   ADSP(39,3)=TMP 
+  1382   *GET,TMP,NODE,3001,U,Z 
+  1383   ADSP(39,4)=TMP 
+  1384   *GET,TMP,NODE,3001,ROT,X   
+  1385   ADSP(39,5)=TMP 
+  1386   *GET,TMP,NODE,3001,ROT,Y   
+  1387   ADSP(39,6)=TMP 
+  1388   *GET,TMP,NODE,3001,ROT,Z   
+  1389   ADSP(39,7)=TMP 
+  1390   *GET,TMP,NODE,3001,RF,FX   
+  1391   ARCT(39,2)=TMP 
+  1392   *GET,TMP,NODE,3001,RF,FY   
+  1393   ARCT(39,3)=TMP 
+  1394   *GET,TMP,NODE,3001,RF,FZ   
+  1395   ARCT(39,4)=TMP 
+  1396   *GET,TMP,NODE,3001,RF,MX   
+  1397   ARCT(39,5)=TMP 
+  1398   *GET,TMP,NODE,3001,RF,MY   
+  1399   ARCT(39,6)=TMP 
+  1400   *GET,TMP,NODE,3001,RF,MZ   
+  1401   ARCT(39,7)=TMP 
+  1402   ADSP(40,1)=3002
+  1403   ARCT(40,1)=3002
+  1404   *GET,TMP,NODE,3002,U,X 
+  1405   ADSP(40,2)=TMP 
+  1406   *GET,TMP,NODE,3002,U,Y 
+  1407   ADSP(40,3)=TMP 
+  1408   *GET,TMP,NODE,3002,U,Z 
+  1409   ADSP(40,4)=TMP 
+  1410   *GET,TMP,NODE,3002,ROT,X   
+  1411   ADSP(40,5)=TMP 
+  1412   *GET,TMP,NODE,3002,ROT,Y   
+  1413   ADSP(40,6)=TMP 
+  1414   *GET,TMP,NODE,3002,ROT,Z   
+  1415   ADSP(40,7)=TMP 
+  1416   *GET,TMP,NODE,3002,RF,FX   
+  1417   ARCT(40,2)=TMP 
+  1418   *GET,TMP,NODE,3002,RF,FY   
+  1419   ARCT(40,3)=TMP 
+  1420   *GET,TMP,NODE,3002,RF,FZ   
+  1421   ARCT(40,4)=TMP 
+  1422   *GET,TMP,NODE,3002,RF,MX   
+  1423   ARCT(40,5)=TMP 
+  1424   *GET,TMP,NODE,3002,RF,MY   
+  1425   ARCT(40,6)=TMP 
+  1426   *GET,TMP,NODE,3002,RF,MZ   
+  1427   ARCT(40,7)=TMP 
+  1428   ADSP(41,1)=3003
+  1429   ARCT(41,1)=3003
+  1430   *GET,TMP,NODE,3003,U,X 
+  1431   ADSP(41,2)=TMP 
+  1432   *GET,TMP,NODE,3003,U,Y 
+  1433   ADSP(41,3)=TMP 
+  1434   *GET,TMP,NODE,3003,U,Z 
+  1435   ADSP(41,4)=TMP 
+  1436   *GET,TMP,NODE,3003,ROT,X   
+  1437   ADSP(41,5)=TMP 
+  1438   *GET,TMP,NODE,3003,ROT,Y   
+  1439   ADSP(41,6)=TMP 
+  1440   *GET,TMP,NODE,3003,ROT,Z   
+  1441   ADSP(41,7)=TMP 
+  1442   *GET,TMP,NODE,3003,RF,FX   
+  1443   ARCT(41,2)=TMP 
+  1444   *GET,TMP,NODE,3003,RF,FY   
+  1445   ARCT(41,3)=TMP 
+  1446   *GET,TMP,NODE,3003,RF,FZ   
+  1447   ARCT(41,4)=TMP 
+  1448   *GET,TMP,NODE,3003,RF,MX   
+  1449   ARCT(41,5)=TMP 
+  1450   *GET,TMP,NODE,3003,RF,MY   
+  1451   ARCT(41,6)=TMP 
+  1452   *GET,TMP,NODE,3003,RF,MZ   
+  1453   ARCT(41,7)=TMP 
+  1454   ADSP(42,1)=3004
+  1455   ARCT(42,1)=3004
+  1456   *GET,TMP,NODE,3004,U,X 
+  1457   ADSP(42,2)=TMP 
+  1458   *GET,TMP,NODE,3004,U,Y 
+  1459   ADSP(42,3)=TMP 
+  1460   *GET,TMP,NODE,3004,U,Z 
+  1461   ADSP(42,4)=TMP 
+  1462   *GET,TMP,NODE,3004,ROT,X   
+  1463   ADSP(42,5)=TMP 
+  1464   *GET,TMP,NODE,3004,ROT,Y   
+  1465   ADSP(42,6)=TMP 
+  1466   *GET,TMP,NODE,3004,ROT,Z   
+  1467   ADSP(42,7)=TMP 
+  1468   *GET,TMP,NODE,3004,RF,FX   
+  1469   ARCT(42,2)=TMP 
+  1470   *GET,TMP,NODE,3004,RF,FY   
+  1471   ARCT(42,3)=TMP 
+  1472   *GET,TMP,NODE,3004,RF,FZ   
+  1473   ARCT(42,4)=TMP 
+  1474   *GET,TMP,NODE,3004,RF,MX   
+  1475   ARCT(42,5)=TMP 
+  1476   *GET,TMP,NODE,3004,RF,MY   
+  1477   ARCT(42,6)=TMP 
+  1478   *GET,TMP,NODE,3004,RF,MZ   
+  1479   ARCT(42,7)=TMP 
+  1480   ADSP(43,1)=3005
+  1481   ARCT(43,1)=3005
+  1482   *GET,TMP,NODE,3005,U,X 
+  1483   ADSP(43,2)=TMP 
+  1484   *GET,TMP,NODE,3005,U,Y 
+  1485   ADSP(43,3)=TMP 
+  1486   *GET,TMP,NODE,3005,U,Z 
+  1487   ADSP(43,4)=TMP 
+  1488   *GET,TMP,NODE,3005,ROT,X   
+  1489   ADSP(43,5)=TMP 
+  1490   *GET,TMP,NODE,3005,ROT,Y   
+  1491   ADSP(43,6)=TMP 
+  1492   *GET,TMP,NODE,3005,ROT,Z   
+  1493   ADSP(43,7)=TMP 
+  1494   *GET,TMP,NODE,3005,RF,FX   
+  1495   ARCT(43,2)=TMP 
+  1496   *GET,TMP,NODE,3005,RF,FY   
+  1497   ARCT(43,3)=TMP 
+  1498   *GET,TMP,NODE,3005,RF,FZ   
+  1499   ARCT(43,4)=TMP 
+  1500   *GET,TMP,NODE,3005,RF,MX   
+  1501   ARCT(43,5)=TMP 
+  1502   *GET,TMP,NODE,3005,RF,MY   
+  1503   ARCT(43,6)=TMP 
+  1504   *GET,TMP,NODE,3005,RF,MZ   
+  1505   ARCT(43,7)=TMP 
+  1506   ADSP(44,1)=4001
+  1507   ARCT(44,1)=4001
+  1508   *GET,TMP,NODE,4001,U,X 
+  1509   ADSP(44,2)=TMP 
+  1510   *GET,TMP,NODE,4001,U,Y 
+  1511   ADSP(44,3)=TMP 
+  1512   *GET,TMP,NODE,4001,U,Z 
+  1513   ADSP(44,4)=TMP 
+  1514   *GET,TMP,NODE,4001,ROT,X   
+  1515   ADSP(44,5)=TMP 
+  1516   *GET,TMP,NODE,4001,ROT,Y   
+  1517   ADSP(44,6)=TMP 
+  1518   *GET,TMP,NODE,4001,ROT,Z   
+  1519   ADSP(44,7)=TMP 
+  1520   *GET,TMP,NODE,4001,RF,FX   
+  1521   ARCT(44,2)=TMP 
+  1522   *GET,TMP,NODE,4001,RF,FY   
+  1523   ARCT(44,3)=TMP 
+  1524   *GET,TMP,NODE,4001,RF,FZ   
+  1525   ARCT(44,4)=TMP 
+  1526   *GET,TMP,NODE,4001,RF,MX   
+  1527   ARCT(44,5)=TMP 
+  1528   *GET,TMP,NODE,4001,RF,MY   
+  1529   ARCT(44,6)=TMP 
+  1530   *GET,TMP,NODE,4001,RF,MZ   
+  1531   ARCT(44,7)=TMP 
+  1532   ADSP(45,1)=4002
+  1533   ARCT(45,1)=4002
+  1534   *GET,TMP,NODE,4002,U,X 
+  1535   ADSP(45,2)=TMP 
+  1536   *GET,TMP,NODE,4002,U,Y 
+  1537   ADSP(45,3)=TMP 
+  1538   *GET,TMP,NODE,4002,U,Z 
+  1539   ADSP(45,4)=TMP 
+  1540   *GET,TMP,NODE,4002,ROT,X   
+  1541   ADSP(45,5)=TMP 
+  1542   *GET,TMP,NODE,4002,ROT,Y   
+  1543   ADSP(45,6)=TMP 
+  1544   *GET,TMP,NODE,4002,ROT,Z   
+  1545   ADSP(45,7)=TMP 
+  1546   *GET,TMP,NODE,4002,RF,FX   
+  1547   ARCT(45,2)=TMP 
+  1548   *GET,TMP,NODE,4002,RF,FY   
+  1549   ARCT(45,3)=TMP 
+  1550   *GET,TMP,NODE,4002,RF,FZ   
+  1551   ARCT(45,4)=TMP 
+  1552   *GET,TMP,NODE,4002,RF,MX   
+  1553   ARCT(45,5)=TMP 
+  1554   *GET,TMP,NODE,4002,RF,MY   
+  1555   ARCT(45,6)=TMP 
+  1556   *GET,TMP,NODE,4002,RF,MZ   
+  1557   ARCT(45,7)=TMP 
+  1558   ADSP(46,1)=4003
+  1559   ARCT(46,1)=4003
+  1560   *GET,TMP,NODE,4003,U,X 
+  1561   ADSP(46,2)=TMP 
+  1562   *GET,TMP,NODE,4003,U,Y 
+  1563   ADSP(46,3)=TMP 
+  1564   *GET,TMP,NODE,4003,U,Z 
+  1565   ADSP(46,4)=TMP 
+  1566   *GET,TMP,NODE,4003,ROT,X   
+  1567   ADSP(46,5)=TMP 
+  1568   *GET,TMP,NODE,4003,ROT,Y   
+  1569   ADSP(46,6)=TMP 
+  1570   *GET,TMP,NODE,4003,ROT,Z   
+  1571   ADSP(46,7)=TMP 
+  1572   *GET,TMP,NODE,4003,RF,FX   
+  1573   ARCT(46,2)=TMP 
+  1574   *GET,TMP,NODE,4003,RF,FY   
+  1575   ARCT(46,3)=TMP 
+  1576   *GET,TMP,NODE,4003,RF,FZ   
+  1577   ARCT(46,4)=TMP 
+  1578   *GET,TMP,NODE,4003,RF,MX   
+  1579   ARCT(46,5)=TMP 
+  1580   *GET,TMP,NODE,4003,RF,MY   
+  1581   ARCT(46,6)=TMP 
+  1582   *GET,TMP,NODE,4003,RF,MZ   
+  1583   ARCT(46,7)=TMP 
+  1584   ADSP(47,1)=4004
+  1585   ARCT(47,1)=4004
+  1586   *GET,TMP,NODE,4004,U,X 
+  1587   ADSP(47,2)=TMP 
+  1588   *GET,TMP,NODE,4004,U,Y 
+  1589   ADSP(47,3)=TMP 
+  1590   *GET,TMP,NODE,4004,U,Z 
+  1591   ADSP(47,4)=TMP 
+  1592   *GET,TMP,NODE,4004,ROT,X   
+  1593   ADSP(47,5)=TMP 
+  1594   *GET,TMP,NODE,4004,ROT,Y   
+  1595   ADSP(47,6)=TMP 
+  1596   *GET,TMP,NODE,4004,ROT,Z   
+  1597   ADSP(47,7)=TMP 
+  1598   *GET,TMP,NODE,4004,RF,FX   
+  1599   ARCT(47,2)=TMP 
+  1600   *GET,TMP,NODE,4004,RF,FY   
+  1601   ARCT(47,3)=TMP 
+  1602   *GET,TMP,NODE,4004,RF,FZ   
+  1603   ARCT(47,4)=TMP 
+  1604   *GET,TMP,NODE,4004,RF,MX   
+  1605   ARCT(47,5)=TMP 
+  1606   *GET,TMP,NODE,4004,RF,MY   
+  1607   ARCT(47,6)=TMP 
+  1608   *GET,TMP,NODE,4004,RF,MZ   
+  1609   ARCT(47,7)=TMP 
+  1610   ADSP(48,1)=4005
+  1611   ARCT(48,1)=4005
+  1612   *GET,TMP,NODE,4005,U,X 
+  1613   ADSP(48,2)=TMP 
+  1614   *GET,TMP,NODE,4005,U,Y 
+  1615   ADSP(48,3)=TMP 
+  1616   *GET,TMP,NODE,4005,U,Z 
+  1617   ADSP(48,4)=TMP 
+  1618   *GET,TMP,NODE,4005,ROT,X   
+  1619   ADSP(48,5)=TMP 
+  1620   *GET,TMP,NODE,4005,ROT,Y   
+  1621   ADSP(48,6)=TMP 
+  1622   *GET,TMP,NODE,4005,ROT,Z   
+  1623   ADSP(48,7)=TMP 
+  1624   *GET,TMP,NODE,4005,RF,FX   
+  1625   ARCT(48,2)=TMP 
+  1626   *GET,TMP,NODE,4005,RF,FY   
+  1627   ARCT(48,3)=TMP 
+  1628   *GET,TMP,NODE,4005,RF,FZ   
+  1629   ARCT(48,4)=TMP 
+  1630   *GET,TMP,NODE,4005,RF,MX   
+  1631   ARCT(48,5)=TMP 
+  1632   *GET,TMP,NODE,4005,RF,MY   
+  1633   ARCT(48,6)=TMP 
+  1634   *GET,TMP,NODE,4005,RF,MZ   
+  1635   ARCT(48,7)=TMP 
+  1636  *CFOPEN,cb3d12_susp_self_nl_ansys_disp,csv  
+  1637  *VWRITE,ADSP(1,1),ADSP(1,2),ADSP(1,3),ADSP(1,4),ADSP(1,5),ADSP(1,6),ADSP(1,7)   
+  1638   (1X,F8.0,6(1X,E18.10)) 
+  1639  *CFCLOS 
+  1640  *CFOPEN,cb3d12_susp_self_nl_ansys_reac,csv  
+  1641  *VWRITE,ARCT(1,1),ARCT(1,2),ARCT(1,3),ARCT(1,4),ARCT(1,5),ARCT(1,6),ARCT(1,7)   
+  1642   (1X,F8.0,6(1X,E18.10)) 
+  1643  *CFCLOS 
+  1644  ! ---- LINK180 cable axial force (SMISC 1) ---- 
+  1645  ESEL,S,TYPE,,3  
+  1646  ESEL,A,TYPE,,4  
+  1647  ETABLE,LKN,SMISC,1  
+  1648  *DIM,ALK,ARRAY,37,2 
+  1649   ALK(1,1)=3001  
+  1650   *GET,TMP,ELEM,29,ETAB,LKN  
+  1651   ALK(1,2)=TMP   
+  1652   ALK(2,1)=3002  
+  1653   *GET,TMP,ELEM,30,ETAB,LKN  
+  1654   ALK(2,2)=TMP   
+  1655   ALK(3,1)=3003  
+  1656   *GET,TMP,ELEM,31,ETAB,LKN  
+  1657   ALK(3,2)=TMP   
+  1658   ALK(4,1)=3004  
+  1659   *GET,TMP,ELEM,32,ETAB,LKN  
+  1660   ALK(4,2)=TMP   
+  1661   ALK(5,1)=3005  
+  1662   *GET,TMP,ELEM,33,ETAB,LKN  
+  1663   ALK(5,2)=TMP   
+  1664   ALK(6,1)=3006  
+  1665   *GET,TMP,ELEM,34,ETAB,LKN  
+  1666   ALK(6,2)=TMP   
+  1667   ALK(7,1)=3007  
+  1668   *GET,TMP,ELEM,35,ETAB,LKN  
+  1669   ALK(7,2)=TMP   
+  1670   ALK(8,1)=3008  
+  1671   *GET,TMP,ELEM,36,ETAB,LKN  
+  1672   ALK(8,2)=TMP   
+  1673   ALK(9,1)=3009  
+  1674   *GET,TMP,ELEM,37,ETAB,LKN  
+  1675   ALK(9,2)=TMP   
+  1676   ALK(10,1)=3010 
+  1677   *GET,TMP,ELEM,38,ETAB,LKN  
+  1678   ALK(10,2)=TMP  
+  1679   ALK(11,1)=3011 
+  1680   *GET,TMP,ELEM,39,ETAB,LKN  
+  1681   ALK(11,2)=TMP  
+  1682   ALK(12,1)=3012 
+  1683   *GET,TMP,ELEM,40,ETAB,LKN  
+  1684   ALK(12,2)=TMP  
+  1685   ALK(13,1)=3013 
+  1686   *GET,TMP,ELEM,41,ETAB,LKN  
+  1687   ALK(13,2)=TMP  
+  1688   ALK(14,1)=3014 
+  1689   *GET,TMP,ELEM,42,ETAB,LKN  
+  1690   ALK(14,2)=TMP  
+  1691   ALK(15,1)=3015 
+  1692   *GET,TMP,ELEM,43,ETAB,LKN  
+  1693   ALK(15,2)=TMP  
+  1694   ALK(16,1)=3016 
+  1695   *GET,TMP,ELEM,44,ETAB,LKN  
+  1696   ALK(16,2)=TMP  
+  1697   ALK(17,1)=3017 
+  1698   *GET,TMP,ELEM,45,ETAB,LKN  
+  1699   ALK(17,2)=TMP  
+  1700   ALK(18,1)=3018 
+  1701   *GET,TMP,ELEM,46,ETAB,LKN  
+  1702   ALK(18,2)=TMP  
+  1703   ALK(19,1)=3019 
+  1704   *GET,TMP,ELEM,47,ETAB,LKN  
+  1705   ALK(19,2)=TMP  
+  1706   ALK(20,1)=3020 
+  1707   *GET,TMP,ELEM,48,ETAB,LKN  
+  1708   ALK(20,2)=TMP  
+  1709   ALK(21,1)=6001 
+  1710   *GET,TMP,ELEM,49,ETAB,LKN  
+  1711   ALK(21,2)=TMP  
+  1712   ALK(22,1)=6002 
+  1713   *GET,TMP,ELEM,50,ETAB,LKN  
+  1714   ALK(22,2)=TMP  
+  1715   ALK(23,1)=6003 
+  1716   *GET,TMP,ELEM,51,ETAB,LKN  
+  1717   ALK(23,2)=TMP  
+  1718   ALK(24,1)=6004 
+  1719   *GET,TMP,ELEM,52,ETAB,LKN  
+  1720   ALK(24,2)=TMP  
+  1721   ALK(25,1)=6005 
+  1722   *GET,TMP,ELEM,53,ETAB,LKN  
+  1723   ALK(25,2)=TMP  
+  1724   ALK(26,1)=6006 
+  1725   *GET,TMP,ELEM,54,ETAB,LKN  
+  1726   ALK(26,2)=TMP  
+  1727   ALK(27,1)=6007 
+  1728   *GET,TMP,ELEM,55,ETAB,LKN  
+  1729   ALK(27,2)=TMP  
+  1730   ALK(28,1)=6008 
+  1731   *GET,TMP,ELEM,56,ETAB,LKN  
+  1732   ALK(28,2)=TMP  
+  1733   ALK(29,1)=6009 
+  1734   *GET,TMP,ELEM,57,ETAB,LKN  
+  1735   ALK(29,2)=TMP  
+  1736   ALK(30,1)=6010 
+  1737   *GET,TMP,ELEM,58,ETAB,LKN  
+  1738   ALK(30,2)=TMP  
+  1739   ALK(31,1)=6011 
+  1740   *GET,TMP,ELEM,59,ETAB,LKN  
+  1741   ALK(31,2)=TMP  
+  1742   ALK(32,1)=6012 
+  1743   *GET,TMP,ELEM,60,ETAB,LKN  
+  1744   ALK(32,2)=TMP  
+  1745   ALK(33,1)=6013 
+  1746   *GET,TMP,ELEM,61,ETAB,LKN  
+  1747   ALK(33,2)=TMP  
+  1748   ALK(34,1)=6014 
+  1749   *GET,TMP,ELEM,62,ETAB,LKN  
+  1750   ALK(34,2)=TMP  
+  1751   ALK(35,1)=6015 
+  1752   *GET,TMP,ELEM,63,ETAB,LKN  
+  1753   ALK(35,2)=TMP  
+  1754   ALK(36,1)=6016 
+  1755   *GET,TMP,ELEM,64,ETAB,LKN  
+  1756   ALK(36,2)=TMP  
+  1757   ALK(37,1)=6017 
+  1758   *GET,TMP,ELEM,65,ETAB,LKN  
+  1759   ALK(37,2)=TMP  
+  1760  *CFOPEN,cb3d12_susp_self_nl_ansys_link,csv  
+  1761  *VWRITE,ALK(1,1),ALK(1,2)   
+  1762   (1X,F8.0,1(1X,E18.10)) 
+  1763  *CFCLOS 
+  1764  ESEL,ALL
+  1765  FINISH  
+  1766  /EXIT,NOSAVE
+
+ RUN SETUP PROCEDURE FROM FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans
+
+ /INPUT FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans  LINE=       0
+
+ TITLE= 
+ CB3D12 Self-anchored suspension bridge vs ANSYS NLGEOM - BEAM4+LINK180 NLGEOM 
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   10:59:55  NOV 14, 2026 CP=      0.312
+
+ CB3D12 Self-anchored suspension bridge vs ANSYS NLGEOM - BEAM4+LINK180 NLGEOM 
+
+
+
+          ***** ANSYS ANALYSIS DEFINITION (PREP7) *****
+
+ ELEMENT TYPE       1 IS BEAM4        3-D ELASTIC BEAM            
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       2 IS BEAM4        3-D ELASTIC BEAM            
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       3 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       3 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ *** WARNING ***                         CP =       0.312   TIME= 10:59:55
+ For element type = 3 (LINK180), KEYOPT(3) = 1 is an undocumented        
+ option.                                                                 
+
+ ELEMENT TYPE       3 IS LINK180      3-D TENSION-ONLY SPAR       
+  KEYOPT( 1- 6)=        0      0      1        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       4 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       4 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ *** WARNING ***                         CP =       0.312   TIME= 10:59:55
+ For element type = 4 (LINK180), KEYOPT(3) = 1 is an undocumented        
+ option.                                                                 
+
+ ELEMENT TYPE       4 IS LINK180      3-D TENSION-ONLY SPAR       
+  KEYOPT( 1- 6)=        0      0      1        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ REAL CONSTANT SET       1  ITEMS   1 TO   6
+   0.78976      0.78450       1.5690       3.0000       1.0000       0.0000    
+
+ REAL CONSTANT SET       1  ITEMS   7 TO  12
+    0.0000       4.3262       0.0000       0.0000       0.0000       0.0000    
+
+ REAL CONSTANT SET       2  ITEMS   1 TO   6
+    4.0000       1.3333       1.3333       1.0000       1.0000       0.0000    
+
+ REAL CONSTANT SET       2  ITEMS   7 TO  12
+    0.0000       2.1333       0.0000       0.0000       0.0000       0.0000    
+
+ REAL CONSTANT SET       3  ITEMS   1 TO   6
+   0.30000E-01   0.0000       0.0000       0.0000       0.0000       0.0000    
+
+ REAL CONSTANT SET       4  ITEMS   1 TO   6
+   0.50000E-02   0.0000       0.0000       0.0000       0.0000       0.0000    
+
+ MATERIAL         1     EX   =  0.2060000E+12  
+
+ MATERIAL         1     PRXY =  0.3000000      
+
+ MATERIAL         2     EX   =  0.3450000E+11  
+
+ MATERIAL         2     PRXY =  0.3000000      
+
+ MATERIAL         3     EX   =  0.1950000E+12  
+
+ MATERIAL         3     PRXY =  0.3000000      
+
+ MATERIAL         1     GXY  =  0.7923077E+11  
+
+ MATERIAL         2     GXY  =  0.1437500E+11  
+
+ NODE      1001  KCS=      0  X,Y,Z=  0.0000       0.0000       0.0000     
+
+ NODE      1002  KCS=      0  X,Y,Z=  10.000       0.0000       0.0000     
+
+ NODE      1003  KCS=      0  X,Y,Z=  20.000       0.0000       0.0000     
+
+ NODE      1004  KCS=      0  X,Y,Z=  30.000       0.0000       0.0000     
+
+ NODE      1005  KCS=      0  X,Y,Z=  40.000       0.0000       0.0000     
+
+ NODE      1006  KCS=      0  X,Y,Z=  50.000       0.0000       0.0000     
+
+ NODE      1007  KCS=      0  X,Y,Z=  60.000       0.0000       0.0000     
+
+ NODE      1008  KCS=      0  X,Y,Z=  70.000       0.0000       0.0000     
+
+ NODE      1009  KCS=      0  X,Y,Z=  80.000       0.0000       0.0000     
+
+ NODE      1010  KCS=      0  X,Y,Z=  90.000       0.0000       0.0000     
+
+ NODE      1011  KCS=      0  X,Y,Z=  100.00       0.0000       0.0000     
+
+ NODE      1012  KCS=      0  X,Y,Z=  110.00       0.0000       0.0000     
+
+ NODE      1013  KCS=      0  X,Y,Z=  120.00       0.0000       0.0000     
+
+ NODE      1014  KCS=      0  X,Y,Z=  130.00       0.0000       0.0000     
+
+ NODE      1015  KCS=      0  X,Y,Z=  140.00       0.0000       0.0000     
+
+ NODE      1016  KCS=      0  X,Y,Z=  150.00       0.0000       0.0000     
+
+ NODE      1017  KCS=      0  X,Y,Z=  160.00       0.0000       0.0000     
+
+ NODE      1018  KCS=      0  X,Y,Z=  170.00       0.0000       0.0000     
+
+ NODE      1019  KCS=      0  X,Y,Z=  180.00       0.0000       0.0000     
+
+ NODE      1020  KCS=      0  X,Y,Z=  190.00       0.0000       0.0000     
+
+ NODE      1021  KCS=      0  X,Y,Z=  200.00       0.0000      0.44409E-015
+
+ NODE      2002  KCS=      0  X,Y,Z=  10.000       0.0000       3.2500     
+
+ NODE      2003  KCS=      0  X,Y,Z=  20.000       0.0000       7.1667     
+
+ NODE      2004  KCS=      0  X,Y,Z=  30.000       0.0000       11.750     
+
+ NODE      2006  KCS=      0  X,Y,Z=  50.000       0.0000       13.333     
+
+ NODE      2007  KCS=      0  X,Y,Z=  60.000       0.0000       10.333     
+
+ NODE      2008  KCS=      0  X,Y,Z=  70.000       0.0000       8.0000     
+
+ NODE      2009  KCS=      0  X,Y,Z=  80.000       0.0000       6.3333     
+
+ NODE      2010  KCS=      0  X,Y,Z=  90.000       0.0000       5.3333     
+
+ NODE      2011  KCS=      0  X,Y,Z=  100.00       0.0000       5.0000     
+
+ NODE      2012  KCS=      0  X,Y,Z=  110.00       0.0000       5.3333     
+
+ NODE      2013  KCS=      0  X,Y,Z=  120.00       0.0000       6.3333     
+
+ NODE      2014  KCS=      0  X,Y,Z=  130.00       0.0000       8.0000     
+
+ NODE      2015  KCS=      0  X,Y,Z=  140.00       0.0000       10.333     
+
+ NODE      2016  KCS=      0  X,Y,Z=  150.00       0.0000       13.333     
+
+ NODE      2018  KCS=      0  X,Y,Z=  170.00       0.0000       11.750     
+
+ NODE      2019  KCS=      0  X,Y,Z=  180.00       0.0000       7.1667     
+
+ NODE      2020  KCS=      0  X,Y,Z=  190.00       0.0000       3.2500     
+
+ NODE      3001  KCS=      0  X,Y,Z=  40.000       0.0000      -6.0000     
+
+ NODE      3002  KCS=      0  X,Y,Z=  40.000       0.0000     -0.25000     
+
+ NODE      3003  KCS=      0  X,Y,Z=  40.000       0.0000       5.5000     
+
+ NODE      3004  KCS=      0  X,Y,Z=  40.000       0.0000       11.250     
+
+ NODE      3005  KCS=      0  X,Y,Z=  40.000       0.0000       17.000     
+
+ NODE      4001  KCS=      0  X,Y,Z=  160.00       0.0000      -6.0000     
+
+ NODE      4002  KCS=      0  X,Y,Z=  160.00       0.0000     -0.25000     
+
+ NODE      4003  KCS=      0  X,Y,Z=  160.00       0.0000       5.5000     
+
+ NODE      4004  KCS=      0  X,Y,Z=  160.00       0.0000       11.250     
+
+ NODE      4005  KCS=      0  X,Y,Z=  160.00       0.0000       17.000     
+
+ NODE      4006  KCS=      0  X,Y,Z=  40.000       1.0000      -6.0000     
+
+ NODE      4007  KCS=      0  X,Y,Z=  40.000       1.0000     -0.25000     
+
+ NODE      4008  KCS=      0  X,Y,Z=  40.000       1.0000       5.5000     
+
+ NODE      4009  KCS=      0  X,Y,Z=  40.000       1.0000       11.250     
+
+ NODE      4010  KCS=      0  X,Y,Z=  160.00       1.0000      -6.0000     
+
+ NODE      4011  KCS=      0  X,Y,Z=  160.00       1.0000     -0.25000     
+
+ NODE      4012  KCS=      0  X,Y,Z=  160.00       1.0000       5.5000     
+
+ NODE      4013  KCS=      0  X,Y,Z=  160.00       1.0000       11.250     
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      1    1001   1002      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      2    1002   1003      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      3    1003   1004      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      4    1004   1005      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      5    1005   1006      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      6    1006   1007      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      7    1007   1008      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      8    1008   1009      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      9    1009   1010      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     10    1010   1011      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     11    1011   1012      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     12    1012   1013      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     13    1013   1014      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     14    1014   1015      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     15    1015   1016      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     16    1016   1017      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     17    1017   1018      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     18    1018   1019      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     19    1019   1020      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     20    1020   1021      0
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     21    3001   3002   4006
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     22    3002   3003   4007
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     23    3003   3004   4008
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     24    3004   3005   4009
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     25    4001   4002   4010
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     26    4002   4003   4011
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     27    4003   4004   4012
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     28    4004   4005   4013
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     29    1001   2002
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     30    2002   2003
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     31    2003   2004
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     32    2004   3005
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     33    3005   2006
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     34    2006   2007
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     35    2007   2008
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     36    2008   2009
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     37    2009   2010
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     38    2010   2011
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     39    2011   2012
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     40    2012   2013
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     41    2013   2014
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     42    2014   2015
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     43    2015   2016
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     44    2016   4005
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     45    4005   2018
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     46    2018   2019
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     47    2019   2020
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     48    2020   1021
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     49    2002   1002
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     50    2003   1003
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     51    2004   1004
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     52    2006   1006
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     53    2007   1007
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     54    2008   1008
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     55    2009   1009
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     56    2010   1010
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     57    2011   1011
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     58    2012   1012
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     59    2013   1013
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     60    2014   1014
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     61    2015   1015
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     62    2016   1016
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     63    2018   1018
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     64    2019   1019
+
+ ELEMENT TYPE SET TO         4
+
+ MATERIAL NUMBER SET TO         3
+
+ REAL CONSTANT NUMBER=        4
+
+ ELEMENT     65    2020   1020
+ The INISTATE,SET command was successfully executed.
+ The INISTATE,DEFINE command successfully executed for element          29
+ The INISTATE,DEFINE command successfully executed for element          30
+ The INISTATE,DEFINE command successfully executed for element          31
+ The INISTATE,DEFINE command successfully executed for element          32
+ The INISTATE,DEFINE command successfully executed for element          33
+ The INISTATE,DEFINE command successfully executed for element          34
+ The INISTATE,DEFINE command successfully executed for element          35
+ The INISTATE,DEFINE command successfully executed for element          36
+ The INISTATE,DEFINE command successfully executed for element          37
+ The INISTATE,DEFINE command successfully executed for element          38
+ The INISTATE,DEFINE command successfully executed for element          39
+ The INISTATE,DEFINE command successfully executed for element          40
+ The INISTATE,DEFINE command successfully executed for element          41
+ The INISTATE,DEFINE command successfully executed for element          42
+ The INISTATE,DEFINE command successfully executed for element          43
+ The INISTATE,DEFINE command successfully executed for element          44
+ The INISTATE,DEFINE command successfully executed for element          45
+ The INISTATE,DEFINE command successfully executed for element          46
+ The INISTATE,DEFINE command successfully executed for element          47
+ The INISTATE,DEFINE command successfully executed for element          48
+ The INISTATE,DEFINE command successfully executed for element          49
+ The INISTATE,DEFINE command successfully executed for element          50
+ The INISTATE,DEFINE command successfully executed for element          51
+ The INISTATE,DEFINE command successfully executed for element          52
+ The INISTATE,DEFINE command successfully executed for element          53
+ The INISTATE,DEFINE command successfully executed for element          54
+ The INISTATE,DEFINE command successfully executed for element          55
+ The INISTATE,DEFINE command successfully executed for element          56
+ The INISTATE,DEFINE command successfully executed for element          57
+ The INISTATE,DEFINE command successfully executed for element          58
+ The INISTATE,DEFINE command successfully executed for element          59
+ The INISTATE,DEFINE command successfully executed for element          60
+ The INISTATE,DEFINE command successfully executed for element          61
+ The INISTATE,DEFINE command successfully executed for element          62
+ The INISTATE,DEFINE command successfully executed for element          63
+ The INISTATE,DEFINE command successfully executed for element          64
+ The INISTATE,DEFINE command successfully executed for element          65
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         1001 TO        1001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         1001 TO        1001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         1021 TO        1021 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         1021 TO        1021 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         1005 TO        1005 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         1005 TO        1005 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         1017 TO        1017 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         1017 TO        1017 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1001 TO        1001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1002 TO        1002 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1003 TO        1003 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1004 TO        1004 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1005 TO        1005 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1006 TO        1006 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1007 TO        1007 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1008 TO        1008 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1009 TO        1009 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1010 TO        1010 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1011 TO        1011 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1012 TO        1012 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1013 TO        1013 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1014 TO        1014 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1015 TO        1015 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1016 TO        1016 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1017 TO        1017 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1018 TO        1018 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1019 TO        1019 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1020 TO        1020 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1021 TO        1021 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2002 TO        2002 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2003 TO        2003 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2004 TO        2004 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2006 TO        2006 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2007 TO        2007 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2008 TO        2008 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2009 TO        2009 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2010 TO        2010 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2011 TO        2011 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2012 TO        2012 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2013 TO        2013 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2014 TO        2014 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2015 TO        2015 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2016 TO        2016 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2018 TO        2018 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2019 TO        2019 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2020 TO        2020 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES         1011 TO        1011 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTY FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTZ FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES         4001 TO        4001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         4001 TO        4001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         4001 TO        4001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         4001 TO        4001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTY FOR SELECTED NODES         4001 TO        4001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTZ FOR SELECTED NODES         4001 TO        4001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1001 TO     1001 BY        1
+  REAL= -100000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1002 TO     1002 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1003 TO     1003 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1004 TO     1004 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1005 TO     1005 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1006 TO     1006 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1007 TO     1007 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1008 TO     1008 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1009 TO     1009 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1010 TO     1010 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1011 TO     1011 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1012 TO     1012 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1013 TO     1013 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1014 TO     1014 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1015 TO     1015 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1016 TO     1016 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1017 TO     1017 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1018 TO     1018 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1019 TO     1019 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1020 TO     1020 BY        1
+  REAL= -200000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1021 TO     1021 BY        1
+  REAL= -100000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3001 TO     3001 BY        1
+  REAL= -282037.500       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3002 TO     3002 BY        1
+  REAL= -564075.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3003 TO     3003 BY        1
+  REAL= -564075.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3004 TO     3004 BY        1
+  REAL= -564075.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3005 TO     3005 BY        1
+  REAL= -282037.500       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      4001 TO     4001 BY        1
+  REAL= -282037.500       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      4002 TO     4002 BY        1
+  REAL= -564075.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      4003 TO     4003 BY        1
+  REAL= -564075.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      4004 TO     4004 BY        1
+  REAL= -564075.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      4005 TO     4005 BY        1
+  REAL= -282037.500       IMAG=  0.00000000    
+
+
+ ***** ROUTINE COMPLETED *****  CP =         0.328
+
+
+
+ *****  ANSYS SOLUTION ROUTINE  *****
+
+
+ PERFORM A STATIC ANALYSIS
+  THIS WILL BE A NEW ANALYSIS
+
+ LARGE DEFORMATION ANALYSIS
+
+ USE      20 SUBSTEPS INITIALLY THIS LOAD STEP FOR ALL  DEGREES OF FREEDOM
+ FOR AUTOMATIC TIME STEPPING:
+   USE    100 SUBSTEPS AS A MAXIMUM
+   USE     10 SUBSTEPS AS A MINIMUM
+
+ USE A MAXIMUM OF    50 EQUILIBRIUM ITERATIONS EACH SUBSTEP
+
+ WRITE ALL  ITEMS TO THE DATABASE WITH A FREQUENCY OF LAST
+   FOR ALL APPLICABLE ENTITIES
+
+ *****  ANSYS SOLVE    COMMAND  *****
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   10:59:55  NOV 14, 2026 CP=      0.328
+
+ CB3D12 Self-anchored suspension bridge vs ANSYS NLGEOM - BEAM4+LINK180 NLGEOM 
+
+
+
+                       S O L U T I O N   O P T I O N S
+
+   PROBLEM DIMENSIONALITY. . . . . . . . . . . . .3-D                  
+   DEGREES OF FREEDOM. . . . . . UX   UY   UZ   ROTX ROTY ROTZ
+   ANALYSIS TYPE . . . . . . . . . . . . . . . . .STATIC (STEADY-STATE)
+   NONLINEAR GEOMETRIC EFFECTS . . . . . . . . . .ON
+   NEWTON-RAPHSON OPTION . . . . . . . . . . . . .PROGRAM CHOSEN   
+   GLOBALLY ASSEMBLED MATRIX . . . . . . . . . . .SYMMETRIC  
+
+ *** NOTE ***                            CP =       0.328   TIME= 10:59:55
+ Present time 0 is less than or equal to the previous time.  Time will   
+ default to 1.                                                           
+
+ *** NOTE ***                            CP =       0.328   TIME= 10:59:55
+ This nonlinear analysis defaults to using the full Newton-Raphson       
+ solution procedure.  This can be modified using the NROPT command.      
+
+ SOLCONTROL,ON uses sparse matrix direct solver
+
+                      L O A D   S T E P   O P T I O N S
+
+   LOAD STEP NUMBER. . . . . . . . . . . . . . . .     1
+   TIME AT END OF THE LOAD STEP. . . . . . . . . .  1.0000    
+   AUTOMATIC TIME STEPPING . . . . . . . . . . . .    ON
+      INITIAL NUMBER OF SUBSTEPS . . . . . . . . .    20
+      MAXIMUM NUMBER OF SUBSTEPS . . . . . . . . .   100
+      MINIMUM NUMBER OF SUBSTEPS . . . . . . . . .    10
+   MAXIMUM NUMBER OF EQUILIBRIUM ITERATIONS. . . .    50
+   STEP CHANGE BOUNDARY CONDITIONS . . . . . . . .    NO
+   STRESS-STIFFENING . . . . . . . . . . . . . . .    ON
+   TERMINATE ANALYSIS IF NOT CONVERGED . . . . . .YES (EXIT)  
+   CONVERGENCE CONTROLS. . . . . . . . . . . . . .USE DEFAULTS
+   PRINT OUTPUT CONTROLS . . . . . . . . . . . . .NO PRINTOUT
+   DATABASE OUTPUT CONTROLS
+      ITEM     FREQUENCY   COMPONENT
+       ALL       LAST               
+
+
+ SOLUTION MONITORING INFO IS WRITTEN TO FILE= cb3d12_susp_self_nl_ansys.mntr                                                                                                                                                                                                                                      
+
+
+ Range of element maximum matrix coefficients in global coordinates
+ Maximum = 1.292860215E+11 at element 20.                                
+ Minimum = 73125000 at element 62.                                       
+
+   *** ELEMENT MATRIX FORMULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        20  BEAM4         0.000   0.000000
+        2         8  BEAM4         0.000   0.000000
+        3        20  LINK180       0.000   0.000000
+        4        17  LINK180       0.000   0.000000
+ Time at end of element matrix formulation CP = 0.4375.                  
+
+ ALL CURRENT ANSYS DATA WRITTEN TO FILE NAME= cb3d12_susp_self_nl_ansys.rdb
+  FOR POSSIBLE RESUME FROM THIS POINT
+     FORCE CONVERGENCE VALUE  =  0.6032E+07  CRITERION=   7420.    
+     MOMENT CONVERGENCE VALUE =   0.000      CRITERION=  0.5102E-04
+
+ SPARSE MATRIX DIRECT SOLVER.
+  Number of equations =         178,    Maximum wavefront =     18
+  Memory allocated for solver              =     7.774 MB
+  Memory required for in-core solution     =     0.139 MB
+  Memory required for out-of-core solution =     0.119 MB
+
+ *** NOTE ***                            CP =       0.562   TIME= 10:59:56
+ The Sparse Matrix Solver is currently running in the in-core memory     
+ mode.  This memory mode uses the most amount of memory in order to      
+ avoid using the hard drive as much as possible, which most often        
+ results in the fastest solution time.  This mode is recommended if      
+ enough physical memory is present to accommodate all of the solver      
+ data.                                                                   
+ Sparse solver maximum pivot= 2.58572043E+11 at node 1017 ROTY.          
+ Sparse solver minimum pivot= 11794263.4 at node 1011 UY.                
+ Sparse solver minimum pivot in absolute value= 11794263.4 at node 1011  
+ UY.                                                                     
+     DISP CONVERGENCE VALUE   =  0.4258E-01  CRITERION=  0.2173E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.4258E-01
+     FORCE CONVERGENCE VALUE  =  0.9370E+05  CRITERION=  0.2145E+05
+     MOMENT CONVERGENCE VALUE =  0.1601E+05  CRITERION=   7469.    
+     DISP CONVERGENCE VALUE   =  0.1996E-03  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1996E-03
+     FORCE CONVERGENCE VALUE  =   3.457      CRITERION=  0.2188E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   1.754      CRITERION=   7626.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+
+   *** ELEMENT RESULT CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        20  BEAM4         0.031   0.001563
+        2         8  BEAM4         0.000   0.000000
+        3        20  LINK180       0.031   0.001563
+        4        17  LINK180       0.000   0.000000
+
+   *** NODAL LOAD CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        20  BEAM4         0.000   0.000000
+        2         8  BEAM4         0.000   0.000000
+        3        20  LINK180       0.000   0.000000
+        4        17  LINK180       0.000   0.000000
+ *** LOAD STEP     1   SUBSTEP     1  COMPLETED.    CUM ITER =      2
+ *** TIME =  0.500000E-01     TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.8289E+05  CRITERION=  0.2103E+05
+     MOMENT CONVERGENCE VALUE =   1.754      CRITERION=   7324.    
+     DISP CONVERGENCE VALUE   =  0.2248E-02  CRITERION=  0.2183E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2248E-02
+     FORCE CONVERGENCE VALUE  =   260.2      CRITERION=  0.2192E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   7.259      CRITERION=   7010.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.1442E-06  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.1442E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     2  COMPLETED.    CUM ITER =      4
+ *** TIME =  0.100000         TIME INC =  0.500000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.75000E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =  0.1243E+06  CRITERION=  0.2151E+05
+     MOMENT CONVERGENCE VALUE =  0.3521E-05  CRITERION=   6870.    
+     DISP CONVERGENCE VALUE   =  0.3372E-02  CRITERION=  0.2183E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3372E-02
+     FORCE CONVERGENCE VALUE  =   586.1      CRITERION=  0.2271E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   16.29      CRITERION=   6315.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2120E-06  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2120E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     3  COMPLETED.    CUM ITER =      6
+ *** TIME =  0.175000         TIME INC =  0.750000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.10000      INCREASED (FACTOR = 1.3333)
+
+     FORCE CONVERGENCE VALUE  =  0.1658E+06  CRITERION=  0.2233E+05
+     MOMENT CONVERGENCE VALUE =  0.1191E-04  CRITERION=   6188.    
+     DISP CONVERGENCE VALUE   =  0.4496E-02  CRITERION=  0.2183E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4496E-02
+     FORCE CONVERGENCE VALUE  =   1043.      CRITERION=  0.2393E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   28.88      CRITERION=   5388.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2781E-06  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2781E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     4  COMPLETED.    CUM ITER =      8
+ *** TIME =  0.275000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.1658E+06  CRITERION=  0.2355E+05
+     MOMENT CONVERGENCE VALUE =  0.2790E-04  CRITERION=   5279.    
+     DISP CONVERGENCE VALUE   =  0.4496E-02  CRITERION=  0.2183E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4496E-02
+     FORCE CONVERGENCE VALUE  =   1043.      CRITERION=  0.2529E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   28.87      CRITERION=   4459.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2837E-06  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2837E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     5  COMPLETED.    CUM ITER =     10
+ *** TIME =  0.375000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.1658E+06  CRITERION=  0.2490E+05
+     MOMENT CONVERGENCE VALUE =  0.2841E-04  CRITERION=   4370.    
+     DISP CONVERGENCE VALUE   =  0.4495E-02  CRITERION=  0.2183E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4495E-02
+     FORCE CONVERGENCE VALUE  =   1043.      CRITERION=  0.2678E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   28.86      CRITERION=   3531.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2892E-06  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2892E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     6  COMPLETED.    CUM ITER =     12
+ *** TIME =  0.475000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.1658E+06  CRITERION=  0.2639E+05
+     MOMENT CONVERGENCE VALUE =  0.2913E-04  CRITERION=   3460.    
+     DISP CONVERGENCE VALUE   =  0.4495E-02  CRITERION=  0.2183E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4495E-02
+     FORCE CONVERGENCE VALUE  =   1043.      CRITERION=  0.2838E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   28.86      CRITERION=   2601.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2947E-06  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2947E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     7  COMPLETED.    CUM ITER =     14
+ *** TIME =  0.575000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.1658E+06  CRITERION=  0.2797E+05
+     MOMENT CONVERGENCE VALUE =  0.2952E-04  CRITERION=   2549.    
+     DISP CONVERGENCE VALUE   =  0.4495E-02  CRITERION=  0.2183E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4495E-02
+     FORCE CONVERGENCE VALUE  =   1042.      CRITERION=  0.3006E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   28.85      CRITERION=   1671.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.3002E-06  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.3002E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     8  COMPLETED.    CUM ITER =     16
+ *** TIME =  0.675000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.1658E+06  CRITERION=  0.2964E+05
+     MOMENT CONVERGENCE VALUE =  0.3009E-04  CRITERION=   1637.    
+     DISP CONVERGENCE VALUE   =  0.4495E-02  CRITERION=  0.2183E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4495E-02
+     FORCE CONVERGENCE VALUE  =   1042.      CRITERION=  0.3183E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   28.84      CRITERION=   740.4     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.3058E-06  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.3058E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     9  COMPLETED.    CUM ITER =     18
+ *** TIME =  0.775000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.1658E+06  CRITERION=  0.3138E+05
+     MOMENT CONVERGENCE VALUE =  0.3061E-04  CRITERION=   725.2    
+     DISP CONVERGENCE VALUE   =  0.4495E-02  CRITERION=  0.2183E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4495E-02
+     FORCE CONVERGENCE VALUE  =   1042.      CRITERION=  0.3365E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   28.83      CRITERION=   191.0     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.3113E-06  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.3113E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP    10  COMPLETED.    CUM ITER =     20
+ *** TIME =  0.875000         TIME INC =  0.100000    
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.62500E-01  DECREASED (FACTOR = 0.6250)
+
+     FORCE CONVERGENCE VALUE  =  0.1036E+06  CRITERION=  0.3310E+05
+     MOMENT CONVERGENCE VALUE =  0.3111E-04  CRITERION=   187.6    
+     DISP CONVERGENCE VALUE   =  0.2809E-02  CRITERION=  0.2183E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2809E-02
+     FORCE CONVERGENCE VALUE  =   406.6      CRITERION=  0.3482E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   11.30      CRITERION=   773.7     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2061E-06  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2061E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP    11  COMPLETED.    CUM ITER =     22
+ *** TIME =  0.937500         TIME INC =  0.625000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.62500E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.1036E+06  CRITERION=  0.3425E+05
+     MOMENT CONVERGENCE VALUE =  0.7906E-05  CRITERION=   758.4    
+     DISP CONVERGENCE VALUE   =  0.2809E-02  CRITERION=  0.2183E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2809E-02
+     FORCE CONVERGENCE VALUE  =   406.6      CRITERION=  0.3601E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   11.30      CRITERION=   1356.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2083E-06  CRITERION=  0.2227E-02 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2083E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP    12  COMPLETED.    CUM ITER =     24
+ *** TIME =   1.00000         TIME INC =  0.625000E-01
+
+
+ *** ANSYS BINARY FILE STATISTICS
+  BUFFER SIZE USED= 16384
+        0.062 MB WRITTEN ON ELEMENT MATRIX FILE: cb3d12_susp_self_nl_ansys.emat
+        0.062 MB WRITTEN ON ELEMENT SAVED DATA FILE: cb3d12_susp_self_nl_ansys.esav
+        0.062 MB WRITTEN ON ASSEMBLED MATRIX FILE: cb3d12_susp_self_nl_ansys.full
+        0.375 MB WRITTEN ON RESULTS FILE: cb3d12_susp_self_nl_ansys.rst
+
+ FINISH SOLUTION PROCESSING
+
+
+ ***** ROUTINE COMPLETED *****  CP =         2.641
+
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   10:59:57  NOV 14, 2026 CP=      2.672
+
+ CB3D12 Self-anchored suspension bridge vs ANSYS NLGEOM - BEAM4+LINK180 NLGEOM 
+
+
+
+          ***** ANSYS RESULTS INTERPRETATION (POST1) *****
+
+ *** NOTE ***                            CP =       2.672   TIME= 10:59:57
+ Reading results into the database (SET command) will update the current 
+ displacement and force boundary conditions in the database with the     
+ values from the results file for that load set.  Note that any          
+ subsequent solutions will use these values unless action is taken to    
+ either SAVE the current values or not overwrite them (/EXIT,NOSAVE).    
+
+
+ USE LAST SUBSTEP ON RESULT FILE  FOR LOAD CASE 0 
+
+ SET COMMAND GOT LOAD STEP=     1  SUBSTEP=    12  CUMULATIVE ITERATION=    24
+   TIME/FREQUENCY=  1.0000    
+ TITLE= CB3D12 Self-anchored suspension bridge vs ANSYS NLGEOM - BEAM4+LINK180 N
+
+ SET PARAMETER DIMENSIONS ON  ADSP TYPE=ARRA  DIMENSIONS=    48     7     1
+
+ SET PARAMETER DIMENSIONS ON  ARCT TYPE=ARRA  DIMENSIONS=    48     7     1
+
+ PARAMETER ADSP(1,1) =     1001.000000    
+
+ PARAMETER ARCT(1,1) =     1001.000000    
+
+ *GET  TMP       FROM  NODE   1001  ITEM=U    X     VALUE= 0.184138057E-02
+
+ PARAMETER ADSP(1,2) =    0.1841380572E-02
+
+ *GET  TMP       FROM  NODE   1001  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(1,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1001  ITEM=U    Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(1,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1001  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(1,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1001  ITEM=ROT  Y     VALUE= 0.689387485E-06
+
+ PARAMETER ADSP(1,6) =    0.6893874849E-06
+
+ *GET  TMP       FROM  NODE   1001  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(1,7) =     0.000000000    
+
+ PARAMETER ARCT(1,2) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1001  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(1,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1001  ITEM=RF   FZ    VALUE= -872650.553     
+
+ PARAMETER ARCT(1,4) =    -872650.5535    
+
+ *GET  TMP       FROM  NODE    1001  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(1,5) =     0.000000000    
+
+ PARAMETER ARCT(1,6) =     0.000000000    
+
+ PARAMETER ARCT(1,7) =     0.000000000    
+
+ PARAMETER ADSP(2,1) =     1002.000000    
+
+ PARAMETER ARCT(2,1) =     1002.000000    
+
+ *GET  TMP       FROM  NODE   1002  ITEM=U    X     VALUE= 0.165724115E-02
+
+ PARAMETER ADSP(2,2) =    0.1657241154E-02
+
+ *GET  TMP       FROM  NODE   1002  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(2,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1002  ITEM=U    Z     VALUE=-0.638039695E-05
+
+ PARAMETER ADSP(2,4) =   -0.6380396948E-05
+
+ *GET  TMP       FROM  NODE   1002  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(2,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1002  ITEM=ROT  Y     VALUE= 0.535379362E-06
+
+ PARAMETER ADSP(2,6) =    0.5353793616E-06
+
+ *GET  TMP       FROM  NODE   1002  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(2,7) =     0.000000000    
+
+ PARAMETER ARCT(2,2) =     0.000000000    
+
+ PARAMETER ARCT(2,3) =     0.000000000    
+
+ PARAMETER ARCT(2,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1002  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(2,5) =     0.000000000    
+
+ PARAMETER ARCT(2,6) =     0.000000000    
+
+ PARAMETER ARCT(2,7) =     0.000000000    
+
+ PARAMETER ADSP(3,1) =     1003.000000    
+
+ PARAMETER ARCT(3,1) =     1003.000000    
+
+ *GET  TMP       FROM  NODE   1003  ITEM=U    X     VALUE= 0.147310222E-02
+
+ PARAMETER ADSP(3,2) =    0.1473102216E-02
+
+ *GET  TMP       FROM  NODE   1003  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(3,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1003  ITEM=U    Z     VALUE=-0.982449590E-05
+
+ PARAMETER ADSP(3,4) =   -0.9824495899E-05
+
+ *GET  TMP       FROM  NODE   1003  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(3,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1003  ITEM=ROT  Y     VALUE= 0.116498112E-06
+
+ PARAMETER ADSP(3,6) =    0.1164981118E-06
+
+ *GET  TMP       FROM  NODE   1003  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(3,7) =     0.000000000    
+
+ PARAMETER ARCT(3,2) =     0.000000000    
+
+ PARAMETER ARCT(3,3) =     0.000000000    
+
+ PARAMETER ARCT(3,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1003  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(3,5) =     0.000000000    
+
+ PARAMETER ARCT(3,6) =     0.000000000    
+
+ PARAMETER ARCT(3,7) =     0.000000000    
+
+ PARAMETER ADSP(4,1) =     1004.000000    
+
+ PARAMETER ARCT(4,1) =     1004.000000    
+
+ *GET  TMP       FROM  NODE   1004  ITEM=U    X     VALUE= 0.128896374E-02
+
+ PARAMETER ADSP(4,2) =    0.1288963742E-02
+
+ *GET  TMP       FROM  NODE   1004  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(4,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1004  ITEM=U    Z     VALUE=-0.811779178E-05
+
+ PARAMETER ADSP(4,4) =   -0.8117791777E-05
+
+ *GET  TMP       FROM  NODE   1004  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(4,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1004  ITEM=ROT  Y     VALUE=-0.480143762E-06
+
+ PARAMETER ADSP(4,6) =   -0.4801437620E-06
+
+ *GET  TMP       FROM  NODE   1004  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(4,7) =     0.000000000    
+
+ PARAMETER ARCT(4,2) =     0.000000000    
+
+ PARAMETER ARCT(4,3) =     0.000000000    
+
+ PARAMETER ARCT(4,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1004  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(4,5) =     0.000000000    
+
+ PARAMETER ARCT(4,6) =     0.000000000    
+
+ PARAMETER ARCT(4,7) =     0.000000000    
+
+ PARAMETER ADSP(5,1) =     1005.000000    
+
+ PARAMETER ARCT(5,1) =     1005.000000    
+
+ *GET  TMP       FROM  NODE   1005  ITEM=U    X     VALUE= 0.110482571E-02
+
+ PARAMETER ADSP(5,2) =    0.1104825712E-02
+
+ *GET  TMP       FROM  NODE   1005  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(5,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1005  ITEM=U    Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(5,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1005  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(5,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1005  ITEM=ROT  Y     VALUE=-0.114332611E-05
+
+ PARAMETER ADSP(5,6) =   -0.1143326107E-05
+
+ *GET  TMP       FROM  NODE   1005  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(5,7) =     0.000000000    
+
+ PARAMETER ARCT(5,2) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1005  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(5,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1005  ITEM=RF   FZ    VALUE=  198828.722     
+
+ PARAMETER ARCT(5,4) =     198828.7217    
+
+ *GET  TMP       FROM  NODE    1005  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(5,5) =     0.000000000    
+
+ PARAMETER ARCT(5,6) =     0.000000000    
+
+ PARAMETER ARCT(5,7) =     0.000000000    
+
+ PARAMETER ADSP(6,1) =     1006.000000    
+
+ PARAMETER ARCT(6,1) =     1006.000000    
+
+ *GET  TMP       FROM  NODE   1006  ITEM=U    X     VALUE= 0.920687674E-03
+
+ PARAMETER ADSP(6,2) =    0.9206876743E-03
+
+ *GET  TMP       FROM  NODE   1006  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(6,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1006  ITEM=U    Z     VALUE= 0.141410585E-04
+
+ PARAMETER ADSP(6,4) =    0.1414105846E-04
+
+ *GET  TMP       FROM  NODE   1006  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(6,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1006  ITEM=ROT  Y     VALUE=-0.162432984E-05
+
+ PARAMETER ADSP(6,6) =   -0.1624329842E-05
+
+ *GET  TMP       FROM  NODE   1006  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(6,7) =     0.000000000    
+
+ PARAMETER ARCT(6,2) =     0.000000000    
+
+ PARAMETER ARCT(6,3) =     0.000000000    
+
+ PARAMETER ARCT(6,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1006  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(6,5) =     0.000000000    
+
+ PARAMETER ARCT(6,6) =     0.000000000    
+
+ PARAMETER ARCT(6,7) =     0.000000000    
+
+ PARAMETER ADSP(7,1) =     1007.000000    
+
+ PARAMETER ARCT(7,1) =     1007.000000    
+
+ *GET  TMP       FROM  NODE   1007  ITEM=U    X     VALUE= 0.736549804E-03
+
+ PARAMETER ADSP(7,2) =    0.7365498041E-03
+
+ *GET  TMP       FROM  NODE   1007  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(7,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1007  ITEM=U    Z     VALUE= 0.313137038E-04
+
+ PARAMETER ADSP(7,4) =    0.3131370376E-04
+
+ *GET  TMP       FROM  NODE   1007  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(7,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1007  ITEM=ROT  Y     VALUE=-0.175363863E-05
+
+ PARAMETER ADSP(7,6) =   -0.1753638635E-05
+
+ *GET  TMP       FROM  NODE   1007  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(7,7) =     0.000000000    
+
+ PARAMETER ARCT(7,2) =     0.000000000    
+
+ PARAMETER ARCT(7,3) =     0.000000000    
+
+ PARAMETER ARCT(7,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1007  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(7,5) =     0.000000000    
+
+ PARAMETER ARCT(7,6) =     0.000000000    
+
+ PARAMETER ARCT(7,7) =     0.000000000    
+
+ PARAMETER ADSP(8,1) =     1008.000000    
+
+ PARAMETER ARCT(8,1) =     1008.000000    
+
+ *GET  TMP       FROM  NODE   1008  ITEM=U    X     VALUE= 0.552412114E-03
+
+ PARAMETER ADSP(8,2) =    0.5524121137E-03
+
+ *GET  TMP       FROM  NODE   1008  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(8,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1008  ITEM=U    Z     VALUE= 0.482047074E-04
+
+ PARAMETER ADSP(8,4) =    0.4820470735E-04
+
+ *GET  TMP       FROM  NODE   1008  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(8,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1008  ITEM=ROT  Y     VALUE=-0.158039846E-05
+
+ PARAMETER ADSP(8,6) =   -0.1580398465E-05
+
+ *GET  TMP       FROM  NODE   1008  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(8,7) =     0.000000000    
+
+ PARAMETER ARCT(8,2) =     0.000000000    
+
+ PARAMETER ARCT(8,3) =     0.000000000    
+
+ PARAMETER ARCT(8,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1008  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(8,5) =     0.000000000    
+
+ PARAMETER ARCT(8,6) =     0.000000000    
+
+ PARAMETER ARCT(8,7) =     0.000000000    
+
+ PARAMETER ADSP(9,1) =     1009.000000    
+
+ PARAMETER ARCT(9,1) =     1009.000000    
+
+ *GET  TMP       FROM  NODE   1009  ITEM=U    X     VALUE= 0.368274606E-03
+
+ PARAMETER ADSP(9,2) =    0.3682746058E-03
+
+ *GET  TMP       FROM  NODE   1009  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(9,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1009  ITEM=U    Z     VALUE= 0.621632270E-04
+
+ PARAMETER ADSP(9,4) =    0.6216322699E-04
+
+ *GET  TMP       FROM  NODE   1009  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(9,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1009  ITEM=ROT  Y     VALUE=-0.117979490E-05
+
+ PARAMETER ADSP(9,6) =   -0.1179794897E-05
+
+ *GET  TMP       FROM  NODE   1009  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(9,7) =     0.000000000    
+
+ PARAMETER ARCT(9,2) =     0.000000000    
+
+ PARAMETER ARCT(9,3) =     0.000000000    
+
+ PARAMETER ARCT(9,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1009  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(9,5) =     0.000000000    
+
+ PARAMETER ARCT(9,6) =     0.000000000    
+
+ PARAMETER ARCT(9,7) =     0.000000000    
+
+ PARAMETER ADSP(10,1) =     1010.000000    
+
+ PARAMETER ARCT(10,1) =     1010.000000    
+
+ *GET  TMP       FROM  NODE   1010  ITEM=U    X     VALUE= 0.184137256E-03
+
+ PARAMETER ADSP(10,2) =    0.1841372556E-03
+
+ *GET  TMP       FROM  NODE   1010  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(10,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1010  ITEM=U    Z     VALUE= 0.712953352E-04
+
+ PARAMETER ADSP(10,4) =    0.7129533520E-04
+
+ *GET  TMP       FROM  NODE   1010  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(10,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1010  ITEM=ROT  Y     VALUE=-0.627737859E-06
+
+ PARAMETER ADSP(10,6) =   -0.6277378586E-06
+
+ *GET  TMP       FROM  NODE   1010  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(10,7) =     0.000000000    
+
+ PARAMETER ARCT(10,2) =     0.000000000    
+
+ PARAMETER ARCT(10,3) =     0.000000000    
+
+ PARAMETER ARCT(10,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1010  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(10,5) =     0.000000000    
+
+ PARAMETER ARCT(10,6) =     0.000000000    
+
+ PARAMETER ARCT(10,7) =     0.000000000    
+
+ PARAMETER ADSP(11,1) =     1011.000000    
+
+ PARAMETER ARCT(11,1) =     1011.000000    
+
+ *GET  TMP       FROM  NODE   1011  ITEM=U    X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(11,2) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1011  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(11,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1011  ITEM=U    Z     VALUE= 0.744654857E-04
+
+ PARAMETER ADSP(11,4) =    0.7446548574E-04
+
+ *GET  TMP       FROM  NODE   1011  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(11,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1011  ITEM=ROT  Y     VALUE= 0.745144728E-12
+
+ PARAMETER ADSP(11,6) =    0.7451447279E-12
+
+ *GET  TMP       FROM  NODE   1011  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(11,7) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1011  ITEM=RF   FX    VALUE= 0.772299720E-001
+
+ PARAMETER ARCT(11,2) =    0.7722997200E-01
+
+ PARAMETER ARCT(11,3) =    0.7722997200E-01
+
+ PARAMETER ARCT(11,4) =    0.7722997200E-01
+
+ *GET  TMP       FROM  NODE    1011  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(11,5) =     0.000000000    
+
+ PARAMETER ARCT(11,6) =     0.000000000    
+
+ PARAMETER ARCT(11,7) =     0.000000000    
+
+ PARAMETER ADSP(12,1) =     1012.000000    
+
+ PARAMETER ARCT(12,1) =     1012.000000    
+
+ *GET  TMP       FROM  NODE   1012  ITEM=U    X     VALUE=-0.184137260E-03
+
+ PARAMETER ADSP(12,2) =   -0.1841372597E-03
+
+ *GET  TMP       FROM  NODE   1012  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(12,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1012  ITEM=U    Z     VALUE= 0.712953208E-04
+
+ PARAMETER ADSP(12,4) =    0.7129532077E-04
+
+ *GET  TMP       FROM  NODE   1012  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(12,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1012  ITEM=ROT  Y     VALUE= 0.627739209E-06
+
+ PARAMETER ADSP(12,6) =    0.6277392089E-06
+
+ *GET  TMP       FROM  NODE   1012  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(12,7) =     0.000000000    
+
+ PARAMETER ARCT(12,2) =     0.000000000    
+
+ PARAMETER ARCT(12,3) =     0.000000000    
+
+ PARAMETER ARCT(12,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1012  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(12,5) =     0.000000000    
+
+ PARAMETER ARCT(12,6) =     0.000000000    
+
+ PARAMETER ARCT(12,7) =     0.000000000    
+
+ PARAMETER ADSP(13,1) =     1013.000000    
+
+ PARAMETER ARCT(13,1) =     1013.000000    
+
+ *GET  TMP       FROM  NODE   1013  ITEM=U    X     VALUE=-0.368274616E-03
+
+ PARAMETER ADSP(13,2) =   -0.3682746160E-03
+
+ *GET  TMP       FROM  NODE   1013  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(13,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1013  ITEM=U    Z     VALUE= 0.621632008E-04
+
+ PARAMETER ADSP(13,4) =    0.6216320084E-04
+
+ *GET  TMP       FROM  NODE   1013  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(13,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1013  ITEM=ROT  Y     VALUE= 0.117979583E-05
+
+ PARAMETER ADSP(13,6) =    0.1179795831E-05
+
+ *GET  TMP       FROM  NODE   1013  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(13,7) =     0.000000000    
+
+ PARAMETER ARCT(13,2) =     0.000000000    
+
+ PARAMETER ARCT(13,3) =     0.000000000    
+
+ PARAMETER ARCT(13,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1013  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(13,5) =     0.000000000    
+
+ PARAMETER ARCT(13,6) =     0.000000000    
+
+ PARAMETER ARCT(13,7) =     0.000000000    
+
+ PARAMETER ADSP(14,1) =     1014.000000    
+
+ PARAMETER ARCT(14,1) =     1014.000000    
+
+ *GET  TMP       FROM  NODE   1014  ITEM=U    X     VALUE=-0.552412128E-03
+
+ PARAMETER ADSP(14,2) =   -0.5524121280E-03
+
+ *GET  TMP       FROM  NODE   1014  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(14,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1014  ITEM=U    Z     VALUE= 0.482046751E-04
+
+ PARAMETER ADSP(14,4) =    0.4820467506E-04
+
+ *GET  TMP       FROM  NODE   1014  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(14,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1014  ITEM=ROT  Y     VALUE= 0.158039873E-05
+
+ PARAMETER ADSP(14,6) =    0.1580398733E-05
+
+ *GET  TMP       FROM  NODE   1014  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(14,7) =     0.000000000    
+
+ PARAMETER ARCT(14,2) =     0.000000000    
+
+ PARAMETER ARCT(14,3) =     0.000000000    
+
+ PARAMETER ARCT(14,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1014  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(14,5) =     0.000000000    
+
+ PARAMETER ARCT(14,6) =     0.000000000    
+
+ PARAMETER ARCT(14,7) =     0.000000000    
+
+ PARAMETER ADSP(15,1) =     1015.000000    
+
+ PARAMETER ARCT(15,1) =     1015.000000    
+
+ *GET  TMP       FROM  NODE   1015  ITEM=U    X     VALUE=-0.736549823E-03
+
+ PARAMETER ADSP(15,2) =   -0.7365498225E-03
+
+ *GET  TMP       FROM  NODE   1015  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(15,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1015  ITEM=U    Z     VALUE= 0.313136729E-04
+
+ PARAMETER ADSP(15,4) =    0.3131367292E-04
+
+ *GET  TMP       FROM  NODE   1015  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(15,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1015  ITEM=ROT  Y     VALUE= 0.175363806E-05
+
+ PARAMETER ADSP(15,6) =    0.1753638061E-05
+
+ *GET  TMP       FROM  NODE   1015  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(15,7) =     0.000000000    
+
+ PARAMETER ARCT(15,2) =     0.000000000    
+
+ PARAMETER ARCT(15,3) =     0.000000000    
+
+ PARAMETER ARCT(15,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1015  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(15,5) =     0.000000000    
+
+ PARAMETER ARCT(15,6) =     0.000000000    
+
+ PARAMETER ARCT(15,7) =     0.000000000    
+
+ PARAMETER ADSP(16,1) =     1016.000000    
+
+ PARAMETER ARCT(16,1) =     1016.000000    
+
+ *GET  TMP       FROM  NODE   1016  ITEM=U    X     VALUE=-0.920687699E-03
+
+ PARAMETER ADSP(16,2) =   -0.9206876986E-03
+
+ *GET  TMP       FROM  NODE   1016  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(16,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1016  ITEM=U    Z     VALUE= 0.141410380E-04
+
+ PARAMETER ADSP(16,4) =    0.1414103798E-04
+
+ *GET  TMP       FROM  NODE   1016  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(16,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1016  ITEM=ROT  Y     VALUE= 0.162432830E-05
+
+ PARAMETER ADSP(16,6) =    0.1624328301E-05
+
+ *GET  TMP       FROM  NODE   1016  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(16,7) =     0.000000000    
+
+ PARAMETER ARCT(16,2) =     0.000000000    
+
+ PARAMETER ARCT(16,3) =     0.000000000    
+
+ PARAMETER ARCT(16,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1016  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(16,5) =     0.000000000    
+
+ PARAMETER ARCT(16,6) =     0.000000000    
+
+ PARAMETER ARCT(16,7) =     0.000000000    
+
+ PARAMETER ADSP(17,1) =     1017.000000    
+
+ PARAMETER ARCT(17,1) =     1017.000000    
+
+ *GET  TMP       FROM  NODE   1017  ITEM=U    X     VALUE=-0.110482574E-02
+
+ PARAMETER ADSP(17,2) =   -0.1104825740E-02
+
+ *GET  TMP       FROM  NODE   1017  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(17,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1017  ITEM=U    Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(17,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1017  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(17,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1017  ITEM=ROT  Y     VALUE= 0.114332357E-05
+
+ PARAMETER ADSP(17,6) =    0.1143323571E-05
+
+ *GET  TMP       FROM  NODE   1017  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(17,7) =     0.000000000    
+
+ PARAMETER ARCT(17,2) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1017  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(17,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1017  ITEM=RF   FZ    VALUE=  198828.714     
+
+ PARAMETER ARCT(17,4) =     198828.7137    
+
+ *GET  TMP       FROM  NODE    1017  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(17,5) =     0.000000000    
+
+ PARAMETER ARCT(17,6) =     0.000000000    
+
+ PARAMETER ARCT(17,7) =     0.000000000    
+
+ PARAMETER ADSP(18,1) =     1018.000000    
+
+ PARAMETER ARCT(18,1) =     1018.000000    
+
+ *GET  TMP       FROM  NODE   1018  ITEM=U    X     VALUE=-0.128896377E-02
+
+ PARAMETER ADSP(18,2) =   -0.1288963774E-02
+
+ *GET  TMP       FROM  NODE   1018  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(18,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1018  ITEM=U    Z     VALUE=-0.811776574E-05
+
+ PARAMETER ADSP(18,4) =   -0.8117765745E-05
+
+ *GET  TMP       FROM  NODE   1018  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(18,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1018  ITEM=ROT  Y     VALUE= 0.480141516E-06
+
+ PARAMETER ADSP(18,6) =    0.4801415155E-06
+
+ *GET  TMP       FROM  NODE   1018  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(18,7) =     0.000000000    
+
+ PARAMETER ARCT(18,2) =     0.000000000    
+
+ PARAMETER ARCT(18,3) =     0.000000000    
+
+ PARAMETER ARCT(18,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1018  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(18,5) =     0.000000000    
+
+ PARAMETER ARCT(18,6) =     0.000000000    
+
+ PARAMETER ARCT(18,7) =     0.000000000    
+
+ PARAMETER ADSP(19,1) =     1019.000000    
+
+ PARAMETER ARCT(19,1) =     1019.000000    
+
+ *GET  TMP       FROM  NODE   1019  ITEM=U    X     VALUE=-0.147310225E-02
+
+ PARAMETER ADSP(19,2) =   -0.1473102253E-02
+
+ *GET  TMP       FROM  NODE   1019  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(19,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1019  ITEM=U    Z     VALUE=-0.982445682E-05
+
+ PARAMETER ADSP(19,4) =   -0.9824456823E-05
+
+ *GET  TMP       FROM  NODE   1019  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(19,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1019  ITEM=ROT  Y     VALUE=-0.116498305E-06
+
+ PARAMETER ADSP(19,6) =   -0.1164983048E-06
+
+ *GET  TMP       FROM  NODE   1019  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(19,7) =     0.000000000    
+
+ PARAMETER ARCT(19,2) =     0.000000000    
+
+ PARAMETER ARCT(19,3) =     0.000000000    
+
+ PARAMETER ARCT(19,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1019  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(19,5) =     0.000000000    
+
+ PARAMETER ARCT(19,6) =     0.000000000    
+
+ PARAMETER ARCT(19,7) =     0.000000000    
+
+ PARAMETER ADSP(20,1) =     1020.000000    
+
+ PARAMETER ARCT(20,1) =     1020.000000    
+
+ *GET  TMP       FROM  NODE   1020  ITEM=U    X     VALUE=-0.165724120E-02
+
+ PARAMETER ADSP(20,2) =   -0.1657241196E-02
+
+ *GET  TMP       FROM  NODE   1020  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(20,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1020  ITEM=U    Z     VALUE=-0.638036804E-05
+
+ PARAMETER ADSP(20,4) =   -0.6380368037E-05
+
+ *GET  TMP       FROM  NODE   1020  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(20,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1020  ITEM=ROT  Y     VALUE=-0.535377195E-06
+
+ PARAMETER ADSP(20,6) =   -0.5353771954E-06
+
+ *GET  TMP       FROM  NODE   1020  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(20,7) =     0.000000000    
+
+ PARAMETER ARCT(20,2) =     0.000000000    
+
+ PARAMETER ARCT(20,3) =     0.000000000    
+
+ PARAMETER ARCT(20,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1020  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(20,5) =     0.000000000    
+
+ PARAMETER ARCT(20,6) =     0.000000000    
+
+ PARAMETER ARCT(20,7) =     0.000000000    
+
+ PARAMETER ADSP(21,1) =     1021.000000    
+
+ PARAMETER ARCT(21,1) =     1021.000000    
+
+ *GET  TMP       FROM  NODE   1021  ITEM=U    X     VALUE=-0.184138062E-02
+
+ PARAMETER ADSP(21,2) =   -0.1841380618E-02
+
+ *GET  TMP       FROM  NODE   1021  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(21,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1021  ITEM=U    Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(21,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1021  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(21,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   1021  ITEM=ROT  Y     VALUE=-0.689384234E-06
+
+ PARAMETER ADSP(21,6) =   -0.6893842344E-06
+
+ *GET  TMP       FROM  NODE   1021  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(21,7) =     0.000000000    
+
+ PARAMETER ARCT(21,2) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1021  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(21,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    1021  ITEM=RF   FZ    VALUE= -872650.584     
+
+ PARAMETER ARCT(21,4) =    -872650.5844    
+
+ *GET  TMP       FROM  NODE    1021  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(21,5) =     0.000000000    
+
+ PARAMETER ARCT(21,6) =     0.000000000    
+
+ PARAMETER ARCT(21,7) =     0.000000000    
+
+ PARAMETER ADSP(22,1) =     2002.000000    
+
+ PARAMETER ARCT(22,1) =     2002.000000    
+
+ *GET  TMP       FROM  NODE   2002  ITEM=U    X     VALUE= 0.153040088E-02
+
+ PARAMETER ADSP(22,2) =    0.1530400877E-02
+
+ *GET  TMP       FROM  NODE   2002  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(22,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2002  ITEM=U    Z     VALUE=-0.426246331E-04
+
+ PARAMETER ADSP(22,4) =   -0.4262463313E-04
+
+ PARAMETER ADSP(22,5) =     0.000000000    
+
+ PARAMETER ADSP(22,6) =     0.000000000    
+
+ PARAMETER ADSP(22,7) =     0.000000000    
+
+ PARAMETER ARCT(22,2) =   -0.4262463313E-04
+
+ *GET  TMP       FROM  NODE    2002  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(22,3) =     0.000000000    
+
+ PARAMETER ARCT(22,4) =     0.000000000    
+
+ PARAMETER ARCT(22,5) =     0.000000000    
+
+ PARAMETER ARCT(22,6) =     0.000000000    
+
+ PARAMETER ARCT(22,7) =     0.000000000    
+
+ PARAMETER ADSP(23,1) =     2003.000000    
+
+ PARAMETER ARCT(23,1) =     2003.000000    
+
+ *GET  TMP       FROM  NODE   2003  ITEM=U    X     VALUE= 0.120278669E-02
+
+ PARAMETER ADSP(23,2) =    0.1202786690E-02
+
+ *GET  TMP       FROM  NODE   2003  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(23,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2003  ITEM=U    Z     VALUE=-0.900005720E-04
+
+ PARAMETER ADSP(23,4) =   -0.9000057196E-04
+
+ PARAMETER ADSP(23,5) =     0.000000000    
+
+ PARAMETER ADSP(23,6) =     0.000000000    
+
+ PARAMETER ADSP(23,7) =     0.000000000    
+
+ PARAMETER ARCT(23,2) =   -0.9000057196E-04
+
+ *GET  TMP       FROM  NODE    2003  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(23,3) =     0.000000000    
+
+ PARAMETER ARCT(23,4) =     0.000000000    
+
+ PARAMETER ARCT(23,5) =     0.000000000    
+
+ PARAMETER ARCT(23,6) =     0.000000000    
+
+ PARAMETER ARCT(23,7) =     0.000000000    
+
+ PARAMETER ADSP(24,1) =     2004.000000    
+
+ PARAMETER ARCT(24,1) =     2004.000000    
+
+ *GET  TMP       FROM  NODE   2004  ITEM=U    X     VALUE= 0.860886239E-03
+
+ PARAMETER ADSP(24,2) =    0.8608862393E-03
+
+ *GET  TMP       FROM  NODE   2004  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(24,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2004  ITEM=U    Z     VALUE=-0.155814202E-03
+
+ PARAMETER ADSP(24,4) =   -0.1558142025E-03
+
+ PARAMETER ADSP(24,5) =     0.000000000    
+
+ PARAMETER ADSP(24,6) =     0.000000000    
+
+ PARAMETER ADSP(24,7) =     0.000000000    
+
+ PARAMETER ARCT(24,2) =   -0.1558142025E-03
+
+ *GET  TMP       FROM  NODE    2004  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(24,3) =     0.000000000    
+
+ PARAMETER ARCT(24,4) =     0.000000000    
+
+ PARAMETER ARCT(24,5) =     0.000000000    
+
+ PARAMETER ARCT(24,6) =     0.000000000    
+
+ PARAMETER ARCT(24,7) =     0.000000000    
+
+ PARAMETER ADSP(25,1) =     2006.000000    
+
+ PARAMETER ARCT(25,1) =     2006.000000    
+
+ *GET  TMP       FROM  NODE   2006  ITEM=U    X     VALUE= 0.734575279E-03
+
+ PARAMETER ADSP(25,2) =    0.7345752794E-03
+
+ *GET  TMP       FROM  NODE   2006  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(25,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2006  ITEM=U    Z     VALUE=-0.814640936E-04
+
+ PARAMETER ADSP(25,4) =   -0.8146409364E-04
+
+ PARAMETER ADSP(25,5) =     0.000000000    
+
+ PARAMETER ADSP(25,6) =     0.000000000    
+
+ PARAMETER ADSP(25,7) =     0.000000000    
+
+ PARAMETER ARCT(25,2) =   -0.8146409364E-04
+
+ *GET  TMP       FROM  NODE    2006  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(25,3) =     0.000000000    
+
+ PARAMETER ARCT(25,4) =     0.000000000    
+
+ PARAMETER ARCT(25,5) =     0.000000000    
+
+ PARAMETER ARCT(25,6) =     0.000000000    
+
+ PARAMETER ARCT(25,7) =     0.000000000    
+
+ PARAMETER ADSP(26,1) =     2007.000000    
+
+ PARAMETER ARCT(26,1) =     2007.000000    
+
+ *GET  TMP       FROM  NODE   2007  ITEM=U    X     VALUE= 0.586026123E-03
+
+ PARAMETER ADSP(26,2) =    0.5860261229E-03
+
+ *GET  TMP       FROM  NODE   2007  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(26,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2007  ITEM=U    Z     VALUE=-0.284550738E-04
+
+ PARAMETER ADSP(26,4) =   -0.2845507381E-04
+
+ PARAMETER ADSP(26,5) =     0.000000000    
+
+ PARAMETER ADSP(26,6) =     0.000000000    
+
+ PARAMETER ADSP(26,7) =     0.000000000    
+
+ PARAMETER ARCT(26,2) =   -0.2845507381E-04
+
+ *GET  TMP       FROM  NODE    2007  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(26,3) =     0.000000000    
+
+ PARAMETER ARCT(26,4) =     0.000000000    
+
+ PARAMETER ARCT(26,5) =     0.000000000    
+
+ PARAMETER ARCT(26,6) =     0.000000000    
+
+ PARAMETER ARCT(26,7) =     0.000000000    
+
+ PARAMETER ADSP(27,1) =     2008.000000    
+
+ PARAMETER ARCT(27,1) =     2008.000000    
+
+ *GET  TMP       FROM  NODE   2008  ITEM=U    X     VALUE= 0.436697195E-03
+
+ PARAMETER ADSP(27,2) =    0.4366971953E-03
+
+ *GET  TMP       FROM  NODE   2008  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(27,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2008  ITEM=U    Z     VALUE= 0.226004359E-05
+
+ PARAMETER ADSP(27,4) =    0.2260043590E-05
+
+ PARAMETER ADSP(27,5) =     0.000000000    
+
+ PARAMETER ADSP(27,6) =     0.000000000    
+
+ PARAMETER ADSP(27,7) =     0.000000000    
+
+ PARAMETER ARCT(27,2) =    0.2260043590E-05
+
+ *GET  TMP       FROM  NODE    2008  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(27,3) =     0.000000000    
+
+ PARAMETER ARCT(27,4) =     0.000000000    
+
+ PARAMETER ARCT(27,5) =     0.000000000    
+
+ PARAMETER ARCT(27,6) =     0.000000000    
+
+ PARAMETER ARCT(27,7) =     0.000000000    
+
+ PARAMETER ADSP(28,1) =     2009.000000    
+
+ PARAMETER ARCT(28,1) =     2009.000000    
+
+ *GET  TMP       FROM  NODE   2009  ITEM=U    X     VALUE= 0.289985812E-03
+
+ PARAMETER ADSP(28,2) =    0.2899858116E-03
+
+ *GET  TMP       FROM  NODE   2009  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(28,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2009  ITEM=U    Z     VALUE= 0.258462379E-04
+
+ PARAMETER ADSP(28,4) =    0.2584623791E-04
+
+ PARAMETER ADSP(28,5) =     0.000000000    
+
+ PARAMETER ADSP(28,6) =     0.000000000    
+
+ PARAMETER ADSP(28,7) =     0.000000000    
+
+ PARAMETER ARCT(28,2) =    0.2584623791E-04
+
+ *GET  TMP       FROM  NODE    2009  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(28,3) =     0.000000000    
+
+ PARAMETER ARCT(28,4) =     0.000000000    
+
+ PARAMETER ARCT(28,5) =     0.000000000    
+
+ PARAMETER ARCT(28,6) =     0.000000000    
+
+ PARAMETER ARCT(28,7) =     0.000000000    
+
+ PARAMETER ADSP(29,1) =     2010.000000    
+
+ PARAMETER ARCT(29,1) =     2010.000000    
+
+ *GET  TMP       FROM  NODE   2010  ITEM=U    X     VALUE= 0.144699367E-03
+
+ PARAMETER ADSP(29,2) =    0.1446993670E-03
+
+ *GET  TMP       FROM  NODE   2010  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(29,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2010  ITEM=U    Z     VALUE= 0.407341326E-04
+
+ PARAMETER ADSP(29,4) =    0.4073413264E-04
+
+ PARAMETER ADSP(29,5) =     0.000000000    
+
+ PARAMETER ADSP(29,6) =     0.000000000    
+
+ PARAMETER ADSP(29,7) =     0.000000000    
+
+ PARAMETER ARCT(29,2) =    0.4073413264E-04
+
+ *GET  TMP       FROM  NODE    2010  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(29,3) =     0.000000000    
+
+ PARAMETER ARCT(29,4) =     0.000000000    
+
+ PARAMETER ARCT(29,5) =     0.000000000    
+
+ PARAMETER ARCT(29,6) =     0.000000000    
+
+ PARAMETER ARCT(29,7) =     0.000000000    
+
+ PARAMETER ADSP(30,1) =     2011.000000    
+
+ PARAMETER ARCT(30,1) =     2011.000000    
+
+ *GET  TMP       FROM  NODE   2011  ITEM=U    X     VALUE=-0.674846753E-08
+
+ PARAMETER ADSP(30,2) =   -0.6748467533E-08
+
+ *GET  TMP       FROM  NODE   2011  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(30,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2011  ITEM=U    Z     VALUE= 0.458198459E-04
+
+ PARAMETER ADSP(30,4) =    0.4581984593E-04
+
+ PARAMETER ADSP(30,5) =     0.000000000    
+
+ PARAMETER ADSP(30,6) =     0.000000000    
+
+ PARAMETER ADSP(30,7) =     0.000000000    
+
+ PARAMETER ARCT(30,2) =    0.4581984593E-04
+
+ *GET  TMP       FROM  NODE    2011  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(30,3) =     0.000000000    
+
+ PARAMETER ARCT(30,4) =     0.000000000    
+
+ PARAMETER ARCT(30,5) =     0.000000000    
+
+ PARAMETER ARCT(30,6) =     0.000000000    
+
+ PARAMETER ARCT(30,7) =     0.000000000    
+
+ PARAMETER ADSP(31,1) =     2012.000000    
+
+ PARAMETER ARCT(31,1) =     2012.000000    
+
+ *GET  TMP       FROM  NODE   2012  ITEM=U    X     VALUE=-0.144672822E-03
+
+ PARAMETER ADSP(31,2) =   -0.1446728221E-03
+
+ *GET  TMP       FROM  NODE   2012  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(31,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2012  ITEM=U    Z     VALUE= 0.407341183E-04
+
+ PARAMETER ADSP(31,4) =    0.4073411827E-04
+
+ PARAMETER ADSP(31,5) =     0.000000000    
+
+ PARAMETER ADSP(31,6) =     0.000000000    
+
+ PARAMETER ADSP(31,7) =     0.000000000    
+
+ PARAMETER ARCT(31,2) =    0.4073411827E-04
+
+ *GET  TMP       FROM  NODE    2012  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(31,3) =     0.000000000    
+
+ PARAMETER ARCT(31,4) =     0.000000000    
+
+ PARAMETER ARCT(31,5) =     0.000000000    
+
+ PARAMETER ARCT(31,6) =     0.000000000    
+
+ PARAMETER ARCT(31,7) =     0.000000000    
+
+ PARAMETER ADSP(32,1) =     2013.000000    
+
+ PARAMETER ARCT(32,1) =     2013.000000    
+
+ *GET  TMP       FROM  NODE   2013  ITEM=U    X     VALUE=-0.290019328E-03
+
+ PARAMETER ADSP(32,2) =   -0.2900193278E-03
+
+ *GET  TMP       FROM  NODE   2013  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(32,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2013  ITEM=U    Z     VALUE= 0.258462107E-04
+
+ PARAMETER ADSP(32,4) =    0.2584621072E-04
+
+ PARAMETER ADSP(32,5) =     0.000000000    
+
+ PARAMETER ADSP(32,6) =     0.000000000    
+
+ PARAMETER ADSP(32,7) =     0.000000000    
+
+ PARAMETER ARCT(32,2) =    0.2584621072E-04
+
+ *GET  TMP       FROM  NODE    2013  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(32,3) =     0.000000000    
+
+ PARAMETER ARCT(32,4) =     0.000000000    
+
+ PARAMETER ARCT(32,5) =     0.000000000    
+
+ PARAMETER ARCT(32,6) =     0.000000000    
+
+ PARAMETER ARCT(32,7) =     0.000000000    
+
+ PARAMETER ADSP(33,1) =     2014.000000    
+
+ PARAMETER ARCT(33,1) =     2014.000000    
+
+ *GET  TMP       FROM  NODE   2014  ITEM=U    X     VALUE=-0.436730713E-03
+
+ PARAMETER ADSP(33,2) =   -0.4367307129E-03
+
+ *GET  TMP       FROM  NODE   2014  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(33,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2014  ITEM=U    Z     VALUE= 0.226001019E-05
+
+ PARAMETER ADSP(33,4) =    0.2260010188E-05
+
+ PARAMETER ADSP(33,5) =     0.000000000    
+
+ PARAMETER ADSP(33,6) =     0.000000000    
+
+ PARAMETER ADSP(33,7) =     0.000000000    
+
+ PARAMETER ARCT(33,2) =    0.2260010188E-05
+
+ *GET  TMP       FROM  NODE    2014  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(33,3) =     0.000000000    
+
+ PARAMETER ARCT(33,4) =     0.000000000    
+
+ PARAMETER ARCT(33,5) =     0.000000000    
+
+ PARAMETER ARCT(33,6) =     0.000000000    
+
+ PARAMETER ARCT(33,7) =     0.000000000    
+
+ PARAMETER ADSP(34,1) =     2015.000000    
+
+ PARAMETER ARCT(34,1) =     2015.000000    
+
+ *GET  TMP       FROM  NODE   2015  ITEM=U    X     VALUE=-0.586009591E-03
+
+ PARAMETER ADSP(34,2) =   -0.5860095909E-03
+
+ *GET  TMP       FROM  NODE   2015  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(34,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2015  ITEM=U    Z     VALUE=-0.284551064E-04
+
+ PARAMETER ADSP(34,4) =   -0.2845510639E-04
+
+ PARAMETER ADSP(34,5) =     0.000000000    
+
+ PARAMETER ADSP(34,6) =     0.000000000    
+
+ PARAMETER ADSP(34,7) =     0.000000000    
+
+ PARAMETER ARCT(34,2) =   -0.2845510639E-04
+
+ *GET  TMP       FROM  NODE    2015  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(34,3) =     0.000000000    
+
+ PARAMETER ARCT(34,4) =     0.000000000    
+
+ PARAMETER ARCT(34,5) =     0.000000000    
+
+ PARAMETER ARCT(34,6) =     0.000000000    
+
+ PARAMETER ARCT(34,7) =     0.000000000    
+
+ PARAMETER ADSP(35,1) =     2016.000000    
+
+ PARAMETER ARCT(35,1) =     2016.000000    
+
+ *GET  TMP       FROM  NODE   2016  ITEM=U    X     VALUE=-0.734558753E-03
+
+ PARAMETER ADSP(35,2) =   -0.7345587528E-03
+
+ *GET  TMP       FROM  NODE   2016  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(35,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2016  ITEM=U    Z     VALUE=-0.814641195E-04
+
+ PARAMETER ADSP(35,4) =   -0.8146411951E-04
+
+ PARAMETER ADSP(35,5) =     0.000000000    
+
+ PARAMETER ADSP(35,6) =     0.000000000    
+
+ PARAMETER ADSP(35,7) =     0.000000000    
+
+ PARAMETER ARCT(35,2) =   -0.8146411951E-04
+
+ *GET  TMP       FROM  NODE    2016  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(35,3) =     0.000000000    
+
+ PARAMETER ARCT(35,4) =     0.000000000    
+
+ PARAMETER ARCT(35,5) =     0.000000000    
+
+ PARAMETER ARCT(35,6) =     0.000000000    
+
+ PARAMETER ARCT(35,7) =     0.000000000    
+
+ PARAMETER ADSP(36,1) =     2018.000000    
+
+ PARAMETER ARCT(36,1) =     2018.000000    
+
+ *GET  TMP       FROM  NODE   2018  ITEM=U    X     VALUE=-0.860949588E-03
+
+ PARAMETER ADSP(36,2) =   -0.8609495881E-03
+
+ *GET  TMP       FROM  NODE   2018  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(36,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2018  ITEM=U    Z     VALUE=-0.155814118E-03
+
+ PARAMETER ADSP(36,4) =   -0.1558141179E-03
+
+ PARAMETER ADSP(36,5) =     0.000000000    
+
+ PARAMETER ADSP(36,6) =     0.000000000    
+
+ PARAMETER ADSP(36,7) =     0.000000000    
+
+ PARAMETER ARCT(36,2) =   -0.1558141179E-03
+
+ *GET  TMP       FROM  NODE    2018  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(36,3) =     0.000000000    
+
+ PARAMETER ARCT(36,4) =     0.000000000    
+
+ PARAMETER ARCT(36,5) =     0.000000000    
+
+ PARAMETER ARCT(36,6) =     0.000000000    
+
+ PARAMETER ARCT(36,7) =     0.000000000    
+
+ PARAMETER ADSP(37,1) =     2019.000000    
+
+ PARAMETER ARCT(37,1) =     2019.000000    
+
+ *GET  TMP       FROM  NODE   2019  ITEM=U    X     VALUE=-0.120282985E-02
+
+ PARAMETER ADSP(37,2) =   -0.1202829852E-02
+
+ *GET  TMP       FROM  NODE   2019  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(37,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2019  ITEM=U    Z     VALUE=-0.900005011E-04
+
+ PARAMETER ADSP(37,4) =   -0.9000050107E-04
+
+ PARAMETER ADSP(37,5) =     0.000000000    
+
+ PARAMETER ADSP(37,6) =     0.000000000    
+
+ PARAMETER ADSP(37,7) =     0.000000000    
+
+ PARAMETER ARCT(37,2) =   -0.9000050107E-04
+
+ *GET  TMP       FROM  NODE    2019  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(37,3) =     0.000000000    
+
+ PARAMETER ARCT(37,4) =     0.000000000    
+
+ PARAMETER ARCT(37,5) =     0.000000000    
+
+ PARAMETER ARCT(37,6) =     0.000000000    
+
+ PARAMETER ARCT(37,7) =     0.000000000    
+
+ PARAMETER ADSP(38,1) =     2020.000000    
+
+ PARAMETER ARCT(38,1) =     2020.000000    
+
+ *GET  TMP       FROM  NODE   2020  ITEM=U    X     VALUE=-0.153036480E-02
+
+ PARAMETER ADSP(38,2) =   -0.1530364798E-02
+
+ *GET  TMP       FROM  NODE   2020  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(38,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   2020  ITEM=U    Z     VALUE=-0.426245838E-04
+
+ PARAMETER ADSP(38,4) =   -0.4262458380E-04
+
+ PARAMETER ADSP(38,5) =     0.000000000    
+
+ PARAMETER ADSP(38,6) =     0.000000000    
+
+ PARAMETER ADSP(38,7) =     0.000000000    
+
+ PARAMETER ARCT(38,2) =   -0.4262458380E-04
+
+ *GET  TMP       FROM  NODE    2020  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(38,3) =     0.000000000    
+
+ PARAMETER ARCT(38,4) =     0.000000000    
+
+ PARAMETER ARCT(38,5) =     0.000000000    
+
+ PARAMETER ARCT(38,6) =     0.000000000    
+
+ PARAMETER ARCT(38,7) =     0.000000000    
+
+ PARAMETER ADSP(39,1) =     3001.000000    
+
+ PARAMETER ARCT(39,1) =     3001.000000    
+
+ *GET  TMP       FROM  NODE   3001  ITEM=U    X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(39,2) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3001  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(39,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3001  ITEM=U    Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(39,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3001  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(39,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3001  ITEM=ROT  Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(39,6) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3001  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(39,7) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    3001  ITEM=RF   FX    VALUE= -7902.62610     
+
+ PARAMETER ARCT(39,2) =    -7902.626105    
+
+ *GET  TMP       FROM  NODE    3001  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(39,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    3001  ITEM=RF   FZ    VALUE=  4930121.84     
+
+ PARAMETER ARCT(39,4) =     4930121.835    
+
+ *GET  TMP       FROM  NODE    3001  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(39,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    3001  ITEM=RF   MY    VALUE= -184258.311     
+
+ PARAMETER ARCT(39,6) =    -184258.3108    
+
+ *GET  TMP       FROM  NODE    3001  ITEM=RF   MZ    VALUE=  0.00000000     
+
+ PARAMETER ARCT(39,7) =     0.000000000    
+
+ PARAMETER ADSP(40,1) =     3002.000000    
+
+ PARAMETER ARCT(40,1) =     3002.000000    
+
+ *GET  TMP       FROM  NODE   3002  ITEM=U    X     VALUE= 0.607388062E-04
+
+ PARAMETER ADSP(40,2) =    0.6073880617E-04
+
+ *GET  TMP       FROM  NODE   3002  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(40,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3002  ITEM=U    Z     VALUE=-0.193670498E-03
+
+ PARAMETER ADSP(40,4) =   -0.1936704980E-03
+
+ *GET  TMP       FROM  NODE   3002  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(40,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3002  ITEM=ROT  Y     VALUE= 0.201747348E-04
+
+ PARAMETER ADSP(40,6) =    0.2017473480E-04
+
+ *GET  TMP       FROM  NODE   3002  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(40,7) =     0.000000000    
+
+ PARAMETER ARCT(40,2) =     0.000000000    
+
+ PARAMETER ARCT(40,3) =     0.000000000    
+
+ PARAMETER ARCT(40,4) =     0.000000000    
+
+ PARAMETER ARCT(40,5) =     0.000000000    
+
+ PARAMETER ARCT(40,6) =     0.000000000    
+
+ PARAMETER ARCT(40,7) =     0.000000000    
+
+ PARAMETER ADSP(41,1) =     3003.000000    
+
+ PARAMETER ARCT(41,1) =     3003.000000    
+
+ *GET  TMP       FROM  NODE   3003  ITEM=U    X     VALUE= 0.221004097E-03
+
+ PARAMETER ADSP(41,2) =    0.2210040969E-03
+
+ *GET  TMP       FROM  NODE   3003  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(41,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3003  ITEM=U    Z     VALUE=-0.363839778E-03
+
+ PARAMETER ADSP(41,4) =   -0.3638397778E-03
+
+ *GET  TMP       FROM  NODE   3003  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(41,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3003  ITEM=ROT  Y     VALUE= 0.346110882E-04
+
+ PARAMETER ADSP(41,6) =    0.3461108815E-04
+
+ *GET  TMP       FROM  NODE   3003  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(41,7) =     0.000000000    
+
+ PARAMETER ARCT(41,2) =     0.000000000    
+
+ PARAMETER ARCT(41,3) =     0.000000000    
+
+ PARAMETER ARCT(41,4) =     0.000000000    
+
+ PARAMETER ARCT(41,5) =     0.000000000    
+
+ PARAMETER ARCT(41,6) =     0.000000000    
+
+ PARAMETER ARCT(41,7) =     0.000000000    
+
+ PARAMETER ADSP(42,1) =     3004.000000    
+
+ PARAMETER ARCT(42,1) =     3004.000000    
+
+ *GET  TMP       FROM  NODE   3004  ITEM=U    X     VALUE= 0.447695420E-03
+
+ PARAMETER ADSP(42,2) =    0.4476954199E-03
+
+ *GET  TMP       FROM  NODE   3004  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(42,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3004  ITEM=U    Z     VALUE=-0.510508164E-03
+
+ PARAMETER ADSP(42,4) =   -0.5105081641E-03
+
+ *GET  TMP       FROM  NODE   3004  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(42,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3004  ITEM=ROT  Y     VALUE= 0.432768112E-04
+
+ PARAMETER ADSP(42,6) =    0.4327681116E-04
+
+ *GET  TMP       FROM  NODE   3004  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(42,7) =     0.000000000    
+
+ PARAMETER ARCT(42,2) =     0.000000000    
+
+ PARAMETER ARCT(42,3) =     0.000000000    
+
+ PARAMETER ARCT(42,4) =     0.000000000    
+
+ PARAMETER ARCT(42,5) =     0.000000000    
+
+ PARAMETER ARCT(42,6) =     0.000000000    
+
+ PARAMETER ARCT(42,7) =     0.000000000    
+
+ PARAMETER ADSP(43,1) =     3005.000000    
+
+ PARAMETER ARCT(43,1) =     3005.000000    
+
+ *GET  TMP       FROM  NODE   3005  ITEM=U    X     VALUE= 0.707602030E-03
+
+ PARAMETER ADSP(43,2) =    0.7076020296E-03
+
+ *GET  TMP       FROM  NODE   3005  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(43,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3005  ITEM=U    Z     VALUE=-0.633674829E-03
+
+ PARAMETER ADSP(43,4) =   -0.6336748291E-03
+
+ *GET  TMP       FROM  NODE   3005  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(43,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   3005  ITEM=ROT  Y     VALUE= 0.461647711E-04
+
+ PARAMETER ADSP(43,6) =    0.4616477107E-04
+
+ *GET  TMP       FROM  NODE   3005  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(43,7) =     0.000000000    
+
+ PARAMETER ARCT(43,2) =     0.000000000    
+
+ PARAMETER ARCT(43,3) =     0.000000000    
+
+ PARAMETER ARCT(43,4) =     0.000000000    
+
+ PARAMETER ARCT(43,5) =     0.000000000    
+
+ PARAMETER ARCT(43,6) =     0.000000000    
+
+ PARAMETER ARCT(43,7) =     0.000000000    
+
+ PARAMETER ADSP(44,1) =     4001.000000    
+
+ PARAMETER ARCT(44,1) =     4001.000000    
+
+ *GET  TMP       FROM  NODE   4001  ITEM=U    X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(44,2) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4001  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(44,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4001  ITEM=U    Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(44,4) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4001  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(44,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4001  ITEM=ROT  Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(44,6) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4001  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(44,7) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    4001  ITEM=RF   FX    VALUE=  7902.54887     
+
+ PARAMETER ARCT(44,2) =     7902.548875    
+
+ *GET  TMP       FROM  NODE    4001  ITEM=RF   FY    VALUE=  0.00000000     
+
+ PARAMETER ARCT(44,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    4001  ITEM=RF   FZ    VALUE=  4930121.87     
+
+ PARAMETER ARCT(44,4) =     4930121.873    
+
+ *GET  TMP       FROM  NODE    4001  ITEM=RF   MX    VALUE=  0.00000000     
+
+ PARAMETER ARCT(44,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE    4001  ITEM=RF   MY    VALUE=  184256.559     
+
+ PARAMETER ARCT(44,6) =     184256.5588    
+
+ *GET  TMP       FROM  NODE    4001  ITEM=RF   MZ    VALUE=  0.00000000     
+
+ PARAMETER ARCT(44,7) =     0.000000000    
+
+ PARAMETER ADSP(45,1) =     4002.000000    
+
+ PARAMETER ARCT(45,1) =     4002.000000    
+
+ *GET  TMP       FROM  NODE   4002  ITEM=U    X     VALUE=-0.607382360E-04
+
+ PARAMETER ADSP(45,2) =   -0.6073823603E-04
+
+ *GET  TMP       FROM  NODE   4002  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(45,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4002  ITEM=U    Z     VALUE=-0.193670499E-03
+
+ PARAMETER ADSP(45,4) =   -0.1936704994E-03
+
+ *GET  TMP       FROM  NODE   4002  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(45,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4002  ITEM=ROT  Y     VALUE=-0.201745467E-04
+
+ PARAMETER ADSP(45,6) =   -0.2017454665E-04
+
+ *GET  TMP       FROM  NODE   4002  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(45,7) =     0.000000000    
+
+ PARAMETER ARCT(45,2) =     0.000000000    
+
+ PARAMETER ARCT(45,3) =     0.000000000    
+
+ PARAMETER ARCT(45,4) =     0.000000000    
+
+ PARAMETER ARCT(45,5) =     0.000000000    
+
+ PARAMETER ARCT(45,6) =     0.000000000    
+
+ PARAMETER ARCT(45,7) =     0.000000000    
+
+ PARAMETER ADSP(46,1) =     4003.000000    
+
+ PARAMETER ARCT(46,1) =     4003.000000    
+
+ *GET  TMP       FROM  NODE   4003  ITEM=U    X     VALUE=-0.221002041E-03
+
+ PARAMETER ADSP(46,2) =   -0.2210020414E-03
+
+ *GET  TMP       FROM  NODE   4003  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(46,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4003  ITEM=U    Z     VALUE=-0.363839781E-03
+
+ PARAMETER ADSP(46,4) =   -0.3638397811E-03
+
+ *GET  TMP       FROM  NODE   4003  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(46,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4003  ITEM=ROT  Y     VALUE=-0.346107683E-04
+
+ PARAMETER ADSP(46,6) =   -0.3461076828E-04
+
+ *GET  TMP       FROM  NODE   4003  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(46,7) =     0.000000000    
+
+ PARAMETER ARCT(46,2) =     0.000000000    
+
+ PARAMETER ARCT(46,3) =     0.000000000    
+
+ PARAMETER ARCT(46,4) =     0.000000000    
+
+ PARAMETER ARCT(46,5) =     0.000000000    
+
+ PARAMETER ARCT(46,6) =     0.000000000    
+
+ PARAMETER ARCT(46,7) =     0.000000000    
+
+ PARAMETER ADSP(47,1) =     4004.000000    
+
+ PARAMETER ARCT(47,1) =     4004.000000    
+
+ *GET  TMP       FROM  NODE   4004  ITEM=U    X     VALUE=-0.447691279E-03
+
+ PARAMETER ADSP(47,2) =   -0.4476912787E-03
+
+ *GET  TMP       FROM  NODE   4004  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(47,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4004  ITEM=U    Z     VALUE=-0.510508169E-03
+
+ PARAMETER ADSP(47,4) =   -0.5105081685E-03
+
+ *GET  TMP       FROM  NODE   4004  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(47,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4004  ITEM=ROT  Y     VALUE=-0.432764156E-04
+
+ PARAMETER ADSP(47,6) =   -0.4327641563E-04
+
+ *GET  TMP       FROM  NODE   4004  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(47,7) =     0.000000000    
+
+ PARAMETER ARCT(47,2) =     0.000000000    
+
+ PARAMETER ARCT(47,3) =     0.000000000    
+
+ PARAMETER ARCT(47,4) =     0.000000000    
+
+ PARAMETER ARCT(47,5) =     0.000000000    
+
+ PARAMETER ARCT(47,6) =     0.000000000    
+
+ PARAMETER ARCT(47,7) =     0.000000000    
+
+ PARAMETER ADSP(48,1) =     4005.000000    
+
+ PARAMETER ARCT(48,1) =     4005.000000    
+
+ *GET  TMP       FROM  NODE   4005  ITEM=U    X     VALUE=-0.707595527E-03
+
+ PARAMETER ADSP(48,2) =   -0.7075955269E-03
+
+ *GET  TMP       FROM  NODE   4005  ITEM=U    Y     VALUE=  0.00000000    
+
+ PARAMETER ADSP(48,3) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4005  ITEM=U    Z     VALUE=-0.633674836E-03
+
+ PARAMETER ADSP(48,4) =   -0.6336748363E-03
+
+ *GET  TMP       FROM  NODE   4005  ITEM=ROT  X     VALUE=  0.00000000    
+
+ PARAMETER ADSP(48,5) =     0.000000000    
+
+ *GET  TMP       FROM  NODE   4005  ITEM=ROT  Y     VALUE=-0.461643529E-04
+
+ PARAMETER ADSP(48,6) =   -0.4616435294E-04
+
+ *GET  TMP       FROM  NODE   4005  ITEM=ROT  Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(48,7) =     0.000000000    
+
+ PARAMETER ARCT(48,2) =     0.000000000    
+
+ PARAMETER ARCT(48,3) =     0.000000000    
+
+ PARAMETER ARCT(48,4) =     0.000000000    
+
+ PARAMETER ARCT(48,5) =     0.000000000    
+
+ PARAMETER ARCT(48,6) =     0.000000000    
+
+ PARAMETER ARCT(48,7) =     0.000000000    
+
+ OPENED FILE= cb3d12_susp_self_nl_ansys_disp.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ OPENED FILE= cb3d12_susp_self_nl_ansys_reac.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ SELECT       FOR ITEM=TYPE COMPONENT=    
+  IN RANGE         3 TO          3 STEP          1
+
+         20  ELEMENTS (OF         65  DEFINED) SELECTED BY  ESEL  COMMAND.
+
+ ALSO SELECT  FOR ITEM=TYPE COMPONENT=    
+  IN RANGE         4 TO          4 STEP          1
+
+         37  ELEMENTS (OF         65  DEFINED) SELECTED BY  ESEL  COMMAND.
+
+ STORE LKN      FROM ITEM=SMIS COMP=   1  FOR ALL SELECTED ELEMENTS
+
+ SET PARAMETER DIMENSIONS ON  ALK TYPE=ARRA  DIMENSIONS=    37     2     1
+
+ PARAMETER ALK(1,1) =     3001.000000    
+
+ *GET  TMP       FROM  ELEM      29  ITEM=ETAB LKN       VALUE=  3150023.50    
+
+ PARAMETER ALK(1,2) =     3150023.500    
+
+ PARAMETER ALK(2,1) =     3002.000000    
+
+ *GET  TMP       FROM  ELEM      30  ITEM=ETAB LKN       VALUE=  3217360.25    
+
+ PARAMETER ALK(2,2) =     3217360.250    
+
+ PARAMETER ALK(3,1) =     3003.000000    
+
+ *GET  TMP       FROM  ELEM      31  ITEM=ETAB LKN       VALUE=  3295441.00    
+
+ PARAMETER ALK(3,2) =     3295441.000    
+
+ PARAMETER ALK(4,1) =     3004.000000    
+
+ *GET  TMP       FROM  ELEM      32  ITEM=ETAB LKN       VALUE=  3383453.75    
+
+ PARAMETER ALK(4,2) =     3383453.750    
+
+ PARAMETER ALK(5,1) =     3005.000000    
+
+ *GET  TMP       FROM  ELEM      33  ITEM=ETAB LKN       VALUE=  3199143.25    
+
+ PARAMETER ALK(5,2) =     3199143.250    
+
+ PARAMETER ALK(6,1) =     3006.000000    
+
+ *GET  TMP       FROM  ELEM      34  ITEM=ETAB LKN       VALUE=  3135903.75    
+
+ PARAMETER ALK(6,2) =     3135903.750    
+
+ PARAMETER ALK(7,1) =     3007.000000    
+
+ *GET  TMP       FROM  ELEM      35  ITEM=ETAB LKN       VALUE=  3084331.50    
+
+ PARAMETER ALK(7,2) =     3084331.500    
+
+ PARAMETER ALK(8,1) =     3008.000000    
+
+ *GET  TMP       FROM  ELEM      36  ITEM=ETAB LKN       VALUE=  3045077.50    
+
+ PARAMETER ALK(8,2) =     3045077.500    
+
+ PARAMETER ALK(9,1) =     3009.000000    
+
+ *GET  TMP       FROM  ELEM      37  ITEM=ETAB LKN       VALUE=  3018624.25    
+
+ PARAMETER ALK(9,2) =     3018624.250    
+
+ PARAMETER ALK(10,1) =     3010.000000    
+
+ *GET  TMP       FROM  ELEM      38  ITEM=ETAB LKN       VALUE=  3005310.25    
+
+ PARAMETER ALK(10,2) =     3005310.250    
+
+ PARAMETER ALK(11,1) =     3011.000000    
+
+ *GET  TMP       FROM  ELEM      39  ITEM=ETAB LKN       VALUE=  3005310.25    
+
+ PARAMETER ALK(11,2) =     3005310.250    
+
+ PARAMETER ALK(12,1) =     3012.000000    
+
+ *GET  TMP       FROM  ELEM      40  ITEM=ETAB LKN       VALUE=  3018624.25    
+
+ PARAMETER ALK(12,2) =     3018624.250    
+
+ PARAMETER ALK(13,1) =     3013.000000    
+
+ *GET  TMP       FROM  ELEM      41  ITEM=ETAB LKN       VALUE=  3045077.50    
+
+ PARAMETER ALK(13,2) =     3045077.500    
+
+ PARAMETER ALK(14,1) =     3014.000000    
+
+ *GET  TMP       FROM  ELEM      42  ITEM=ETAB LKN       VALUE=  3084331.50    
+
+ PARAMETER ALK(14,2) =     3084331.500    
+
+ PARAMETER ALK(15,1) =     3015.000000    
+
+ *GET  TMP       FROM  ELEM      43  ITEM=ETAB LKN       VALUE=  3135903.75    
+
+ PARAMETER ALK(15,2) =     3135903.750    
+
+ PARAMETER ALK(16,1) =     3016.000000    
+
+ *GET  TMP       FROM  ELEM      44  ITEM=ETAB LKN       VALUE=  3199143.25    
+
+ PARAMETER ALK(16,2) =     3199143.250    
+
+ PARAMETER ALK(17,1) =     3017.000000    
+
+ *GET  TMP       FROM  ELEM      45  ITEM=ETAB LKN       VALUE=  3383453.75    
+
+ PARAMETER ALK(17,2) =     3383453.750    
+
+ PARAMETER ALK(18,1) =     3018.000000    
+
+ *GET  TMP       FROM  ELEM      46  ITEM=ETAB LKN       VALUE=  3295441.00    
+
+ PARAMETER ALK(18,2) =     3295441.000    
+
+ PARAMETER ALK(19,1) =     3019.000000    
+
+ *GET  TMP       FROM  ELEM      47  ITEM=ETAB LKN       VALUE=  3217360.25    
+
+ PARAMETER ALK(19,2) =     3217360.250    
+
+ PARAMETER ALK(20,1) =     3020.000000    
+
+ *GET  TMP       FROM  ELEM      48  ITEM=ETAB LKN       VALUE=  3150023.50    
+
+ PARAMETER ALK(20,2) =     3150023.500    
+
+ PARAMETER ALK(21,1) =     6001.000000    
+
+ *GET  TMP       FROM  ELEM      49  ITEM=ETAB LKN       VALUE=  199721.984    
+
+ PARAMETER ALK(21,2) =     199721.9844    
+
+ PARAMETER ALK(22,1) =     6002.000000    
+
+ *GET  TMP       FROM  ELEM      50  ITEM=ETAB LKN       VALUE=  199717.312    
+
+ PARAMETER ALK(22,2) =     199717.3125    
+
+ PARAMETER ALK(23,1) =     6003.000000    
+
+ *GET  TMP       FROM  ELEM      51  ITEM=ETAB LKN       VALUE=  199567.188    
+
+ PARAMETER ALK(23,2) =     199567.1875    
+
+ PARAMETER ALK(24,1) =     6004.000000    
+
+ *GET  TMP       FROM  ELEM      52  ITEM=ETAB LKN       VALUE=  200078.172    
+
+ PARAMETER ALK(24,2) =     200078.1719    
+
+ PARAMETER ALK(25,1) =     6005.000000    
+
+ *GET  TMP       FROM  ELEM      53  ITEM=ETAB LKN       VALUE=  200240.359    
+
+ PARAMETER ALK(25,2) =     200240.3594    
+
+ PARAMETER ALK(26,1) =     6006.000000    
+
+ *GET  TMP       FROM  ELEM      54  ITEM=ETAB LKN       VALUE=  200244.719    
+
+ PARAMETER ALK(26,2) =     200244.7188    
+
+ PARAMETER ALK(27,1) =     6007.000000    
+
+ *GET  TMP       FROM  ELEM      55  ITEM=ETAB LKN       VALUE=  200243.672    
+
+ PARAMETER ALK(27,2) =     200243.6719    
+
+ PARAMETER ALK(28,1) =     6008.000000    
+
+ *GET  TMP       FROM  ELEM      56  ITEM=ETAB LKN       VALUE=  200242.922    
+
+ PARAMETER ALK(28,2) =     200242.9219    
+
+ PARAMETER ALK(29,1) =     6009.000000    
+
+ *GET  TMP       FROM  ELEM      57  ITEM=ETAB LKN       VALUE=  200242.641    
+
+ PARAMETER ALK(29,2) =     200242.6406    
+
+ PARAMETER ALK(30,1) =     6010.000000    
+
+ *GET  TMP       FROM  ELEM      58  ITEM=ETAB LKN       VALUE=  200242.922    
+
+ PARAMETER ALK(30,2) =     200242.9219    
+
+ PARAMETER ALK(31,1) =     6011.000000    
+
+ *GET  TMP       FROM  ELEM      59  ITEM=ETAB LKN       VALUE=  200243.672    
+
+ PARAMETER ALK(31,2) =     200243.6719    
+
+ PARAMETER ALK(32,1) =     6012.000000    
+
+ *GET  TMP       FROM  ELEM      60  ITEM=ETAB LKN       VALUE=  200244.719    
+
+ PARAMETER ALK(32,2) =     200244.7188    
+
+ PARAMETER ALK(33,1) =     6013.000000    
+
+ *GET  TMP       FROM  ELEM      61  ITEM=ETAB LKN       VALUE=  200240.359    
+
+ PARAMETER ALK(33,2) =     200240.3594    
+
+ PARAMETER ALK(34,1) =     6014.000000    
+
+ *GET  TMP       FROM  ELEM      62  ITEM=ETAB LKN       VALUE=  200078.172    
+
+ PARAMETER ALK(34,2) =     200078.1719    
+
+ PARAMETER ALK(35,1) =     6015.000000    
+
+ *GET  TMP       FROM  ELEM      63  ITEM=ETAB LKN       VALUE=  199567.188    
+
+ PARAMETER ALK(35,2) =     199567.1875    
+
+ PARAMETER ALK(36,1) =     6016.000000    
+
+ *GET  TMP       FROM  ELEM      64  ITEM=ETAB LKN       VALUE=  199717.312    
+
+ PARAMETER ALK(36,2) =     199717.3125    
+
+ PARAMETER ALK(37,1) =     6017.000000    
+
+ *GET  TMP       FROM  ELEM      65  ITEM=ETAB LKN       VALUE=  199721.984    
+
+ PARAMETER ALK(37,2) =     199721.9844    
+
+ OPENED FILE= cb3d12_susp_self_nl_ansys_link.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ ALL SELECT   FOR ITEM=ELEM COMPONENT=    
+  IN RANGE         1 TO         65 STEP          1
+
+         65  ELEMENTS (OF         65  DEFINED) SELECTED BY  ESEL  COMMAND.
+
+ EXIT THE ANSYS POST1 DATABASE PROCESSOR
+
+
+ ***** ROUTINE COMPLETED *****  CP =         2.812
+
+
+
+ EXIT ANSYS WITHOUT SAVING DATABASE
+
+
+ NUMBER OF WARNING MESSAGES ENCOUNTERED=          2
+ NUMBER OF ERROR   MESSAGES ENCOUNTERED=          0
+
++--------------------- A N S Y S   S T A T I S T I C S ------------------------+
+
+Release: Release 18.0       Build: 18.0       Update: UP20161219   Platform: WINDOWS x64 
+Date Run: 11/14/2026   Time: 10:59     Process ID: 24536
+Operating System: Windows 10  (Build: 19045)
+
+Processor Model:         Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
+
+Compiler: Intel(R) FORTRAN Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) C/C++ Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) Math Kernel Library Version 11.3.3 Product Build 20160413
+
+Number of machines requested            :    1
+Total number of cores available         :    8
+Number of physical cores available      :    4
+Number of processes requested           :    1
+Number of threads per process requested :    2
+Total number of cores requested         :    2 (Shared Memory Parallel)                    
+
+GPU Acceleration: Not Requested
+
+Job Name: cb3d12_susp_self_nl_ansys
+Working Directory: D:\AI-work\BridgeStudio\cases\CB3D12_suspension_self_anchored
+
+Total CPU time for main thread                    :        1.7 seconds
+Total CPU time summed for all threads             :        2.8 seconds
+
+Elapsed time spent pre-processing model (/PREP7)  :        0.0 seconds
+Elapsed time spent solution - preprocessing       :        0.0 seconds
+Elapsed time spent computing solution             :        1.3 seconds
+Elapsed time spent solution - postprocessing      :        0.0 seconds
+Elapsed time spent post-processing model (/POST1) :        0.1 seconds
+ 
+Equation solver used                              :            Sparse (symmetric)
+
+Maximum total memory used                         :       14.0 MB
+Maximum total memory allocated                    :     2112.0 MB
+Total physical memory available                   :         16 GB
+
++------------------ E N D   A N S Y S   S T A T I S T I C S -------------------+
+
+
+ *---------------------------------------------------------------------------*
+ |                                                                           |
+ |                            ANSYS RUN COMPLETED                            |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Ansys Release 18.0          Build 18.0         UP20161219     WINDOWS x64 |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Database Requested(-db)  1024 MB    Scratch Memory Requested      1024 MB |
+ | Maximum Database Used       1 MB    Maximum Scratch Memory Used     13 MB |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ |        CP Time      (sec) =          2.844       Time  =  10:59:57        |
+ |        Elapsed Time (sec) =          5.000       Date  =  11/14/2026      |
+ |                                                                           |
+ *---------------------------------------------------------------------------*
