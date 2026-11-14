@@ -117,6 +117,13 @@ def parse_cable_result(path: str | Path) -> dict:
     shape: dict[int, tuple[float, float]] = {}
     erection: list[dict] = []
     erection_shape: dict[int, list[float]] = {}
+    # 逐阶段 ANSYS 独立复算的同源输入（内核 cable_solver.cpp 输出）：
+    #   [ERECTION_CHAIN] <node id> <x>  主跨主缆节点链
+    #   [ERECTION_LOAD]  <stage> <q...> 每阶段吊索搬运到主缆节点的竖向荷载 N
+    #   [ERECTION_FORCE] <stage> <T...> 每阶段主跨各段轴力 N
+    erection_chain: list[tuple[int, float]] = []
+    erection_load: dict[int, list[float]] = {}
+    erection_force: dict[int, list[float]] = {}
     modal_lines: list[str] = []
     buckling_lines: list[str] = []
     length_lines: list[str] = []
@@ -240,6 +247,12 @@ def parse_cable_result(path: str | Path) -> dict:
         elif sec == "ERECTION_SHAPE" and len(parts) >= 2:
             # 每阶段一行：<stage> <主跨主缆节点高程序列>
             erection_shape[int(parts[0])] = [float(v) for v in parts[1:]]
+        elif sec == "ERECTION_CHAIN" and len(parts) >= 2:
+            erection_chain.append((int(parts[0]), float(parts[1])))
+        elif sec == "ERECTION_LOAD" and len(parts) >= 2:
+            erection_load[int(parts[0])] = [float(v) for v in parts[1:]]
+        elif sec == "ERECTION_FORCE" and len(parts) >= 2:
+            erection_force[int(parts[0])] = [float(v) for v in parts[1:]]
         elif sec == "MODAL":
             # 成桥态切线刚度上的模态段，与 fem_eigen_3d 共用同一个解析器。
             modal_lines.append(line)
@@ -274,7 +287,10 @@ def parse_cable_result(path: str | Path) -> dict:
             "hangers": hangers, "girder": girder, "girder_ends": girder_ends,
             "girder_live": girder_live, "reaction": reaction,
             "cable_shape": shape, "erection": erection,
-            "erection_shape": erection_shape}
+            "erection_shape": erection_shape,
+            "erection_chain": erection_chain,
+            "erection_load": erection_load,
+            "erection_force": erection_force}
 
 
 def solve_cable_bridge(model, out_dir: str | Path,

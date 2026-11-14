@@ -1,0 +1,73 @@
+================================================================================
+CB3D13_suspension_balanced_erection  算例归档
+================================================================================
+
+唯一数据源: BridgeStudio.suspension_3d.build_suspension_3d(
+  {'system': 'SELF', 'main_span': 120.0, 'side_span': 0.0, 'sag_ratio': 0.1, 'panel': 10.0, 'clearance': 5.0, 'tower_below': 6.0, 'n_tower_seg': 4, 'B': 12.0, 'h': 3.0, 'tf': 0.028, 'tw': 0.02, 'q_deck': 20000.0, 'q2_deck': 5000.0, 'cable_dens': 0.0, 'tower_dens': 2500.0, 'side_hangers': True, 'anchor_offset': 8.0, 'main_area_mm2': 30000.0, 'hanger_area_mm2': 5000.0, 'tower_b': 2.0, 'tower_h': 2.0, 'lane_count': 1, 'erection': True, 'erection_panels': 2})  -> ModelSpec3D
+  生成后清空 model.lanes（只做静力对标，不引入车道活载 / 模态）。
+
+三层验证:
+  [A] 全桥成桥态 FEM vs ANSYS NLGEOM+LINK180（位移/索力/反力）
+  [B] 自锚式自动平衡边跨：side_span=0 -> L_bal，梁端无抗拔需求
+  [C] 施工阶段逐阶段找形：5 个有荷载阶段各一份 LINK180 索链 APDL
+
+自动平衡边跨:
+  L_bal = sqrt(2*H*dz_top/q) = 71.414284 m
+  side_span auto = True；实际边跨 71.414284 m；边跨/主跨 0.5951
+  对照 CB3D12 手动 40 m 边跨: 梁端 Rz = -872.621 kN（抗拔）
+  本算例梁端 Rz = +0.975 kN（近乎为零）
+
+FEM 找形: cable_solver.exe FormFinding（*SUSP_BRIDGE SYSTEM=SELF）
+  converged=True, iterations=10, H=3000.0 kN, 主跨矢高=12 m
+  closure_err=2.420787e-03 m (= max|[U]|, 位移量级而非迭代残差)
+  主缆 26 段 + 吊索 23 根 = 49 根 CABLE
+  一期恒载 Q1=15000.0 N/m，二期 Q2=5000.0 N/m
+
+链路 [A]:
+  ModelSpec3D.to_dat()  -> cb3d13_balanced_erection.dat
+  cable_solver.exe       -> cb3d13_balanced_erection_cable.txt
+    [ERECTED]+[U] -> 设计几何 D；[CABLE] L0 -> INISTATE 初应变
+  ansys_bridge_susp.design_geometry() + spec_nl_to_apdl()
+                        -> cb3d13_balanced_erection_nl.inp
+  ANSYS180.exe -b -j cb3d13_balanced_erection_nl_ansys -i cb3d13_balanced_erection_nl.inp -> cb3d13_balanced_erection_nl_ansys_*.csv
+  compare_susp()         -> cb3d13_balanced_erection_nl_compare_report.txt
+  eps 范围 0.000210572 .. 0.000588025
+  ANSYS 日志: 0 error / 2 warning
+
+链路 [C]（I 阶段新增内核输出段）:
+  cable_solver.cpp [ERECTION_CHAIN]  主跨主缆节点 id / x
+               [ERECTION_SHAPE]  每阶段主缆线形 z
+               [ERECTION_LOAD]   每阶段吊索节点荷载 q
+               [ERECTION_FORCE]  每阶段主缆段轴力 T
+  ansys_bridge_erection.stage_apdl()  -> cb3d13_balanced_erection_stage<N>.inp
+  主缆 E=1.95e+11 Pa, A=0.03 m2, EA=5.85e+09 N
+  L0_stage[k] = L_stage[k] / (1 + T_stage[k]/EA)
+  ANSYS 初始几何 = 阶段线形 + 0.20 m 正弦扰动
+  ANSYS180.exe -b -j <stage job> -> <stage job>_{{disp,link}}.csv
+  compare_erection()  -> cb3d13_balanced_erection_erection_compare_report.txt
+  阶段: 1:吊装(0 error/0 warning), 2:吊装(0 error/0 warning), 3:吊装(0 error/0 warning), 4:合拢(0 error/0 warning), 5:铺装(0 error/0 warning)
+
+口径边界:
+  悬索桥 FormFinding 不是斜拉桥的制造线形闭环；[CAMBER]/[ERECTED]
+  只是预拱度建议，不参与 L0 反算。
+  cable_dens=0 -> W=0 关闭垂度/Ernst（ANSYS LINK180 无垂度模型）。
+  FEM 施工阶段用「主缆总无应力长度守恒、塔顶鞍座可滑」二分 H；
+  ANSYS LINK180 是「各段下料长度固定」。从成桥线形直接卸载到部分
+  荷载阶段不是同一问题；本算例对标的是给定阶段下料长度 + 荷载后
+  两套求解器是否给出同一平衡态。
+  空缆态（H 命中二分下界 100 N、矢高 0）为退化态，不参与对标。
+  未验证: 索垂度 / Ernst、大转动梁柱效应、ANSYS 版本升级后
+  LINK180 KEYOPT(3)=1 行为复测。
+
+文件清单:
+  cb3d13_balanced_erection.dat                   FEM 前处理输出
+  cb3d13_balanced_erection.model.json            模型快照
+  cb3d13_balanced_erection_cable.txt             cable_solver 找形结果（含 ERECTION_* 段）
+  cb3d13_balanced_erection_nl.*                  [A] 全桥 APDL + ANSYS CSV / .out / 报告
+  cb3d13_balanced_erection_balance_report.txt    [B] 自动平衡边跨量化报告
+  cb3d13_balanced_erection_stage<N>.*            [C] 逐阶段 APDL + CSV + .out + 报告
+  cb3d13_balanced_erection_manifest.txt / _run_log.txt
+
+复现:
+  C:\Users\user\anaconda3\python.exe D:\AI-work\BridgeStudio\cases\run_cases_erection.py
+================================================================================

@@ -1,0 +1,18 @@
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d13_balanced_erection_nl_ansys -i cb3d13_balanced_erection_nl.inp -o cb3d13_balanced_erection_nl_ansys.out
+[ANSYS-FULL] exit=0
+[ANSYS-FULL] errors=0 warnings=2 KEYOPT(3)=1-warning: present
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d13_balanced_erection_stage1 -i cb3d13_balanced_erection_stage1.inp -o cb3d13_balanced_erection_stage1_ansys.out
+[ANSYS-STAGE-1] exit=0
+[ANSYS-STAGE-1] errors=0 warnings=0 KEYOPT(3)=1-warning: absent
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d13_balanced_erection_stage2 -i cb3d13_balanced_erection_stage2.inp -o cb3d13_balanced_erection_stage2_ansys.out
+[ANSYS-STAGE-2] exit=0
+[ANSYS-STAGE-2] errors=0 warnings=0 KEYOPT(3)=1-warning: absent
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d13_balanced_erection_stage3 -i cb3d13_balanced_erection_stage3.inp -o cb3d13_balanced_erection_stage3_ansys.out
+[ANSYS-STAGE-3] exit=0
+[ANSYS-STAGE-3] errors=0 warnings=0 KEYOPT(3)=1-warning: absent
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d13_balanced_erection_stage4 -i cb3d13_balanced_erection_stage4.inp -o cb3d13_balanced_erection_stage4_ansys.out
+[ANSYS-STAGE-4] exit=0
+[ANSYS-STAGE-4] errors=0 warnings=0 KEYOPT(3)=1-warning: absent
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cb3d13_balanced_erection_stage5 -i cb3d13_balanced_erection_stage5.inp -o cb3d13_balanced_erection_stage5_ansys.out
+[ANSYS-STAGE-5] exit=0
+[ANSYS-STAGE-5] errors=0 warnings=0 KEYOPT(3)=1-warning: absent

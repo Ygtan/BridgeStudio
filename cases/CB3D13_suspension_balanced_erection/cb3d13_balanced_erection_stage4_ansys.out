@@ -1,0 +1,966 @@
+
+ ANSYS Multiphysics                                
+
+
+ *------------------------------------------------------------------*
+ |                                                                  |
+ |   W E L C O M E   T O   T H E   A N S Y S (R)  P R O G R A M     |
+ |                                                                  |
+ *------------------------------------------------------------------*
+
+
+
+
+ ***************************************************************
+ *            ANSYS Release 18.0     LEGAL NOTICES             *
+ ***************************************************************
+ *                                                             *
+ * Copyright 2016 SAS IP, Inc.  All rights reserved.           *
+ * Unauthorized use, distribution or duplication is            *
+ * prohibited.                                                 *
+ *                                                             *
+ * Ansys is a registered trademark of ANSYS, Inc. or its       *
+ * subsidiaries in the United States or other countries.       *
+ * See the ANSYS, Inc. online documentation or the ANSYS, Inc. *
+ * documentation CD or online help for the complete Legal      *
+ * Notice.                                                     *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * THIS ANSYS SOFTWARE PRODUCT AND PROGRAM DOCUMENTATION       *
+ * INCLUDE TRADE SECRETS AND CONFIDENTIAL AND PROPRIETARY      *
+ * PRODUCTS OF ANSYS, INC., ITS SUBSIDIARIES, OR LICENSORS.    *
+ * The software products and documentation are furnished by    *
+ * ANSYS, Inc. or its subsidiaries under a software license    *
+ * agreement that contains provisions concerning               *
+ * non-disclosure, copying, length and nature of use,          *
+ * compliance with exporting laws, warranties, disclaimers,    *
+ * limitations of liability, and remedies, and other           *
+ * provisions.  The software products and documentation may be *
+ * used, disclosed, transferred, or copied only in accordance  *
+ * with the terms and conditions of that software license      *
+ * agreement.                                                  *
+ *                                                             *
+ * ANSYS, Inc. is a UL registered                              *
+ * ISO 9001:2008 company.                                      *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * This product is subject to U.S. laws governing export and   *
+ * re-export.                                                  *
+ *                                                             *
+ * For U.S. Government users, except as specifically granted   *
+ * by the ANSYS, Inc. software license agreement, the use,     *
+ * duplication, or disclosure by the United States Government  *
+ * is subject to restrictions stated in the ANSYS, Inc.        *
+ * software license agreement and FAR 12.212 (for non-DOD      *
+ * licenses).                                                  *
+ *                                                             *
+ ***************************************************************
+
+ Release 18.0
+     
+ Point Releases and Patches installed:   
+     
+ ANSYS, Inc. Products Release 18.0   
+ ANSYS Mechanical Products Release 18.0  
+ ANSYS Autodyn Release 18.0  
+ ANSYS LS-DYNA Release 18.0  
+ ANSYS AIM Release 18.0  
+ ANSYS CFX (includes ANSYS CFD-Post) Release 18.0
+ ANSYS Fluent (includes ANSYS CFD-Post) Release 18.0 
+ ANSYS TurboGrid Release 18.0
+ ANSYS FENSAP-ICE Release 18.0   
+ ANSYS Polyflow (includes ANSYS CFD-Post) Release 18.0   
+ ANSYS Forte Release 18.0
+ ANSYS Chemkin Release 18.0  
+ ANSYS ICEM CFD Release 18.0 
+ ANSYS Aqwa Release 18.0 
+ ANSYS Icepak (includes ANSYS CFD-Post) Release 18.0 
+ AutoCAD Release 18.0
+ ACIS Release 18.0   
+ Catia, Version 4 Release 18.0   
+ Catia, Version 6 Release 18.0   
+ Creo Elements/Direct Modeling Release 18.0  
+ Inventor Release 18.0   
+ JTOpen Release 18.0 
+ NX Release 18.0 
+ Parasolid Release 18.0  
+ Creo Parametric (formerly Pro/ENGINEER) Release 18.0
+ Solid Edge Release 18.0 
+ SolidWorks Release 18.0 
+ ANSYS, Inc. License Manager Release 18.0
+
+
+          *****  ANSYS COMMAND LINE ARGUMENTS  *****
+  INITIAL JOBNAME              = cb3d13_balanced_erection_stage4                                                                                                                                                                                                                         
+  BATCH MODE REQUESTED (-b)    = LIST
+  INPUT FILE COPY MODE (-c)    = COPY
+
+ RELEASE= Release 18.0         BUILD= 18.0      UP20161219   VERSION=WINDOWS x64 
+ CURRENT JOBNAME=cb3d13_balanced_erection_stage4  11:49:12  NOV 14, 2026 CP=      0.203
+
+     1  /TITLE,CB3D13 erection stage 4  
+     2  /PREP7  
+     3  ET,1,LINK180
+     4  KEYOPT,1,2,0
+     5  ! KEYOPT(3) left at 0: every stage keeps positive tension,  
+     6  ! tension-only would add needless on/off switching in NLGEOM.   
+     7  R,1,0.03
+     8  MP,EX,1,195000000000
+     9  N,1, 71.41428429,0,17   
+    10  N,2, 81.41428429,0,13.400439229 
+    11  N,3, 91.41428429,0,10.46122803  
+    12  N,4, 101.4142843,0,8.17907919524
+    13  N,5, 111.4142843,0,6.55116992776
+    14  N,6, 121.4142843,0,5.57533421726
+    15  N,7, 131.4142843,0,5.250210453  
+    16  N,8, 141.4142843,0,5.57533421726
+    17  N,9, 151.4142843,0,6.55116992876
+    18  N,10, 161.4142843,0,8.17907919624   
+    19  N,11, 171.4142843,0,10.46122803 
+    20  N,12, 181.4142843,0,13.400439229
+    21  N,13, 191.4142843,0,17  
+    22  E,1,2   
+    23  E,2,3   
+    24  E,3,4   
+    25  E,4,5   
+    26  E,5,6   
+    27  E,6,7   
+    28  E,7,8   
+    29  E,8,9   
+    30  E,9,10  
+    31  E,10,11 
+    32  E,11,12 
+    33  E,12,13 
+    34  ! Tower-top chain ends fixed; out-of-plane UY fixed everywhere. 
+    35  D,ALL,UY,0  
+    36  D,1,UX,0
+    37  D,1,UZ,0
+    38  D,13,UX,0   
+    39  D,13,UZ,0   
+    40  INISTATE,SET,DTYP,EPEL  
+    41  INISTATE,DEFINE,1,,EPEL,X,-0.00124678185060301  
+    42  INISTATE,DEFINE,2,,EPEL,X,-0.000910571465314924 
+    43  INISTATE,DEFINE,3,,EPEL,X,-0.000509262359181806 
+    44  INISTATE,DEFINE,4,,EPEL,X,-0.000117269007040677 
+    45  INISTATE,DEFINE,5,,EPEL,X,0.000193012272701631  
+    46  INISTATE,DEFINE,6,,EPEL,X,0.000364071070441563  
+    47  INISTATE,DEFINE,7,,EPEL,X,0.000364071070441563  
+    48  INISTATE,DEFINE,8,,EPEL,X,0.000193012272507564  
+    49  INISTATE,DEFINE,9,,EPEL,X,-0.000117269007040677 
+    50  INISTATE,DEFINE,10,,EPEL,X,-0.000509262360547824
+    51  INISTATE,DEFINE,11,,EPEL,X,-0.000910571465314924
+    52  INISTATE,DEFINE,12,,EPEL,X,-0.00124678185043225 
+    53  /SOLU   
+    54  ANTYPE,STATIC   
+    55  NLGEOM,ON   
+    56  NSUBST,60,300,10
+    57  NEQIT,100   
+    58  OUTRES,ALL,LAST 
+    59  ! ---- hanger loads transferred to main-cable nodes (downward = -FZ) ----   
+    60  F,2,FZ,-150000  
+    61  F,3,FZ,-150000  
+    62  F,4,FZ,-150000  
+    63  F,5,FZ,-150000  
+    64  F,6,FZ,-150000  
+    65  F,7,FZ,-150000  
+    66  F,8,FZ,-150000  
+    67  F,9,FZ,-150000  
+    68  F,10,FZ,-150000 
+    69  F,11,FZ,-150000 
+    70  F,12,FZ,-150000 
+    71  SOLVE   
+    72  /POST1  
+    73  SET,LAST
+    74  *DIM,ADSP,ARRAY,13,4
+    75   ADSP(1,1)=1
+    76   *GET,ADSP(1,2),NODE,1,U,X  
+    77   *GET,ADSP(1,3),NODE,1,U,Y  
+    78   *GET,ADSP(1,4),NODE,1,U,Z  
+    79   ADSP(2,1)=2
+    80   *GET,ADSP(2,2),NODE,2,U,X  
+    81   *GET,ADSP(2,3),NODE,2,U,Y  
+    82   *GET,ADSP(2,4),NODE,2,U,Z  
+    83   ADSP(3,1)=3
+    84   *GET,ADSP(3,2),NODE,3,U,X  
+    85   *GET,ADSP(3,3),NODE,3,U,Y  
+    86   *GET,ADSP(3,4),NODE,3,U,Z  
+    87   ADSP(4,1)=4
+    88   *GET,ADSP(4,2),NODE,4,U,X  
+    89   *GET,ADSP(4,3),NODE,4,U,Y  
+    90   *GET,ADSP(4,4),NODE,4,U,Z  
+    91   ADSP(5,1)=5
+    92   *GET,ADSP(5,2),NODE,5,U,X  
+    93   *GET,ADSP(5,3),NODE,5,U,Y  
+    94   *GET,ADSP(5,4),NODE,5,U,Z  
+    95   ADSP(6,1)=6
+    96   *GET,ADSP(6,2),NODE,6,U,X  
+    97   *GET,ADSP(6,3),NODE,6,U,Y  
+    98   *GET,ADSP(6,4),NODE,6,U,Z  
+    99   ADSP(7,1)=7
+   100   *GET,ADSP(7,2),NODE,7,U,X  
+   101   *GET,ADSP(7,3),NODE,7,U,Y  
+   102   *GET,ADSP(7,4),NODE,7,U,Z  
+   103   ADSP(8,1)=8
+   104   *GET,ADSP(8,2),NODE,8,U,X  
+   105   *GET,ADSP(8,3),NODE,8,U,Y  
+   106   *GET,ADSP(8,4),NODE,8,U,Z  
+   107   ADSP(9,1)=9
+   108   *GET,ADSP(9,2),NODE,9,U,X  
+   109   *GET,ADSP(9,3),NODE,9,U,Y  
+   110   *GET,ADSP(9,4),NODE,9,U,Z  
+   111   ADSP(10,1)=10  
+   112   *GET,ADSP(10,2),NODE,10,U,X
+   113   *GET,ADSP(10,3),NODE,10,U,Y
+   114   *GET,ADSP(10,4),NODE,10,U,Z
+   115   ADSP(11,1)=11  
+   116   *GET,ADSP(11,2),NODE,11,U,X
+   117   *GET,ADSP(11,3),NODE,11,U,Y
+   118   *GET,ADSP(11,4),NODE,11,U,Z
+   119   ADSP(12,1)=12  
+   120   *GET,ADSP(12,2),NODE,12,U,X
+   121   *GET,ADSP(12,3),NODE,12,U,Y
+   122   *GET,ADSP(12,4),NODE,12,U,Z
+   123   ADSP(13,1)=13  
+   124   *GET,ADSP(13,2),NODE,13,U,X
+   125   *GET,ADSP(13,3),NODE,13,U,Y
+   126   *GET,ADSP(13,4),NODE,13,U,Z
+   127  *CFOPEN,cb3d13_balanced_erection_stage4_disp,csv
+   128  *VWRITE,ADSP(1,1),ADSP(1,2),ADSP(1,3),ADSP(1,4) 
+   129   (1X,F8.0,3(1X,E18.10)) 
+   130  *CFCLOS 
+   131  ETABLE,LKN,SMISC,1  
+   132  *DIM,ALK,ARRAY,12,2 
+   133   ALK(1,1)=1 
+   134   *GET,ALK(1,2),ELEM,1,ETAB,LKN  
+   135   ALK(2,1)=2 
+   136   *GET,ALK(2,2),ELEM,2,ETAB,LKN  
+   137   ALK(3,1)=3 
+   138   *GET,ALK(3,2),ELEM,3,ETAB,LKN  
+   139   ALK(4,1)=4 
+   140   *GET,ALK(4,2),ELEM,4,ETAB,LKN  
+   141   ALK(5,1)=5 
+   142   *GET,ALK(5,2),ELEM,5,ETAB,LKN  
+   143   ALK(6,1)=6 
+   144   *GET,ALK(6,2),ELEM,6,ETAB,LKN  
+   145   ALK(7,1)=7 
+   146   *GET,ALK(7,2),ELEM,7,ETAB,LKN  
+   147   ALK(8,1)=8 
+   148   *GET,ALK(8,2),ELEM,8,ETAB,LKN  
+   149   ALK(9,1)=9 
+   150   *GET,ALK(9,2),ELEM,9,ETAB,LKN  
+   151   ALK(10,1)=10   
+   152   *GET,ALK(10,2),ELEM,10,ETAB,LKN
+   153   ALK(11,1)=11   
+   154   *GET,ALK(11,2),ELEM,11,ETAB,LKN
+   155   ALK(12,1)=12   
+   156   *GET,ALK(12,2),ELEM,12,ETAB,LKN
+   157  *CFOPEN,cb3d13_balanced_erection_stage4_link,csv
+   158  *VWRITE,ALK(1,1),ALK(1,2)   
+   159   (1X,F8.0,1(1X,E18.10)) 
+   160  *CFCLOS 
+   161  FINISH  
+
+ RUN SETUP PROCEDURE FROM FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans
+
+ /INPUT FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans  LINE=       0
+
+ TITLE= 
+ CB3D13 erection stage 4                                                       
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   11:49:12  NOV 14, 2026 CP=      0.266
+
+ CB3D13 erection stage 4                                                       
+
+
+
+          ***** ANSYS ANALYSIS DEFINITION (PREP7) *****
+
+ ELEMENT TYPE       1 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ  
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       1 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ  
+  THREE-DIMENSIONAL MODEL
+
+ REAL CONSTANT SET       1  ITEMS   1 TO   6
+   0.30000E-01   0.0000       0.0000       0.0000       0.0000       0.0000    
+
+ MATERIAL         1     EX   =  0.1950000E+12  
+
+ NODE         1  KCS=      0  X,Y,Z=  71.414       0.0000       17.000     
+
+ NODE         2  KCS=      0  X,Y,Z=  81.414       0.0000       13.400     
+
+ NODE         3  KCS=      0  X,Y,Z=  91.414       0.0000       10.461     
+
+ NODE         4  KCS=      0  X,Y,Z=  101.41       0.0000       8.1791     
+
+ NODE         5  KCS=      0  X,Y,Z=  111.41       0.0000       6.5512     
+
+ NODE         6  KCS=      0  X,Y,Z=  121.41       0.0000       5.5753     
+
+ NODE         7  KCS=      0  X,Y,Z=  131.41       0.0000       5.2502     
+
+ NODE         8  KCS=      0  X,Y,Z=  141.41       0.0000       5.5753     
+
+ NODE         9  KCS=      0  X,Y,Z=  151.41       0.0000       6.5512     
+
+ NODE        10  KCS=      0  X,Y,Z=  161.41       0.0000       8.1791     
+
+ NODE        11  KCS=      0  X,Y,Z=  171.41       0.0000       10.461     
+
+ NODE        12  KCS=      0  X,Y,Z=  181.41       0.0000       13.400     
+
+ NODE        13  KCS=      0  X,Y,Z=  191.41       0.0000       17.000     
+
+ ELEMENT      1       1      2
+
+ ELEMENT      2       2      3
+
+ ELEMENT      3       3      4
+
+ ELEMENT      4       4      5
+
+ ELEMENT      5       5      6
+
+ ELEMENT      6       6      7
+
+ ELEMENT      7       7      8
+
+ ELEMENT      8       8      9
+
+ ELEMENT      9       9     10
+
+ ELEMENT     10      10     11
+
+ ELEMENT     11      11     12
+
+ ELEMENT     12      12     13
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES            1 TO          13 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES            1 TO           1 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES            1 TO           1 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES           13 TO          13 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES           13 TO          13 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+ The INISTATE,SET command was successfully executed.
+ The INISTATE,DEFINE command successfully executed for element           1
+ The INISTATE,DEFINE command successfully executed for element           2
+ The INISTATE,DEFINE command successfully executed for element           3
+ The INISTATE,DEFINE command successfully executed for element           4
+ The INISTATE,DEFINE command successfully executed for element           5
+ The INISTATE,DEFINE command successfully executed for element           6
+ The INISTATE,DEFINE command successfully executed for element           7
+ The INISTATE,DEFINE command successfully executed for element           8
+ The INISTATE,DEFINE command successfully executed for element           9
+ The INISTATE,DEFINE command successfully executed for element          10
+ The INISTATE,DEFINE command successfully executed for element          11
+ The INISTATE,DEFINE command successfully executed for element          12
+
+
+ ***** ROUTINE COMPLETED *****  CP =         0.297
+
+
+
+ *****  ANSYS SOLUTION ROUTINE  *****
+
+
+ PERFORM A STATIC ANALYSIS
+  THIS WILL BE A NEW ANALYSIS
+
+ LARGE DEFORMATION ANALYSIS
+
+ USE      60 SUBSTEPS INITIALLY THIS LOAD STEP FOR ALL  DEGREES OF FREEDOM
+ FOR AUTOMATIC TIME STEPPING:
+   USE    300 SUBSTEPS AS A MAXIMUM
+   USE     10 SUBSTEPS AS A MINIMUM
+
+ USE A MAXIMUM OF   100 EQUILIBRIUM ITERATIONS EACH SUBSTEP
+
+ WRITE ALL  ITEMS TO THE DATABASE WITH A FREQUENCY OF LAST
+   FOR ALL APPLICABLE ENTITIES
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         2 TO        2 BY        1
+  REAL= -150000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         3 TO        3 BY        1
+  REAL= -150000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         4 TO        4 BY        1
+  REAL= -150000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         5 TO        5 BY        1
+  REAL= -150000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         6 TO        6 BY        1
+  REAL= -150000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         7 TO        7 BY        1
+  REAL= -150000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         8 TO        8 BY        1
+  REAL= -150000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES         9 TO        9 BY        1
+  REAL= -150000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        10 TO       10 BY        1
+  REAL= -150000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        11 TO       11 BY        1
+  REAL= -150000.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES        12 TO       12 BY        1
+  REAL= -150000.000       IMAG=  0.00000000    
+
+ *****  ANSYS SOLVE    COMMAND  *****
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   11:49:13  NOV 14, 2026 CP=      0.297
+
+ CB3D13 erection stage 4                                                       
+
+
+
+                       S O L U T I O N   O P T I O N S
+
+   PROBLEM DIMENSIONALITY. . . . . . . . . . . . .3-D                  
+   DEGREES OF FREEDOM. . . . . . UX   UY   UZ  
+   ANALYSIS TYPE . . . . . . . . . . . . . . . . .STATIC (STEADY-STATE)
+   NONLINEAR GEOMETRIC EFFECTS . . . . . . . . . .ON
+   NEWTON-RAPHSON OPTION . . . . . . . . . . . . .PROGRAM CHOSEN   
+   GLOBALLY ASSEMBLED MATRIX . . . . . . . . . . .SYMMETRIC  
+
+ *** NOTE ***                            CP =       0.297   TIME= 11:49:13
+ Present time 0 is less than or equal to the previous time.  Time will   
+ default to 1.                                                           
+
+ *** NOTE ***                            CP =       0.297   TIME= 11:49:13
+ This nonlinear analysis defaults to using the full Newton-Raphson       
+ solution procedure.  This can be modified using the NROPT command.      
+
+ SOLCONTROL,ON uses sparse matrix direct solver
+
+ *** NOTE ***                            CP =       0.297   TIME= 11:49:13
+ The conditions for direct assembly have been met.  No .emat or .erot    
+ files will be produced.                                                 
+
+                      L O A D   S T E P   O P T I O N S
+
+   LOAD STEP NUMBER. . . . . . . . . . . . . . . .     1
+   TIME AT END OF THE LOAD STEP. . . . . . . . . .  1.0000    
+   AUTOMATIC TIME STEPPING . . . . . . . . . . . .    ON
+      INITIAL NUMBER OF SUBSTEPS . . . . . . . . .    60
+      MAXIMUM NUMBER OF SUBSTEPS . . . . . . . . .   300
+      MINIMUM NUMBER OF SUBSTEPS . . . . . . . . .    10
+   MAXIMUM NUMBER OF EQUILIBRIUM ITERATIONS. . . .   100
+   STEP CHANGE BOUNDARY CONDITIONS . . . . . . . .    NO
+   STRESS-STIFFENING . . . . . . . . . . . . . . .    ON
+   TERMINATE ANALYSIS IF NOT CONVERGED . . . . . .YES (EXIT)  
+   CONVERGENCE CONTROLS. . . . . . . . . . . . . .USE DEFAULTS
+   PRINT OUTPUT CONTROLS . . . . . . . . . . . . .NO PRINTOUT
+   DATABASE OUTPUT CONTROLS
+      ITEM     FREQUENCY   COMPONENT
+       ALL       LAST               
+
+
+ SOLUTION MONITORING INFO IS WRITTEN TO FILE= cb3d13_balanced_erection_stage4.mntr                                                                                                                                                                                                                                
+
+
+ Range of element maximum matrix coefficients in global coordinates
+ Maximum = 584073883 at element 6.                                       
+ Minimum = 487210809 at element 1.                                       
+
+   *** ELEMENT MATRIX FORMULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        12  LINK180       0.000   0.000000
+ Time at end of element matrix formulation CP = 0.40625.                 
+
+ ALL CURRENT ANSYS DATA WRITTEN TO FILE NAME= cb3d13_balanced_erection_stage4.rdb
+  FOR POSSIBLE RESUME FROM THIS POINT
+     FORCE CONVERGENCE VALUE  =  0.6192E+07  CRITERION=  0.5263E+05
+
+ SPARSE MATRIX DIRECT SOLVER.
+  Number of equations =          22,    Maximum wavefront =      6
+  Memory allocated for solver              =     7.689 MB
+  Memory required for in-core solution     =     0.057 MB
+  Memory required for out-of-core solution =     0.056 MB
+
+ *** NOTE ***                            CP =       0.500   TIME= 11:49:13
+ The Sparse Matrix Solver is currently running in the in-core memory     
+ mode.  This memory mode uses the most amount of memory in order to      
+ avoid using the hard drive as much as possible, which most often        
+ results in the fastest solution time.  This mode is recommended if      
+ enough physical memory is present to accommodate all of the solver      
+ data.                                                                   
+ Sparse solver maximum pivot= 1.992371378E+09 at node 11 UX.             
+ Sparse solver minimum pivot= -87384819.4 at node 10 UX.                 
+ Sparse solver minimum pivot in absolute value= 230036.971 at node 12    
+ UZ.                                                                     
+     DISP CONVERGENCE VALUE   =  0.1278      CRITERION=  0.6523E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1278    
+     FORCE CONVERGENCE VALUE  =  0.2434E+06  CRITERION=   509.2    
+     DISP CONVERGENCE VALUE   =  0.1232E-01  CRITERION=  0.6656E-02
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1232E-01
+     FORCE CONVERGENCE VALUE  =  0.1154E+05  CRITERION=   307.1    
+     DISP CONVERGENCE VALUE   =  0.2335E-01  CRITERION=  0.6792E-02
+    EQUIL ITER   3 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2335E-01
+     FORCE CONVERGENCE VALUE  =  0.7376E+05  CRITERION=   321.2    
+     DISP CONVERGENCE VALUE   =  0.1854E-02  CRITERION=  0.6930E-02 <<< CONVERGED
+    EQUIL ITER   4 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1854E-02
+     FORCE CONVERGENCE VALUE  =   363.3      CRITERION=   319.2    
+     DISP CONVERGENCE VALUE   =  0.9092E-03  CRITERION=  0.7072E-02 <<< CONVERGED
+    EQUIL ITER   5 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.9092E-03
+     FORCE CONVERGENCE VALUE  =   113.2      CRITERION=   325.7     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   5
+
+   *** ELEMENT RESULT CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        12  LINK180       0.000   0.000000
+
+   *** NODAL LOAD CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        12  LINK180       0.000   0.000000
+ *** LOAD STEP     1   SUBSTEP     1  COMPLETED.    CUM ITER =      5
+ *** TIME =  0.166667E-01     TIME INC =  0.166667E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.16667E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.6183E+07  CRITERION=  0.5317E+05
+     DISP CONVERGENCE VALUE   =  0.1224      CRITERION=  0.6523E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1224    
+     FORCE CONVERGENCE VALUE  =  0.1964E+06  CRITERION=   807.4    
+     DISP CONVERGENCE VALUE   =  0.1502E-01  CRITERION=  0.6656E-02
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1502E-01
+     FORCE CONVERGENCE VALUE  =  0.2564E+05  CRITERION=   612.8    
+     DISP CONVERGENCE VALUE   =  0.1740E-01  CRITERION=  0.6792E-02
+    EQUIL ITER   3 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1740E-01
+     FORCE CONVERGENCE VALUE  =  0.3553E+05  CRITERION=   628.8    
+     DISP CONVERGENCE VALUE   =  0.1658E-02  CRITERION=  0.6930E-02 <<< CONVERGED
+    EQUIL ITER   4 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1658E-02
+     FORCE CONVERGENCE VALUE  =   368.4      CRITERION=   638.3     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   4
+ *** LOAD STEP     1   SUBSTEP     2  COMPLETED.    CUM ITER =      9
+ *** TIME =  0.333333E-01     TIME INC =  0.166667E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.25000E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =   903.6      CRITERION=   1030.    
+     DISP CONVERGENCE VALUE   =  0.7455E-03  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.7455E-03
+     FORCE CONVERGENCE VALUE  =   79.53      CRITERION=   1051.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     3  COMPLETED.    CUM ITER =     10
+ *** TIME =  0.583333E-01     TIME INC =  0.250000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.37500E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =   593.5      CRITERION=   1692.    
+     DISP CONVERGENCE VALUE   =  0.4449E-03  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.4449E-03
+     FORCE CONVERGENCE VALUE  =   28.24      CRITERION=   1726.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     4  COMPLETED.    CUM ITER =     11
+ *** TIME =  0.958333E-01     TIME INC =  0.375000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.56250E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =   93.02      CRITERION=   2685.    
+     DISP CONVERGENCE VALUE   =  0.7321E-05  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.7321E-05
+     FORCE CONVERGENCE VALUE  =  0.5563E-02  CRITERION=   2739.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     5  COMPLETED.    CUM ITER =     12
+ *** TIME =  0.152083         TIME INC =  0.562500E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.84375E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =   177.5      CRITERION=   4173.    
+     DISP CONVERGENCE VALUE   =  0.1227E-04  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1227E-04
+     FORCE CONVERGENCE VALUE  =  0.1849E-01  CRITERION=   4255.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     6  COMPLETED.    CUM ITER =     13
+ *** TIME =  0.236458         TIME INC =  0.843750E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.10000      INCREASED (FACTOR = 1.1852)
+
+     FORCE CONVERGENCE VALUE  =   260.7      CRITERION=   5934.    
+     DISP CONVERGENCE VALUE   =  0.1999E-04  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1999E-04
+     FORCE CONVERGENCE VALUE  =  0.3888E-01  CRITERION=   6051.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     7  COMPLETED.    CUM ITER =     14
+ *** TIME =  0.336458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   281.5      CRITERION=   7692.    
+     DISP CONVERGENCE VALUE   =  0.2156E-04  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2156E-04
+     FORCE CONVERGENCE VALUE  =  0.5427E-01  CRITERION=   7843.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     8  COMPLETED.    CUM ITER =     15
+ *** TIME =  0.436458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   280.1      CRITERION=   9446.    
+     DISP CONVERGENCE VALUE   =  0.2143E-04  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2143E-04
+     FORCE CONVERGENCE VALUE  =  0.6615E-01  CRITERION=   9633.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP     9  COMPLETED.    CUM ITER =     16
+ *** TIME =  0.536458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   278.8      CRITERION=  0.1120E+05
+     DISP CONVERGENCE VALUE   =  0.2130E-04  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2130E-04
+     FORCE CONVERGENCE VALUE  =  0.7790E-01  CRITERION=  0.1142E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    10  COMPLETED.    CUM ITER =     17
+ *** TIME =  0.636458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   277.4      CRITERION=  0.1295E+05
+     DISP CONVERGENCE VALUE   =  0.2116E-04  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2116E-04
+     FORCE CONVERGENCE VALUE  =  0.8951E-01  CRITERION=  0.1321E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    11  COMPLETED.    CUM ITER =     18
+ *** TIME =  0.736458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   276.1      CRITERION=  0.1469E+05
+     DISP CONVERGENCE VALUE   =  0.2104E-04  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2104E-04
+     FORCE CONVERGENCE VALUE  =  0.1010      CRITERION=  0.1499E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    12  COMPLETED.    CUM ITER =     19
+ *** TIME =  0.836458         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =   274.8      CRITERION=  0.1644E+05
+     DISP CONVERGENCE VALUE   =  0.2091E-04  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2091E-04
+     FORCE CONVERGENCE VALUE  =  0.1124      CRITERION=  0.1677E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    13  COMPLETED.    CUM ITER =     20
+ *** TIME =  0.936458         TIME INC =  0.100000    
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.63542E-01  DECREASED (FACTOR = 0.6354)
+
+     FORCE CONVERGENCE VALUE  =   142.2      CRITERION=  0.1754E+05
+     DISP CONVERGENCE VALUE   =  0.1081E-04  CRITERION=  0.6523E-02 <<< CONVERGED
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1081E-04
+     FORCE CONVERGENCE VALUE  =  0.6185E-01  CRITERION=  0.1790E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     1   SUBSTEP    14  COMPLETED.    CUM ITER =     21
+ *** TIME =   1.00000         TIME INC =  0.635417E-01
+
+
+ *** ANSYS BINARY FILE STATISTICS
+  BUFFER SIZE USED= 16384
+        0.062 MB WRITTEN ON ELEMENT SAVED DATA FILE: cb3d13_balanced_erection_stage4.esav
+        0.062 MB WRITTEN ON ASSEMBLED MATRIX FILE: cb3d13_balanced_erection_stage4.full
+        0.312 MB WRITTEN ON RESULTS FILE: cb3d13_balanced_erection_stage4.rst
+
+ FINISH SOLUTION PROCESSING
+
+
+ ***** ROUTINE COMPLETED *****  CP =         2.188
+
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   11:49:14  NOV 14, 2026 CP=      2.234
+
+ CB3D13 erection stage 4                                                       
+
+
+
+          ***** ANSYS RESULTS INTERPRETATION (POST1) *****
+
+ *** NOTE ***                            CP =       2.234   TIME= 11:49:14
+ Reading results into the database (SET command) will update the current 
+ displacement and force boundary conditions in the database with the     
+ values from the results file for that load set.  Note that any          
+ subsequent solutions will use these values unless action is taken to    
+ either SAVE the current values or not overwrite them (/EXIT,NOSAVE).    
+
+
+ USE LAST SUBSTEP ON RESULT FILE  FOR LOAD CASE 0 
+
+ SET COMMAND GOT LOAD STEP=     1  SUBSTEP=    14  CUMULATIVE ITERATION=    21
+   TIME/FREQUENCY=  1.0000    
+ TITLE= CB3D13 erection stage 4                                                 
+
+ SET PARAMETER DIMENSIONS ON  ADSP TYPE=ARRA  DIMENSIONS=    13     4     1
+
+ PARAMETER ADSP(1,1) =     1.000000000    
+
+ *GET  ADSP      FROM  NODE      1  ITEM=U    X     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      1  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      1  ITEM=U    Z     VALUE=  0.00000000    
+
+ PARAMETER ADSP(2,1) =     2.000000000    
+
+ *GET  ADSP      FROM  NODE      2  ITEM=U    X     VALUE=-0.381263054E-05
+
+ *GET  ADSP      FROM  NODE      2  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      2  ITEM=U    Z     VALUE=-0.517738804E-01
+
+ PARAMETER ADSP(3,1) =     3.000000000    
+
+ *GET  ADSP      FROM  NODE      3  ITEM=U    X     VALUE=-0.442968709E-05
+
+ *GET  ADSP      FROM  NODE      3  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      3  ITEM=U    Z     VALUE=-0.100019260    
+
+ PARAMETER ADSP(4,1) =     4.000000000    
+
+ *GET  ADSP      FROM  NODE      4  ITEM=U    X     VALUE=-0.296576556E-05
+
+ *GET  ADSP      FROM  NODE      4  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      4  ITEM=U    Z     VALUE=-0.141448250    
+
+ PARAMETER ADSP(5,1) =     5.000000000    
+
+ *GET  ADSP      FROM  NODE      5  ITEM=U    X     VALUE=-0.112829924E-05
+
+ *GET  ADSP      FROM  NODE      5  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      5  ITEM=U    Z     VALUE=-0.173237488    
+
+ PARAMETER ADSP(6,1) =     6.000000000    
+
+ *GET  ADSP      FROM  NODE      6  ITEM=U    X     VALUE=-0.123871971E-06
+
+ *GET  ADSP      FROM  NODE      6  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      6  ITEM=U    Z     VALUE=-0.193220799    
+
+ PARAMETER ADSP(7,1) =     7.000000000    
+
+ *GET  ADSP      FROM  NODE      7  ITEM=U    X     VALUE= 0.239074097E-10
+
+ *GET  ADSP      FROM  NODE      7  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      7  ITEM=U    Z     VALUE=-0.200036679    
+
+ PARAMETER ADSP(8,1) =     8.000000000    
+
+ *GET  ADSP      FROM  NODE      8  ITEM=U    X     VALUE= 0.123906770E-06
+
+ *GET  ADSP      FROM  NODE      8  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      8  ITEM=U    Z     VALUE=-0.193220798    
+
+ PARAMETER ADSP(9,1) =     9.000000000    
+
+ *GET  ADSP      FROM  NODE      9  ITEM=U    X     VALUE= 0.112839385E-05
+
+ *GET  ADSP      FROM  NODE      9  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE      9  ITEM=U    Z     VALUE=-0.173237489    
+
+ PARAMETER ADSP(10,1) =     10.00000000    
+
+ *GET  ADSP      FROM  NODE     10  ITEM=U    X     VALUE= 0.296579668E-05
+
+ *GET  ADSP      FROM  NODE     10  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     10  ITEM=U    Z     VALUE=-0.141448249    
+
+ PARAMETER ADSP(11,1) =     11.00000000    
+
+ *GET  ADSP      FROM  NODE     11  ITEM=U    X     VALUE= 0.442992331E-05
+
+ *GET  ADSP      FROM  NODE     11  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     11  ITEM=U    Z     VALUE=-0.100019261    
+
+ PARAMETER ADSP(12,1) =     12.00000000    
+
+ *GET  ADSP      FROM  NODE     12  ITEM=U    X     VALUE= 0.381275892E-05
+
+ *GET  ADSP      FROM  NODE     12  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     12  ITEM=U    Z     VALUE=-0.517738807E-01
+
+ PARAMETER ADSP(13,1) =     13.00000000    
+
+ *GET  ADSP      FROM  NODE     13  ITEM=U    X     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     13  ITEM=U    Y     VALUE=  0.00000000    
+
+ *GET  ADSP      FROM  NODE     13  ITEM=U    Z     VALUE=  0.00000000    
+
+ OPENED FILE= cb3d13_balanced_erection_stage4_disp.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ STORE LKN      FROM ITEM=SMIS COMP=   1  FOR ALL SELECTED ELEMENTS
+
+ SET PARAMETER DIMENSIONS ON  ALK TYPE=ARRA  DIMENSIONS=    12     2     1
+
+ PARAMETER ALK(1,1) =     1.000000000    
+
+ *GET  ALK       FROM  ELEM       1  ITEM=ETAB LKN       VALUE=  2405353.75    
+
+ PARAMETER ALK(2,1) =     2.000000000    
+
+ *GET  ALK       FROM  ELEM       2  ITEM=ETAB LKN       VALUE=  2358119.25    
+
+ PARAMETER ALK(3,1) =     3.000000000    
+
+ *GET  ALK       FROM  ELEM       3  ITEM=ETAB LKN       VALUE=  2319639.25    
+
+ PARAMETER ALK(4,1) =     4.000000000    
+
+ *GET  ALK       FROM  ELEM       4  ITEM=ETAB LKN       VALUE=  2290355.00    
+
+ PARAMETER ALK(5,1) =     5.000000000    
+
+ *GET  ALK       FROM  ELEM       5  ITEM=ETAB LKN       VALUE=  2270622.25    
+
+ PARAMETER ALK(6,1) =     6.000000000    
+
+ *GET  ALK       FROM  ELEM       6  ITEM=ETAB LKN       VALUE=  2260691.50    
+
+ PARAMETER ALK(7,1) =     7.000000000    
+
+ *GET  ALK       FROM  ELEM       7  ITEM=ETAB LKN       VALUE=  2260691.50    
+
+ PARAMETER ALK(8,1) =     8.000000000    
+
+ *GET  ALK       FROM  ELEM       8  ITEM=ETAB LKN       VALUE=  2270622.25    
+
+ PARAMETER ALK(9,1) =     9.000000000    
+
+ *GET  ALK       FROM  ELEM       9  ITEM=ETAB LKN       VALUE=  2290355.00    
+
+ PARAMETER ALK(10,1) =     10.00000000    
+
+ *GET  ALK       FROM  ELEM      10  ITEM=ETAB LKN       VALUE=  2319639.25    
+
+ PARAMETER ALK(11,1) =     11.00000000    
+
+ *GET  ALK       FROM  ELEM      11  ITEM=ETAB LKN       VALUE=  2358119.25    
+
+ PARAMETER ALK(12,1) =     12.00000000    
+
+ *GET  ALK       FROM  ELEM      12  ITEM=ETAB LKN       VALUE=  2405353.75    
+
+ OPENED FILE= cb3d13_balanced_erection_stage4_link.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ EXIT THE ANSYS POST1 DATABASE PROCESSOR
+
+
+ ***** ROUTINE COMPLETED *****  CP =         2.266
+
+
+
+ ***** END OF INPUT ENCOUNTERED *****
+
+ PURGE ALL SOLUTION AND POST DATA
+ SAVE ALL MODEL DATA
+
+ ALL CURRENT ANSYS DATA WRITTEN TO FILE NAME= cb3d13_balanced_erection_stage4.db
+  FOR POSSIBLE RESUME FROM THIS POINT
+
+
+ NUMBER OF WARNING MESSAGES ENCOUNTERED=          0
+ NUMBER OF ERROR   MESSAGES ENCOUNTERED=          0
+
++--------------------- A N S Y S   S T A T I S T I C S ------------------------+
+
+Release: Release 18.0       Build: 18.0       Update: UP20161219   Platform: WINDOWS x64 
+Date Run: 11/14/2026   Time: 11:49     Process ID: 25560
+Operating System: Windows 10  (Build: 19045)
+
+Processor Model:         Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
+
+Compiler: Intel(R) FORTRAN Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) C/C++ Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) Math Kernel Library Version 11.3.3 Product Build 20160413
+
+Number of machines requested            :    1
+Total number of cores available         :    8
+Number of physical cores available      :    4
+Number of processes requested           :    1
+Number of threads per process requested :    2
+Total number of cores requested         :    2 (Shared Memory Parallel)                    
+
+GPU Acceleration: Not Requested
+
+Job Name: cb3d13_balanced_erection_stage4
+Working Directory: D:\AI-work\BridgeStudio\cases\CB3D13_suspension_balanced_erection
+
+Total CPU time for main thread                    :        1.3 seconds
+Total CPU time summed for all threads             :        2.4 seconds
+
+Elapsed time spent pre-processing model (/PREP7)  :        0.0 seconds
+Elapsed time spent solution - preprocessing       :        0.0 seconds
+Elapsed time spent computing solution             :        1.0 seconds
+Elapsed time spent solution - postprocessing      :        0.0 seconds
+Elapsed time spent post-processing model (/POST1) :        0.0 seconds
+ 
+Equation solver used                              :            Sparse (symmetric)
+
+Maximum total memory used                         :       14.0 MB
+Maximum total memory allocated                    :     2112.0 MB
+Total physical memory available                   :         16 GB
+
++------------------ E N D   A N S Y S   S T A T I S T I C S -------------------+
+
+
+ *---------------------------------------------------------------------------*
+ |                                                                           |
+ |                            ANSYS RUN COMPLETED                            |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Ansys Release 18.0          Build 18.0         UP20161219     WINDOWS x64 |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Database Requested(-db)  1024 MB    Scratch Memory Requested      1024 MB |
+ | Maximum Database Used       1 MB    Maximum Scratch Memory Used     13 MB |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ |        CP Time      (sec) =          2.359       Time  =  11:49:14        |
+ |        Elapsed Time (sec) =          5.000       Date  =  11/14/2026      |
+ |                                                                           |
+ *---------------------------------------------------------------------------*

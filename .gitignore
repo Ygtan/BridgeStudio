@@ -40,3 +40,5 @@ cases/**/*.log
 cases/**/*.ldhi
 cases/**/*.rdb
 cases/**/*.r[0-9][0-9][0-9]
+# 阶段 APDL 独立求解会生成 .db 数据库（CB3D13 每个阶段约 2.2 MB）
+cases/**/*.db
