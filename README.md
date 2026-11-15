@@ -567,8 +567,16 @@ B3 已于 2026-11-14 第十七次按 `STABILITY=1` opt-in 接入主链路球面�
 另由 `frame_probe.exe` 完成 CB3D19 共转 CR 梁刚接框架后屈曲全过程
 与 ANSYS `BEAM188 + ARCLEN` 的**独立探针层**对标（第 21 项 CTest、
 12513 项黄金值、三套线性刚度锚点），`fem_3d_nl.hpp` /
-`stability_path_3d.hpp` / `cable_solver.cpp` 零改动，故 B3 继续
-`P ≠ Y`、不等于成桥态闭环已具备全过程稳定分析；
+`stability_path_3d.hpp` / `cable_solver.cpp` 零改动，故 B3 在**第十八次
+收官时**继续 `P ≠ Y`、不等于成桥态闭环已具备全过程稳定分析；
+**2026-11-15 第十九次（a 阶段 ①）** 新增 `STABASIS=COMPLETION` 与
+`*STABILITY_LOAD`，把平衡路径起点换成成桥态收敛位移 `u0` + 恒定荷载
+`F0`（`R = F0 + λ·Finc − Fint(u)`），`[STABILITY] BASIS=completion_state`
+挂在主链路结果文件 `[END]` 前；第 22 项 CTest 用 V 形双索单自由度
+体系的独立闭式 `λ(v)` 逐点对拍 `MODE=STATIC` / `TENSION` 两种成桥态
+闭环。**B3 仍 `P` 不 `Y`**：① 只有 FEM 自洽与解析锚点，真实桥梁
+ANSYS 两段对标属 ②、B3 推 `Y` 属 ③，验收表见 `B类后续项接入规格.md`
+§2.6；
 B4 / B5 仍**只立规格、未实现力学**；
 B2 的 `[LENGTH2D]` 一层自第十三次
 起、2D 平面索力优化 `[OPT2D]` 一层自第十四次起已按 opt-in 真正新造 2D

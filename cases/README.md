@@ -5,8 +5,14 @@
 ANSYS APDL（`.inp`）、模型快照（`.model.json`）、ANSYS 批处理输出
 （`.out` / CSV）与对比报告（`.txt`），可离线复查，不需要再跑 ANSYS。
 
-命名规则：`CB01~CB05` 为 2D 连续梁，`CB3D01~CB3D19` 为 3D 算例；
+命名规则：`CB01~CB05` 为 2D 连续梁，`CB3D01~CB3D20` 为 3D 算例；
 编号按接入顺序递增，与 FEM-Eigen 侧 `tests/benchmark/` 的回归套件一一对应。
+**例外**：CB3D18（主链路 `STABILITY=1` opt-in）与 CB3D20（成桥态起点
+`STABASIS=COMPLETION`）是**纯 FEM 侧 benchmark**，本仓库 `cases/` 下
+没有对应算例目录，也没有 ANSYS `.inp` —— 它们的冻结 `.dat` 与结果文件
+在 FEM-Eigen `tests/benchmark/stable_path_3d/` 与
+`tests/benchmark/completion_stability_3d/`，不进上表。CB3D20 的
+ANSYS 真实桥梁两段对标属后续阶段②，届时才会新建 BS 侧算例目录。
 
 ## 算例清单
 

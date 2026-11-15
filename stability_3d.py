@@ -35,9 +35,15 @@
 如实边界（``BOUNDARY_NOTE``）
 ----------------------------
 只有球面弧长法、默认 ``STABILITY=0`` 全关；位移控制 / Riks /
-分支屈曲 / 初始缺陷 / 材料非线性 / CR 梁后屈曲 / 真实桥梁全过程
+分支屈曲 / 初始缺陷 / 材料非线性 / CR 梁后屈曲主链路 / 真实桥梁全过程
 对标均未覆盖，且**不等于**成桥态闭环已具备全过程稳定分析。
 能力矩阵该行标 ``P`` 不标 ``Y``。
+
+第十九次 ① 起有两种 ``BASIS``，**不得混成一个口径**：
+``reference_configuration`` 从参考构形 ``u=0`` 起算、λ 放大总参考荷载；
+``completion_state`` 从成桥态收敛位移 ``u0`` + 恒定荷载 ``F0`` 起算、
+λ 只放大 ``*STABILITY_LOAD`` 增量荷载。后者段内另有 ``STATE CTRL0=``
+行给出起点绝对控制位移，用于与 ``[U]`` 段自洽对拍。
 """
 
 from __future__ import annotations
@@ -49,9 +55,13 @@ from typing import Any, Iterable
 BOUNDARY_NOTE = (
     "只有球面弧长法（PATHMETHOD=SPHERE），默认 STABILITY=0 全关；"
     "位移控制 / Riks / 分支屈曲与分支切换 / 初始缺陷与缺陷敏感性 / "
-    "材料非线性 / CR 梁后屈曲 / 真实桥梁全过程稳定对标均未覆盖。"
-    "本段基于 readModel3D 参考构形，不等于成桥态闭环已具备全过程稳定分析。"
-    "λ 是参考荷载放大倍数，不是规范稳定安全系数，JTG 3362 无 λ 合格限值。"
+    "材料非线性 / CR 梁后屈曲主链路 / 真实桥梁全过程稳定对标均未覆盖。"
+    "BASIS=reference_configuration 基于 readModel3D 参考构形、λ 放大总参考荷载；"
+    "BASIS=completion_state 以成桥态收敛位移 u0 + 恒定荷载 F0 为起点、"
+    "λ 只放大 *STABILITY_LOAD 增量荷载，两者不是同一个量、不得互相冒充。"
+    "后者（第十九次 ①）只有 FEM 自洽与独立闭式锚点，ANSYS 真实桥梁两段对标"
+    "与施工阶段链路仍未做，不等于成桥态闭环已具备全过程稳定分析。"
+    "λ 是参考荷载放大倍数，不是 JTG 3362 的稳定安全系数，规范无 λ 合格限值。"
 )
 
 #: 内核错误码 → 中文说明。不静默：解析不到稳定段时按这个写明原因。
@@ -73,6 +83,15 @@ ERROR_TEXT = {
     "no_equilibrium_point": "内核没有产出任何平衡点，本次无路径可展示。",
     "no_stability_section": "求解器未输出稳定路径段（STABILITY=0 未开启，"
                             "或使用了旧版内核）；本项做不了。",
+    # 第十九次 ①：STABASIS=COMPLETION 专属，不复用参考构形的错误码。
+    "zero_incremental_load": "*STABILITY_LOAD 为空或全为 0，无法组装增量"
+                             "参考荷载 Finc；成桥态全过程路径做不了。",
+    "unsupported_stability_basis": "STABASIS 不是 REFERENCE / COMPLETION；"
+                                   "本内核只有这两种基准，本次未产出平衡路径。",
+    "completion_not_converged": "成桥态闭环（找形 / 索长迭代 / 内层 Newton）"
+                                "未收敛，不能拿未收敛位移当路径起点；本次未产出。",
+    "invalid_initial_state": "成桥态初态向量 u0 / F0 与模型自由度数不一致，"
+                             "路径起点无效；本次未产出平衡路径。",
 }
 
 _RE_HEAD = re.compile(
@@ -81,11 +100,15 @@ _RE_SUM = re.compile(
     r"^NSTEP=(\d+) NPOINT=(\d+) CONVERGED=([01]) "
     r"CTRLNODE=(\d+) CTRLDOF=(\d+) STRAIN=([01]) PSI=(\S+)$")
 _RE_FINAL = re.compile(r"^LAMBDA_FINAL=(\S+) ERROR=(\S+)$")
+_RE_STATE = re.compile(
+    r"^STATE CTRL0=(\S+) F0_NORM=(\S+) FINC_NORM=(\S+) RES0=(\S+)$")
 _RE_POINT = re.compile(
     r"^I STEP=(\d+) LAMBDA=(\S+) CTRL=(\S+) RES=(\S+) "
     r"ITER=(\d+) DS=(\S+) PIVOT=(\S+) CONVERGED=([01])$")
+# ERROR 段的 BASIS 也要如实带回：completion_state 的报错不能写成
+# reference_configuration，否则下游会把两种基准的失败原因混在一起。
 _RE_ERR_HEAD = re.compile(
-    r"^KIND=none STATUS=not_applicable BASIS=reference_configuration$")
+    r"^KIND=none STATUS=not_applicable BASIS=(\S+)$")
 _RE_ERR_CODE = re.compile(r"^ERROR=(\S+)$")
 
 
@@ -100,6 +123,8 @@ def empty_stability(error: str = "") -> dict[str, Any]:
         "pathmethod": "", "nstep": 0, "npoint": 0, "converged": False,
         "ctrlnode": 0, "ctrldof": 0, "strain": 0, "psi": 0.0,
         "lambda_final": None, "points": [], "error": error,
+        # 第十九次 ①：completion_state 基准的起点状态（缺省 None 不补 0）。
+        "ctrl0": None, "f0_norm": None, "finc_norm": None, "res0": None,
     }
 
 
@@ -122,8 +147,10 @@ def parse_stability_section(lines: Iterable[str]) -> dict[str, Any]:
         if not line or line.startswith("#"):
             continue
         if _RE_ERR_HEAD.match(line):
+            m = _RE_ERR_HEAD.match(line)
             out["kind"] = "none"
             out["status"] = "not_applicable"
+            out["basis"] = m.group(1)
             saw_head = True
             continue
         m = _RE_ERR_CODE.match(line)
@@ -154,6 +181,13 @@ def parse_stability_section(lines: Iterable[str]) -> dict[str, Any]:
         if m:
             out["lambda_final"] = _f(m.group(1))
             out["error"] = "" if m.group(2) == "none" else m.group(2)
+            continue
+        m = _RE_STATE.match(line)
+        if m:
+            out["ctrl0"] = _f(m.group(1))
+            out["f0_norm"] = _f(m.group(2))
+            out["finc_norm"] = _f(m.group(3))
+            out["res0"] = _f(m.group(4))
             continue
         m = _RE_POINT.match(line)
         if m:
@@ -191,11 +225,19 @@ def stability_report_text(result: dict[str, Any]) -> str:
         lam = [p["lambda"] for p in result["points"]]
         lam_max, lam_min = max(lam), min(lam)
         return (
-            f"球面弧长法平衡路径：{len(result['points'])} 个平衡点，"
+            f"球面弧长法平衡路径：基准 BASIS={result['basis']}，"
+            f"{len(result['points'])} 个平衡点，"
             f"λ 范围 {lam_min:.6g} ~ {lam_max:.6g}（越过极限点后出现下降段），"
             f"终点 λ={result['lambda_final']:.6g}，"
             f"控制量 CTRLDOF={result['ctrldof']}、应变度量 STRAIN={result['strain']}。"
-            f"λ 是参考荷载放大倍数，不是规范稳定安全系数；"
+            + (f"成桥态起点 CTRL0={result['ctrl0']:.6g}，"
+               f"|F0|={result['f0_norm']:.6g}、|Finc|={result['finc_norm']:.6g}，"
+               f"段内 CTRL 是相对成桥态的位移增量（不是绝对位移）。"
+               if result.get("basis") == "completion_state"
+               and result.get("ctrl0") is not None else "")
+            + "reference_configuration 的 λ 放大总参考荷载、"
+              "completion_state 的 λ 只放大增量荷载，两者不得互相冒充。"
+              "λ 是参考荷载放大倍数，不是规范稳定安全系数；"
             f"极限点由 λ 转折判定，PIVOT 是全矩阵 LU 对角量级比（含约束"
             f"自由度置 1），不是奇异判据。边界：{BOUNDARY_NOTE}"
         )
