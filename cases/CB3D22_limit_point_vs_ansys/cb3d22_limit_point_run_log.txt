@@ -1,0 +1,14 @@
+$ D:\AI-work\FEM-Eigen\_c_build\cable_solver.exe cb3d22_limit_point.dat
+[FEM-cb3d22_limit_point] exit=0
+cable_solver: mode=STATIC cables=16 converged=1 iterations=12 5.4 ms
+  索力 0 ~ 284.2 kN（Σ=2327 kN）；竖向平衡 1720 vs 1.804e+04 kN，偏差 -90.47%
+  结果: cb3d22_limit_point_cable.txt
+$ D:\AI-work\FEM-Eigen\_c_build\cable_solver.exe lp_default.dat
+[FEM-lp_default] exit=0
+cable_solver: mode=STATIC cables=16 converged=1 iterations=12 7.8 ms
+  索力 0 ~ 284.2 kN（Σ=2327 kN）；竖向平衡 1720 vs 1.804e+04 kN，偏差 -90.47%
+  结果: lp_default_cable.txt
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j lp_load -i lp_load.inp -o lp_load_ansys.out
+[ANSYS-lp_load] exit=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j lp_arc -i lp_arc.inp -o lp_arc_ansys.out
+[ANSYS-lp_arc] exit=0

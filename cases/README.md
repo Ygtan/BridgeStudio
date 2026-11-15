@@ -5,7 +5,8 @@
 ANSYS APDL（`.inp`）、模型快照（`.model.json`）、ANSYS 批处理输出
 （`.out` / CSV）与对比报告（`.txt`），可离线复查，不需要再跑 ANSYS。
 
-命名规则：`CB01~CB05` 为 2D 连续梁，`CB3D01~CB3D21` 为 3D 算例；
+命名规则：`CB01~CB05` 为 2D 连续梁，`CB3D01~CB3D21` 为 3D 算例
+（第十九次 ③a 新增 CB3D22 后为 `CB3D01~CB3D22`）；
 编号按接入顺序递增，与 FEM-Eigen 侧 `tests/benchmark/` 的回归套件一一对应。
 **例外**：CB3D18（主链路 `STABILITY=1` opt-in）与 CB3D20（成桥态起点
 `STABASIS=COMPLETION` 的 V 形双索单自由度解析题）是**纯 FEM 侧
@@ -46,6 +47,7 @@ ANSYS 版）：它把同一个 `STABASIS=COMPLETION` 主链路放到 50 节点 /
 | CB3D17 | `CB3D17_snap_through_arc_length` | 球面弧长法**后屈曲 / snap-through 全过程**（极限点、下降段、反向荷载）vs ANSYS `LINK180 + ARCLEN`（3 个 job） | `run_cases_snap.py` | `snap_through_ansys_3d` |
 | CB3D19 | `CB3D19_frame_postbuckling_arc_length` | 共转 CR 梁**刚接框架（Williams toggle 型）后屈曲全过程** vs ANSYS `BEAM188 + ARCLEN`（2 个 job，每杆 24 单元） | `run_cases_frame.py` | `frame_postbuckling_3d` |
 | CB3D21 | `CB3D21_completion_stability_vs_ansys` | **真实双塔三跨斜拉桥成桥态起点全过程稳定** vs ANSYS 两段求解（step1 恒载成桥态 / step2 增量荷载，荷载控制主 job + `ARCLEN` 交叉验证，2 个 job）；同源设计线形 + 16 根索 `L0` + `INISTATE eps`；第 23 项 CTest 冻结 2392 项黄金值 | `run_cases_completion.py` | `completion_bridge_3d` |
+| CB3D22 | `CB3D22_limit_point_vs_ansys` | **③a 真实斜拉桥越过极值点 / 下降段**：与 CB3D21 同源桥只缩塔截面（`TOWER_SCALE=0.012`）、增量荷载改为塔顶 2009 节点 `+X`；FEM 球面弧长 `λ_max=1.624941`、下降段 207 步 vs ANSYS 两段 `ARCLEN λ_max=1.622748`（2 个 job，均 0 error）；按 `ΔUX` 插值 `λ` 逐点对拍；第 25 项 CTest 冻结 140 项检查 | `run_cases_limit_point.py` | `bridge_limit_point_3d` |
 
 CB3D13 除全桥 APDL 外还归档 5 份阶段 APDL（`*_stage1..5.inp`）与对应
 ANSYS CSV；三层验证口径见 `ansys_bridge_erection.py` 模块头与
@@ -161,6 +163,35 @@ CB3D21（2026-11-15，a 阶段 ②）是首个**真实桥梁尺度**的
   见 FEM-Eigen `tests/benchmark/completion_bridge_3d/README.md`
   与 `B类后续项接入规格.md` §2.6。
 
+CB3D22（2026-11-15，a 阶段 ③a）是首个**真实桥梁越过极值点 / 下降段**
+的算例。`ansys_bridge_limit_point.py` 以 `COMPLETION_CFG` 原几何 /
+材料 / 恒载 / 16 根索 `L0` 为唯一数据源，只把桥塔实常数
+`RealConst3D(id=2)` 按 `TOWER_SCALE=0.012` 缩放，增量荷载改为塔顶
+2009 节点 `+X`（`PINC=1e6 N`），用 P-Δ 软化产生 `λ_max` 与下降段。
+初版曾用缩小 `tower_b/tower_h` **重新建模**，导致塔自重缩小 83 倍、
+成桥态不同源、FEM 不收敛，已改回「只缩实常数」口径。
+
+- **两段求解**：ANSYS `step1` 默认 `TIME=1` 求成桥态，
+  `step2` 用 `F,2009,FX`，`λ = TIME − 1`，不靠反力求和。
+  `lp_load` 荷载控制只到 `λ=1.5`（极值点前）；
+  `lp_arc` 用 `ARCLEN,ON,0.005,1.0E-8` 越过极值点。
+- **非单调路径对拍**：λ 在极值点后下降，不能拿 λ 当插值自变量；
+  按单调量 `ΔUX = UX − UX_step1` 插值 λ 逐点对拍。FEM
+  `NPOINT=553`、`λ_max=1.624941 @ dUX=0.200411`、下降段 207 步；
+  ANSYS `lp_arc` `λ_max=1.622748 @ dUX=0.201182`，
+  极值点 `dλ=1.349e-3`、`dUX=3.850e-3`，两 job 均 0 error。
+  `One indefinite tangent matrix is detected` 是极值点物理标志，
+  ANSYS job 成败以 `NUMBER OF ERROR MESSAGES ENCOUNTERED=0` 判定。
+- **如实边界**：细塔是为观测极值点构造的稳定敏感研究构型，不是实际
+  设计尺寸；`[STABILITY]` 起点仍是成桥态。分支屈曲 / 初始缺陷 /
+  材料非线性 / 施工阶段中间态稳定仍未覆盖。
+  **③a 完成仍 `P` 不 `Y`**，见
+  FEM-Eigen `tests/benchmark/bridge_limit_point_3d/README.md`
+  与 `B类后续项接入规格.md` §2.5 / §2.6。
+- **③a 同时修复** CB3D21 登记的 `MODE=COMPLETION` 起点不同源缺陷：
+  `basisModel` 回传同源模型，见 FEM-Eigen
+  `tests/benchmark/completion_basis_3d/README.md`。
+
 ## 归档规则
 
 `.gitignore` 放行 `.dat` / `.inp` / `.model.json` / `.csv` / `.txt` / `.out`
@@ -174,9 +205,10 @@ CB3D21（2026-11-15，a 阶段 ②）是首个**真实桥梁尺度**的
 # 单个阶段（示例：CB3D13；需要 ANSYS 18.0 许可 + anaconda python）
 C:\Users\user\anaconda3\python.exe D:\AI-work\BridgeStudio\cases\run_cases_erection.py
 
-# 离线回归（只需 FEM-Eigen 构建产物，不需要 ANSYS）
-ctest --test-dir D:\AI-work\FEM-Eigen\build --output-on-failure
-powershell -ExecutionPolicy Bypass -File D:\AI-work\FEM-Eigen\run_tests.ps1
+# 离线回归（只需 FEM-Eigen 构建产物，不需要 ANSYS）。
+# 构建目录须用与冻结证据同工具链的 mingw64 版本（见 tests/benchmark/README.md）。
+ctest --test-dir D:\AI-work\FEM-Eigen\_d_build --output-on-failure
+powershell -ExecutionPolicy Bypass -File D:\AI-work\FEM-Eigen\run_tests.ps1 -BuildDir _d_build
 ```
 
 新增算例时：在 `cases/` 下建 `CBxx_*` 目录、写 `run_cases_*.py`，

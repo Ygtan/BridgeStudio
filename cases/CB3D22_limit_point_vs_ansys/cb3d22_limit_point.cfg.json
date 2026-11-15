@@ -1,0 +1,67 @@
+{
+  "ansys_cases": [
+    {
+      "arclen": false,
+      "desc": "load-controlled step 2 (ascending branch only, pre-limit)",
+      "id": "lp_load",
+      "lammax": 1.5,
+      "time2": 2.5
+    },
+    {
+      "arclen": true,
+      "desc": "ARCLEN step 2 (pass limit point and follow descending branch)",
+      "id": "lp_arc",
+      "lammax": 2.0,
+      "time2": 3.0
+    }
+  ],
+  "arctrm_u": 1.6,
+  "case": "CB3D22",
+  "ctrl": [
+    2009,
+    1
+  ],
+  "ctrl_target": 1.5,
+  "eps0": 0.0008,
+  "fem_exe": "D:\\AI-work\\FEM-Eigen\\_c_build\\cable_solver.exe",
+  "l0": {
+    "9001": 14.565727155388942,
+    "9002": 21.848590733083412,
+    "9003": 28.788045992246477,
+    "9004": 33.60717437818174,
+    "9005": 16.419386445120363,
+    "9006": 24.629079667680543,
+    "9007": 30.530881480666576,
+    "9008": 36.52363475796248,
+    "9009": 16.419386445120367,
+    "9010": 24.629079667680543,
+    "9011": 30.530881480666586,
+    "9012": 36.523634757962476,
+    "9013": 14.565727155388942,
+    "9014": 21.848590733083412,
+    "9015": 28.788045992246477,
+    "9016": 33.60717437818174
+  },
+  "limit_cfg": {
+    "B": 12.0,
+    "cable_area_mm2": 3000.0,
+    "cable_dens": 0.0,
+    "h": 2.5,
+    "main_span": 80.0,
+    "method": "DECK",
+    "mode": "STATIC",
+    "n_cable": 4,
+    "panel": 10.0,
+    "q_deck": 50000.0,
+    "side_span": 30.0,
+    "tf": 0.28,
+    "tower_b": 3.0,
+    "tower_h": 3.0,
+    "tower_height": 25.0,
+    "tw": 0.45
+  },
+  "pinc": 1000000.0,
+  "stab_keys": "STABILITY=1 STABASIS=COMPLETION PATHMETHOD=SPHERE CTRLNODE=2009 CTRLDOF=1 CTRLTARGET=1.5\nDS0=0.001 DSMAX=0.01 DSMIN=1.0e-12 PSI=0.5\nMAXPATHSTEP=2500 STABITER=60 STABTOL=1.0e-5 STRAIN=0",
+  "title": "③a real-bridge limit point (thin-tower stable-sensitive config)",
+  "tower_scale": 0.012
+}

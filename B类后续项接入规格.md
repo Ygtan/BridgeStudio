@@ -350,6 +350,26 @@ step2 荷载控制主 job 用 `λ=(TIME−1)·LAMMAX` 对 FEM `[STABILITY]`
   `TIME` 不是 λ、只比终点。`BASIS=completion_state` 与
   `BASIS=reference_configuration` 继续分列，不得拿参考构形单段
   `ARCLEN` 冒充成桥态两段。② 完成**仍 `P` 不 `Y`**。
+- **第十九次 ③a 补记（起点同源 / 施工阶段共存 / 越过极值点）**：
+  ② 登记的 `MODE=COMPLETION` 起点不同源缺陷已实质修复——
+  `fem_3d_nl.hpp` 的 `CableLengthResult3D` / `ErectionGeometryResult3D` /
+  `CompletionStateResult3D` 增加 `Model3D basisModel`，
+  `cable_solver.cpp` 只在 `STABASIS=COMPLETION`（opt-in）且
+  `MODE=TENSION/COMPLETION` 时把与 `u0` 同源的最终模型交给
+  `[STABILITY]` 装配，并加自由度结构一致性检查；CB3D10 `RES0`
+  由 `3.1492e6 N` 降到 `7.4001e-3 N`、首步 λ 由负转正
+  （第 24 项 CTest，110 项检查）。施工阶段链路核对结论是
+  CB3D13 上 `[STABILITY]` 与 5 个 `[ERECTION*]` 段**并列输出、互不污染**，
+  `[STABILITY]` 起点仍是成桥态而非某个施工阶段中间态。
+  ③a 另补 CB3D22 真实斜拉桥**越过极值点 / 下降段**算例
+  （`ansys_bridge_limit_point.py` / `cases/run_cases_limit_point.py` /
+  第 25 项 CTest，140 项检查）：FEM `λ_max=1.624941`、下降段 207 步，
+  ANSYS `ARCLEN λ_max=1.622748`，两 job 0 error。
+  **上述三项都是成桥态起点的路径跟踪能力，不改变 §2.5 其余边界**：
+  位移控制 / Riks、分支屈曲与分支切换、初始缺陷形态 / 幅值 / 敏感性、
+  材料非线性本构、动力 snap-through、施工阶段中间态全过程稳定
+  **仍未覆盖**；CB3D22 的细塔是稳定敏感研究构型，不是实际设计尺寸。
+  故 ③a 完成**仍 `P` 不 `Y`**。
 
 ### 2.6 a 阶段三阶段验收口径（什么才算把 B3 推成 `Y`）
 
@@ -381,6 +401,32 @@ step2 荷载控制主 job 用 `λ=(TIME−1)·LAMMAX` 对 FEM `[STABILITY]`
 全部满足，但 ③ 的施工阶段链路核对与 §2.5 全部边界收口
 **尚未完成**，故 B3 仍 `P` 不 `Y`。② 发现的 `MODE=COMPLETION`
 起点不同源缺陷登记为独立后续项，不得因 ② 完成而略过。
+
+**③a 阶段实测收口（2026-11-15，用户选 `3a`）**：先做实质技术收口，
+再评估是否具备推 `Y` 条件。三件交付：
+
+| 项 | 交付物 | 实测 |
+|---|---|---|
+| 起点同源修复 | `fem_3d_nl.hpp` 三个结果结构 `basisModel` + `cable_solver.cpp` 同源模型分流 + 自由度一致性检查 + 第 24 项 CTest | CB3D10 `RES0/|F0|` 从 `1.06` 降到 `2.502e-9`；`MODE=COMPLETION` 与 `MODE=STATIC` 两条独立闭环逐点 `worst|dλ|=1.081e-6`；110 项检查 |
+| 施工阶段链路核对 | 第 24 项 CTest 的 CB3D13 case | 5 个 `[ERECTION*]` 段逐位一致、`RES0/|F0|=1.112e-9`、26 个平衡点；结论是**共存**，不是每阶段中间态可分析 |
+| 真实桥梁越过极限点 | `ansys_bridge_limit_point.py` / `run_cases_limit_point.py` / BS 算例 `CB3D22_limit_point_vs_ansys` / 第 25 项 CTest | FEM `λ_max=1.624941 @ dUX=0.200411`、下降段 207 步；ANSYS `λ_max=1.622748 @ dUX=0.201182`；极值点 `dλ=1.349e-3`、`dUX=3.850e-3`；140 项检查 |
+
+全量回归：干净 Ninja 构建 `_d_build` 显式锁定
+`mingw64/bin/g++.exe`（与冻结证据同工具链），
+`ctest` **25/25**、`run_tests.ps1 -BuildDir _d_build` `ALL TESTS PASSED`。
+③a 期间发现并登记：历史冻结证据用 mingw64、③a 新证据最初用
+`ucrt64` 编译，两套 CRT 的末位浮点不同；第 24 项冻结证据已用规范
+工具链重新生成，第 25 项改用 `tests/benchmark/replay_tolerance.py`
+的结构化跨工具链比较。
+
+**B3 结论：仍 `P` 不 `Y`**。§2.6 规定 ③ 必须「确认 §2.5 全部边界
+收口后才把 `P` 改 `Y`」，而 §2.5 列明的位移控制 / Riks、分支屈曲与
+分支切换、初始缺陷、材料非线性、动力 snap-through、**施工阶段中间态
+全过程稳定**，③a 一项也未实现；③a 只收口了「成桥态起点同源」
+「施工阶段段共存」「真实桥梁越过极值点」三处。故 ③a 完成
+**不等于 ③ 完成**，能力矩阵该行继续 `P`。要推 `Y` 只有两条路：
+补齐上述力学，或由用户重新拍板修改 §2.5 / §2.6 的验收口径；
+**不得靠改文档提前打勾**。
 
 ## 3. B4 预应力损失两处规范口径
 
@@ -519,6 +565,23 @@ step2 荷载控制主 job 用 `λ=(TIME−1)·LAMMAX` 对 FEM `[STABILITY]`
     「`cases/README.md` 登记 CB3D21、FE 总索引登记 23 个 CTest」；
     CB3D21 报告 `RESULT: ALL CHECKS PASSED`、两 job 0 error，
     但路径单调硬化无极限点、施工阶段链路未接入，B3 仍 `P` 不 `Y`。
+18. 第十九次 ③a 不虚报：同一守卫的 `stage3_contract()` 锁住
+    「`fem_3d_nl.hpp` 三个结果结构回传 `basisModel`、
+    `cable_solver.cpp` 只在 opt-in 成桥态用同源模型且带
+    `invalid_initial_state` 自由度检查」「第 24 / 25 项 CTest 与
+    `run_tests.ps1 -BuildDir` 在位、FE 总索引 25 个 CTest、
+    编号 `CB3D10_BASIS_FIX` 不与 CB3D22 复用」
+    「`ansys_bridge_limit_point.py` 只缩塔实常数、不重新建模，
+    两个 ANSYS job 各 2 个 `SOLVE` / 16 条 `INISTATE` / 0 error，
+    `lp_load` 荷载控制、`lp_arc` 才有 `ARCLEN`，按 `ΔUX` 插值 `λ`」
+    「§2.5 / §2.6 如实写明 ③a 完成仍 `P` 不 `Y`、
+    不得靠改文档提前打勾」「FE 侧 `CHANGELOG.md` /
+    `input_format_3d.md` / `USER_MANUAL.md` / `DEVELOPMENT_GUIDE.md`
+    四份文档均登记 ③a，且 `USER_MANUAL.md` / `DEVELOPMENT_GUIDE.md`
+    同样写明 B3 仍 `P` 不 `Y`」；CB3D22 报告 20 checks / 0 failed，
+    干净构建 `ctest` 25/25、`run_tests.ps1` `ALL TESTS PASSED`。
+    但 §2.5 的分支屈曲 / 初始缺陷 / 材料非线性 /
+    施工阶段中间态全过程稳定**全部未收口**，③a 完成不等于 ③ 完成。
 
 **明确未闭环**：B3 的分支屈曲 / 初始缺陷 / 材料非线性 / CR 梁后屈曲
 的**主链路成桥态闭环与施工阶段链路接入**（第十八次 CB3D19 只把

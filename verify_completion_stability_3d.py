@@ -22,6 +22,10 @@
 第十九次 ② 增补 `stage2_contract()`：真实斜拉桥 ANSYS 两段对标的
 同源导出、两个 SOLVE / 16 条 INISTATE、`--live-ansys` 不覆写冻结 CSV、
 MODE=COMPLETION 起点不同源缺陷如实登记、② 完成仍 `P` 不 `Y`。
+
+第十九次 ③a 增补 `stage3_contract()`：`basisModel` 起点同源修复、
+施工阶段段共存核对、CB3D22 越过极值点 / 下降段、第 24 / 25 项 CTest、
+25 个 CTest 总索引，以及「③a 完成仍 `P` 不 `Y`」的不虚报口径。
 """
 
 from __future__ import annotations
@@ -265,8 +269,9 @@ def stage2_contract() -> None:
         check("② 第 23 项 README 如实写明无极限点 / 仍 P 不 Y",
               "无极限点" in read(bench / "README.md")
               and "仍 `P` 不标 `Y`" in read(bench / "README.md"))
-        check("② FE 总索引登记 23 个 CTest",
-              "23 个 CTest" in read(root / "tests" / "benchmark" / "README.md"))
+        fe_idx = read(root / "tests" / "benchmark" / "README.md")
+        check("② FE 总索引登记 23 个 CTest（③a 后合计 25 个）",
+              "23 个 CTest" in fe_idx and "25 个 CTest" in fe_idx)
     check("② 算例索引登记 CB3D21 / completion_bridge_3d",
           "CB3D21" in cases_idx and "completion_bridge_3d" in cases_idx
           and "CB3D01~CB3D21" in cases_idx)
@@ -282,15 +287,141 @@ def stage2_contract() -> None:
           and "施工阶段链路核对" in spec)
 
 
+def stage3_contract() -> None:
+    """第十九次 ③a：起点同源修复 / 施工阶段共存 / 越过极值点 / 仍 P 不 Y。
+
+    纯离线：只读源码与冻结证据文本，不调求解器、不重跑 ANSYS、不写文件。
+    """
+    root = fe()
+    lp = read(ROOT / "ansys_bridge_limit_point.py")
+    rc = read(ROOT / "cases" / "run_cases_limit_point.py")
+    spec = read(ROOT / "B类后续项接入规格.md")
+    mat = read(ROOT / "能力边界矩阵.md")
+    cases_idx = read(ROOT / "cases" / "README.md")
+    case_dir = ROOT / "cases" / "CB3D22_limit_point_vs_ansys"
+
+    # ---- 1. ③a 同源构型：只缩实常数，不重新建模 ----
+    check("③a 导出模块 / 编排脚本在位且锁定 TOWER_SCALE / 同源配置",
+          bool(lp) and bool(rc)
+          and "TOWER_SCALE = 0.012" in lp
+          and "LIMIT_CFG = dict(COMPLETION_CFG)" in lp
+          and "--check-only" in rc and "--sync-to" in rc)
+    check("③a 只缩放桥塔实常数，不改几何 / 恒载 / 索（避免成桥态不同源）",
+          "def build_model():" in lp and "r.A *= TOWER_SCALE" in lp
+          and "r.IY *= TOWER_SCALE ** 2" in lp
+          and "build_cable_stayed_3d(**LIMIT_CFG)" in lp)
+    check("③a ANSYS 两段仍用 λ = TIME − 1、ARCLEN 只给 lp_arc",
+          "λ = TIME − 1" in lp and "ARCTRM,U," in lp
+          and "ARCLEN,ON" in lp)
+    check("③a 正式算例目录与 20 checks / 0 failed 报告在位",
+          case_dir.is_dir()
+          and "20 checks, 0 failed" in read(
+              case_dir / "cb3d22_limit_point_compare_report.txt"))
+    for job in ("lp_load", "lp_arc"):
+        inp = read(case_dir / (job + ".inp"))
+        out = read(case_dir / (job + "_ansys.out"))
+        check(f"③a ANSYS {job}：2 SOLVE / 16 INISTATE / 0 error",
+              len([x for x in inp.splitlines() if x.strip() == "SOLVE"]) == 2
+              and inp.count("INISTATE,DEFINE,") == 16
+              and "NUMBER OF ERROR   MESSAGES ENCOUNTERED=          0" in out)
+    check("③a lp_load 荷载控制、lp_arc 才用 ARCLEN",
+          "ARCLEN,ON" not in read(case_dir / "lp_load.inp")
+          and "ARCLEN,ON" in read(case_dir / "lp_arc.inp"))
+    check("③a 按 ΔUX 插值 λ（λ 非单调）并分段统计",
+          "interp_lambda_by_ctrl" in rc
+          and "TOL_DESCEND" in rc and "TOL_MEAN" in rc)
+
+    # ---- 2. FE 侧起点同源修复与两项新 CTest ----
+    if root is None:
+        check("定位 FEM-Eigen 源码目录（③a）", False, "未定位")
+        return
+    nl = read(root / "fem_3d_nl.hpp")
+    cs = read(root / "cable_solver.cpp")
+    bench = root / "tests" / "benchmark"
+    b24 = bench / "completion_basis_3d"
+    b25 = bench / "bridge_limit_point_3d"
+    check("③a 内核三个结果结构回传同源 basisModel",
+          nl.count("Model3D basisModel;") == 3
+          and "out.basisModel = m;" in nl)
+    check("③a 主链路只在 opt-in 成桥态改用同源模型并做自由度一致性检查",
+          "useStabilityModel" in cs
+          and "invalid_initial_state" in cs
+          and "useStabilityModel ? stabilityModel : m" in cs)
+    check("③a 第 24 项 CTest（起点同源 + 施工阶段共存）在位",
+          (b24 / "compare_completion_basis_3d.py").is_file()
+          and (b24 / "reference" / "completion_basis_3d.json").is_file()
+          and "CB3D10_BASIS_FIX" in read(b24 / "build_reference_basis.py")
+          and "CB3D13" in read(b24 / "README.md")
+          and "不得据此把 B3 涂成 `Y`" in read(b24 / "README.md"))
+    check("③a 第 25 项 CTest（越过极值点 / 下降段）在位",
+          (b25 / "compare_bridge_limit_point_3d.py").is_file()
+          and (b25 / "reference" / "cb3d22_limit_point.json").is_file()
+          and "越过极值点" in read(b25 / "README.md")
+          and "下降段" in read(b25 / "README.md"))
+    check("③a CTest 注册与 run_tests.ps1 -BuildDir 同步",
+          "bridge_limit_point_3d_benchmark" in read(root / "CMakeLists.txt")
+          and "completion_basis_3d_benchmark" in read(root / "CMakeLists.txt")
+          and "-BuildDir" in read(root / "run_tests.ps1")
+          and "bridge_limit_point_3d" in read(root / "run_tests.ps1"))
+    check("③a 跨工具链重放口径集中且不放宽冻结证据判据",
+          (bench / "replay_tolerance.py").is_file()
+          and "TOL_REL = 1.0e-9" in read(bench / "replay_tolerance.py")
+          and "TOL_RES_ABS = 0.1" in read(bench / "replay_tolerance.py")
+          and "25 个 CTest" in read(bench / "README.md")
+          and "mingw64/bin/g++.exe" in read(bench / "README.md"))
+    check("③a 编号不复用：CB3D22 只属极限点算例",
+          "CB3D22" in read(b25 / "README.md")
+          and "CB3D10" in read(b24 / "README.md")
+          and "CB3D13" in read(b24 / "README.md")
+          and "CB3D10_BASIS_FIX" in read(b24 / "README.md"))
+
+    # ---- 3. 文档 / 矩阵如实：③a 完成仍 P 不 Y ----
+    check("③a 规格 §2.5 / §2.6 如实登记且明确仍 P 不 Y",
+          "第十九次 ③a 补记" in spec
+          and "③a 阶段实测收口" in spec
+          and "**B3 结论：仍 `P` 不 `Y`**" in spec
+          and "不得靠改文档提前打勾" in spec
+          and "分支屈曲" in spec and "施工阶段中间态全过程稳定" in spec)
+    check("③a 能力矩阵仍 | N | P | 且缺口条数不变",
+          "| 非线性稳定全过程（球面弧长法 opt-in） | N | P |" in mat
+          and "第十九次 ③a 记录" in mat
+          and "仍 `P ≠ Y`" in mat)
+    check("③a 算例索引登记 CB3D22 / bridge_limit_point_3d",
+          "CB3D22" in cases_idx
+          and "bridge_limit_point_3d" in cases_idx
+          and "CB3D01~CB3D21" in cases_idx)
+    for name in ("README.md", "使用说明.md", "开发使用手册.md"):
+        txt = read(ROOT / name)
+        check(f"{name} 登记 ③a 且仍 P 不 Y",
+              "③a" in txt and "STABASIS=COMPLETION" in txt
+              and ("仍 `P`" in txt or "仍 `P ≠ Y`" in txt))
+
+    # ---- 4. FE 侧四份文档同步（③a 收尾补记，防止回退后无人发现）----
+    fe_docs = {
+        "CHANGELOG.md": "③a 起点同源修复",
+        "input_format_3d.md": "basisModel",
+        "USER_MANUAL.md": "9.10 成桥态全过程稳定",
+        "DEVELOPMENT_GUIDE.md": "同源模型",
+    }
+    for name, marker in fe_docs.items():
+        txt = read(root / name)
+        check(f"FE {name} 登记 ③a 且写明 {marker}",
+              "③a" in txt and marker in txt)
+    check("FE USER_MANUAL / DEVELOPMENT_GUIDE 如实写明 B3 仍 P 不 Y",
+          "仍 `P` 不 `Y`" in read(root / "USER_MANUAL.md")
+          and "仍 `P` 不 `Y`" in read(root / "DEVELOPMENT_GUIDE.md"))
+
+
 def main() -> int:
     print("=" * 78)
-    print("第十九次 ① / ② 成桥态全过程稳定接入层独立守卫（纯离线）")
+    print("第十九次 ① / ② / ③a 成桥态全过程稳定接入层独立守卫（纯离线）")
     print("=" * 78)
     fe_contract()
     parser_contract()
     oracle()
     docs()
     stage2_contract()
+    stage3_contract()
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(PASS)} 通过")
