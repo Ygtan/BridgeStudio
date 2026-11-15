@@ -1,0 +1,64 @@
+{
+  "case_id": "cb3d21_completion_stability",
+  "COMPLETION_CFG": {
+    "main_span": 80.0,
+    "side_span": 30.0,
+    "tower_height": 25.0,
+    "n_cable": 4,
+    "panel": 10.0,
+    "B": 12.0,
+    "h": 2.5,
+    "tf": 0.28,
+    "tw": 0.45,
+    "tower_b": 3.0,
+    "tower_h": 3.0,
+    "q_deck": 50000.0,
+    "cable_area_mm2": 3000.0,
+    "cable_dens": 0.0,
+    "mode": "STATIC",
+    "method": "DECK"
+  },
+  "EPS0": 0.0008,
+  "PINC": 1000000.0,
+  "LAMMAX": 4.55,
+  "CTRL_NODE": 1016,
+  "CTRL_DOF": 3,
+  "VMAX": 0.07,
+  "STAB_KEYS": "STABILITY=1 STABASIS=COMPLETION PATHMETHOD=SPHERE CTRLNODE=1016 CTRLDOF=3 CTRLTARGET=0.05\nDS0=0.002 DSMAX=0.01 DSMIN=1.0e-9 PSI=0.5\nMAXPATHSTEP=2000 STABITER=40 STABTOL=1.0e-7 STRAIN=0\n",
+  "ANSYS_CASES": [
+    {
+      "id": "cs_load",
+      "arclen": false,
+      "time2": 2.0,
+      "desc": "load-controlled step 2 (primary path benchmark)"
+    },
+    {
+      "id": "cs_arc",
+      "arclen": true,
+      "time2": 6.0,
+      "desc": "ARCLEN step 2 (endpoint cross-check only)"
+    }
+  ],
+  "cable_L0": {
+    "9001": 14.565727155388942,
+    "9002": 21.848590733083412,
+    "9003": 28.788045992246477,
+    "9004": 33.60717437818174,
+    "9005": 16.419386445120363,
+    "9006": 24.629079667680543,
+    "9007": 30.530881480666576,
+    "9008": 36.52363475796248,
+    "9009": 16.419386445120367,
+    "9010": 24.629079667680543,
+    "9011": 30.530881480666586,
+    "9012": 36.523634757962476,
+    "9013": 14.565727155388942,
+    "9014": 21.848590733083412,
+    "9015": 28.788045992246477,
+    "9016": 33.60717437818174
+  },
+  "nodes": 50,
+  "elements": 63,
+  "cables": 16,
+  "F_orig": -266666.66666666645
+}

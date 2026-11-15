@@ -1,0 +1,42 @@
+CB3D21 completion-state stability path: FEM vs ANSYS two-step
+==============================================================================
+双塔三跨斜拉桥（与 CB3D10 同几何/材料/恒载）；MODE=STATIC + 设计线形 + 16 根索显式 L0
+main_span=80.0 m side_span=30.0 m tower_height=25.0 m n_cable=4 panel=10.0 m
+EPS0=0.0008  PINC=1e+06 N  LAMMAX=4.55  CTRL=(1016,3)  VMAX=0.07 m
+FEM  R = F0 + lambda*Finc - Fint(u),  u(0)=u0 (成桥态)
+ANSYS step1 TIME=1 恒载成桥态；step2 F_orig=-266666.667 N -> F_end=-4816666.67 N
+lambda_FEM=(TIME-1)*LAMMAX（荷载控制）；不用反力求和（多荷载模型不可靠）
+
+--- 起点自洽：成桥态 u0 / F0 与 [NEWTON] 收敛残差 ---
+[PASS] BASIS=completion_state / CONVERGED : basis=completion_state converged=1 error=none NPOINT=246
+[PASS] RES0 / F0_NORM <= 1.0e-06 : RES0=0.00797259 N  F0_NORM=2.95721e+06 N  rel=2.696e-09
+[PASS] RES0 与 [NEWTON] RESLAST 同量级 : RES0=0.00797259 N  RESLAST=0.005957 N  ratio=1.338 (tol 10.0)
+[PASS] STATE CTRL0 == [U](1016,3) : CTRL0=-0.00993250616197  [U]=-0.009932506162  |d|=3.060e-14
+  FINC_NORM=1000000 N ; LAMBDA_FINAL=4.55306751
+
+--- FEM 弧长路径自洽 ---
+[PASS] 路径单调硬化、无极限点（本算例口径） : NPOINT=246  lambda 0 -> 4.55306751
+[PASS] FEM 路径覆盖 ANSYS 全部子步 : lambda_final=4.55306751 >= LAMMAX=4.55
+[PASS] 默认零污染负例无 [STABILITY] 段 : cs_default has_stability=False
+
+--- ANSYS 荷载控制两段 vs FEM [STABILITY] 逐点对拍 ---
+[PASS] FEM CTRL0 vs ANSYS step1 UZ : FEM=-0.00993250616 m  ANSYS=-0.00993424188 m  |d|=1.736e-06 m (tol 1.0e-04)
+[PASS] 逐子步 |DeltaUZ - FEM CTRL| <= 1.0e-04 m : worst=1.852186e-05 m @ lambda=4.55, n=28 (tol 1.0e-04)
+[PASS] 初始线性段斜率 FEM vs ANSYS : k_ansys=9.09722e+07 N/m  k_fem=9.09847e+07 N/m  rel=1.374e-04 (tol 2.0e-02)
+  step1 UZ=-0.00993424188 m ; step2 28 子步 ; 终点 UZ=-0.0599350982 m (DeltaUZ=-0.0500008563 m)
+
+--- ARCLEN 交叉验证（TIME 不是 lambda，只比终点）---
+[PASS] ARCLEN job 终点 vs 荷载控制终点 : ARCLEN UZ=-0.0599351672 m  load UZ=-0.0599350982 m  |d|=6.901e-08 m (tol 1.0e-04)
+  ARCLEN substeps=45  TIME_final=6（不作 lambda 换算）
+
+[PASS] ANSYS 日志 0 error [cs_load] : errors=0 warnings=1
+[PASS] ANSYS 日志 0 error [cs_arc] : errors=0 warnings=2
+
+口径边界：BASIS=completion_state 的 lambda 只缩放增量荷载，
+不是规范稳定安全系数；本算例路径单调硬化无极限点，
+越过极限点能力由 L/N 阶段独立基准题与 FEM 弧长内核证明。
+MODE=COMPLETION 索长迭代改写 L0 导致 u0 与 m 不同源，
+本算例用 MODE=STATIC + 显式 L0 绕开，该缺陷登记为独立后续项。
+② 完成后 B3 能力矩阵仍标 P 不标 Y。
+
+RESULT: ALL CHECKS PASSED

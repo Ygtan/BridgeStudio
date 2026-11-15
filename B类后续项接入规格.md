@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | B1 组合体系 | **暂缓**（用户指定） | `组合体系接入规格.md`、`verify_combo_system.py` 86/86 显式拒绝 |
 | B2 2D ↔ 3D 能力对齐 | **部分实现（十五次逐次接入）**：先按源码事实接通 2D 模态 / 线性屈曲；第六次 A 档按 `P` 口径接通 2D **截面应力**半部（承载力当时显式拒绝）；第七次把「引用完整性中文校验」按源码事实由 `N` 纠正为 `P` 并补齐；第八次接通「同源计算书四出口」的**导出机制**（仍标 `P`）；第九次由 FE opt-in 补 `[MODAL2D]` 段闭环「模态周期 T / 振型 / 参与质量」（`BASIS=xy`，用户拍板方向口径，收官时 **B2 剩余 3 项**）；第十次由 FE opt-in 补 `[PRESTRESSLOSS2D]` 段闭环「2D 分项预应力损失明细」（`BASIS=2d_global`，仍标 `P` 不标 `Y`）；第十一次由 FE opt-in 留痕补 `[NEWTON2D]` 段，**只闭环三层迭代中的内层 Newton 一层**（该格 `N→P`，仍标 `P` 不标 `Y`），`[LENGTH]` / `[OPT]` 两层经只读调研确认 2D 内核没有对应力学、两格继续标 `N`、不造占位，**B2 剩余 2 项**（内容收窄为「两层力学 + 多格式导出」）；第十二次在同一格内按 opt-in `RebarSpec2D` / `capacity_2d.py` 接通 Mu / Vu 一条 flex 链（压弯 / 轴压仍缺、仍标 `P` 不标 `Y`），§4.2 与 **B2 剩余 2 项**均不变；第十三次**首次真正新造 2D 力学**、按 opt-in 补齐 `[LENGTH2D]` 平面索长闭合一层（该格 `2D=N` → `2D=P`、仍标 `P` 不标 `Y`），`[OPT]` 仍标 `N`、不造占位，第十三次收官时 §4.2 为 **1 个 `2D=N` + 6 个 `2D=P`**、**B2 剩余 2 项**（内容曾再收窄为「`[OPT]` 一层力学 + 多格式导出 / `.mct` 反向导入」）；**第十四次** `[OPT2D]` 2D 平面索力优化按 opt-in **首次新造第二层力学**接通（该格 `N→P`、仍标 `P` 不标 `Y`，只 MINMAXM + 显式索力箱、不等于 3D `[OPT]`），§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、**B2 剩余 1 项**（仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入），双层 opt-in 默认全关、默认 `.dat` / `.result` / 黄金基线逐位不变，逐项评估写入 §1；**2026-11-12 第十五次** B2「2D 平行导出 / 导入链」两格按 B 档 `P` 接通（多格式导出 / `.mct` 反向导入，`2D=N` → `2D=P`、**仍 `P` 不 `Y`**），§4.2 现为 **0 个 `2D=N` + 9 个 `2D=P`**、**B2 剩余 0 项**（B2 逐次接入全部收口；两格仍 `P ≠ Y`） | `modal_2d.py`、`verify_modal_2d.py` 111/111、`strength_2d.py`、`verify_strength_2d.py` 162/162、`bridge_spec.py::validate_model`、`verify_validate_2d.py` 83/83、`report_2d.py`、`verify_report_2d.py`、`modal_2d.py::parse_modal_detail`、`verify_modal_detail_2d.py`、`prestress_loss_2d.py`、`verify_prestress_loss_2d.py`、`newton_2d.py`、`verify_newton_2d.py` |
-| B3 非线性稳定全过程 | **第十七次按 opt-in 接入（2026-11-14）**：`STABILITY=1` 把球面弧长法平衡路径跟踪接入 `cable_solver.exe` 主程序，`[STABILITY]` 段 + 独立解析锚点 + 第 20 项 CTest；默认全关、既有算例逐位不变。**第十八次（N 阶段）** 补 CB3D19 共转 CR 梁刚接框架后屈曲独立对标（`frame_probe.exe` + `BEAM188/ARCLEN` + 第 21 项 CTest），仍属独立探针、不是成桥态闭环。**第十九次（2026-11-15，a 阶段 ①）** 新增 `STABASIS=COMPLETION` 与 `*STABILITY_LOAD`，把平衡路径起点从 `readModel3D` 参考构形换成**成桥态收敛位移 `u0` + 恒定荷载 `F0`**（`R = F0 + λ·Finc − Fint(u)`），`[STABILITY] BASIS=completion_state` 挂在主链路 `[END]` 前；第 22 项 CTest 用 V 形双索单自由度体系的**独立闭式 `λ(v)`** 逐点对拍 `MODE=STATIC` / `MODE=TENSION` 两种成桥态闭环。**仍标 `P` 不标 `Y`**：① 只做 FEM 侧自洽与解析锚点，真实桥梁算例的 ANSYS 两段对标属 ②、B3 推 `Y` 属 ③，边界见 §2.5 / §2.6 | §2、§2.5、§2.6 |
+| B3 非线性稳定全过程 | **第十七次按 opt-in 接入（2026-11-14）**：`STABILITY=1` 把球面弧长法平衡路径跟踪接入 `cable_solver.exe` 主程序，`[STABILITY]` 段 + 独立解析锚点 + 第 20 项 CTest；默认全关、既有算例逐位不变。**第十八次（N 阶段）** 补 CB3D19 共转 CR 梁刚接框架后屈曲独立对标（`frame_probe.exe` + `BEAM188/ARCLEN` + 第 21 项 CTest），仍属独立探针、不是成桥态闭环。**第十九次（2026-11-15，a 阶段 ①）** 新增 `STABASIS=COMPLETION` 与 `*STABILITY_LOAD`，把平衡路径起点从 `readModel3D` 参考构形换成**成桥态收敛位移 `u0` + 恒定荷载 `F0`**（`R = F0 + λ·Finc − Fint(u)`），`[STABILITY] BASIS=completion_state` 挂在主链路 `[END]` 前；第 22 项 CTest 用 V 形双索单自由度体系的**独立闭式 `λ(v)`** 逐点对拍 `MODE=STATIC` / `MODE=TENSION` 两种成桥态闭环。**仍标 `P` 不标 `Y`**：① 只做 FEM 侧自洽与解析锚点，真实桥梁算例的 ANSYS 两段对标属 ②、B3 推 `Y` 属 ③。**第十九次 ②（2026-11-15）已交付**：CB3D21 真实双塔三跨斜拉桥（50 节点 / 63 单元 / 16 索）与 ANSYS 两段求解逐子步对拍（`ansys_bridge_completion.py` / `run_cases_completion.py` / 第 23 项 CTest，2392 项黄金值、`--live-ansys` 复核 `max|d|≤1e-11`）；同源设计线形 + 16 根索 `L0` + `INISTATE eps`，`RES0=7.97e-3 N` 与 `[NEWTON] RESLAST` 同量级。② 完成**仍 `P` 不 `Y`**：③ 才推 `Y`，且 `MODE=COMPLETION` 起点不同源缺陷登记为独立后续项。边界见 §2.5 / §2.6 | §2、§2.5、§2.6 |
 | B4 预应力损失两处规范口径 | **只写规格**（σl2 有条文但口径待决；σl6 缺规范表值） | §3 |
 | B5 成桥态无应力曲率 | **只写规格**（研究性扩展） | §4 |
 
@@ -194,7 +194,7 @@ oracle、`ultimate` 逐端最不利效应同源、`γ0 / α1 / α3` 出处、缺
   **仍是荷载控制 Newton**、仍是 `Ftarget = lam·Fext`，`NonlinearOptions3D`
   默认值一字未动；`[BUCKLING]` ERROR 段仍无条件写出。
 
-### 2.2 缺什么（第十九次 ① 后的再收窄）
+### 2.2 缺什么（第十九次 ② 后的再收窄）
 
 **已补齐**：球面弧长法的路径跟踪控制、λ 作为未知量的增广系统与
 Crisfield 球面约束方程、越过极值点的下降段、LU 对角量级比
@@ -223,11 +223,28 @@ Crisfield 球面约束方程、越过极值点的下降段、LU 对角量级比
 `MODE=STATIC`（显式 `L0`）与 `MODE=TENSION`（索长迭代命中 `T*`）
 两种成桥态闭环，并验证 `CTRL0 ≡ [U]` 与默认零污染。
 
+**第十九次 ②（a 阶段，2026-11-15）新增、且已与商业软件对拍**：
+`ansys_bridge_completion.py` / `run_cases_completion.py` 把
+`STABASIS=COMPLETION` 放到真实双塔三跨斜拉桥（CB3D21，50 节点 /
+63 单元 / 16 索），同一份 `ModelSpec3D(mode=STATIC, 设计线形)` 同时
+生成 FEM `.dat` 与 ANSYS 两段 `.inp`；16 根索 `L0 = L_design/(1+EPS0)`
+与 `INISTATE eps ≡ EPS0` 严格同源。ANSYS step1 `TIME=1` 求成桥态，
+step2 荷载控制主 job 用 `λ=(TIME−1)·LAMMAX` 对 FEM `[STABILITY]`
+逐子步插值对拍（28 子步 `worst|ΔUZ|=1.85e-5 m`），`ARCLEN` job
+只作终点交叉验证（`|d|=6.9e-8 m`）。第 23 项 CTest 冻结 2392 项
+黄金值，`--live-ansys` 临时目录复跑两 job 的 CSV `max|d|≤1e-11`。
+起点 `RES0=7.97e-3 N` 与 `[NEWTON] RESLAST=5.96e-3 N` 同量级。
+**这不是**参考构形单段 `ARCLEN`：两段求解的 step1 必须真实建成桥态，
+不得拿参考构形 `ARCLEN` 冒充。
+
 **仍缺**（见 §2.5 / §2.6）：位移控制 / Riks / 分支屈曲与分支切换、初始缺陷
 形态与幅值 / 缺陷敏感性、材料非线性本构、**CR 梁后屈曲接进主链路
-成桥态闭环与施工阶段链路**、真实桥梁全过程稳定对标（**ANSYS
-成桥态等效初应变 + 两段求解**尚未做，① 阶段只有 FEM 自洽与解析锚点，
-不得拿参考构形 `ARCLEN` 冒充）、施工阶段链路接入。
+成桥态闭环与施工阶段链路**、施工阶段链路接入、
+**`MODE=COMPLETION` 索长迭代改写 `L0` 导致 `u0` 与 `m` 不同源的修复**
+（② 用 `MODE=STATIC` + 显式 `L0` 绕开，CB3D10 实测 `RES0=3.15 MN`，
+属独立后续项）、**越过极限点 / 下降段的真实桥梁算例**
+（CB3D21 路径单调硬化、无极限点；该能力仍只有 L / N 阶段独立基准题
+与 FEM 球面弧长内核）。
 这些仍是实质算法新增或对标新增，不是把已有段改名。
 
 ### 2.3 两阶段规格（第十七次已实现，2026-11-14）
@@ -315,9 +332,24 @@ Crisfield 球面约束方程、越过极值点的下降段、LU 对角量级比
 - `P ≠ Y` 的结论：主链路默认关闭、`REFERENCE` 基准只有轴向 / CR 杆系
   基准题有独立解析锚点、`COMPLETION` 基准（第十九次 ①）只有 FEM 自洽
   与单自由度闭式解析锚点、Williams toggle 型 CR 梁后屈曲**只在独立探针
-  层对标**、真实桥梁的全过程稳定对标与施工阶段链路仍未闭环。
-  把 `P` 涂成 `Y` 需要按 §2.6 三阶段全部走完；① 完成**不等于** `Y`，
-  任何一项落地前不得把 `P` 涂成 `Y`。
+  层对标**、施工阶段链路仍未闭环。
+  **第十九次 ② 补记**：真实斜拉桥的 ANSYS 两段对标（CB3D21 /
+  第 23 项 CTest）已落地，但它是**单调硬化路径、无极限点**，
+  且 `MODE=COMPLETION` 起点不同源缺陷未修；分支屈曲 / 初始缺陷 /
+  材料非线性 / 施工阶段链路仍未覆盖。
+  把 `P` 涂成 `Y` 需要按 §2.6 三阶段全部走完；① / ② 完成**不等于**
+  `Y`，③ 走完前不得把 `P` 涂成 `Y`。
+- **第十九次 ② 补记（真实桥梁两段对标）**：`ansys_bridge_completion.py`
+  以 `MODE=STATIC` + 设计线形 + 显式 `L0` 为唯一数据源，FEM `.dat`
+  与 ANSYS `.inp` 共用 16 根索 `L0`，
+  `INISTATE,DEFINE,...,EPEL,X,eps ≡ EPS0`（偏差 `1.83e-16`）；
+  两个 ANSYS job 都恰有 2 个 `SOLVE`（step1 成桥态恒载 + step2
+  增量荷载）、2 条 `F,1016,FZ`、16 条 `INISTATE`。
+  **不用反力求和**（50 个 `F` / 34 个约束节点上 `ΣRF,FZ` 随加载
+  反而下降），主 job 用 `λ=(TIME−1)·LAMMAX`，`ARCLEN` job 的
+  `TIME` 不是 λ、只比终点。`BASIS=completion_state` 与
+  `BASIS=reference_configuration` 继续分列，不得拿参考构形单段
+  `ARCLEN` 冒充成桥态两段。② 完成**仍 `P` 不 `Y`**。
 
 ### 2.6 a 阶段三阶段验收口径（什么才算把 B3 推成 `Y`）
 
@@ -339,6 +371,16 @@ Crisfield 球面约束方程、越过极值点的下降段、LU 对角量级比
 量**，报告与计算书必须分列、不得互相冒充；
 ④ ANSYS 对标必须是「先建成桥态、再在成桥态上做 `ARCLEN`」的两段口径，
 单段 `ARCLEN` 只对应参考构形基准，不能拿来验收 `completion_state`。
+
+**② 阶段实测收口（2026-11-15）**：CB3D21 交付第 23 项 CTest，
+`RES0/|F0| = 2.696e-9`、`CTRL0 ≡ [U](1016,3)`（差 `3.06e-14`）、
+16 根索 `L0*(1+EPS0) ≡ 设计弦长`（偏差 `0`）、`INISTATE eps`
+偏差 `1.83e-16`、28 子步 `worst|ΔUZ| = 1.85e-5 m`、
+`ARCLEN` 与荷载控制终点 `|d| = 6.9e-8 m`、两个 ANSYS job
+均 0 error、`--live-ansys` 复跑 `max|d| ≤ 1e-11`。四条硬口径
+全部满足，但 ③ 的施工阶段链路核对与 §2.5 全部边界收口
+**尚未完成**，故 B3 仍 `P` 不 `Y`。② 发现的 `MODE=COMPLETION`
+起点不同源缺陷登记为独立后续项，不得因 ② 完成而略过。
 
 ## 3. B4 预应力损失两处规范口径
 
@@ -467,6 +509,16 @@ Crisfield 球面约束方程、越过极值点的下降段、LU 对角量级比
     `λ(v)`** 逐点对拍，另有「无增量荷载 / 未知基准 / 默认零污染」负例；
     FE 侧 `fem_3d_nl.hpp` 与 `cable_solver.cpp` 既有默认路径零改动，
     `[BUCKLING]` `ERROR=nonlinear_state_not_supported` 仍在。
+17. 第十九次 ② 真实桥梁两段对标不虚报：同一守卫的 `stage2_contract()`
+    锁住「`ansys_bridge_completion.py` / `run_cases_completion.py` 在位
+    且 `MODE=STATIC` + 同一份 `L0` + `INISTATE eps` 同源」「两个 ANSYS
+    job 都恰有 2 个 `SOLVE`（step1 成桥态 + step2 增量荷载），主 job
+    荷载控制、`ARCLEN` job 只作终点交叉验证，不得拿参考构形单段
+    `ARCLEN` 冒充」「第 23 项 CTest 离线可跑、`--live-ansys` 不覆写
+    冻结 CSV」「能力矩阵仍 `| N | P |`、§2.6 三阶段表在位、③ 仍待」
+    「`cases/README.md` 登记 CB3D21、FE 总索引登记 23 个 CTest」；
+    CB3D21 报告 `RESULT: ALL CHECKS PASSED`、两 job 0 error，
+    但路径单调硬化无极限点、施工阶段链路未接入，B3 仍 `P` 不 `Y`。
 
 **明确未闭环**：B3 的分支屈曲 / 初始缺陷 / 材料非线性 / CR 梁后屈曲
 的**主链路成桥态闭环与施工阶段链路接入**（第十八次 CB3D19 只把

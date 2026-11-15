@@ -1,0 +1,75 @@
+CB3D21 manifest - completion-state stability path vs ANSYS two-step
+case_id = cb3d21_completion_stability
+fem_exe = cable_solver.exe
+ansys_exe = ANSYS180.exe (v180)
+
+唯一数据源: BridgeStudio.ansys_bridge_completion.COMPLETION_CFG + EPS0 + PINC + LAMMAX
+  ModelSpec3D(mode=STATIC, 设计线形) -> *.dat / *.inp 同源导出
+
+COMPLETION_CFG:
+  B = 12.0
+  cable_area_mm2 = 3000.0
+  cable_dens = 0.0
+  h = 2.5
+  main_span = 80.0
+  method = DECK
+  mode = STATIC
+  n_cable = 4
+  panel = 10.0
+  q_deck = 50000.0
+  side_span = 30.0
+  tf = 0.28
+  tower_b = 3.0
+  tower_h = 3.0
+  tower_height = 25.0
+  tw = 0.45
+EPS0 = 0.0008
+PINC = 1000000
+LAMMAX = 4.55
+CTRL_NODE = 1016 ; CTRL_DOF = 3 ; VMAX = 0.07
+STAB_KEYS = STABILITY=1 STABASIS=COMPLETION PATHMETHOD=SPHERE CTRLNODE=1016 CTRLDOF=3 CTRLTARGET=0.05 DS0=0.002 DSMAX=0.01 DSMIN=1.0e-9 PSI=0.5 MAXPATHSTEP=2000 STABITER=40 STABTOL=1.0e-7 STRAIN=0
+F_orig(1016,FZ) = -266666.666667 N
+F_end(1016,FZ)  = -4816666.66667 N
+INISTATE eps_uniform = 0.0008
+
+ANSYS cases:
+  cs_load    arclen=False time2=2     load-controlled step 2 (primary path benchmark)
+  cs_arc     arclen=True  time2=6     ARCLEN step 2 (endpoint cross-check only)
+
+Files (frozen as benchmark evidence):
+  cb3d21_completion_stability.cfg.json
+  cb3d21_completion_stability.dat
+  cb3d21_completion_stability.model.json
+  cb3d21_completion_stability_cable.txt
+  cb3d21_completion_stability_compare_report.txt
+  cs_arc.DSP
+  cs_arc.arc
+  cs_arc.emat
+  cs_arc.err
+  cs_arc.esav
+  cs_arc.full
+  cs_arc.inp
+  cs_arc.ldhi
+  cs_arc.log
+  cs_arc.mntr
+  cs_arc.r001
+  cs_arc.rdb
+  cs_arc.rst
+  cs_arc_ansys.out
+  cs_arc_curve.csv
+  cs_default.dat
+  cs_default_cable.txt
+  cs_load.DSP
+  cs_load.emat
+  cs_load.err
+  cs_load.esav
+  cs_load.full
+  cs_load.inp
+  cs_load.ldhi
+  cs_load.log
+  cs_load.mntr
+  cs_load.r001
+  cs_load.rdb
+  cs_load.rst
+  cs_load_ansys.out
+  cs_load_curve.csv

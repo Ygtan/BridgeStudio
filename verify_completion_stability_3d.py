@@ -16,8 +16,12 @@
 6. 独立 oracle：手工 ``completion_state`` 正常段 / ERROR 段逐字段解析，
    ``ctrl0`` 缺段时为 ``None`` 不补 0。
 
-**本守卫存在本身就在锁住「① 完成不等于 B3 推 Y」**：任何一项把矩阵
+**本守卫存在本身就在锁住「① / ② 完成不等于 B3 推 Y」**：任何一项把矩阵
 涂成 `Y` 或删掉 §2.6 的阶段表，这里立刻红。
+
+第十九次 ② 增补 `stage2_contract()`：真实斜拉桥 ANSYS 两段对标的
+同源导出、两个 SOLVE / 16 条 INISTATE、`--live-ansys` 不覆写冻结 CSV、
+MODE=COMPLETION 起点不同源缺陷如实登记、② 完成仍 `P` 不 `Y`。
 """
 
 from __future__ import annotations
@@ -211,14 +215,82 @@ def docs() -> None:
               and ("仍 `P`" in txt or "仍 `P ≠ Y`" in txt))
 
 
+def stage2_contract() -> None:
+    """第十九次 ②：真实桥梁两段对标的如实边界（纯离线，不调求解器）。"""
+    root = fe()
+    ac = read(ROOT / "ansys_bridge_completion.py")
+    rc = read(ROOT / "cases" / "run_cases_completion.py")
+    cases_idx = read(ROOT / "cases" / "README.md")
+    mat = read(ROOT / "能力边界矩阵.md")
+    spec = read(ROOT / "B类后续项接入规格.md")
+    cb_case = ROOT / "cases" / "CB3D21_completion_stability_vs_ansys"
+
+    check("② 同源导出模块与编排脚本在位",
+          bool(ac) and bool(rc)
+          and "mode=\"STATIC\"" in ac
+          and "COMPLETION_CFG" in ac
+          and "--sync-only" in rc)
+    check("② 唯一数据源显式 L0 / STABASIS / *STABILITY_LOAD",
+          all(k in ac for k in (
+              "cable_l0", "L0 = L_design", "STABASIS=COMPLETION",
+              "*STABILITY_LOAD", "initial_cable_strain", "LAMMAX", "PINC")))
+    check("② INISTATE eps 同源断言 + 两段 APDL 建模",
+          "INISTATE" in ac and "eps" in ac
+          and "spec_nl_to_apdl" in ac and "SOLVE" in ac
+          and "eps_uniform" in rc)
+    check("② 不用反力求和、λ 用 TIME 换算、ARCLEN 只作终点",
+          "反力求和" in ac and "lambda_FEM=(TIME-1)*LAMMAX" in rc
+          and "ARCLEN" in ac and "cs_arc" in rc)
+    check("② 正式算例目录与 ALL CHECKS PASSED 报告在位",
+          cb_case.is_dir()
+          and "ALL CHECKS PASSED" in read(
+              cb_case / "cb3d21_completion_stability_compare_report.txt"))
+    for job in ("cs_load", "cs_arc"):
+        inp = read(cb_case / (job + ".inp"))
+        check(f"② ANSYS {job} 恰有 2 个 SOLVE / 2 条 F / 16 条 INISTATE",
+              len([x for x in inp.splitlines() if x.strip() == "SOLVE"]) == 2
+              and len([x for x in inp.splitlines()
+                       if x.startswith("F,1016,FZ,")]) == 2
+              and inp.count("INISTATE,DEFINE,") == 16)
+    check("② 主 job 荷载控制、交叉 job 才有 ARCLEN",
+          "ARCLEN,ON" not in read(cb_case / "cs_load.inp")
+          and "ARCLEN,ON" in read(cb_case / "cs_arc.inp"))
+    if root is not None:
+        bench = root / "tests" / "benchmark" / "completion_bridge_3d"
+        cmp_src = read(bench / "compare_completion_bridge_3d.py")
+        check("② 第 23 项 CTest 离线入口 + --live-ansys 不写回冻结 cases",
+              bool(cmp_src) and "--live-ansys" in cmp_src
+              and "绝不写回" in cmp_src
+              and "completion_state" in cmp_src)
+        check("② 第 23 项 README 如实写明无极限点 / 仍 P 不 Y",
+              "无极限点" in read(bench / "README.md")
+              and "仍 `P` 不标 `Y`" in read(bench / "README.md"))
+        check("② FE 总索引登记 23 个 CTest",
+              "23 个 CTest" in read(root / "tests" / "benchmark" / "README.md"))
+    check("② 算例索引登记 CB3D21 / completion_bridge_3d",
+          "CB3D21" in cases_idx and "completion_bridge_3d" in cases_idx
+          and "CB3D01~CB3D21" in cases_idx)
+    check("② 能力矩阵仍 | N | P | 且 §2.6 三阶段表仍在",
+          "| 非线性稳定全过程（球面弧长法 opt-in） | N | P |" in mat
+          and "### 2.6 a 阶段三阶段验收口径" in spec
+          and "| ③ |" in spec and "③ 才推 `Y`" in spec)
+    check("② MODE=COMPLETION 起点不同源缺陷如实登记（不得略过）",
+          "起点不同源" in spec and "RES0=3.15 MN" in spec
+          and "独立后续项" in spec)
+    check("② 完成仍 P 不 Y、施工阶段链路属 ③",
+          "② 完成**仍 `P` 不 `Y`**" in spec
+          and "施工阶段链路核对" in spec)
+
+
 def main() -> int:
     print("=" * 78)
-    print("第十九次 ① 成桥态全过程稳定接入层独立守卫（纯离线）")
+    print("第十九次 ① / ② 成桥态全过程稳定接入层独立守卫（纯离线）")
     print("=" * 78)
     fe_contract()
     parser_contract()
     oracle()
     docs()
+    stage2_contract()
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(PASS)} 通过")

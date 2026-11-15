@@ -1,0 +1,2468 @@
+
+ ANSYS Multiphysics                                
+
+
+ *------------------------------------------------------------------*
+ |                                                                  |
+ |   W E L C O M E   T O   T H E   A N S Y S (R)  P R O G R A M     |
+ |                                                                  |
+ *------------------------------------------------------------------*
+
+
+
+
+ ***************************************************************
+ *            ANSYS Release 18.0     LEGAL NOTICES             *
+ ***************************************************************
+ *                                                             *
+ * Copyright 2016 SAS IP, Inc.  All rights reserved.           *
+ * Unauthorized use, distribution or duplication is            *
+ * prohibited.                                                 *
+ *                                                             *
+ * Ansys is a registered trademark of ANSYS, Inc. or its       *
+ * subsidiaries in the United States or other countries.       *
+ * See the ANSYS, Inc. online documentation or the ANSYS, Inc. *
+ * documentation CD or online help for the complete Legal      *
+ * Notice.                                                     *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * THIS ANSYS SOFTWARE PRODUCT AND PROGRAM DOCUMENTATION       *
+ * INCLUDE TRADE SECRETS AND CONFIDENTIAL AND PROPRIETARY      *
+ * PRODUCTS OF ANSYS, INC., ITS SUBSIDIARIES, OR LICENSORS.    *
+ * The software products and documentation are furnished by    *
+ * ANSYS, Inc. or its subsidiaries under a software license    *
+ * agreement that contains provisions concerning               *
+ * non-disclosure, copying, length and nature of use,          *
+ * compliance with exporting laws, warranties, disclaimers,    *
+ * limitations of liability, and remedies, and other           *
+ * provisions.  The software products and documentation may be *
+ * used, disclosed, transferred, or copied only in accordance  *
+ * with the terms and conditions of that software license      *
+ * agreement.                                                  *
+ *                                                             *
+ * ANSYS, Inc. is a UL registered                              *
+ * ISO 9001:2008 company.                                      *
+ *                                                             *
+ ***************************************************************
+ *                                                             *
+ * This product is subject to U.S. laws governing export and   *
+ * re-export.                                                  *
+ *                                                             *
+ * For U.S. Government users, except as specifically granted   *
+ * by the ANSYS, Inc. software license agreement, the use,     *
+ * duplication, or disclosure by the United States Government  *
+ * is subject to restrictions stated in the ANSYS, Inc.        *
+ * software license agreement and FAR 12.212 (for non-DOD      *
+ * licenses).                                                  *
+ *                                                             *
+ ***************************************************************
+
+ Release 18.0
+     
+ Point Releases and Patches installed:   
+     
+ ANSYS, Inc. Products Release 18.0   
+ ANSYS Mechanical Products Release 18.0  
+ ANSYS Autodyn Release 18.0  
+ ANSYS LS-DYNA Release 18.0  
+ ANSYS AIM Release 18.0  
+ ANSYS CFX (includes ANSYS CFD-Post) Release 18.0
+ ANSYS Fluent (includes ANSYS CFD-Post) Release 18.0 
+ ANSYS TurboGrid Release 18.0
+ ANSYS FENSAP-ICE Release 18.0   
+ ANSYS Polyflow (includes ANSYS CFD-Post) Release 18.0   
+ ANSYS Forte Release 18.0
+ ANSYS Chemkin Release 18.0  
+ ANSYS ICEM CFD Release 18.0 
+ ANSYS Aqwa Release 18.0 
+ ANSYS Icepak (includes ANSYS CFD-Post) Release 18.0 
+ AutoCAD Release 18.0
+ ACIS Release 18.0   
+ Catia, Version 4 Release 18.0   
+ Catia, Version 6 Release 18.0   
+ Creo Elements/Direct Modeling Release 18.0  
+ Inventor Release 18.0   
+ JTOpen Release 18.0 
+ NX Release 18.0 
+ Parasolid Release 18.0  
+ Creo Parametric (formerly Pro/ENGINEER) Release 18.0
+ Solid Edge Release 18.0 
+ SolidWorks Release 18.0 
+ ANSYS, Inc. License Manager Release 18.0
+
+
+          *****  ANSYS COMMAND LINE ARGUMENTS  *****
+  INITIAL JOBNAME              = cs_arc                                                                                                                                                                                                                                                  
+  BATCH MODE REQUESTED (-b)    = LIST
+  INPUT FILE COPY MODE (-c)    = COPY
+
+ RELEASE= Release 18.0         BUILD= 18.0      UP20161219   VERSION=WINDOWS x64 
+ CURRENT JOBNAME=cs_arc  15:37:10  NOV 15, 2026 CP=      0.188
+
+     1  /BATCH  
+     2  /TITLE,CB3D21 completion-state stability path - FEM vs ANSYS two-step - BEAM4+LINK180 NLGEOM
+     3  /PREP7  
+     4  ET,1,BEAM4  
+     5  ET,2,BEAM4  
+     6  ET,3,LINK180
+     7  KEYOPT,3,2,0
+     8  KEYOPT,3,3,1
+     9  R,1,8.466,4.4356099,8.8712198,2.5,1,0.0 
+    10  RMORE,0.0,22.0395700085,0.0,0.0,0.0,0.0 
+    11  R,2,9,6.75,6.75,1,1,0.0 
+    12  RMORE,0.0,10.8,0.0,0.0,0.0,0.0  
+    13  R,3,0.003   
+    14  MP,EX,1,34500000000 
+    15  MP,PRXY,1,0.3   
+    16  MP,EX,2,195000000000
+    17  MP,PRXY,2,0.3   
+    18  MP,GXY,1,14375000000
+    19  MP,GXY,1,14375000000
+    20  ! ---- Nodes: FEM [ERECTED] manufactured geometry ----  
+    21  N,1001,0,0,0
+    22  N,1002,3.75,0,0 
+    23  N,1003,7.5,0,0  
+    24  N,1004,11.25,0,0
+    25  N,1005,15,0,0   
+    26  N,1006,18.75,0,0
+    27  N,1007,22.5,0,0 
+    28  N,1008,26.25,0,0
+    29  N,1009,30,0,0   
+    30  N,1010,35.3333333333,0,0
+    31  N,1011,40.6666666667,0,0
+    32  N,1012,46,0,0   
+    33  N,1013,51.3333333333,0,0
+    34  N,1014,56.6666666667,0,0
+    35  N,1015,62,0,0   
+    36  N,1016,67.3333333333,0,0
+    37  N,1017,72.6666666667,0,0
+    38  N,1018,78,0,0   
+    39  N,1019,83.3333333333,0,0
+    40  N,1020,88.6666666667,0,0
+    41  N,1021,94,0,0   
+    42  N,1022,99.3333333333,0,0
+    43  N,1023,104.666666667,0,0
+    44  N,1024,110,0,0  
+    45  N,1025,113.75,0,0   
+    46  N,1026,117.5,0,0
+    47  N,1027,121.25,0,0   
+    48  N,1028,125,0,0  
+    49  N,1029,128.75,0,0   
+    50  N,1030,132.5,0,0
+    51  N,1031,136.25,0,0   
+    52  N,1032,140,0,0  
+    53  N,2001,30,0,0   
+    54  N,2002,30,0,3.125   
+    55  N,2003,30,0,6.25
+    56  N,2004,30,0,9.375   
+    57  N,2005,30,0,12.5
+    58  N,2006,30,0,15.625  
+    59  N,2007,30,0,18.75   
+    60  N,2008,30,0,21.875  
+    61  N,2009,30,0,25  
+    62  N,3001,110,0,0  
+    63  N,3002,110,0,3.125  
+    64  N,3003,110,0,6.25   
+    65  N,3004,110,0,9.375  
+    66  N,3005,110,0,12.5   
+    67  N,3006,110,0,15.625 
+    68  N,3007,110,0,18.75  
+    69  N,3008,110,0,21.875 
+    70  N,3009,110,0,25 
+    71  ! ---- Orientation nodes K (near-vertical BEAM4) ----   
+    72  N,3010,30,1,0   
+    73  N,3011,30,1,3.125   
+    74  N,3012,30,1,6.25
+    75  N,3013,30,1,9.375   
+    76  N,3014,30,1,12.5
+    77  N,3015,30,1,15.625  
+    78  N,3016,30,1,18.75   
+    79  N,3017,30,1,21.875  
+    80  N,3018,110,1,0  
+    81  N,3019,110,1,3.125  
+    82  N,3020,110,1,6.25   
+    83  N,3021,110,1,9.375  
+    84  N,3022,110,1,12.5   
+    85  N,3023,110,1,15.625 
+    86  N,3024,110,1,18.75  
+    87  N,3025,110,1,21.875 
+    88  ! ---- Elements: ANSYS elem no. = creation order ----   
+    89  TYPE,1  
+    90  MAT,1   
+    91  REAL,1  
+    92  E,1001,1002 
+    93  TYPE,1  
+    94  MAT,1   
+    95  REAL,1  
+    96  E,1002,1003 
+    97  TYPE,1  
+    98  MAT,1   
+    99  REAL,1  
+   100  E,1003,1004 
+   101  TYPE,1  
+   102  MAT,1   
+   103  REAL,1  
+   104  E,1004,1005 
+   105  TYPE,1  
+   106  MAT,1   
+   107  REAL,1  
+   108  E,1005,1006 
+   109  TYPE,1  
+   110  MAT,1   
+   111  REAL,1  
+   112  E,1006,1007 
+   113  TYPE,1  
+   114  MAT,1   
+   115  REAL,1  
+   116  E,1007,1008 
+   117  TYPE,1  
+   118  MAT,1   
+   119  REAL,1  
+   120  E,1008,1009 
+   121  TYPE,1  
+   122  MAT,1   
+   123  REAL,1  
+   124  E,1009,1010 
+   125  TYPE,1  
+   126  MAT,1   
+   127  REAL,1  
+   128  E,1010,1011 
+   129  TYPE,1  
+   130  MAT,1   
+   131  REAL,1  
+   132  E,1011,1012 
+   133  TYPE,1  
+   134  MAT,1   
+   135  REAL,1  
+   136  E,1012,1013 
+   137  TYPE,1  
+   138  MAT,1   
+   139  REAL,1  
+   140  E,1013,1014 
+   141  TYPE,1  
+   142  MAT,1   
+   143  REAL,1  
+   144  E,1014,1015 
+   145  TYPE,1  
+   146  MAT,1   
+   147  REAL,1  
+   148  E,1015,1016 
+   149  TYPE,1  
+   150  MAT,1   
+   151  REAL,1  
+   152  E,1016,1017 
+   153  TYPE,1  
+   154  MAT,1   
+   155  REAL,1  
+   156  E,1017,1018 
+   157  TYPE,1  
+   158  MAT,1   
+   159  REAL,1  
+   160  E,1018,1019 
+   161  TYPE,1  
+   162  MAT,1   
+   163  REAL,1  
+   164  E,1019,1020 
+   165  TYPE,1  
+   166  MAT,1   
+   167  REAL,1  
+   168  E,1020,1021 
+   169  TYPE,1  
+   170  MAT,1   
+   171  REAL,1  
+   172  E,1021,1022 
+   173  TYPE,1  
+   174  MAT,1   
+   175  REAL,1  
+   176  E,1022,1023 
+   177  TYPE,1  
+   178  MAT,1   
+   179  REAL,1  
+   180  E,1023,1024 
+   181  TYPE,1  
+   182  MAT,1   
+   183  REAL,1  
+   184  E,1024,1025 
+   185  TYPE,1  
+   186  MAT,1   
+   187  REAL,1  
+   188  E,1025,1026 
+   189  TYPE,1  
+   190  MAT,1   
+   191  REAL,1  
+   192  E,1026,1027 
+   193  TYPE,1  
+   194  MAT,1   
+   195  REAL,1  
+   196  E,1027,1028 
+   197  TYPE,1  
+   198  MAT,1   
+   199  REAL,1  
+   200  E,1028,1029 
+   201  TYPE,1  
+   202  MAT,1   
+   203  REAL,1  
+   204  E,1029,1030 
+   205  TYPE,1  
+   206  MAT,1   
+   207  REAL,1  
+   208  E,1030,1031 
+   209  TYPE,1  
+   210  MAT,1   
+   211  REAL,1  
+   212  E,1031,1032 
+   213  TYPE,2  
+   214  MAT,1   
+   215  REAL,2  
+   216  E,2001,2002,3010
+   217  TYPE,2  
+   218  MAT,1   
+   219  REAL,2  
+   220  E,2002,2003,3011
+   221  TYPE,2  
+   222  MAT,1   
+   223  REAL,2  
+   224  E,2003,2004,3012
+   225  TYPE,2  
+   226  MAT,1   
+   227  REAL,2  
+   228  E,2004,2005,3013
+   229  TYPE,2  
+   230  MAT,1   
+   231  REAL,2  
+   232  E,2005,2006,3014
+   233  TYPE,2  
+   234  MAT,1   
+   235  REAL,2  
+   236  E,2006,2007,3015
+   237  TYPE,2  
+   238  MAT,1   
+   239  REAL,2  
+   240  E,2007,2008,3016
+   241  TYPE,2  
+   242  MAT,1   
+   243  REAL,2  
+   244  E,2008,2009,3017
+   245  TYPE,2  
+   246  MAT,1   
+   247  REAL,2  
+   248  E,3001,3002,3018
+   249  TYPE,2  
+   250  MAT,1   
+   251  REAL,2  
+   252  E,3002,3003,3019
+   253  TYPE,2  
+   254  MAT,1   
+   255  REAL,2  
+   256  E,3003,3004,3020
+   257  TYPE,2  
+   258  MAT,1   
+   259  REAL,2  
+   260  E,3004,3005,3021
+   261  TYPE,2  
+   262  MAT,1   
+   263  REAL,2  
+   264  E,3005,3006,3022
+   265  TYPE,2  
+   266  MAT,1   
+   267  REAL,2  
+   268  E,3006,3007,3023
+   269  TYPE,2  
+   270  MAT,1   
+   271  REAL,2  
+   272  E,3007,3008,3024
+   273  TYPE,2  
+   274  MAT,1   
+   275  REAL,2  
+   276  E,3008,3009,3025
+   277  TYPE,3  
+   278  MAT,2   
+   279  REAL,3  
+   280  E,2005,1007 
+   281  TYPE,3  
+   282  MAT,2   
+   283  REAL,3  
+   284  E,2007,1006 
+   285  TYPE,3  
+   286  MAT,2   
+   287  REAL,3  
+   288  E,2008,1004 
+   289  TYPE,3  
+   290  MAT,2   
+   291  REAL,3  
+   292  E,2009,1003 
+   293  TYPE,3  
+   294  MAT,2   
+   295  REAL,3  
+   296  E,2005,1011 
+   297  TYPE,3  
+   298  MAT,2   
+   299  REAL,3  
+   300  E,2007,1012 
+   301  TYPE,3  
+   302  MAT,2   
+   303  REAL,3  
+   304  E,2008,1013 
+   305  TYPE,3  
+   306  MAT,2   
+   307  REAL,3  
+   308  E,2009,1014 
+   309  TYPE,3  
+   310  MAT,2   
+   311  REAL,3  
+   312  E,3005,1022 
+   313  TYPE,3  
+   314  MAT,2   
+   315  REAL,3  
+   316  E,3007,1021 
+   317  TYPE,3  
+   318  MAT,2   
+   319  REAL,3  
+   320  E,3008,1020 
+   321  TYPE,3  
+   322  MAT,2   
+   323  REAL,3  
+   324  E,3009,1019 
+   325  TYPE,3  
+   326  MAT,2   
+   327  REAL,3  
+   328  E,3005,1026 
+   329  TYPE,3  
+   330  MAT,2   
+   331  REAL,3  
+   332  E,3007,1027 
+   333  TYPE,3  
+   334  MAT,2   
+   335  REAL,3  
+   336  E,3008,1029 
+   337  TYPE,3  
+   338  MAT,2   
+   339  REAL,3  
+   340  E,3009,1030 
+   341  ! ---- Cable initial strain from FEM unstrained length L0 ----  
+   342  INISTATE,SET,DTYP,EPEL  
+   343  INISTATE,DEFINE,48,,EPEL,X,0.000799999999999879 
+   344  INISTATE,DEFINE,49,,EPEL,X,0.00079999999999996  
+   345  INISTATE,DEFINE,50,,EPEL,X,0.000799999999999963 
+   346  INISTATE,DEFINE,51,,EPEL,X,0.000799999999999817 
+   347  INISTATE,DEFINE,52,,EPEL,X,0.000799999999999824 
+   348  INISTATE,DEFINE,53,,EPEL,X,0.000799999999999969 
+   349  INISTATE,DEFINE,54,,EPEL,X,0.000799999999999868 
+   350  INISTATE,DEFINE,55,,EPEL,X,0.000799999999999923 
+   351  INISTATE,DEFINE,56,,EPEL,X,0.000799999999999824 
+   352  INISTATE,DEFINE,57,,EPEL,X,0.000799999999999969 
+   353  INISTATE,DEFINE,58,,EPEL,X,0.000799999999999867 
+   354  INISTATE,DEFINE,59,,EPEL,X,0.000799999999999923 
+   355  INISTATE,DEFINE,60,,EPEL,X,0.000799999999999879 
+   356  INISTATE,DEFINE,61,,EPEL,X,0.00079999999999996  
+   357  INISTATE,DEFINE,62,,EPEL,X,0.000799999999999963 
+   358  INISTATE,DEFINE,63,,EPEL,X,0.000799999999999817 
+   359  ! ---- Boundary conditions ---- 
+   360  D,1001,UY,0 
+   361  D,1001,UZ,0 
+   362  D,1009,UY,0 
+   363  D,1009,UZ,0 
+   364  D,1024,UY,0 
+   365  D,1024,UZ,0 
+   366  D,1032,UY,0 
+   367  D,1032,UZ,0 
+   368  D,1001,UX,0 
+   369  D,1001,ROTX,0   
+   370  D,1002,ROTX,0   
+   371  D,1003,ROTX,0   
+   372  D,1004,ROTX,0   
+   373  D,1005,ROTX,0   
+   374  D,1006,ROTX,0   
+   375  D,1007,ROTX,0   
+   376  D,1008,ROTX,0   
+   377  D,1009,ROTX,0   
+   378  D,1010,ROTX,0   
+   379  D,1011,ROTX,0   
+   380  D,1012,ROTX,0   
+   381  D,1013,ROTX,0   
+   382  D,1014,ROTX,0   
+   383  D,1015,ROTX,0   
+   384  D,1016,ROTX,0   
+   385  D,1017,ROTX,0   
+   386  D,1018,ROTX,0   
+   387  D,1019,ROTX,0   
+   388  D,1020,ROTX,0   
+   389  D,1021,ROTX,0   
+   390  D,1022,ROTX,0   
+   391  D,1023,ROTX,0   
+   392  D,1024,ROTX,0   
+   393  D,1025,ROTX,0   
+   394  D,1026,ROTX,0   
+   395  D,1027,ROTX,0   
+   396  D,1028,ROTX,0   
+   397  D,1029,ROTX,0   
+   398  D,1030,ROTX,0   
+   399  D,1031,ROTX,0   
+   400  D,1032,ROTX,0   
+   401  D,2001,UX,0 
+   402  D,2001,UY,0 
+   403  D,2001,UZ,0 
+   404  D,2001,ROTX,0   
+   405  D,2001,ROTY,0   
+   406  D,2001,ROTZ,0   
+   407  D,3001,UX,0 
+   408  D,3001,UY,0 
+   409  D,3001,UZ,0 
+   410  D,3001,ROTX,0   
+   411  D,3001,ROTY,0   
+   412  D,3001,ROTZ,0   
+   413  ! ---- Nodal loads (merged *CLOAD; ANSYS F overwrites duplicates) ----  
+   414  F,1001,FZ,-93750
+   415  F,1002,FZ,-187500   
+   416  F,1003,FZ,-187500   
+   417  F,1004,FZ,-187500   
+   418  F,1005,FZ,-187500   
+   419  F,1006,FZ,-187500   
+   420  F,1007,FZ,-187500   
+   421  F,1008,FZ,-187500   
+   422  F,1009,FZ,-227083.333333
+   423  F,1010,FZ,-266666.666667
+   424  F,1011,FZ,-266666.666667
+   425  F,1012,FZ,-266666.666667
+   426  F,1013,FZ,-266666.666667
+   427  F,1014,FZ,-266666.666667
+   428  F,1015,FZ,-266666.666667
+   429  F,1016,FZ,-266666.666667
+   430  F,1017,FZ,-266666.666667
+   431  F,1018,FZ,-266666.666667
+   432  F,1019,FZ,-266666.666667
+   433  F,1020,FZ,-266666.666667
+   434  F,1021,FZ,-266666.666667
+   435  F,1022,FZ,-266666.666667
+   436  F,1023,FZ,-266666.666667
+   437  F,1024,FZ,-227083.333333
+   438  F,1025,FZ,-187500   
+   439  F,1026,FZ,-187500   
+   440  F,1027,FZ,-187500   
+   441  F,1028,FZ,-187500   
+   442  F,1029,FZ,-187500   
+   443  F,1030,FZ,-187500   
+   444  F,1031,FZ,-187500   
+   445  F,1032,FZ,-93750
+   446  F,2001,FZ,-344882.8125  
+   447  F,2002,FZ,-689765.625   
+   448  F,2003,FZ,-689765.625   
+   449  F,2004,FZ,-689765.625   
+   450  F,2005,FZ,-689765.625   
+   451  F,2006,FZ,-689765.625   
+   452  F,2007,FZ,-689765.625   
+   453  F,2008,FZ,-689765.625   
+   454  F,2009,FZ,-344882.8125  
+   455  F,3001,FZ,-344882.8125  
+   456  F,3002,FZ,-689765.625   
+   457  F,3003,FZ,-689765.625   
+   458  F,3004,FZ,-689765.625   
+   459  F,3005,FZ,-689765.625   
+   460  F,3006,FZ,-689765.625   
+   461  F,3007,FZ,-689765.625   
+   462  F,3008,FZ,-689765.625   
+   463  F,3009,FZ,-344882.8125  
+   464  FINISH  
+   465  /SOLU   
+   466  ANTYPE,STATIC   
+   467  NLGEOM,ON   
+   468  NSUBST,20,100,10
+   469  NEQIT,50
+   470  OUTRES,ALL,ALL  
+   471  SOLVE   
+   472  ! ---- load step 2: incremental load (ARCLEN step 2 (endpoint cross-check only)) ----   
+   473  F,1016,FZ,-4816666.66666667 
+   474  ARCLEN,ON,0.01,1.0E-8   
+   475  NSUBST,600,3000,20  
+   476  NEQIT,60
+   477  TIME,6  
+   478  ARCTRM,U,0.07,1016,UZ   
+   479  OUTRES,ALL,ALL  
+   480  SOLVE   
+   481  FINISH  
+   482  ! ---- Machine-readable results (first column = FEM id) ----
+   483  /POST1  
+   484  *GET,NSET,ACTIVE,0,SET,NSET 
+   485  *DIM,CURV,ARRAY,NSET,4  
+   486  *DO,I,1,NSET
+   487   SET,,,,,,,I
+   488   *GET,VZ,NODE,1016,U,Z  
+   489   *GET,TNOW,ACTIVE,0,SET,TIME
+   490   CURV(I,1)=I
+   491   CURV(I,2)=TNOW 
+   492   CURV(I,3)=VZ   
+   493   CURV(I,4)=0
+   494  *ENDDO  
+   495  *CFOPEN,cs_arc_curve,csv
+   496  *VWRITE,CURV(1,1),CURV(1,2),CURV(1,3),CURV(1,4) 
+   497   (1X,F8.0,3(1X,E20.12)) 
+   498  *CFCLOS 
+   499  FINISH  
+   500  /EXIT,NOSAVE
+
+ RUN SETUP PROCEDURE FROM FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans
+
+ /INPUT FILE= C:\Program Files\ANSYS Inc\v180\ANSYS\apdl\start.ans  LINE=       0
+
+ TITLE= 
+ CB3D21 completion-state stability path - FEM vs ANSYS two-step - BEAM4+LINK180
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   15:37:10  NOV 15, 2026 CP=      0.250
+
+ CB3D21 completion-state stability path - FEM vs ANSYS two-step - BEAM4+LINK180
+
+
+
+          ***** ANSYS ANALYSIS DEFINITION (PREP7) *****
+
+ ELEMENT TYPE       1 IS BEAM4        3-D ELASTIC BEAM            
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       2 IS BEAM4        3-D ELASTIC BEAM            
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       3 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ ELEMENT TYPE       3 IS LINK180      3-D SPAR                    
+  KEYOPT( 1- 6)=        0      0      0        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ *** WARNING ***                         CP =       0.250   TIME= 15:37:10
+ For element type = 3 (LINK180), KEYOPT(3) = 1 is an undocumented        
+ option.                                                                 
+
+ ELEMENT TYPE       3 IS LINK180      3-D TENSION-ONLY SPAR       
+  KEYOPT( 1- 6)=        0      0      1        0      0      0
+  KEYOPT( 7-12)=        0      0      0        0      0      0
+  KEYOPT(13-18)=        0      0      0        0      0      0
+
+ CURRENT NODAL DOF SET IS  UX    UY    UZ    ROTX  ROTY  ROTZ
+  THREE-DIMENSIONAL MODEL
+
+ REAL CONSTANT SET       1  ITEMS   1 TO   6
+    8.4660       4.4356       8.8712       2.5000       1.0000       0.0000    
+
+ REAL CONSTANT SET       1  ITEMS   7 TO  12
+    0.0000       22.040       0.0000       0.0000       0.0000       0.0000    
+
+ REAL CONSTANT SET       2  ITEMS   1 TO   6
+    9.0000       6.7500       6.7500       1.0000       1.0000       0.0000    
+
+ REAL CONSTANT SET       2  ITEMS   7 TO  12
+    0.0000       10.800       0.0000       0.0000       0.0000       0.0000    
+
+ REAL CONSTANT SET       3  ITEMS   1 TO   6
+   0.30000E-02   0.0000       0.0000       0.0000       0.0000       0.0000    
+
+ MATERIAL         1     EX   =  0.3450000E+11  
+
+ MATERIAL         1     PRXY =  0.3000000      
+
+ MATERIAL         2     EX   =  0.1950000E+12  
+
+ MATERIAL         2     PRXY =  0.3000000      
+
+ MATERIAL         1     GXY  =  0.1437500E+11  
+
+ MATERIAL         1     GXY  =  0.1437500E+11  
+
+ NODE      1001  KCS=      0  X,Y,Z=  0.0000       0.0000       0.0000     
+
+ NODE      1002  KCS=      0  X,Y,Z=  3.7500       0.0000       0.0000     
+
+ NODE      1003  KCS=      0  X,Y,Z=  7.5000       0.0000       0.0000     
+
+ NODE      1004  KCS=      0  X,Y,Z=  11.250       0.0000       0.0000     
+
+ NODE      1005  KCS=      0  X,Y,Z=  15.000       0.0000       0.0000     
+
+ NODE      1006  KCS=      0  X,Y,Z=  18.750       0.0000       0.0000     
+
+ NODE      1007  KCS=      0  X,Y,Z=  22.500       0.0000       0.0000     
+
+ NODE      1008  KCS=      0  X,Y,Z=  26.250       0.0000       0.0000     
+
+ NODE      1009  KCS=      0  X,Y,Z=  30.000       0.0000       0.0000     
+
+ NODE      1010  KCS=      0  X,Y,Z=  35.333       0.0000       0.0000     
+
+ NODE      1011  KCS=      0  X,Y,Z=  40.667       0.0000       0.0000     
+
+ NODE      1012  KCS=      0  X,Y,Z=  46.000       0.0000       0.0000     
+
+ NODE      1013  KCS=      0  X,Y,Z=  51.333       0.0000       0.0000     
+
+ NODE      1014  KCS=      0  X,Y,Z=  56.667       0.0000       0.0000     
+
+ NODE      1015  KCS=      0  X,Y,Z=  62.000       0.0000       0.0000     
+
+ NODE      1016  KCS=      0  X,Y,Z=  67.333       0.0000       0.0000     
+
+ NODE      1017  KCS=      0  X,Y,Z=  72.667       0.0000       0.0000     
+
+ NODE      1018  KCS=      0  X,Y,Z=  78.000       0.0000       0.0000     
+
+ NODE      1019  KCS=      0  X,Y,Z=  83.333       0.0000       0.0000     
+
+ NODE      1020  KCS=      0  X,Y,Z=  88.667       0.0000       0.0000     
+
+ NODE      1021  KCS=      0  X,Y,Z=  94.000       0.0000       0.0000     
+
+ NODE      1022  KCS=      0  X,Y,Z=  99.333       0.0000       0.0000     
+
+ NODE      1023  KCS=      0  X,Y,Z=  104.67       0.0000       0.0000     
+
+ NODE      1024  KCS=      0  X,Y,Z=  110.00       0.0000       0.0000     
+
+ NODE      1025  KCS=      0  X,Y,Z=  113.75       0.0000       0.0000     
+
+ NODE      1026  KCS=      0  X,Y,Z=  117.50       0.0000       0.0000     
+
+ NODE      1027  KCS=      0  X,Y,Z=  121.25       0.0000       0.0000     
+
+ NODE      1028  KCS=      0  X,Y,Z=  125.00       0.0000       0.0000     
+
+ NODE      1029  KCS=      0  X,Y,Z=  128.75       0.0000       0.0000     
+
+ NODE      1030  KCS=      0  X,Y,Z=  132.50       0.0000       0.0000     
+
+ NODE      1031  KCS=      0  X,Y,Z=  136.25       0.0000       0.0000     
+
+ NODE      1032  KCS=      0  X,Y,Z=  140.00       0.0000       0.0000     
+
+ NODE      2001  KCS=      0  X,Y,Z=  30.000       0.0000       0.0000     
+
+ NODE      2002  KCS=      0  X,Y,Z=  30.000       0.0000       3.1250     
+
+ NODE      2003  KCS=      0  X,Y,Z=  30.000       0.0000       6.2500     
+
+ NODE      2004  KCS=      0  X,Y,Z=  30.000       0.0000       9.3750     
+
+ NODE      2005  KCS=      0  X,Y,Z=  30.000       0.0000       12.500     
+
+ NODE      2006  KCS=      0  X,Y,Z=  30.000       0.0000       15.625     
+
+ NODE      2007  KCS=      0  X,Y,Z=  30.000       0.0000       18.750     
+
+ NODE      2008  KCS=      0  X,Y,Z=  30.000       0.0000       21.875     
+
+ NODE      2009  KCS=      0  X,Y,Z=  30.000       0.0000       25.000     
+
+ NODE      3001  KCS=      0  X,Y,Z=  110.00       0.0000       0.0000     
+
+ NODE      3002  KCS=      0  X,Y,Z=  110.00       0.0000       3.1250     
+
+ NODE      3003  KCS=      0  X,Y,Z=  110.00       0.0000       6.2500     
+
+ NODE      3004  KCS=      0  X,Y,Z=  110.00       0.0000       9.3750     
+
+ NODE      3005  KCS=      0  X,Y,Z=  110.00       0.0000       12.500     
+
+ NODE      3006  KCS=      0  X,Y,Z=  110.00       0.0000       15.625     
+
+ NODE      3007  KCS=      0  X,Y,Z=  110.00       0.0000       18.750     
+
+ NODE      3008  KCS=      0  X,Y,Z=  110.00       0.0000       21.875     
+
+ NODE      3009  KCS=      0  X,Y,Z=  110.00       0.0000       25.000     
+
+ NODE      3010  KCS=      0  X,Y,Z=  30.000       1.0000       0.0000     
+
+ NODE      3011  KCS=      0  X,Y,Z=  30.000       1.0000       3.1250     
+
+ NODE      3012  KCS=      0  X,Y,Z=  30.000       1.0000       6.2500     
+
+ NODE      3013  KCS=      0  X,Y,Z=  30.000       1.0000       9.3750     
+
+ NODE      3014  KCS=      0  X,Y,Z=  30.000       1.0000       12.500     
+
+ NODE      3015  KCS=      0  X,Y,Z=  30.000       1.0000       15.625     
+
+ NODE      3016  KCS=      0  X,Y,Z=  30.000       1.0000       18.750     
+
+ NODE      3017  KCS=      0  X,Y,Z=  30.000       1.0000       21.875     
+
+ NODE      3018  KCS=      0  X,Y,Z=  110.00       1.0000       0.0000     
+
+ NODE      3019  KCS=      0  X,Y,Z=  110.00       1.0000       3.1250     
+
+ NODE      3020  KCS=      0  X,Y,Z=  110.00       1.0000       6.2500     
+
+ NODE      3021  KCS=      0  X,Y,Z=  110.00       1.0000       9.3750     
+
+ NODE      3022  KCS=      0  X,Y,Z=  110.00       1.0000       12.500     
+
+ NODE      3023  KCS=      0  X,Y,Z=  110.00       1.0000       15.625     
+
+ NODE      3024  KCS=      0  X,Y,Z=  110.00       1.0000       18.750     
+
+ NODE      3025  KCS=      0  X,Y,Z=  110.00       1.0000       21.875     
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      1    1001   1002      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      2    1002   1003      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      3    1003   1004      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      4    1004   1005      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      5    1005   1006      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      6    1006   1007      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      7    1007   1008      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      8    1008   1009      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT      9    1009   1010      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     10    1010   1011      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     11    1011   1012      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     12    1012   1013      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     13    1013   1014      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     14    1014   1015      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     15    1015   1016      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     16    1016   1017      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     17    1017   1018      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     18    1018   1019      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     19    1019   1020      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     20    1020   1021      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     21    1021   1022      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     22    1022   1023      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     23    1023   1024      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     24    1024   1025      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     25    1025   1026      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     26    1026   1027      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     27    1027   1028      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     28    1028   1029      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     29    1029   1030      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     30    1030   1031      0
+
+ ELEMENT TYPE SET TO         1
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        1
+
+ ELEMENT     31    1031   1032      0
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     32    2001   2002   3010
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     33    2002   2003   3011
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     34    2003   2004   3012
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     35    2004   2005   3013
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     36    2005   2006   3014
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     37    2006   2007   3015
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     38    2007   2008   3016
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     39    2008   2009   3017
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     40    3001   3002   3018
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     41    3002   3003   3019
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     42    3003   3004   3020
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     43    3004   3005   3021
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     44    3005   3006   3022
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     45    3006   3007   3023
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     46    3007   3008   3024
+
+ ELEMENT TYPE SET TO         2
+
+ MATERIAL NUMBER SET TO         1
+
+ REAL CONSTANT NUMBER=        2
+
+ ELEMENT     47    3008   3009   3025
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     48    2005   1007
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     49    2007   1006
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     50    2008   1004
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     51    2009   1003
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     52    2005   1011
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     53    2007   1012
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     54    2008   1013
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     55    2009   1014
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     56    3005   1022
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     57    3007   1021
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     58    3008   1020
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     59    3009   1019
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     60    3005   1026
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     61    3007   1027
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     62    3008   1029
+
+ ELEMENT TYPE SET TO         3
+
+ MATERIAL NUMBER SET TO         2
+
+ REAL CONSTANT NUMBER=        3
+
+ ELEMENT     63    3009   1030
+ The INISTATE,SET command was successfully executed.
+ The INISTATE,DEFINE command successfully executed for element          48
+ The INISTATE,DEFINE command successfully executed for element          49
+ The INISTATE,DEFINE command successfully executed for element          50
+ The INISTATE,DEFINE command successfully executed for element          51
+ The INISTATE,DEFINE command successfully executed for element          52
+ The INISTATE,DEFINE command successfully executed for element          53
+ The INISTATE,DEFINE command successfully executed for element          54
+ The INISTATE,DEFINE command successfully executed for element          55
+ The INISTATE,DEFINE command successfully executed for element          56
+ The INISTATE,DEFINE command successfully executed for element          57
+ The INISTATE,DEFINE command successfully executed for element          58
+ The INISTATE,DEFINE command successfully executed for element          59
+ The INISTATE,DEFINE command successfully executed for element          60
+ The INISTATE,DEFINE command successfully executed for element          61
+ The INISTATE,DEFINE command successfully executed for element          62
+ The INISTATE,DEFINE command successfully executed for element          63
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         1001 TO        1001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         1001 TO        1001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         1009 TO        1009 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         1009 TO        1009 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         1024 TO        1024 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         1024 TO        1024 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         1032 TO        1032 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         1032 TO        1032 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES         1001 TO        1001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1001 TO        1001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1002 TO        1002 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1003 TO        1003 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1004 TO        1004 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1005 TO        1005 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1006 TO        1006 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1007 TO        1007 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1008 TO        1008 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1009 TO        1009 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1010 TO        1010 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1011 TO        1011 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1012 TO        1012 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1013 TO        1013 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1014 TO        1014 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1015 TO        1015 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1016 TO        1016 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1017 TO        1017 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1018 TO        1018 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1019 TO        1019 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1020 TO        1020 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1021 TO        1021 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1022 TO        1022 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1023 TO        1023 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1024 TO        1024 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1025 TO        1025 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1026 TO        1026 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1027 TO        1027 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1028 TO        1028 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1029 TO        1029 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1030 TO        1030 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1031 TO        1031 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         1032 TO        1032 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES         2001 TO        2001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         2001 TO        2001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         2001 TO        2001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         2001 TO        2001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTY FOR SELECTED NODES         2001 TO        2001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTZ FOR SELECTED NODES         2001 TO        2001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UX   FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UY   FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT UZ   FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTX FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTY FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED CONSTRAINT ROTZ FOR SELECTED NODES         3001 TO        3001 BY           1
+ REAL=  0.00000000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1001 TO     1001 BY        1
+  REAL= -93750.0000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1002 TO     1002 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1003 TO     1003 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1004 TO     1004 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1005 TO     1005 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1006 TO     1006 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1007 TO     1007 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1008 TO     1008 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1009 TO     1009 BY        1
+  REAL= -227083.333       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1010 TO     1010 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1011 TO     1011 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1012 TO     1012 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1013 TO     1013 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1014 TO     1014 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1015 TO     1015 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1016 TO     1016 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1017 TO     1017 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1018 TO     1018 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1019 TO     1019 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1020 TO     1020 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1021 TO     1021 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1022 TO     1022 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1023 TO     1023 BY        1
+  REAL= -266666.667       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1024 TO     1024 BY        1
+  REAL= -227083.333       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1025 TO     1025 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1026 TO     1026 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1027 TO     1027 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1028 TO     1028 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1029 TO     1029 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1030 TO     1030 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1031 TO     1031 BY        1
+  REAL= -187500.000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1032 TO     1032 BY        1
+  REAL= -93750.0000       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      2001 TO     2001 BY        1
+  REAL= -344882.812       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      2002 TO     2002 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      2003 TO     2003 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      2004 TO     2004 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      2005 TO     2005 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      2006 TO     2006 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      2007 TO     2007 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      2008 TO     2008 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      2009 TO     2009 BY        1
+  REAL= -344882.812       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3001 TO     3001 BY        1
+  REAL= -344882.812       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3002 TO     3002 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3003 TO     3003 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3004 TO     3004 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3005 TO     3005 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3006 TO     3006 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3007 TO     3007 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3008 TO     3008 BY        1
+  REAL= -689765.625       IMAG=  0.00000000    
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      3009 TO     3009 BY        1
+  REAL= -344882.812       IMAG=  0.00000000    
+
+
+ ***** ROUTINE COMPLETED *****  CP =         0.266
+
+
+
+ *****  ANSYS SOLUTION ROUTINE  *****
+
+
+ PERFORM A STATIC ANALYSIS
+  THIS WILL BE A NEW ANALYSIS
+
+ LARGE DEFORMATION ANALYSIS
+
+ USE      20 SUBSTEPS INITIALLY THIS LOAD STEP FOR ALL  DEGREES OF FREEDOM
+ FOR AUTOMATIC TIME STEPPING:
+   USE    100 SUBSTEPS AS A MAXIMUM
+   USE     10 SUBSTEPS AS A MINIMUM
+
+ USE A MAXIMUM OF    50 EQUILIBRIUM ITERATIONS EACH SUBSTEP
+
+ WRITE ALL  ITEMS TO THE DATABASE WITH A FREQUENCY OF ALL 
+   FOR ALL APPLICABLE ENTITIES
+
+ *****  ANSYS SOLVE    COMMAND  *****
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   15:37:10  NOV 15, 2026 CP=      0.266
+
+ CB3D21 completion-state stability path - FEM vs ANSYS two-step - BEAM4+LINK180
+
+
+
+                       S O L U T I O N   O P T I O N S
+
+   PROBLEM DIMENSIONALITY. . . . . . . . . . . . .3-D                  
+   DEGREES OF FREEDOM. . . . . . UX   UY   UZ   ROTX ROTY ROTZ
+   ANALYSIS TYPE . . . . . . . . . . . . . . . . .STATIC (STEADY-STATE)
+   NONLINEAR GEOMETRIC EFFECTS . . . . . . . . . .ON
+   NEWTON-RAPHSON OPTION . . . . . . . . . . . . .PROGRAM CHOSEN   
+   GLOBALLY ASSEMBLED MATRIX . . . . . . . . . . .SYMMETRIC  
+
+ *** NOTE ***                            CP =       0.266   TIME= 15:37:10
+ Present time 0 is less than or equal to the previous time.  Time will   
+ default to 1.                                                           
+
+ *** NOTE ***                            CP =       0.266   TIME= 15:37:10
+ This nonlinear analysis defaults to using the full Newton-Raphson       
+ solution procedure.  This can be modified using the NROPT command.      
+
+ SOLCONTROL,ON uses sparse matrix direct solver
+
+                      L O A D   S T E P   O P T I O N S
+
+   LOAD STEP NUMBER. . . . . . . . . . . . . . . .     1
+   TIME AT END OF THE LOAD STEP. . . . . . . . . .  1.0000    
+   AUTOMATIC TIME STEPPING . . . . . . . . . . . .    ON
+      INITIAL NUMBER OF SUBSTEPS . . . . . . . . .    20
+      MAXIMUM NUMBER OF SUBSTEPS . . . . . . . . .   100
+      MINIMUM NUMBER OF SUBSTEPS . . . . . . . . .    10
+   MAXIMUM NUMBER OF EQUILIBRIUM ITERATIONS. . . .    50
+   STEP CHANGE BOUNDARY CONDITIONS . . . . . . . .    NO
+   STRESS-STIFFENING . . . . . . . . . . . . . . .    ON
+   TERMINATE ANALYSIS IF NOT CONVERGED . . . . . .YES (EXIT)  
+   CONVERGENCE CONTROLS. . . . . . . . . . . . . .USE DEFAULTS
+   PRINT OUTPUT CONTROLS . . . . . . . . . . . . .NO PRINTOUT
+   DATABASE OUTPUT CONTROLS
+      ITEM     FREQUENCY   COMPONENT
+       ALL        ALL               
+
+
+ SOLUTION MONITORING INFO IS WRITTEN TO FILE= cs_arc.mntr                                                                                                                                                                                                                                                         
+
+
+ Range of element maximum matrix coefficients in global coordinates
+ Maximum = 3.264608886E+11 at element 31.                                
+ Minimum = 8523828.89 at element 55.                                     
+
+   *** ELEMENT MATRIX FORMULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        31  BEAM4         0.000   0.000000
+        2        16  BEAM4         0.000   0.000000
+        3        16  LINK180       0.000   0.000000
+ Time at end of element matrix formulation CP = 0.34375.                 
+
+ ALL CURRENT ANSYS DATA WRITTEN TO FILE NAME= cs_arc.rdb
+  FOR POSSIBLE RESUME FROM THIS POINT
+     FORCE CONVERGENCE VALUE  =  0.2811E+07  CRITERION=   738.8    
+     MOMENT CONVERGENCE VALUE =   0.000      CRITERION=  0.5102E-04
+
+ SPARSE MATRIX DIRECT SOLVER.
+  Number of equations =         247,    Maximum wavefront =     24
+  Memory allocated for solver              =     7.833 MB
+  Memory required for in-core solution     =     0.197 MB
+  Memory required for out-of-core solution =     0.161 MB
+
+ *** NOTE ***                            CP =       0.438   TIME= 15:37:11
+ The Sparse Matrix Solver is currently running in the in-core memory     
+ mode.  This memory mode uses the most amount of memory in order to      
+ avoid using the hard drive as much as possible, which most often        
+ results in the fastest solution time.  This mode is recommended if      
+ enough physical memory is present to accommodate all of the solver      
+ data.                                                                   
+ Sparse solver maximum pivot= 6.529217773E+11 at node 1008 ROTY.         
+ Sparse solver minimum pivot= 118465464 at node 1017 UY.                 
+ Sparse solver minimum pivot in absolute value= 118465464 at node 1017   
+ UY.                                                                     
+     DISP CONVERGENCE VALUE   =  0.1113E-01  CRITERION=  0.5678E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.1113E-01
+     FORCE CONVERGENCE VALUE  =  0.2794E+05  CRITERION=  0.2620E+05
+     MOMENT CONVERGENCE VALUE =   2442.      CRITERION=   9697.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.7857E-05  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.7857E-05
+     FORCE CONVERGENCE VALUE  =  0.1667      CRITERION=  0.2673E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.3797E-01  CRITERION=   9908.     <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+
+   *** ELEMENT RESULT CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        31  BEAM4         0.000   0.000000
+        2        16  BEAM4         0.000   0.000000
+        3        16  LINK180       0.000   0.000000
+
+   *** NODAL LOAD CALCULATION TIMES
+     TYPE    NUMBER   ENAME      TOTAL CP  AVE CP
+
+        1        31  BEAM4         0.000   0.000000
+        2        16  BEAM4         0.000   0.000000
+        3        16  LINK180       0.000   0.000000
+ *** LOAD STEP     1   SUBSTEP     1  COMPLETED.    CUM ITER =      2
+ *** TIME =  0.500000E-01     TIME INC =  0.500000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.50000E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.1448E+06  CRITERION=  0.2571E+05
+     MOMENT CONVERGENCE VALUE =  0.3797E-01  CRITERION=   9516.    
+     DISP CONVERGENCE VALUE   =  0.1109E-02  CRITERION=  0.5682E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1109E-02
+     FORCE CONVERGENCE VALUE  =   228.6      CRITERION=  0.2735E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   15.73      CRITERION=   7313.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.1078E-06  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.1078E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     2  COMPLETED.    CUM ITER =      4
+ *** TIME =  0.100000         TIME INC =  0.500000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.75000E-01  INCREASED (FACTOR = 1.5000)
+
+     FORCE CONVERGENCE VALUE  =  0.2172E+06  CRITERION=  0.2688E+05
+     MOMENT CONVERGENCE VALUE =  0.4642E-05  CRITERION=   7167.    
+     DISP CONVERGENCE VALUE   =  0.1663E-02  CRITERION=  0.5682E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1663E-02
+     FORCE CONVERGENCE VALUE  =   516.3      CRITERION=  0.2936E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   35.41      CRITERION=   3738.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.1608E-06  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.1608E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     3  COMPLETED.    CUM ITER =      6
+ *** TIME =  0.175000         TIME INC =  0.750000E-01
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.10000      INCREASED (FACTOR = 1.3333)
+
+     FORCE CONVERGENCE VALUE  =  0.2896E+06  CRITERION=  0.2894E+05
+     MOMENT CONVERGENCE VALUE =  0.1599E-04  CRITERION=   3663.    
+     DISP CONVERGENCE VALUE   =  0.2217E-02  CRITERION=  0.5682E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2217E-02
+     FORCE CONVERGENCE VALUE  =   919.7      CRITERION=  0.3249E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   62.96      CRITERION=   1338.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2152E-06  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2152E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     4  COMPLETED.    CUM ITER =      8
+ *** TIME =  0.275000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.2896E+06  CRITERION=  0.3206E+05
+     MOMENT CONVERGENCE VALUE =  0.3816E-04  CRITERION=   1311.    
+     DISP CONVERGENCE VALUE   =  0.2217E-02  CRITERION=  0.5682E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2217E-02
+     FORCE CONVERGENCE VALUE  =   919.5      CRITERION=  0.3599E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   62.98      CRITERION=   5994.     <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2233E-06  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2233E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     5  COMPLETED.    CUM ITER =     10
+ *** TIME =  0.375000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.2896E+06  CRITERION=  0.3553E+05
+     MOMENT CONVERGENCE VALUE =  0.3965E-04  CRITERION=   5873.    
+     DISP CONVERGENCE VALUE   =  0.2217E-02  CRITERION=  0.5682E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2217E-02
+     FORCE CONVERGENCE VALUE  =   919.3      CRITERION=  0.3978E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   63.00      CRITERION=  0.1079E+05 <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2314E-06  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2314E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     6  COMPLETED.    CUM ITER =     12
+ *** TIME =  0.475000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.2896E+06  CRITERION=  0.3928E+05
+     MOMENT CONVERGENCE VALUE =  0.4109E-04  CRITERION=  0.1057E+05
+     DISP CONVERGENCE VALUE   =  0.2217E-02  CRITERION=  0.5682E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2217E-02
+     FORCE CONVERGENCE VALUE  =   919.0      CRITERION=  0.4377E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   63.01      CRITERION=  0.1560E+05 <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2395E-06  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2395E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     7  COMPLETED.    CUM ITER =     14
+ *** TIME =  0.575000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.2896E+06  CRITERION=  0.4321E+05
+     MOMENT CONVERGENCE VALUE =  0.4253E-04  CRITERION=  0.1528E+05
+     DISP CONVERGENCE VALUE   =  0.2217E-02  CRITERION=  0.5682E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2217E-02
+     FORCE CONVERGENCE VALUE  =   918.8      CRITERION=  0.4792E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   63.03      CRITERION=  0.2041E+05 <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2476E-06  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2476E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     8  COMPLETED.    CUM ITER =     16
+ *** TIME =  0.675000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.2896E+06  CRITERION=  0.4730E+05
+     MOMENT CONVERGENCE VALUE =  0.4394E-04  CRITERION=  0.2000E+05
+     DISP CONVERGENCE VALUE   =  0.2217E-02  CRITERION=  0.5682E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2217E-02
+     FORCE CONVERGENCE VALUE  =   918.6      CRITERION=  0.5219E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   63.05      CRITERION=  0.2522E+05 <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2557E-06  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2557E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP     9  COMPLETED.    CUM ITER =     18
+ *** TIME =  0.775000         TIME INC =  0.100000    
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.10000      UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.2896E+06  CRITERION=  0.5150E+05
+     MOMENT CONVERGENCE VALUE =  0.4538E-04  CRITERION=  0.2472E+05
+     DISP CONVERGENCE VALUE   =  0.2217E-02  CRITERION=  0.5682E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2217E-02
+     FORCE CONVERGENCE VALUE  =   918.3      CRITERION=  0.5655E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   63.07      CRITERION=  0.3004E+05 <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.2638E-06  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.2638E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP    10  COMPLETED.    CUM ITER =     20
+ *** TIME =  0.875000         TIME INC =  0.100000    
+ *** AUTO TIME STEP:  NEXT TIME INC = 0.62500E-01  DECREASED (FACTOR = 0.6250)
+
+     FORCE CONVERGENCE VALUE  =  0.1810E+06  CRITERION=  0.5564E+05
+     MOMENT CONVERGENCE VALUE =  0.4689E-04  CRITERION=  0.2944E+05
+     DISP CONVERGENCE VALUE   =  0.1386E-02  CRITERION=  0.5682E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1386E-02
+     FORCE CONVERGENCE VALUE  =   357.0      CRITERION=  0.5931E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   24.64      CRITERION=  0.3305E+05 <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.1749E-06  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.1749E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP    11  COMPLETED.    CUM ITER =     22
+ *** TIME =  0.937500         TIME INC =  0.625000E-01
+ *** AUTO STEP TIME:  NEXT TIME INC = 0.62500E-01  UNCHANGED
+
+     FORCE CONVERGENCE VALUE  =  0.1810E+06  CRITERION=  0.5835E+05
+     MOMENT CONVERGENCE VALUE =  0.1208E-04  CRITERION=  0.3239E+05
+     DISP CONVERGENCE VALUE   =  0.1386E-02  CRITERION=  0.5682E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1386E-02
+     FORCE CONVERGENCE VALUE  =   356.9      CRITERION=  0.6210E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =   24.65      CRITERION=  0.3606E+05 <<< CONVERGED
+     DISP CONVERGENCE VALUE   =  0.1781E-06  CRITERION=  0.5798E-03 <<< CONVERGED
+    EQUIL ITER   2 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC = -0.1781E-06
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   2
+ *** LOAD STEP     1   SUBSTEP    12  COMPLETED.    CUM ITER =     24
+ *** TIME =   1.00000         TIME INC =  0.625000E-01
+
+
+ *** ANSYS BINARY FILE STATISTICS
+  BUFFER SIZE USED= 16384
+        0.125 MB WRITTEN ON ELEMENT MATRIX FILE: cs_arc.emat
+        0.062 MB WRITTEN ON ELEMENT SAVED DATA FILE: cs_arc.esav
+        0.062 MB WRITTEN ON ASSEMBLED MATRIX FILE: cs_arc.full
+        0.812 MB WRITTEN ON RESULTS FILE: cs_arc.rst
+
+ SPECIFIED NODAL LOAD FZ   FOR SELECTED NODES      1016 TO     1016 BY        1
+  REAL= -4816666.67       IMAG=  0.00000000    
+
+ USE THE ARC-LENGTH  METHOD
+
+ *** NOTE ***                            CP =       2.203   TIME= 15:37:12
+ The maximum multiplier of the reference arc-length radius must be       
+ greater than 1.  It has been reset to a default value of 25.            
+  USE MINIMUM MULTIPLIER OF  0.10000E-07 FOR THE ARC-LENGTH RADIUS
+
+ USE     600 SUBSTEPS INITIALLY THIS LOAD STEP FOR ALL  DEGREES OF FREEDOM
+ FOR AUTOMATIC TIME STEPPING:
+   USE   3000 SUBSTEPS AS A MAXIMUM
+   USE     20 SUBSTEPS AS A MINIMUM
+
+ USE A MAXIMUM OF    60 EQUILIBRIUM ITERATIONS EACH SUBSTEP
+
+ TIME=  6.0000    
+
+ TERMINATE THE ANALYSIS IF THE MAXIMUM DISPLACEMENT
+  AT NODE  1016  UZ   IS GREATER THAN 0.70000E-01
+
+
+ WRITE ALL  ITEMS TO THE DATABASE WITH A FREQUENCY OF ALL 
+   FOR ALL APPLICABLE ENTITIES
+
+ *****  ANSYS SOLVE    COMMAND  *****
+
+ *** NOTE ***                            CP =       2.203   TIME= 15:37:12
+ This nonlinear analysis defaults to using the full Newton-Raphson       
+ solution procedure.  This can be modified using the NROPT command.      
+
+ SOLCONTROL,ON uses sparse matrix direct solver
+
+ *** WARNING ***                         CP =       2.203   TIME= 15:37:12
+ The auto time stepping (AUTOTS,ON command) does not support arc-length  
+ method.  The auto time stepping has been turned off.                    
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   15:37:12  NOV 15, 2026 CP=      2.234
+
+ CB3D21 completion-state stability path - FEM vs ANSYS two-step - BEAM4+LINK180
+
+
+
+                      L O A D   S T E P   O P T I O N S
+
+   LOAD STEP NUMBER. . . . . . . . . . . . . . . .     2
+   TIME AT END OF THE LOAD STEP. . . . . . . . . .  6.0000    
+   NUMBER OF SUBSTEPS. . . . . . . . . . . . . . .   600
+   MAXIMUM NUMBER OF EQUILIBRIUM ITERATIONS. . . .    60
+   ARC-LENGTH . . . . .  . . . . . . . . . . . . .    ON
+   STEP CHANGE BOUNDARY CONDITIONS . . . . . . . .    NO
+   STRESS-STIFFENING . . . . . . . . . . . . . . .    ON
+   TERMINATE ANALYSIS IF NOT CONVERGED . . . . . .YES (EXIT)  
+   CONVERGENCE CONTROLS. . . . . . . . . . . . . .USE DEFAULTS
+   PRINT OUTPUT CONTROLS . . . . . . . . . . . . .NO PRINTOUT
+   DATABASE OUTPUT CONTROLS
+      ITEM     FREQUENCY   COMPONENT
+       ALL        ALL               
+
+
+ SOLUTION MONITORING INFO IS WRITTEN TO FILE= cs_arc.mntr                                                                                                                                                                                                                                                         
+
+     FORCE CONVERGENCE VALUE  =   7583.      CRITERION=  0.6086E+05
+     MOMENT CONVERGENCE VALUE =  0.1228E-04  CRITERION=  0.3534E+05
+     ARCLEN NEW TIME =   1.0083     ARC-LENGTH =  0.21327E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.8336E-04
+     FORCE CONVERGENCE VALUE  =   1.933      CRITERION=  0.6211E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.1574E-01  CRITERION=  0.3624E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP     1  COMPLETED.    CUM ITER =     25
+ *** TIME =   1.00833      TIME INC =  0.833333E-02  MAX DISPLACEMENT =   -0.1002E-01
+
+     FORCE CONVERGENCE VALUE  =   7583.      CRITERION=  0.6087E+05
+     MOMENT CONVERGENCE VALUE =  0.1574E-01  CRITERION=  0.3551E+05
+     ARCLEN NEW TIME =   1.0167     ARC-LENGTH =  0.21327E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.8337E-04
+     FORCE CONVERGENCE VALUE  =   1.934      CRITERION=  0.6213E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.1572E-01  CRITERION=  0.3641E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP     2  COMPLETED.    CUM ITER =     26
+ *** TIME =   1.01667      TIME INC =  0.124993E-01  MAX DISPLACEMENT =   -0.1010E-01
+
+     FORCE CONVERGENCE VALUE  =  0.9164      CRITERION=  0.6090E+05
+     MOMENT CONVERGENCE VALUE =  0.3739E-02  CRITERION=  0.3594E+05
+     ARCLEN NEW TIME =   1.0292     ARC-LENGTH =  0.45244E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3560E-08
+     FORCE CONVERGENCE VALUE  =  0.4487E-03  CRITERION=  0.6215E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.2152E-06  CRITERION=  0.3667E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP     3  COMPLETED.    CUM ITER =     27
+ *** TIME =   1.02917      TIME INC =  0.124995E-01  MAX DISPLACEMENT =   -0.1023E-01
+
+     FORCE CONVERGENCE VALUE  =   4.610      CRITERION=  0.6092E+05
+     MOMENT CONVERGENCE VALUE =  0.5505E-01  CRITERION=  0.3619E+05
+     ARCLEN NEW TIME =   1.0417     ARC-LENGTH =  0.45244E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.7311E-08
+     FORCE CONVERGENCE VALUE  =  0.6054E-03  CRITERION=  0.6217E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.3036E-06  CRITERION=  0.3693E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP     4  COMPLETED.    CUM ITER =     28
+ *** TIME =   1.04167      TIME INC =  0.187508E-01  MAX DISPLACEMENT =   -0.1035E-01
+
+     FORCE CONVERGENCE VALUE  =   4.114      CRITERION=  0.6095E+05
+     MOMENT CONVERGENCE VALUE =  0.4781E-01  CRITERION=  0.3658E+05
+     ARCLEN NEW TIME =   1.0604     ARC-LENGTH =  0.67866E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1157E-07
+     FORCE CONVERGENCE VALUE  =  0.8619E-03  CRITERION=  0.6220E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.3517E-06  CRITERION=  0.3732E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP     5  COMPLETED.    CUM ITER =     29
+ *** TIME =   1.06042      TIME INC =  0.187501E-01  MAX DISPLACEMENT =   -0.1054E-01
+
+     FORCE CONVERGENCE VALUE  =   11.76      CRITERION=  0.6098E+05
+     MOMENT CONVERGENCE VALUE =  0.1594      CRITERION=  0.3696E+05
+     ARCLEN NEW TIME =   1.0792     ARC-LENGTH =  0.67866E-03
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2045E-08
+     FORCE CONVERGENCE VALUE  =  0.4442E-03  CRITERION=  0.6223E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.3086E-06  CRITERION=  0.3771E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP     6  COMPLETED.    CUM ITER =     30
+ *** TIME =   1.07917      TIME INC =  0.281252E-01  MAX DISPLACEMENT =   -0.1073E-01
+
+     FORCE CONVERGENCE VALUE  =   1.488      CRITERION=  0.6103E+05
+     MOMENT CONVERGENCE VALUE =  0.1982E-01  CRITERION=  0.3753E+05
+     ARCLEN NEW TIME =   1.1073     ARC-LENGTH =  0.10180E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2583E-09
+     FORCE CONVERGENCE VALUE  =  0.3120E-03  CRITERION=  0.6227E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.3798E-06  CRITERION=  0.3830E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP     7  COMPLETED.    CUM ITER =     31
+ *** TIME =   1.10729      TIME INC =  0.421878E-01  MAX DISPLACEMENT =   -0.1101E-01
+
+     FORCE CONVERGENCE VALUE  =   23.12      CRITERION=  0.6110E+05
+     MOMENT CONVERGENCE VALUE =  0.3132      CRITERION=  0.3840E+05
+     ARCLEN NEW TIME =   1.1495     ARC-LENGTH =  0.15270E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.4021E-08
+     FORCE CONVERGENCE VALUE  =  0.4245E-03  CRITERION=  0.6235E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.3321E-06  CRITERION=  0.3918E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP     8  COMPLETED.    CUM ITER =     32
+ *** TIME =   1.14948      TIME INC =  0.632820E-01  MAX DISPLACEMENT =   -0.1143E-01
+
+     FORCE CONVERGENCE VALUE  =   37.22      CRITERION=  0.6121E+05
+     MOMENT CONVERGENCE VALUE =  0.5032      CRITERION=  0.3969E+05
+     ARCLEN NEW TIME =   1.2128     ARC-LENGTH =  0.22905E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.6473E-08
+     FORCE CONVERGENCE VALUE  =  0.4464E-03  CRITERION=  0.6245E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.3798E-06  CRITERION=  0.4050E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP     9  COMPLETED.    CUM ITER =     33
+ *** TIME =   1.21276      TIME INC =  0.949236E-01  MAX DISPLACEMENT =   -0.1206E-01
+
+     FORCE CONVERGENCE VALUE  =   83.71      CRITERION=  0.6137E+05
+     MOMENT CONVERGENCE VALUE =   1.131      CRITERION=  0.4164E+05
+     ARCLEN NEW TIME =   1.3077     ARC-LENGTH =  0.34357E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.1456E-07
+     FORCE CONVERGENCE VALUE  =  0.6148E-03  CRITERION=  0.6262E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.4672E-06  CRITERION=  0.4249E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    10  COMPLETED.    CUM ITER =     34
+ *** TIME =   1.30769      TIME INC =  0.142387      MAX DISPLACEMENT =   -0.1301E-01
+
+     FORCE CONVERGENCE VALUE  =   188.3      CRITERION=  0.6162E+05
+     MOMENT CONVERGENCE VALUE =   2.542      CRITERION=  0.4455E+05
+     ARCLEN NEW TIME =   1.4501     ARC-LENGTH =  0.51536E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3276E-07
+     FORCE CONVERGENCE VALUE  =  0.1083E-02  CRITERION=  0.6288E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.6075E-06  CRITERION=  0.4546E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    11  COMPLETED.    CUM ITER =     35
+ *** TIME =   1.45007      TIME INC =  0.208329      MAX DISPLACEMENT =   -0.1444E-01
+
+     FORCE CONVERGENCE VALUE  =   395.1      CRITERION=  0.6202E+05
+     MOMENT CONVERGENCE VALUE =   5.318      CRITERION=  0.4882E+05
+     ARCLEN NEW TIME =   1.6584     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.6871E-07
+     FORCE CONVERGENCE VALUE  =  0.2191E-02  CRITERION=  0.6328E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.1071E-05  CRITERION=  0.4981E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    12  COMPLETED.    CUM ITER =     36
+ *** TIME =   1.65840      TIME INC =  0.208333      MAX DISPLACEMENT =   -0.1652E-01
+
+     FORCE CONVERGENCE VALUE  =   217.5      CRITERION=  0.6244E+05
+     MOMENT CONVERGENCE VALUE =   2.817      CRITERION=  0.5308E+05
+     ARCLEN NEW TIME =   1.8667     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.3782E-07
+     FORCE CONVERGENCE VALUE  =  0.1252E-02  CRITERION=  0.6371E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.5332E-06  CRITERION=  0.5417E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    13  COMPLETED.    CUM ITER =     37
+ *** TIME =   1.86674      TIME INC =  0.208338      MAX DISPLACEMENT =   -0.1860E-01
+
+     FORCE CONVERGENCE VALUE  =   229.7      CRITERION=  0.6288E+05
+     MOMENT CONVERGENCE VALUE =   3.500      CRITERION=  0.5735E+05
+     ARCLEN NEW TIME =   2.0751     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3996E-07
+     FORCE CONVERGENCE VALUE  =  0.1289E-02  CRITERION=  0.6416E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.8563E-06  CRITERION=  0.5852E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    14  COMPLETED.    CUM ITER =     38
+ *** TIME =   2.07507      TIME INC =  0.208341      MAX DISPLACEMENT =   -0.2069E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1764      CRITERION=  0.6334E+05
+     MOMENT CONVERGENCE VALUE =  0.5463      CRITERION=  0.6162E+05
+     ARCLEN NEW TIME =   2.2834     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC= -0.2502E-10
+     FORCE CONVERGENCE VALUE  =  0.4380E-03  CRITERION=  0.6463E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.3946E-06  CRITERION=  0.6288E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    15  COMPLETED.    CUM ITER =     39
+ *** TIME =   2.28342      TIME INC =  0.208345      MAX DISPLACEMENT =   -0.2277E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1780      CRITERION=  0.6383E+05
+     MOMENT CONVERGENCE VALUE =  0.5464      CRITERION=  0.6589E+05
+     ARCLEN NEW TIME =   2.4918     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3892E-10
+     FORCE CONVERGENCE VALUE  =  0.3070E-03  CRITERION=  0.6513E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.6901E-06  CRITERION=  0.6723E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    16  COMPLETED.    CUM ITER =     40
+ *** TIME =   2.49176      TIME INC =  0.208348      MAX DISPLACEMENT =   -0.2486E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1768      CRITERION=  0.6433E+05
+     MOMENT CONVERGENCE VALUE =  0.5462      CRITERION=  0.7016E+05
+     ARCLEN NEW TIME =   2.7001     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2376E-10
+     FORCE CONVERGENCE VALUE  =  0.3594E-03  CRITERION=  0.6565E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.3533E-06  CRITERION=  0.7159E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    17  COMPLETED.    CUM ITER =     41
+ *** TIME =   2.70011      TIME INC =  0.208352      MAX DISPLACEMENT =   -0.2694E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1773      CRITERION=  0.6486E+05
+     MOMENT CONVERGENCE VALUE =  0.5463      CRITERION=  0.7443E+05
+     ARCLEN NEW TIME =   2.9085     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2409E-10
+     FORCE CONVERGENCE VALUE  =  0.3497E-03  CRITERION=  0.6619E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.6904E-06  CRITERION=  0.7594E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    18  COMPLETED.    CUM ITER =     42
+ *** TIME =   2.90846      TIME INC =  0.208355      MAX DISPLACEMENT =   -0.2902E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1767      CRITERION=  0.6541E+05
+     MOMENT CONVERGENCE VALUE =  0.5462      CRITERION=  0.7870E+05
+     ARCLEN NEW TIME =   3.1168     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2411E-10
+     FORCE CONVERGENCE VALUE  =  0.3729E-03  CRITERION=  0.6675E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.8640E-06  CRITERION=  0.8030E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    19  COMPLETED.    CUM ITER =     43
+ *** TIME =   3.11681      TIME INC =  0.208359      MAX DISPLACEMENT =   -0.3111E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1772      CRITERION=  0.6598E+05
+     MOMENT CONVERGENCE VALUE =  0.5462      CRITERION=  0.8297E+05
+     ARCLEN NEW TIME =   3.3252     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2411E-10
+     FORCE CONVERGENCE VALUE  =  0.2812E-03  CRITERION=  0.6733E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.7538E-06  CRITERION=  0.8466E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    20  COMPLETED.    CUM ITER =     44
+ *** TIME =   3.32517      TIME INC =  0.208362      MAX DISPLACEMENT =   -0.3319E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1771      CRITERION=  0.6657E+05
+     MOMENT CONVERGENCE VALUE =  0.5462      CRITERION=  0.8724E+05
+     ARCLEN NEW TIME =   3.5335     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2411E-10
+     FORCE CONVERGENCE VALUE  =  0.3815E-03  CRITERION=  0.6793E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.8462E-06  CRITERION=  0.8902E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    21  COMPLETED.    CUM ITER =     45
+ *** TIME =   3.53354      TIME INC =  0.208366      MAX DISPLACEMENT =   -0.3528E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1768      CRITERION=  0.6718E+05
+     MOMENT CONVERGENCE VALUE =  0.5461      CRITERION=  0.9151E+05
+     ARCLEN NEW TIME =   3.7419     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2411E-10
+     FORCE CONVERGENCE VALUE  =  0.3437E-03  CRITERION=  0.6855E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.7805E-06  CRITERION=  0.9338E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    22  COMPLETED.    CUM ITER =     46
+ *** TIME =   3.74190      TIME INC =  0.208369      MAX DISPLACEMENT =   -0.3736E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1771      CRITERION=  0.6781E+05
+     MOMENT CONVERGENCE VALUE =  0.5461      CRITERION=  0.9578E+05
+     ARCLEN NEW TIME =   3.9503     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2411E-10
+     FORCE CONVERGENCE VALUE  =  0.3454E-03  CRITERION=  0.6919E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.1047E-05  CRITERION=  0.9774E+05 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    23  COMPLETED.    CUM ITER =     47
+ *** TIME =   3.95027      TIME INC =  0.208373      MAX DISPLACEMENT =   -0.3944E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1771      CRITERION=  0.6846E+05
+     MOMENT CONVERGENCE VALUE =  0.5461      CRITERION=  0.1001E+06
+     ARCLEN NEW TIME =   4.1586     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2410E-10
+     FORCE CONVERGENCE VALUE  =  0.4375E-03  CRITERION=  0.6985E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.9982E-06  CRITERION=  0.1021E+06 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    24  COMPLETED.    CUM ITER =     48
+ *** TIME =   4.15864      TIME INC =  0.208376      MAX DISPLACEMENT =   -0.4153E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1769      CRITERION=  0.6912E+05
+     MOMENT CONVERGENCE VALUE =  0.5461      CRITERION=  0.1043E+06
+     ARCLEN NEW TIME =   4.3670     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2410E-10
+     FORCE CONVERGENCE VALUE  =  0.4640E-03  CRITERION=  0.7053E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.1028E-05  CRITERION=  0.1065E+06 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    25  COMPLETED.    CUM ITER =     49
+ *** TIME =   4.36702      TIME INC =  0.208380      MAX DISPLACEMENT =   -0.4361E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1772      CRITERION=  0.6980E+05
+     MOMENT CONVERGENCE VALUE =  0.5460      CRITERION=  0.1086E+06
+     ARCLEN NEW TIME =   4.5754     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2410E-10
+     FORCE CONVERGENCE VALUE  =  0.3464E-03  CRITERION=  0.7123E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.1228E-05  CRITERION=  0.1108E+06 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    26  COMPLETED.    CUM ITER =     50
+ *** TIME =   4.57540      TIME INC =  0.208383      MAX DISPLACEMENT =   -0.4569E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1769      CRITERION=  0.7050E+05
+     MOMENT CONVERGENCE VALUE =  0.5460      CRITERION=  0.1129E+06
+     ARCLEN NEW TIME =   4.7838     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2409E-10
+     FORCE CONVERGENCE VALUE  =  0.4104E-03  CRITERION=  0.7194E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.1092E-05  CRITERION=  0.1152E+06 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    27  COMPLETED.    CUM ITER =     51
+ *** TIME =   4.78378      TIME INC =  0.208387      MAX DISPLACEMENT =   -0.4778E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1772      CRITERION=  0.7121E+05
+     MOMENT CONVERGENCE VALUE =  0.5460      CRITERION=  0.1171E+06
+     ARCLEN NEW TIME =   4.9922     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2409E-10
+     FORCE CONVERGENCE VALUE  =  0.4513E-03  CRITERION=  0.7267E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.9375E-06  CRITERION=  0.1195E+06 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    28  COMPLETED.    CUM ITER =     52
+ *** TIME =   4.99217      TIME INC =  0.208390      MAX DISPLACEMENT =   -0.4986E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1770      CRITERION=  0.7194E+05
+     MOMENT CONVERGENCE VALUE =  0.5459      CRITERION=  0.1214E+06
+     ARCLEN NEW TIME =   5.2006     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2409E-10
+     FORCE CONVERGENCE VALUE  =  0.3481E-03  CRITERION=  0.7341E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.1060E-05  CRITERION=  0.1239E+06 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    29  COMPLETED.    CUM ITER =     53
+ *** TIME =   5.20056      TIME INC =  0.208394      MAX DISPLACEMENT =   -0.5194E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1770      CRITERION=  0.7269E+05
+     MOMENT CONVERGENCE VALUE =  0.5459      CRITERION=  0.1257E+06
+     ARCLEN NEW TIME =   5.4090     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2409E-10
+     FORCE CONVERGENCE VALUE  =  0.3924E-03  CRITERION=  0.7417E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.1013E-05  CRITERION=  0.1283E+06 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    30  COMPLETED.    CUM ITER =     54
+ *** TIME =   5.40895      TIME INC =  0.208397      MAX DISPLACEMENT =   -0.5403E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1771      CRITERION=  0.7345E+05
+     MOMENT CONVERGENCE VALUE =  0.5459      CRITERION=  0.1300E+06
+     ARCLEN NEW TIME =   5.6173     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2408E-10
+     FORCE CONVERGENCE VALUE  =  0.3902E-03  CRITERION=  0.7495E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.9465E-06  CRITERION=  0.1326E+06 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    31  COMPLETED.    CUM ITER =     55
+ *** TIME =   5.61735      TIME INC =  0.208401      MAX DISPLACEMENT =   -0.5611E-01
+
+     FORCE CONVERGENCE VALUE  =  0.1773      CRITERION=  0.7422E+05
+     MOMENT CONVERGENCE VALUE =  0.5459      CRITERION=  0.1342E+06
+     ARCLEN NEW TIME =   5.8258     ARC-LENGTH =  0.75402E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.2408E-10
+     FORCE CONVERGENCE VALUE  =  0.4189E-03  CRITERION=  0.7573E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.1019E-05  CRITERION=  0.1370E+06 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    32  COMPLETED.    CUM ITER =     56
+ *** TIME =   5.82575      TIME INC =  0.174250      MAX DISPLACEMENT =   -0.5819E-01
+
+     FORCE CONVERGENCE VALUE  =  0.3108E+05  CRITERION=  0.7496E+05
+     MOMENT CONVERGENCE VALUE =  0.5458      CRITERION=  0.1385E+06
+     ARCLEN NEW TIME =   6.0000     ARC-LENGTH =  0.63046E-02
+    EQUIL ITER   1 COMPLETED.  NEW TRIANG MATRIX.  MAX DOF INC=  0.3413E-03
+     FORCE CONVERGENCE VALUE  =   23.59      CRITERION=  0.7641E+05 <<< CONVERGED
+     MOMENT CONVERGENCE VALUE =  0.2665      CRITERION=  0.1406E+06 <<< CONVERGED
+    >>> SOLUTION CONVERGED AFTER EQUILIBRIUM ITERATION   1
+ *** LOAD STEP     2   SUBSTEP    33  COMPLETED.    CUM ITER =     57
+ *** TIME =   6.00000      TIME INC =   0.00000      MAX DISPLACEMENT =   -0.5994E-01
+
+ *** NOTE ***                            CP =       5.672   TIME= 15:37:13
+ Maximum load for load step 2 was reached.                               
+
+ FINISH SOLUTION PROCESSING
+
+
+ ***** ROUTINE COMPLETED *****  CP =         5.719
+
+
+
+ *** ANSYS - ENGINEERING ANALYSIS SYSTEM  RELEASE Release 18.0     18.0     ***
+ ANSYS Multiphysics                                
+ 00000000  VERSION=WINDOWS x64   15:37:14  NOV 15, 2026 CP=      5.719
+
+ CB3D21 completion-state stability path - FEM vs ANSYS two-step - BEAM4+LINK180
+
+
+
+          ***** ANSYS RESULTS INTERPRETATION (POST1) *****
+
+ *** NOTE ***                            CP =       5.719   TIME= 15:37:14
+ Reading results into the database (SET command) will update the current 
+ displacement and force boundary conditions in the database with the     
+ values from the results file for that load set.  Note that any          
+ subsequent solutions will use these values unless action is taken to    
+ either SAVE the current values or not overwrite them (/EXIT,NOSAVE).    
+
+ *GET  NSET      FROM  ACTI  ITEM=SET  NSET  VALUE=  45.0000000    
+
+ SET PARAMETER DIMENSIONS ON  CURV TYPE=ARRA  DIMENSIONS=    45     4     1
+
+ *DO LOOP ON PARAMETER= I FROM  1.0000     TO  45.000     BY  1.0000    
+
+
+ USE DATA SET     1 ON RESULT FILE  FOR LOAD CASE 0 
+
+ SET COMMAND GOT LOAD STEP=     1  SUBSTEP=     1  CUMULATIVE ITERATION=     2
+   TIME/FREQUENCY= 0.50000E-01
+ TITLE= CB3D21 completion-state stability path - FEM vs ANSYS two-step - BEAM4+L
+
+ *GET  VZ        FROM  NODE   1016  ITEM=U    Z     VALUE= 0.111320533E-01
+
+ *GET  TNOW      FROM  ACTI  ITEM=SET  TIME  VALUE= 0.500000000E-01
+
+ PARAMETER CURV(I,1) =     1.000000000    
+
+ PARAMETER CURV(I,2) =    0.5000000000E-01
+
+ PARAMETER CURV(I,3) =    0.1113205333E-01
+
+ PARAMETER CURV(I,4) =     0.000000000    
+
+ *ENDDO  INDEX= I                               
+
+ OPENED FILE= cs_arc_curve.csv FOR COMMAND FILE DATA 
+
+
+  COMMAND FILE CLOSED 
+
+
+ EXIT THE ANSYS POST1 DATABASE PROCESSOR
+
+
+ ***** ROUTINE COMPLETED *****  CP =         5.812
+
+
+
+ EXIT ANSYS WITHOUT SAVING DATABASE
+
+
+ NUMBER OF WARNING MESSAGES ENCOUNTERED=          2
+ NUMBER OF ERROR   MESSAGES ENCOUNTERED=          0
+
++--------------------- A N S Y S   S T A T I S T I C S ------------------------+
+
+Release: Release 18.0       Build: 18.0       Update: UP20161219   Platform: WINDOWS x64 
+Date Run: 11/15/2026   Time: 15:37     Process ID: 18500
+Operating System: Windows 10  (Build: 19045)
+
+Processor Model:         Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz
+
+Compiler: Intel(R) FORTRAN Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) C/C++ Compiler Version 15.0.7  (Build: 20160518)
+          Intel(R) Math Kernel Library Version 11.3.3 Product Build 20160413
+
+Number of machines requested            :    1
+Total number of cores available         :    8
+Number of physical cores available      :    4
+Number of processes requested           :    1
+Number of threads per process requested :    2
+Total number of cores requested         :    2 (Shared Memory Parallel)                    
+
+GPU Acceleration: Not Requested
+
+Job Name: cs_arc
+Working Directory: D:\AI-work\BridgeStudio\cases\CB3D21_completion_stability_vs_ansys
+
+Total CPU time for main thread                    :        2.9 seconds
+Total CPU time summed for all threads             :        5.8 seconds
+
+Elapsed time spent pre-processing model (/PREP7)  :        0.0 seconds
+Elapsed time spent solution - preprocessing       :        0.0 seconds
+Elapsed time spent computing solution             :        3.0 seconds
+Elapsed time spent solution - postprocessing      :        0.0 seconds
+Elapsed time spent post-processing model (/POST1) :        0.0 seconds
+ 
+Equation solver used                              :            Sparse (symmetric)
+
+Maximum total memory used                         :       14.0 MB
+Maximum total memory allocated                    :     2112.0 MB
+Total physical memory available                   :         16 GB
+
++------------------ E N D   A N S Y S   S T A T I S T I C S -------------------+
+
+
+ *---------------------------------------------------------------------------*
+ |                                                                           |
+ |                            ANSYS RUN COMPLETED                            |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Ansys Release 18.0          Build 18.0         UP20161219     WINDOWS x64 |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ | Database Requested(-db)  1024 MB    Scratch Memory Requested      1024 MB |
+ | Maximum Database Used       1 MB    Maximum Scratch Memory Used     13 MB |
+ |                                                                           |
+ |---------------------------------------------------------------------------|
+ |                                                                           |
+ |        CP Time      (sec) =          5.844       Time  =  15:37:14        |
+ |        Elapsed Time (sec) =          7.000       Date  =  11/15/2026      |
+ |                                                                           |
+ *---------------------------------------------------------------------------*

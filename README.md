@@ -576,7 +576,14 @@ B3 已于 2026-11-14 第十七次按 `STABILITY=1` opt-in 接入主链路球面�
 体系的独立闭式 `λ(v)` 逐点对拍 `MODE=STATIC` / `TENSION` 两种成桥态
 闭环。**B3 仍 `P` 不 `Y`**：① 只有 FEM 自洽与解析锚点，真实桥梁
 ANSYS 两段对标属 ②、B3 推 `Y` 属 ③，验收表见 `B类后续项接入规格.md`
-§2.6；
+§2.6；**2026-11-15 第十九次 ②** 已交付 CB3D21 真实双塔三跨斜拉桥
+与 ANSYS 两段求解逐子步对标（`ansys_bridge_completion.py` /
+`cases/run_cases_completion.py` / 第 23 项 CTest，2392 项黄金值、
+28 子步 `worst|ΔUZ|=1.85e-5 m`、`--live-ansys max|d|≤1e-11`），
+同一份设计线形 + 16 根索 `L0` + `INISTATE eps` 同源，
+`RES0` 与 `[NEWTON] RESLAST` 同量级；② 完成**仍 `P` 不 `Y`**
+（路径单调硬化无极限点、`MODE=COMPLETION` 起点不同源缺陷未修、
+施工阶段链路未接入，③ 才推 `Y`，见规格 §2.5 / §2.6）；
 B4 / B5 仍**只立规格、未实现力学**；
 B2 的 `[LENGTH2D]` 一层自第十三次
 起、2D 平面索力优化 `[OPT2D]` 一层自第十四次起已按 opt-in 真正新造 2D

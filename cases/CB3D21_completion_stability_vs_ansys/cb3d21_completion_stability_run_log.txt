@@ -1,0 +1,16 @@
+CB3D21 run log
+============================================================
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cs_load -i cs_load.inp -o cs_load_ansys.out
+[cs_load] exit=0
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j cs_arc -i cs_arc.inp -o cs_arc_ansys.out
+[cs_arc] exit=0
+$ D:\AI-work\FEM-Eigen\build\cable_solver.exe cb3d21_completion_stability.dat
+[cable_solver/cb3d21_completion_stability] exit=0
+cable_solver: mode=STATIC cables=16 converged=1 iterations=9 4.8 ms
+  ?? 442.2 ~ 509.6 kN??=7815 kN?????? 5978 vs 1.804e+04 kN??? -66.86%
+  ??: cb3d21_completion_stability_cable.txt
+$ D:\AI-work\FEM-Eigen\build\cable_solver.exe cs_default.dat
+[cable_solver/cs_default] exit=0
+cable_solver: mode=STATIC cables=16 converged=1 iterations=9 5.1 ms
+  ?? 442.2 ~ 509.6 kN??=7815 kN?????? 5978 vs 1.804e+04 kN??? -66.86%
+  ??: cs_default_cable.txt

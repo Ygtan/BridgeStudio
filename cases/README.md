@@ -5,14 +5,18 @@
 ANSYS APDL（`.inp`）、模型快照（`.model.json`）、ANSYS 批处理输出
 （`.out` / CSV）与对比报告（`.txt`），可离线复查，不需要再跑 ANSYS。
 
-命名规则：`CB01~CB05` 为 2D 连续梁，`CB3D01~CB3D20` 为 3D 算例；
+命名规则：`CB01~CB05` 为 2D 连续梁，`CB3D01~CB3D21` 为 3D 算例；
 编号按接入顺序递增，与 FEM-Eigen 侧 `tests/benchmark/` 的回归套件一一对应。
 **例外**：CB3D18（主链路 `STABILITY=1` opt-in）与 CB3D20（成桥态起点
-`STABASIS=COMPLETION`）是**纯 FEM 侧 benchmark**，本仓库 `cases/` 下
-没有对应算例目录，也没有 ANSYS `.inp` —— 它们的冻结 `.dat` 与结果文件
-在 FEM-Eigen `tests/benchmark/stable_path_3d/` 与
-`tests/benchmark/completion_stability_3d/`，不进上表。CB3D20 的
-ANSYS 真实桥梁两段对标属后续阶段②，届时才会新建 BS 侧算例目录。
+`STABASIS=COMPLETION` 的 V 形双索单自由度解析题）是**纯 FEM 侧
+benchmark**，本仓库 `cases/` 下没有对应算例目录，也没有 ANSYS `.inp`
+—— 它们的冻结 `.dat` 与结果文件在 FEM-Eigen
+`tests/benchmark/stable_path_3d/` 与
+`tests/benchmark/completion_stability_3d/`，不进上表。
+**CB3D21 是 ② 阶段新建的 BS 侧真实斜拉桥算例**（不是 CB3D20 的
+ANSYS 版）：它把同一个 `STABASIS=COMPLETION` 主链路放到 50 节点 /
+63 单元 / 16 索的双塔三跨斜拉桥上，与 ANSYS 两段求解对拍，
+目录与第 23 项 CTest 见下表。
 
 ## 算例清单
 
@@ -41,6 +45,7 @@ ANSYS 真实桥梁两段对标属后续阶段②，届时才会新建 BS 侧算�
 | CB3D16 | `CB3D16_large_rotation_beam_column` | 共转 CR 梁**大转动卷圆**（至 2π）+ **梁柱 P-Δ 放大** vs ANSYS `BEAM188 + NLGEOM`（8 个 job） | `run_cases_beamnl.py` | `beam_nl_ansys_3d` |
 | CB3D17 | `CB3D17_snap_through_arc_length` | 球面弧长法**后屈曲 / snap-through 全过程**（极限点、下降段、反向荷载）vs ANSYS `LINK180 + ARCLEN`（3 个 job） | `run_cases_snap.py` | `snap_through_ansys_3d` |
 | CB3D19 | `CB3D19_frame_postbuckling_arc_length` | 共转 CR 梁**刚接框架（Williams toggle 型）后屈曲全过程** vs ANSYS `BEAM188 + ARCLEN`（2 个 job，每杆 24 单元） | `run_cases_frame.py` | `frame_postbuckling_3d` |
+| CB3D21 | `CB3D21_completion_stability_vs_ansys` | **真实双塔三跨斜拉桥成桥态起点全过程稳定** vs ANSYS 两段求解（step1 恒载成桥态 / step2 增量荷载，荷载控制主 job + `ARCLEN` 交叉验证，2 个 job）；同源设计线形 + 16 根索 `L0` + `INISTATE eps`；第 23 项 CTest 冻结 2392 项黄金值 | `run_cases_completion.py` | `completion_bridge_3d` |
 
 CB3D13 除全桥 APDL 外还归档 5 份阶段 APDL（`*_stage1..5.inp`）与对应
 ANSYS CSV；三层验证口径见 `ansys_bridge_erection.py` 模块头与
@@ -130,6 +135,31 @@ CB3D19 与 CB3D18 不同，**在 `cases/` 下建正式算例目录**：两根各
 - **仍 `P` 不 `Y`**：这是独立 `frame_probe.exe` 探针，不是成桥态
   闭环 / 施工阶段链路已具备全过程稳定分析；把两者接通属于后续
   a 阶段，边界见 `B类后续项接入规格.md` §2.5。
+
+CB3D21（2026-11-15，a 阶段 ②）是首个**真实桥梁尺度**的
+`BASIS=completion_state` 算例。`ansys_bridge_completion.py` 以
+`COMPLETION_CFG + EPS0=8e-4 + PINC=1e6 + LAMMAX=4.55` 为唯一数据源，
+从同一份 `ModelSpec3D(mode=STATIC, 设计线形)` 同时生成 FEM `.dat`
+与 ANSYS 两段 `.inp`：16 根索的 `L0 = L_design/(1+EPS0)` 与
+`INISTATE,DEFINE,...,EPEL,X,EPS0` 严格同源，从根上消除参考构形偏差。
+
+- **不用反力求和**：完整斜拉桥 50 个 `F` / 34 个约束节点上
+  `ΣRF,FZ` 在 step2 随加载反而下降。荷载控制主 job `cs_load` 用
+  `λ=(TIME−1)·LAMMAX` 与 `ΔUZ=UZ−UZ_step1` 对 FEM `[STABILITY]`
+  逐点插值对拍（28 子步，`worst|ΔUZ|=1.85e-5 m`）；`cs_arc` 的
+  `TIME` 是 `ARCLEN` 上界、不是 λ，只做终点位移交叉验证
+  （`|d|=6.9e-8 m`）。
+- **起点严格闭合**：`RES0=7.97e-3 N` 与 `[NEWTON] RESLAST=5.96e-3 N`
+  同量级，`STATE CTRL0 ≡ [U](1016,3)`。必须用 `MODE=STATIC` + 显式
+  `L0`：`MODE=COMPLETION` 的索长迭代会改写 `m.elements[*].L0`，
+  与 `u0` 不同源（CB3D10 实测 `RES0=3.15 MN`），该缺陷登记为
+  独立后续项，② 未修。
+- **仍 `P` 不 `Y`**：本算例路径单调硬化、无极限点，ANSYS 荷载控制
+  即可覆盖全程；「越过极限点 / 下降段 / 反向荷载」由 CB3D17 /
+  CB3D19 独立基准题与 FEM 球面弧长内核证明。施工阶段链路接入、
+  分支屈曲 / 初始缺陷 / 材料非线性未覆盖，B3 推 `Y` 属 ③。
+  见 FEM-Eigen `tests/benchmark/completion_bridge_3d/README.md`
+  与 `B类后续项接入规格.md` §2.6。
 
 ## 归档规则
 
