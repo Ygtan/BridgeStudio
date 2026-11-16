@@ -370,6 +370,29 @@ step2 荷载控制主 job 用 `λ=(TIME−1)·LAMMAX` 对 FEM `[STABILITY]`
   材料非线性本构、动力 snap-through、施工阶段中间态全过程稳定
   **仍未覆盖**；CB3D22 的细塔是稳定敏感研究构型，不是实际设计尺寸。
   故 ③a 完成**仍 `P` 不 `Y`**。
+- **第二十次 ③b 补记（施工阶段中间态起点 opt-in）**：③a 登记的
+  「施工阶段中间态全过程稳定未覆盖」已推进为「**主链路有一个
+  opt-in 研究构型算例**」——`fem_3d_nl.hpp::NLStageResult3D` 增加
+  `Model3D model` 并在 `solveModel3DStagesNonlinear()` 每阶段写
+  `row.model = mc`，`cable_solver.cpp` 新增 `STABASIS=STAGE` +
+  `STAGEID=<id>` 独立 opt-in，以指定阶段的共转列式全量平衡态
+  `u_stage` 为弧长路径起点，`F0` 为该阶段累计恒定荷载、`Finc`
+  仍只来自 `*STABILITY_LOAD`；`[STAGES]` / `STAGE=` /
+  `BASIS=stage_state` 与另两种基准分列，未知阶段写
+  `ERROR=stage_not_found` 不降级。CB3D23（4 节点 / 3 杆 `TRUSS`
+  浅拱，3 个施工阶段、取阶段 2）与 ANSYS 18.0 两段求解对拍：
+  `STAGE=2 NELEM=3 NDOF=12`、`RES0/|F0|=6.34e-13`、
+  FEM `NPOINT=134` / `λ_end=2.57577583`、两 job 0 error、
+  按 `|ΔUY|` 插值 `λ` 的 `worst|Δλ|≈0.0051`；第 26 项 CTest
+  214 项检查。两侧同源加 `UX` 导向约束消除一阶运动机构，轴向
+  应变取约 `2e-4` 避开 `LINK180` 默认 Almansi 应变与 FEM 共转
+  工程应变的系统性差异。**如实边界**：`STAGE` 仍是独立 opt-in
+  （默认 `REFERENCE` / `STABILITY=0` 输出逐位不变）；CB3D23 是
+  研究构型，**不是真实桥梁施工阶段**，不覆盖 CR 梁 / 索的真实
+  施工工序；位移控制 / Riks、分支屈曲与分支切换、初始缺陷、
+  材料非线性本构、动力 snap-through **仍未覆盖**。因此 §2.6 的
+  「确认 §2.5 全部边界收口」未满足，③b 完成**仍 `P` 不 `Y`**，
+  不得靠一个 opt-in 算例提前打勾。
 
 ### 2.6 a 阶段三阶段验收口径（什么才算把 B3 推成 `Y`）
 
@@ -427,6 +450,27 @@ step2 荷载控制主 job 用 `λ=(TIME−1)·LAMMAX` 对 FEM `[STABILITY]`
 **不等于 ③ 完成**，能力矩阵该行继续 `P`。要推 `Y` 只有两条路：
 补齐上述力学，或由用户重新拍板修改 §2.5 / §2.6 的验收口径；
 **不得靠改文档提前打勾**。
+
+**③b 阶段实测收口（2026-11-15，用户 `按建议做`）**：按上一条的两条路
+之外，先把 §2.5 中「施工阶段中间态全过程稳定」这一项从「完全未覆盖」
+推进到「主链路有 opt-in 研究构型算例」，其余边界不动。
+
+| 项 | 交付物 | 实测 |
+|---|---|---|
+| 同源阶段模型 | `fem_3d_nl.hpp::NLStageResult3D::model`（每阶段 `row.model = mc`）+ `stability_output_3d.hpp::StabilityStateHeader3D` 的 `stageId/stageElems/stageDofs` | 阶段 1 `NELEM=2` → 阶段 2 `NELEM=3 NDOF=12`，`[STAGES]` 3 阶段全收敛 |
+| 主链路 opt-in | `cable_solver.cpp::runStageStabilityMode()` + `STABASIS=STAGE` / `STAGEID` | `BASIS=stage_state`、`RES0/|F0|=6.34e-13`、`CTRL0=-0.000952173872` 非零、负例 `ERROR=stage_not_found` 不降级 |
+| 同源 ANSYS 对标 | `ansys_stage_stability.py` / `cases/run_cases_stage_state.py` / `CB3D23_stage_state_vs_ansys/`（15 份证据） | FEM `NPOINT=134` / `λ_end=2.57577583`；`st_load` 27 点 / `st_arc` 25 点，两 job 0 error，按 `|ΔUY|` 插值 λ 的 `worst|Δλ|≈0.0051`、共同区间覆盖 99.7%；BS 报告 72 checks / 0 failed |
+| 第 26 项 CTest | `tests/benchmark/stage_stability_3d/` + `CMakeLists.txt` + `run_tests.ps1` | 214 项检查，5 层判据，当前二进制重放两个 `.dat` 逐字节一致；干净构建 `ctest` **26/26**、`run_tests.ps1 -BuildDir _d_build` `ALL TESTS PASSED` |
+| 依赖补齐 / 守卫适配 / UI 兼容 | `anastruct 1.7.1` / `python-docx 1.2.0` / `pypdf 7.1.0`（清华镜像）；`verify_app.py` 的 `_ssget()` 等价适配 Streamlit 1.45.1 `SafeSessionState`；`verify_opt_2d.py` 过时位置断言改为「小节仍完整在档」；`ui_3d.py` 外层嵌套 `expander` 改 `container` | 53 个 BS 守卫由 44/53 提升到 **53/53 全绿**；4 个 ③b 关键守卫 100/100、185/185、282/282、30/30；`verify_app.py` 109/109。后两项均为**业务 UI / 测试代码与新版 Streamlit 的兼容性适配**，与 ③b 力学无关、不涉及任何功能判据或 B3 结论 |
+
+**③b 完成后的 B3 结论：仍 `P` 不 `Y`**。理由：① `STAGE` 是独立
+opt-in，默认 `REFERENCE` / `STABILITY=0` 输出逐位不变；② CB3D23
+是 4 节点 3 杆 `TRUSS` 浅拱研究构型，两侧同源加 `UX` 导向约束、
+轴向应变约 `2e-4`，**不是真实桥梁施工阶段**，也不覆盖 CR 梁 / 索
+的真实施工工序；③ §2.5 的位移控制 / Riks、分支屈曲与分支切换、
+初始缺陷、材料非线性、动力 snap-through 五项**仍未实现**。
+按 §2.6 的「确认 §2.5 全部边界收口」口径，③ 仍未走完，
+能力矩阵该行继续 `P`。**不得靠一个 opt-in 算例提前打勾**。
 
 ## 3. B4 预应力损失两处规范口径
 
@@ -582,6 +626,44 @@ step2 荷载控制主 job 用 `λ=(TIME−1)·LAMMAX` 对 FEM `[STABILITY]`
     干净构建 `ctest` 25/25、`run_tests.ps1` `ALL TESTS PASSED`。
     但 §2.5 的分支屈曲 / 初始缺陷 / 材料非线性 /
     施工阶段中间态全过程稳定**全部未收口**，③a 完成不等于 ③ 完成。
+19. 第二十次 ③b 不虚报：同一守卫的 `stage4_contract()` 锁住
+    「`NLStageResult3D::model` 每阶段回传同源模型、
+    `cable_solver.cpp` 的 `runStageStabilityMode()` 用 `pick->model`
+    装配 F0 / Fint / 弧长路径、未知 `STAGEID` 写
+    `ERROR=stage_not_found`」「`BASIS=stage_state` 与另两种基准
+    分列、`[STAGES]` 与 `STAGE=` 留痕、第 26 项 CTest 与
+    `run_tests.ps1 -BuildDir` 在位、FE 总索引 26 个 CTest」
+    「`ansys_stage_stability.py` / `run_cases_stage_state.py`
+    同源导出，两个 ANSYS job 各 2 个 `SOLVE` / 0 error、
+    `λ = TIME − 1`、按 `|ΔUY|` 插值 λ」
+    「§2.5 / §2.6 如实写明 ③b 完成仍 `P` 不 `Y`、
+    不得靠一个 opt-in 算例提前打勾」「FE 侧 `CHANGELOG.md` /
+    `input_format_3d.md` / `USER_MANUAL.md` / `DEVELOPMENT_GUIDE.md`
+    四份文档均登记 ③b 且写明 `STABASIS=STAGE`」；
+    CB3D23 报告 72 checks / 0 failed，第 26 项 214 项检查，
+    干净构建 `ctest` 26/26、`run_tests.ps1` `ALL TESTS PASSED`。
+    但 §2.5 的位移控制 / Riks、分支屈曲、初始缺陷、材料非线性、
+    动力 snap-through 仍未收口，且 CB3D23 不是真实桥梁施工阶段，
+    ③b 完成不等于 ③ 完成。
+    本轮另如实登记两处**与力学无关**的守卫环境适配（不得视为放宽
+    判据或虚报）：`verify_app.py` 因 Streamlit 1.45.1 把
+    `AppTest.session_state` 换成 `SafeSessionState`（无 `dict.get()`），
+    新增 `_ssget()` 以 `in` + `[]` 严格等价替换 12 处旧写法；
+    `verify_opt_2d.py` 的「CHANGELOG 前 12 行含 `## 2026-11-12`」
+    是 ③a 起过时的位置断言（当日小节持续追加到顶部），改为锁
+    「该日期小节仍完整在档」。两条都**不放宽任何功能判据**。
+    结果：`verify_opt_2d.py` 286/286，另 4 个 ③b 关键守卫全绿
+    （100/100、185/185、282/282、30/30）。
+    `ui_3d.py` 的「与 MIDAS 互导」外层 `st.expander` 内嵌
+    `_interop_block()` 的 `c1/c2.expander` 触发。最小修复是把外层
+    改为普通 `st.container()` + 一行 `caption`，保留内层 4 个折叠块、
+    全部按钮 / 下载 / 试算功能与守卫断言，仅去掉「互导整块可折叠」
+    这一层包装；修复后 `verify_app.py` **109/109 通过**。
+    这是业务 UI 与新版 Streamlit 的兼容性问题，不是 ③b 引入、
+    不涉及任何力学判据，**不放宽断言、不改 B3 结论**。
+    补齐 `anastruct` / `python-docx` / `pypdf` 并完成上述等价适配后，
+    53 个 BS 守卫全部通过，4 个 ③b 关键守卫为
+    100/100、185/185、282/282、30/30。
 
 **明确未闭环**：B3 的分支屈曲 / 初始缺陷 / 材料非线性 / CR 梁后屈曲
 的**主链路成桥态闭环与施工阶段链路接入**（第十八次 CB3D19 只把

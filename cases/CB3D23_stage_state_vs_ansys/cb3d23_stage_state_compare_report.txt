@@ -1,0 +1,20 @@
+==============================================================================
+CB3D23 ③b：施工阶段中间态起点的全过程稳定 FEM vs ANSYS 两段对标
+==============================================================================
+口径: FEM R=F0+λ·Finc−Fint(u), u0=施工阶段 2 共转列式全量平衡位移;
+      ANSYS step1 TIME=1 求同一阶段平衡态, step2 λ=TIME−1;
+      按 ΔUY 插值 λ 逐点对拍。BASIS=stage_state 与 completion_state 分列。
+------------------------------------------------------------------------------
+[PASS] [STAGES] [1, 2, 3]；STAGE=2 NELEM=3 NDOF=12，阶段 1 NELEM=2
+[PASS] 起点闭合 RES0/|F0|=6.34e-13，CTRL0=-0.000952173872（非零初态）
+[PASS] FEM 路径 NPOINT=134 λ_end=2.57577583 |ΔUY|_end=0.00502513021（单调）
+[PASS] 负例 STAGEID=99 -> ERROR=stage_not_found，无静默降级
+[PASS] 同源锚点：APDL N/E/F 与 .dat / cfg.json 逐项一致，2 个 job 各含 3 个阶段 2 单元
+[PASS] st_load: step1 UY=-0.000951910681；step2 27 点，共同区间 |ΔUY|=[1.28988e-05, 0.00502513] 覆盖 FEM 路径 99.7%，逐点 worst|Δλ|=0.005124 mean=0.001891
+[PASS] st_arc: step1 UY=-0.000951910681；step2 25 点，共同区间 |ΔUY|=[1.28988e-05, 0.00502513] 覆盖 FEM 路径 99.7%，逐点 worst|Δλ|=0.005109 mean=0.001881
+[PASS] ANSYS 两个 job：0 error，λ=TIME−1 且终点覆盖整个 FEM 路径
+------------------------------------------------------------------------------
+FEM   : NPOINT=134 lambda_end=2.57577583 CTRL0=-0.000952173872
+ANSYS : st_load 27 点 / st_arc 25 点；两个 job 0 error
+结论  : 72 checks, 0 failed
+RESULT: ALL CHECKS PASSED

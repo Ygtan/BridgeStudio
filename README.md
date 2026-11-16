@@ -593,6 +593,23 @@ ANSYS 两段对标属 ②、B3 推 `Y` 属 ③，验收表见 `B类后续项接�
 第 25 项 CTest）；干净构建全量 `ctest` 25/25。
 **③a 完成仍 `P` 不 `Y`**：§2.5 的分支屈曲 / 初始缺陷 /
 材料非线性 / 施工阶段中间态稳定等边界未收口，见规格 §2.5 / §2.6；
+**2026-11-15 第二十次 ③b** 按「按建议做」继续 §2.5 收口，
+把施工阶段中间态从「完全未覆盖」推进为「主链路有 opt-in
+研究构型算例」：`fem_3d_nl.hpp::NLStageResult3D` 回传同源
+`Model3D model`，`cable_solver.cpp` 新增 `STABASIS=STAGE` +
+`STAGEID=<id>` 独立 opt-in（`BASIS=stage_state`、`[STAGES]` /
+`STAGE=` 留痕、未知阶段 `ERROR=stage_not_found` 不降级）；
+`ansys_stage_stability.py` / `cases/run_cases_stage_state.py`
+同源导出 CB3D23（4 节点 3 杆 `TRUSS` 浅拱、3 阶段取阶段 2），
+`STAGE=2 NELEM=3 NDOF=12`、`RES0/|F0|=6.34e-13`、
+FEM `NPOINT=134` / `λ_end=2.57577583`、两个 ANSYS job 0 error、
+按 `|ΔUY|` 插值 λ `worst|Δλ|≈0.0051`；第 26 项 CTest
+214 项检查，干净构建 `ctest` **26/26**、
+`run_tests.ps1 -BuildDir _d_build` `ALL TESTS PASSED`。
+**③b 完成仍 `P` 不 `Y`**：`STAGE` 是独立 opt-in、CB3D23 是
+研究构型不是真实桥梁施工阶段，位移控制 / Riks、分支屈曲、
+初始缺陷、材料非线性、动力 snap-through 仍未闭环，见规格
+§2.5 / §2.6；
 B4 / B5 仍**只立规格、未实现力学**；
 B2 的 `[LENGTH2D]` 一层自第十三次
 起、2D 平面索力优化 `[OPT2D]` 一层自第十四次起已按 opt-in 真正新造 2D

@@ -6,7 +6,8 @@ ANSYS APDL（`.inp`）、模型快照（`.model.json`）、ANSYS 批处理输出
 （`.out` / CSV）与对比报告（`.txt`），可离线复查，不需要再跑 ANSYS。
 
 命名规则：`CB01~CB05` 为 2D 连续梁，`CB3D01~CB3D21` 为 3D 算例
-（第十九次 ③a 新增 CB3D22 后为 `CB3D01~CB3D22`）；
+（第十九次 ③a 新增 CB3D22 后为 `CB3D01~CB3D22`，第二十次 ③b 新增
+CB3D23 后为 `CB3D01~CB3D23`）；
 编号按接入顺序递增，与 FEM-Eigen 侧 `tests/benchmark/` 的回归套件一一对应。
 **例外**：CB3D18（主链路 `STABILITY=1` opt-in）与 CB3D20（成桥态起点
 `STABASIS=COMPLETION` 的 V 形双索单自由度解析题）是**纯 FEM 侧
@@ -48,6 +49,7 @@ ANSYS 版）：它把同一个 `STABASIS=COMPLETION` 主链路放到 50 节点 /
 | CB3D19 | `CB3D19_frame_postbuckling_arc_length` | 共转 CR 梁**刚接框架（Williams toggle 型）后屈曲全过程** vs ANSYS `BEAM188 + ARCLEN`（2 个 job，每杆 24 单元） | `run_cases_frame.py` | `frame_postbuckling_3d` |
 | CB3D21 | `CB3D21_completion_stability_vs_ansys` | **真实双塔三跨斜拉桥成桥态起点全过程稳定** vs ANSYS 两段求解（step1 恒载成桥态 / step2 增量荷载，荷载控制主 job + `ARCLEN` 交叉验证，2 个 job）；同源设计线形 + 16 根索 `L0` + `INISTATE eps`；第 23 项 CTest 冻结 2392 项黄金值 | `run_cases_completion.py` | `completion_bridge_3d` |
 | CB3D22 | `CB3D22_limit_point_vs_ansys` | **③a 真实斜拉桥越过极值点 / 下降段**：与 CB3D21 同源桥只缩塔截面（`TOWER_SCALE=0.012`）、增量荷载改为塔顶 2009 节点 `+X`；FEM 球面弧长 `λ_max=1.624941`、下降段 207 步 vs ANSYS 两段 `ARCLEN λ_max=1.622748`（2 个 job，均 0 error）；按 `ΔUX` 插值 `λ` 逐点对拍；第 25 项 CTest 冻结 140 项检查 | `run_cases_limit_point.py` | `bridge_limit_point_3d` |
+| CB3D23 | `CB3D23_stage_state_vs_ansys` | **③b 施工阶段中间态起点全过程稳定**：`STABASIS=STAGE STAGEID=2`（`BASIS=stage_state`、`[STAGES]` / `STAGE=` 留痕），4 节点 3 杆 `TRUSS` 浅拱 / 3 个施工阶段；FEM `NPOINT=134` / `λ_end=2.57577583`、`RES0/|F0|=6.34e-13` vs ANSYS 两段（`st_load` 荷载控制 / `st_arc` `ARCLEN`，2 个 job 均 0 error）；按 `\|ΔUY\|` 插值 `λ` 逐点对拍；负例 `STAGEID=99` 写 `ERROR=stage_not_found`；第 26 项 CTest 冻结 15 份证据 / 214 项检查 | `run_cases_stage_state.py` | `stage_stability_3d` |
 
 CB3D13 除全桥 APDL 外还归档 5 份阶段 APDL（`*_stage1..5.inp`）与对应
 ANSYS CSV；三层验证口径见 `ansys_bridge_erection.py` 模块头与
@@ -191,6 +193,42 @@ CB3D22（2026-11-15，a 阶段 ③a）是首个**真实桥梁越过极值点 / �
 - **③a 同时修复** CB3D21 登记的 `MODE=COMPLETION` 起点不同源缺陷：
   `basisModel` 回传同源模型，见 FEM-Eigen
   `tests/benchmark/completion_basis_3d/README.md`。
+
+CB3D23（2026-11-15，第二十次 ③b）是首个把 `[STABILITY]` 路径起点
+放到**施工阶段中间态**的算例。`ansys_stage_stability.py` 以一份常量表
+（`CASE_ID=cb3d23_stage_state`）为唯一数据源，同时生成 FEM `.dat`
+与两个 ANSYS `.inp`；`cases/run_cases_stage_state.py` 负责编排、
+`--check-only` 离线复核与 `--sync-to` / `--sync-only` 冻结证据同步。
+
+- **构型**：4 节点 / 3 杆 `TRUSS` 浅拱，`E=2.1e11`、`A=0.001`；
+  阶段 1 激活边杆 1/3 并加节点 2/3 各 `−10000 N`，阶段 2 激活中杆 2，
+  阶段 3 追加各 `−5000 N`。`STAGEID=2` 取 3 杆全激活、阶段 3 荷载
+  未施加的中间态（`STAGE=2 NELEM=3 NDOF=12`），不是成桥态。
+- **同源与消机构**：两侧同源给节点 2/3 加 `UX=0` 侧向导向约束，
+  消除 4 个平动自由度 / 3 个杆长约束的一阶运动机构（否则 ANSYS
+  报 `Sparse solver minimum pivot`）。曾试加对角三角化杆 `E,1,3`，
+  FEM 阶段求解器不收敛，已回退 3 杆构型。
+- **两段求解**：`step1 TIME=1` 求同一阶段平衡态（`UY=-0.000951910681`）；
+  `step2` 写 `F_end = F_orig + LAMMAX·PINC`（`−64000 N`）且
+  `TIME = 1 + LAMMAX = 3.7`，故 `λ = TIME − 1`，不靠反力求和。
+  `st_load` 荷载控制、`st_arc` `ARCLEN` 交叉验证，两 job 0 error。
+- **对拍与应变档**：路径单调，按递增 `|ΔUY|` 插值 λ 逐点比较
+  （FEM `NPOINT=134` / `λ_end=2.57577583`，共同区间覆盖 99.7%，
+  `worst|Δλ|≈0.0051`）。阶段荷载 / `PINC` / `CTRLTARGET` 取到轴向
+  应变约 `2e-4`；10 倍档下 ANSYS `LINK180` 默认 Almansi 应变与 FEM
+  共转工程应变出现系统性差异（`u0` 差 `2.89e-5 m`、
+  `worst|Δλ|≈0.038`），不能当力学回归。
+- **负例与回归**：`STAGEID=99` 写 `ERROR=stage_not_found` 且无平衡点，
+  不静默降级成成桥态或参考构型。BS 报告 72 checks / 0 failed；
+  FE 侧第 26 项 CTest 冻结 15 份证据、214 项检查，当前二进制重放
+  两个 `.dat` 逐字节一致（同为 mingw64 工具链）。
+- **如实边界**：`STAGE` 是独立 opt-in，默认 `REFERENCE` /
+  `STABILITY=0` 输出逐位不变；CB3D23 是研究构型，**不是真实桥梁
+  施工阶段**，不覆盖 CR 梁 / 索的真实施工工序。位移控制 / Riks、
+  分支屈曲与分支切换、初始缺陷、材料非线性、动力 snap-through
+  仍未闭环，**③b 完成仍 `P` 不 `Y`**，见 FEM-Eigen
+  `tests/benchmark/stage_stability_3d/README.md`
+  与 `B类后续项接入规格.md` §2.5 / §2.6。
 
 ## 归档规则
 

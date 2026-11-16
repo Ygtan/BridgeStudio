@@ -1,0 +1,70 @@
+/BATCH
+/TITLE,CB3D23 construction-stage intermediate state stability - FEM vs ANSYS two-step - st_load - LINK180 NLGEOM
+/PREP7
+ET,1,LINK180
+R,1,0.001
+MP,EX,1,210000000000
+MP,PRXY,1,0.3
+! ---- Nodes: same source as FEM .dat ----
+N,1,-2,0,0
+N,2,-0.69999999999999996,0.34999999999999998,0
+N,3,0.69999999999999996,0.34999999999999998,0
+N,4,2,0,0
+! ---- Elements: stage-2 active elements only (ANSYS elem no. = creation order) ----
+TYPE,1
+MAT,1
+REAL,1
+E,1,2
+E,2,3
+E,3,4
+! ---- Boundary conditions (FEM dof 1/2/3 = UX/UY/UZ) ----
+D,1,UX,0.0
+D,1,UY,0.0
+D,1,UZ,0.0
+D,4,UX,0.0
+D,4,UY,0.0
+D,4,UZ,0.0
+D,2,UZ,0.0
+D,3,UZ,0.0
+D,2,UX,0.0
+D,3,UX,0.0
+! ---- Stage 2 accumulated constant loads (F0) ----
+F,2,FY,-10000
+F,3,FY,-10000
+FINISH
+/SOLU
+ANTYPE,STATIC
+NLGEOM,ON
+NSUBST,20,100,10
+NEQIT,50
+OUTRES,ALL,ALL
+TIME,1
+SOLVE
+! ---- load step 2: incremental load (load-controlled step 2 from stage-2 equilibrium) ----
+F,2,FY,-64000
+F,3,FY,-64000
+NSUBST,400,1000,20
+NEQIT,60
+TIME,3.7
+OUTRES,ALL,ALL
+SOLVE
+FINISH
+! ---- Machine-readable results (first column = FEM id) ----
+/POST1
+*GET,NSET,ACTIVE,0,SET,NSET
+*DIM,CURV,ARRAY,NSET,4
+*DO,I,1,NSET
+ SET,,,,,,,I
+ *GET,VY,NODE,2,U,Y
+ *GET,TNOW,ACTIVE,0,SET,TIME
+ CURV(I,1)=I
+ CURV(I,2)=TNOW
+ CURV(I,3)=VY
+ CURV(I,4)=0
+*ENDDO
+*CFOPEN,st_load_curve,csv
+*VWRITE,CURV(1,1),CURV(1,2),CURV(1,3),CURV(1,4)
+ (1X,F8.0,3(1X,E20.12))
+*CFCLOS
+FINISH
+/EXIT,NOSAVE

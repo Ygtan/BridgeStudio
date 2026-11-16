@@ -1,0 +1,10 @@
+$ cable_solver.exe cb3d23_stage_state.dat
+[fem] exit=0
+cable_solver: mode=STAGE_STABILITY stageid=2 converged=1 结果: cb3d23_stage_state_stage_stability.txt
+[fem-bad] exit=3
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j st_load -i st_load.inp -o st_load_ansys.out
+[ansys-st_load] exit=0
+[ansys-st_load] errors/warnings=(0, 0)
+$ C:\Program Files\ANSYS Inc\v180\ANSYS\bin\winx64\ANSYS180.exe -b -j st_arc -i st_arc.inp -o st_arc_ansys.out
+[ansys-st_arc] exit=0
+[ansys-st_arc] errors/warnings=(0, 1)

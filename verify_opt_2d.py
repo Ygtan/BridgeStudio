@@ -858,8 +858,11 @@ def docs() -> None:
           and "B2 剩余 0 项" in guide)
 
     # FE 三份：CHANGELOG 新小节 / input_format §6.6 / USER_MANUAL 专章与对照表。
-    check("FE CHANGELOG 顶部 ## 2026-11-12",
-          "## 2026-11-12" in "\n".join(fe_log.splitlines()[:12]))
+    # 2026-11-15 ③a / ③b：当日小节持续追加到 CHANGELOG 顶部，
+    # 「## 2026-11-12 必须落在前 12 行」是过时的**位置**断言（与第十四次
+    # 记录是否完整无关）。改为锁「该日期小节仍完整在档」，其余判据不放宽。
+    check("FE CHANGELOG 保留 ## 2026-11-12 小节（③a/③b 后不再位于顶部）",
+          "## 2026-11-12" in fe_log)
     check("FE CHANGELOG 有 [OPT2D] 新小节",
           "### 新增：2D 平面索力优化 [OPT2D] 段" in fe_log)
     check("FE CHANGELOG 写明 37 个黄金基线不刷新 / 不等于 3D [OPT]",

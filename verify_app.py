@@ -34,6 +34,20 @@ APP_RETRY = os.environ.get("BRIDGESTUDIO_APP_RETRY", "1") != "0"
 _T0 = time.monotonic()
 
 
+def _ssget(at: AppTest, key: str, default=None):
+    """读取 AppTest 的 session_state，**不放宽任何断言**。
+
+    Streamlit >= 1.45 的 `AppTest.session_state` 是 `SafeSessionState`，
+    只实现 `__contains__` / `__getitem__` / `__getattr__`，不再提供
+    `dict.get()`——旧写法 `at.session_state.get(key)` 会被解释成
+    「取名为 get 的 session 变量」并抛 `AttributeError`。
+    这里用 `in` + `[]` 做严格等价的适配：key 在则取值，否则 default。
+    2026-11-15 ③b 环境适配，与功能断言无关。
+    """
+    ss = at.session_state
+    return ss[key] if key in ss else default
+
+
 def _is_timeout(exc: BaseException) -> bool:
     name = type(exc).__name__.lower()
     text = str(exc).lower()
@@ -199,7 +213,7 @@ def main() -> int:
     if _btn is not None:
         _btn.click().run()
         check("求解无异常", not _errors(at), _errors(at)[:1])
-        _r = at.session_state.get("r3d_result")
+        _r = _ssget(at, "r3d_result")
         check("结果是 SolveResult", type(_r).__name__ == "SolveResult",
               type(_r).__name__)
         if _r is not None:
@@ -267,7 +281,7 @@ def main() -> int:
                   any(c.key == f"v3d_deform_{_fp}" for c in at.checkbox))
             _pc = at.get("plotly_chart")
             check("三维图已渲染", len(_pc) == 1, f"{len(_pc)} 张")
-            _sc = at.session_state.get("v3d_scene")
+            _sc = _ssget(at, "v3d_scene")
             check("场景已缓存且与结果同源",
                   bool(_sc) and len(_sc[1].members) == _r.stats.get("elements"),
                   f"{len(_sc[1].members)} 构件" if _sc else "—")
@@ -275,7 +289,7 @@ def main() -> int:
             if _fld is not None:
                 _fld.select("combo_My").run()
                 check("切换着色场无异常", not _errors(at), _errors(at)[:1])
-                _sc2 = at.session_state.get("v3d_scene")
+                _sc2 = _ssget(at, "v3d_scene")
                 check("切到基本组合后场景换场",
                       bool(_sc2) and _sc2[1].field.key == "combo_My",
                       _sc2[1].field.key if _sc2 else "—")
@@ -298,7 +312,7 @@ def main() -> int:
             check("互导块出现 .mct 上传口", len(_fu) == 1, f"{len(_fu)} 个")
             if _xb is not None:
                 _xb.click().run()
-                _xp = (at.session_state.get("mi_export") or {}).get("path")
+                _xp = (_ssget(at, "mi_export") or {}).get("path")
                 check("界面导出 .mct 已落盘",
                       bool(_xp) and Path(_xp).exists()
                       and Path(_xp).stat().st_size > 10_000,
@@ -318,7 +332,7 @@ def main() -> int:
             check("生成可旋转视图按钮存在", _hb is not None)
             if _hb is not None:
                 _hb.click().run()
-                _hp = at.session_state.get("v3d_html_path")
+                _hp = _ssget(at, "v3d_html_path")
                 check("可旋转视图已落盘且内联引擎",
                       bool(_hp) and Path(_hp).exists()
                       and Path(_hp).stat().st_size > 1_000_000,
@@ -331,7 +345,7 @@ def main() -> int:
         if _gb is not None:
             _gb.click().run()
             check("生成报告无异常", not _errors(at), _errors(at)[:1])
-            _got = at.session_state.get("r3d_report")
+            _got = _ssget(at, "r3d_report")
             _paths = (_got or {}).get("paths", {})
             _perr = (_got or {}).get("pdf_error")
             check("PDF 出口未静默失败（无浏览器须显式告警）",
@@ -376,7 +390,7 @@ def main() -> int:
     if _btn is not None:
         _btn.click().run()
         check("求解无异常", not _errors(at), _errors(at)[:1])
-        _r = at.session_state.get("r3d_result")
+        _r = _ssget(at, "r3d_result")
         check("结果是 SolveResult 且 kind 正确",
               _r is not None and _r.kind == "cable_stayed",
               getattr(_r, "kind", "—"))
@@ -419,7 +433,7 @@ def main() -> int:
                               for x in _fld.options)
                   and any("活载 My" in str(x) for x in _fld.options),
                   str(len(_fld.options)) + " 个场" if _fld else "—")
-            _sc3 = at.session_state.get("v3d_scene")
+            _sc3 = _ssget(at, "v3d_scene")
             check("斜拉桥场景仍可建（136 构件）",
                   bool(_sc3) and len(_sc3[1].members) == 136,
                   f"{len(_sc3[1].members)} 构件" if _sc3 else "—")
@@ -429,7 +443,7 @@ def main() -> int:
         check("计算书按钮存在", _rb is not None)
         if _rb is not None:
             _rb.click().run()
-            _rp = at.session_state.get("cb_report_path")
+            _rp = _ssget(at, "cb_report_path")
             check("计算书已生成", bool(_rp) and Path(_rp).exists(), str(_rp or "—"))
             if _rp and Path(_rp).exists():
                 from docx import Document as _Doc
@@ -447,7 +461,7 @@ def main() -> int:
         check("三方复核按钮存在", _eb is not None)
         if _eb is not None:
             _eb.click().run()
-            _ex = at.session_state.get("cb_export")
+            _ex = _ssget(at, "cb_export")
             _paths = (_ex or {}).get("paths", {})
             _ok = bool(_paths) and all(Path(p).exists() and Path(p).stat().st_size > 500
                                        for p in _paths.values())
@@ -486,7 +500,7 @@ def main() -> int:
     if _btn is not None:
         _btn.click().run()
         check("悬索桥求解无异常", not _errors(at), _errors(at)[:1])
-        _r = at.session_state.get("r3d_result")
+        _r = _ssget(at, "r3d_result")
         check("结果为 suspension",
               _r is not None and getattr(_r, "kind", "") == "suspension",
               getattr(_r, "kind", "—"))
@@ -507,7 +521,7 @@ def main() -> int:
                   next((b for b in at.button if b.key == "cb_export_btn"), None) is None)
             if _sb is not None:
                 _sb.click().run()
-                _ex = at.session_state.get("susp_export")
+                _ex = _ssget(at, "susp_export")
                 _paths = (_ex or {}).get("paths", {})
                 check("悬索桥三份已落盘",
                       bool(_paths) and all(Path(p).exists()

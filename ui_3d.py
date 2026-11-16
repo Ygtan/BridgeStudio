@@ -660,7 +660,13 @@ def render(doc: ModelDoc) -> None:
                 st.caption(f"· {h}")
 
     # ---- 互导（放在求解之前：导入别人的模型本身就是一条"取模型"的路）----
-    with st.expander("与 MIDAS 互导（.mct）：导出当前模型 / 导入 MIDAS 模型试算"):
+    # Streamlit >= 1.45 明确禁止 expander 嵌套 expander：_interop_block() 内的
+    # c1/c2.expander 若被外层 st.expander 包住会抛
+    # StreamlitAPIException("Expanders may not be nested inside other expanders")
+    # 并中断整个 script run。外层改用普通 container，保留内层 4 个折叠块、
+    # 全部按钮 / 下载 / 试算功能与守卫断言；仅去掉「互导整块可折叠」这一层包装。
+    with st.container():
+        st.caption("与 MIDAS 互导（.mct）：导出当前模型 / 导入 MIDAS 模型试算")
         _interop_block(doc)
 
     # ---- 求解 ----

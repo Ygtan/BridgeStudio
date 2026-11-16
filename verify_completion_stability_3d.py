@@ -26,6 +26,13 @@ MODE=COMPLETION 起点不同源缺陷如实登记、② 完成仍 `P` 不 `Y`。
 第十九次 ③a 增补 `stage3_contract()`：`basisModel` 起点同源修复、
 施工阶段段共存核对、CB3D22 越过极值点 / 下降段、第 24 / 25 项 CTest、
 25 个 CTest 总索引，以及「③a 完成仍 `P` 不 `Y`」的不虚报口径。
+
+第二十次 ③b 增补 `stage4_contract()`：`NLStageResult3D::model` 同源
+阶段模型回传、`STABASIS=STAGE` / `STAGEID` 独立 opt-in、
+`BASIS=stage_state` 与另两种基准分列、`ERROR=stage_not_found` 不降级、
+CB3D23 同源导出与两个 ANSYS 两段 job、第 26 项 CTest / 26 个 CTest
+总索引，以及「③b 完成仍 `P` 不 `Y`」「不得靠一个 opt-in 算例提前
+打勾」的不虚报口径。
 """
 
 from __future__ import annotations
@@ -412,9 +419,154 @@ def stage3_contract() -> None:
           and "仍 `P` 不 `Y`" in read(root / "DEVELOPMENT_GUIDE.md"))
 
 
+def stage4_contract() -> None:
+    """第二十次 ③b：施工阶段中间态起点 opt-in / CB3D23 / 仍 P 不 Y。
+
+    纯离线：只读源码与冻结证据文本，不调求解器、不重跑 ANSYS、不写文件。
+    """
+    root = fe()
+    export = read(ROOT / "ansys_stage_stability.py")
+    runner = read(ROOT / "cases" / "run_cases_stage_state.py")
+    spec = read(ROOT / "B类后续项接入规格.md")
+    mat = read(ROOT / "能力边界矩阵.md")
+    cases_idx = read(ROOT / "cases" / "README.md")
+    case_dir = ROOT / "cases" / "CB3D23_stage_state_vs_ansys"
+
+    # ---- 1. BS 侧同源导出 / 编排 / 正式算例 ----
+    check("③b 导出模块与编排脚本在位，且用一份常量表同源生成 .dat / .inp",
+          bool(export) and bool(runner)
+          and 'CASE_ID = "cb3d23_stage_state"' in export
+          and "def fem_dat(" in export and "def ansys_inp(" in export
+          and "--check-only" in runner and "--sync-to" in runner
+          and "--sync-only" in runner)
+    check("③b STABASIS=STAGE STAGEID=2 与两种 λ 口径分列",
+          "STABASIS=STAGE" in export and "STAGEID=2" in export
+          and "stage_state" in export
+          and "STAGE_ID = 2" in export
+          and "PINC = -20000.0" in export
+          and "CTRLTARGET = 0.005" in export)
+    check("③b 两侧同源加 UX 导向约束消除一阶运动机构",
+          "FIXED_X" in export and "FIXED_ALL" in export
+          and "D,2,UX,0.0" in read(case_dir / "st_load.inp")
+          and "D,3,UX,0.0" in read(case_dir / "st_load.inp"))
+    check("③b 正式算例目录与 72 checks / 0 failed 报告在位",
+          case_dir.is_dir()
+          and "72 checks, 0 failed" in read(
+              case_dir / "cb3d23_stage_state_compare_report.txt")
+          and "ERROR=stage_not_found" in read(
+              case_dir / "st_bad_stage_stage_stability.txt"))
+    for job in ("st_load", "st_arc"):
+        inp = read(case_dir / (job + ".inp"))
+        out = read(case_dir / (job + "_ansys.out"))
+        check(f"③b ANSYS {job}：2 SOLVE / TIME=1,3.7 / 0 error",
+              len([x for x in inp.splitlines() if x.strip() == "SOLVE"]) == 2
+              and "TIME,1" in inp and "TIME,3.7" in inp
+              and "NUMBER OF ERROR   MESSAGES ENCOUNTERED=          0" in out)
+    check("③b st_load 荷载控制、st_arc 才用 ARCLEN",
+          "ARCLEN,ON" not in read(case_dir / "st_load.inp")
+          and "ARCLEN,ON" in read(case_dir / "st_arc.inp"))
+    check("③b 按 |ΔUY| 插值 λ 对拍、λ = TIME − 1 不靠反力求和",
+          "interp_lambda_by_ctrl" in runner
+          and "λ = TIME − 1" in runner
+          and "TIME,1" in runner
+          and "lammax" in export)
+
+    # ---- 2. FE 侧同源阶段模型与独立 opt-in ----
+    if root is None:
+        check("定位 FEM-Eigen 源码目录（③b）", False, "未定位")
+        return
+    nl = read(root / "fem_3d_nl.hpp")
+    cs = read(root / "cable_solver.cpp")
+    out = read(root / "stability_output_3d.hpp")
+    bench = root / "tests" / "benchmark"
+    b26 = bench / "stage_stability_3d"
+    check("③b NLStageResult3D 回传同源阶段模型 model",
+          "Model3D model;" in nl and "row.model = mc;" in nl)
+    check("③b 主链路 STABASIS=STAGE / STAGEID 与 runStageStabilityMode",
+          "runStageStabilityMode" in cs
+          and '"STAGEID"' in cs
+          and "STAGE" in cs
+          and "pick->model" in cs
+          and "stage_not_found" in cs
+          and '"STAGE"' in cs)
+    check("③b 未知阶段不降级：stage_not_found 且输出独立文件",
+          'fail("stage_not_found")' in cs
+          and "_stage_stability.txt" in cs
+          and "ERROR=stage_not_found" in read(
+              case_dir / "st_bad_stage_stage_stability.txt"))
+    check("③b StabilityStateHeader3D 增 STAGE= 行且只在 stageId>=0 写出",
+          "stageId" in out and "stageElems" in out and "stageDofs" in out
+          and "sh.stageId >= 0" in out)
+    check("③b [STAGES] 段与三种 BASIS 分列",
+          "[STAGES]" in cs
+          and '"STAGE"' in cs
+          and '"stage_state"' in cs
+          and '"completion_state"' in cs
+          and "BASIS=stage_state" in read(bench / "stage_stability_3d" / "README.md"))
+
+    # ---- 3. 第 26 项 CTest / 双入口 / 总索引 ----
+    check("③b 第 26 项 CTest（黄金值 / 生成器 / 比对脚本 / README）在位",
+          (b26 / "compare_stage_state_3d.py").is_file()
+          and (b26 / "build_reference_stage_state.py").is_file()
+          and (b26 / "reference" / "cb3d23_stage_state.json").is_file()
+          and (b26 / "README.md").is_file()
+          and "214" in read(b26 / "README.md")
+          and "仍 `P` 不 `Y`" in read(b26 / "README.md"))
+    check("③b 15 份冻结证据与 BS manifest 一致",
+          len([p for p in (b26 / "cases").glob("*") if p.is_file()]) == 15
+          and "cb3d23_stage_state_stage_stability.txt" in read(
+              case_dir / "cb3d23_stage_state_manifest.txt"))
+    check("③b CMakeLists / run_tests.ps1 / FE 总索引同步第 26 项",
+          "stage_stability_3d_benchmark" in read(root / "CMakeLists.txt")
+          and "stage_stability_3d" in read(root / "run_tests.ps1")
+          and "-BuildDir" in read(root / "run_tests.ps1")
+          and "26 个 CTest" in read(bench / "README.md")
+          and "25 个 CTest" in read(bench / "README.md")
+          and "mingw64/bin/g++.exe" in read(bench / "README.md"))
+    check("③b 算例索引登记 CB3D23 / stage_stability_3d 且不复用旧编号",
+          "CB3D23" in cases_idx
+          and "stage_stability_3d" in cases_idx
+          and "CB3D01~CB3D21" in cases_idx
+          and "CB3D22" in cases_idx)
+
+    # ---- 4. 文档 / 矩阵如实：③b 完成仍 P 不 Y ----
+    check("③b 规格 §2.5 / §2.6 / §6 如实登记且明确仍 P 不 Y",
+          "第二十次 ③b 补记" in spec
+          and "③b 阶段实测收口" in spec
+          and "③b 完成后的 B3 结论：仍 `P` 不 `Y`" in spec
+          and "19. 第二十次 ③b 不虚报" in spec
+          and "不得靠一个 opt-in 算例提前打勾" in spec
+          and "**B3 结论：仍 `P` 不 `Y`**" in spec)
+    check("③b 能力矩阵仍 | N | P | 且缺口条数不变",
+          "| 非线性稳定全过程（球面弧长法 opt-in） | N | P |" in mat
+          and "第二十次 ③b 记录" in mat
+          and "仍 `P ≠ Y`" in mat
+          and "B2 剩余 0 项" in mat)
+    for name in ("README.md", "使用说明.md", "开发使用手册.md"):
+        txt = read(ROOT / name)
+        check(f"{name} 登记 ③b 且仍 P 不 Y",
+              "③b" in txt and "STABASIS=STAGE" in txt
+              and ("仍 `P`" in txt or "仍 `P ≠ Y`" in txt))
+
+    # ---- 5. FE 侧四份文档同步（③b 收尾补记，防止回退后无人发现）----
+    fe_docs = {
+        "CHANGELOG.md": "③b 施工阶段中间态起点的全过程稳定",
+        "input_format_3d.md": "STABASIS=STAGE",
+        "USER_MANUAL.md": "9.11 施工阶段中间态全过程稳定",
+        "DEVELOPMENT_GUIDE.md": "③b：施工阶段链路也必须回传",
+    }
+    for name, marker in fe_docs.items():
+        txt = read(root / name)
+        check(f"FE {name} 登记 ③b 且写明 {marker}",
+              "③b" in txt and marker in txt)
+    check("FE USER_MANUAL / DEVELOPMENT_GUIDE 如实写明 B3 仍 P 不 Y",
+          "仍 `P` 不 `Y`" in read(root / "USER_MANUAL.md")
+          and "仍 `P` 不 `Y`" in read(root / "DEVELOPMENT_GUIDE.md"))
+
+
 def main() -> int:
     print("=" * 78)
-    print("第十九次 ① / ② / ③a 成桥态全过程稳定接入层独立守卫（纯离线）")
+    print("第十九次 ① / ② / ③a 与第二十次 ③b 全过程稳定接入层独立守卫（纯离线）")
     print("=" * 78)
     fe_contract()
     parser_contract()
@@ -422,6 +574,7 @@ def main() -> int:
     docs()
     stage2_contract()
     stage3_contract()
+    stage4_contract()
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(PASS)} 通过")
