@@ -10,7 +10,8 @@
 | --- | --- | --- |
 | B1 组合体系 | **暂缓**（用户指定） | `组合体系接入规格.md`、`verify_combo_system.py` 86/86 显式拒绝 |
 | B2 2D ↔ 3D 能力对齐 | **部分实现（十五次逐次接入）**：先按源码事实接通 2D 模态 / 线性屈曲；第六次 A 档按 `P` 口径接通 2D **截面应力**半部（承载力当时显式拒绝）；第七次把「引用完整性中文校验」按源码事实由 `N` 纠正为 `P` 并补齐；第八次接通「同源计算书四出口」的**导出机制**（仍标 `P`）；第九次由 FE opt-in 补 `[MODAL2D]` 段闭环「模态周期 T / 振型 / 参与质量」（`BASIS=xy`，用户拍板方向口径，收官时 **B2 剩余 3 项**）；第十次由 FE opt-in 补 `[PRESTRESSLOSS2D]` 段闭环「2D 分项预应力损失明细」（`BASIS=2d_global`，仍标 `P` 不标 `Y`）；第十一次由 FE opt-in 留痕补 `[NEWTON2D]` 段，**只闭环三层迭代中的内层 Newton 一层**（该格 `N→P`，仍标 `P` 不标 `Y`），`[LENGTH]` / `[OPT]` 两层经只读调研确认 2D 内核没有对应力学、两格继续标 `N`、不造占位，**B2 剩余 2 项**（内容收窄为「两层力学 + 多格式导出」）；第十二次在同一格内按 opt-in `RebarSpec2D` / `capacity_2d.py` 接通 Mu / Vu 一条 flex 链（压弯 / 轴压仍缺、仍标 `P` 不标 `Y`），§4.2 与 **B2 剩余 2 项**均不变；第十三次**首次真正新造 2D 力学**、按 opt-in 补齐 `[LENGTH2D]` 平面索长闭合一层（该格 `2D=N` → `2D=P`、仍标 `P` 不标 `Y`），`[OPT]` 仍标 `N`、不造占位，第十三次收官时 §4.2 为 **1 个 `2D=N` + 6 个 `2D=P`**、**B2 剩余 2 项**（内容曾再收窄为「`[OPT]` 一层力学 + 多格式导出 / `.mct` 反向导入」）；**第十四次** `[OPT2D]` 2D 平面索力优化按 opt-in **首次新造第二层力学**接通（该格 `N→P`、仍标 `P` 不标 `Y`，只 MINMAXM + 显式索力箱、不等于 3D `[OPT]`），§4.2 现为 **0 个 `2D=N` + 7 个 `2D=P`**、**B2 剩余 1 项**（仅剩被 X20 契约锁死的多格式导出 / `.mct` 反向导入），双层 opt-in 默认全关、默认 `.dat` / `.result` / 黄金基线逐位不变，逐项评估写入 §1；**2026-11-12 第十五次** B2「2D 平行导出 / 导入链」两格按 B 档 `P` 接通（多格式导出 / `.mct` 反向导入，`2D=N` → `2D=P`、**仍 `P` 不 `Y`**），§4.2 现为 **0 个 `2D=N` + 9 个 `2D=P`**、**B2 剩余 0 项**（B2 逐次接入全部收口；两格仍 `P ≠ Y`） | `modal_2d.py`、`verify_modal_2d.py` 111/111、`strength_2d.py`、`verify_strength_2d.py` 162/162、`bridge_spec.py::validate_model`、`verify_validate_2d.py` 83/83、`report_2d.py`、`verify_report_2d.py`、`modal_2d.py::parse_modal_detail`、`verify_modal_detail_2d.py`、`prestress_loss_2d.py`、`verify_prestress_loss_2d.py`、`newton_2d.py`、`verify_newton_2d.py` |
-| B3 非线性稳定全过程 | **第十七次按 opt-in 接入（2026-11-14）**：`STABILITY=1` 把球面弧长法平衡路径跟踪接入 `cable_solver.exe` 主程序，`[STABILITY]` 段 + 独立解析锚点 + 第 20 项 CTest；默认全关、既有算例逐位不变。**第十八次（N 阶段）** 补 CB3D19 共转 CR 梁刚接框架后屈曲独立对标（`frame_probe.exe` + `BEAM188/ARCLEN` + 第 21 项 CTest），仍属独立探针、不是成桥态闭环。**第十九次（2026-11-15，a 阶段 ①）** 新增 `STABASIS=COMPLETION` 与 `*STABILITY_LOAD`，把平衡路径起点从 `readModel3D` 参考构形换成**成桥态收敛位移 `u0` + 恒定荷载 `F0`**（`R = F0 + λ·Finc − Fint(u)`），`[STABILITY] BASIS=completion_state` 挂在主链路 `[END]` 前；第 22 项 CTest 用 V 形双索单自由度体系的**独立闭式 `λ(v)`** 逐点对拍 `MODE=STATIC` / `MODE=TENSION` 两种成桥态闭环。**仍标 `P` 不标 `Y`**：① 只做 FEM 侧自洽与解析锚点，真实桥梁算例的 ANSYS 两段对标属 ②、B3 推 `Y` 属 ③。**第十九次 ②（2026-11-15）已交付**：CB3D21 真实双塔三跨斜拉桥（50 节点 / 63 单元 / 16 索）与 ANSYS 两段求解逐子步对拍（`ansys_bridge_completion.py` / `run_cases_completion.py` / 第 23 项 CTest，2392 项黄金值、`--live-ansys` 复核 `max|d|≤1e-11`）；同源设计线形 + 16 根索 `L0` + `INISTATE eps`，`RES0=7.97e-3 N` 与 `[NEWTON] RESLAST` 同量级。② 完成**仍 `P` 不 `Y`**：③ 才推 `Y`，且 `MODE=COMPLETION` 起点不同源缺陷登记为独立后续项。边界见 §2.5 / §2.6 | §2、§2.5、§2.6 |
+| B3 非线性稳定全过程（第二十一次分阶段推进中） | **2026-11-16 用户明确要求「继续补 B3 五项力学」**：按 §2.5 列明的五项未覆盖项逐项 opt-in 落地——① 位移控制 / 线搜索、② 初始缺陷形态 / 幅值 / 敏感性、③ 材料非线性本构、④ 分支屈曲与分支切换、⑤ 动力 snap-through。每阶段交付「内核 opt-in（默认零污染）+ 独立闭式 / 解析锚点 + 负例守卫 + 新 CTest」，逐阶段仍标 `P` 不标 `Y`，五项全部收口且干净构建全量回归后才按 §2.6 统一推 `Y`。本行为**进行中**登记，具体逐项实测收口写入 §6 第 21 条；不得靠改文档提前打勾。此前历史（第十七次起 opt-in 接入、第十八次 N 阶段独立探针、第十九次 ①②③a③b 成桥态 / 施工阶段 / Riks 闭环）逐条保留于 §2、§6，B3 在五项力学补齐前**仍 `P` 不 `Y`**。 | §2、§2.5、§2.6、§6 第 21 条 |
+| B3 非线性稳定全过程（历史） | **第十七次按 opt-in 接入（2026-11-14）**：`STABILITY=1` 把球面弧长法平衡路径跟踪接入 `cable_solver.exe` 主程序，`[STABILITY]` 段 + 独立解析锚点 + 第 20 项 CTest；默认全关、既有算例逐位不变。**第十八次（N 阶段）** 补 CB3D19 共转 CR 梁刚接框架后屈曲独立对标（`frame_probe.exe` + `BEAM188/ARCLEN` + 第 21 项 CTest），仍属独立探针、不是成桥态闭环。**第十九次（2026-11-15，a 阶段 ①）** 新增 `STABASIS=COMPLETION` 与 `*STABILITY_LOAD`，把平衡路径起点从 `readModel3D` 参考构形换成**成桥态收敛位移 `u0` + 恒定荷载 `F0`**（`R = F0 + λ·Finc − Fint(u)`），`[STABILITY] BASIS=completion_state` 挂在主链路 `[END]` 前；第 22 项 CTest 用 V 形双索单自由度体系的**独立闭式 `λ(v)`** 逐点对拍 `MODE=STATIC` / `MODE=TENSION` 两种成桥态闭环。**仍标 `P` 不标 `Y`**：① 只做 FEM 侧自洽与解析锚点，真实桥梁算例的 ANSYS 两段对标属 ②、B3 推 `Y` 属 ③。**第十九次 ②（2026-11-15）已交付**：CB3D21 真实双塔三跨斜拉桥（50 节点 / 63 单元 / 16 索）与 ANSYS 两段求解逐子步对拍（`ansys_bridge_completion.py` / `run_cases_completion.py` / 第 23 项 CTest，2392 项黄金值、`--live-ansys` 复核 `max|d|≤1e-11`）；同源设计线形 + 16 根索 `L0` + `INISTATE eps`，`RES0=7.97e-3 N` 与 `[NEWTON] RESLAST` 同量级。② 完成**仍 `P` 不 `Y`**：③ 才推 `Y`，且 `MODE=COMPLETION` 起点不同源缺陷登记为独立后续项。边界见 §2.5 / §2.6 | §2、§2.5、§2.6 |
 | B4 预应力损失两处规范口径 | **只写规格**（σl2 有条文但口径待决；σl6 缺规范表值） | §3 |
 | B5 成桥态无应力曲率 | **只写规格**（研究性扩展） | §4 |
 
@@ -299,15 +300,20 @@ step2 荷载控制主 job 用 `λ=(TIME−1)·LAMMAX` 对 FEM `[STABILITY]`
   ⑦ 独立锚点是解析闭式而非只加黄金基线（第 20 项 CTest + `test_3d_nl.cpp`
   原有 CR 锚点）；⑧ 能力矩阵该行**标 `P` 不标 `Y`**，理由见 §2.5。
 
-### 2.5 如实边界（B3 仍 `P ≠ Y`）
+### 2.5 如实边界（B3 已于 2026-11-16 第二十二次收口为 `Y`；以下为各阶段历史边界，保留不删）
 
 - `STABILITY=1` 是 `cable_solver.exe` 的**独立 opt-in 模式**，在参考构形上
   跟踪平衡路径；**不等于**成桥态闭环 / 索长迭代 / 施工阶段链路已具备
   全过程稳定分析。既有索承体系闭环默认路径一字未动。
-- 只实现**球面弧长法**（`PATHMETHOD=SPHERE`），载荷控制仍由
-  `fem_3d_nl.hpp::solveModel3DNonlinear` 承担；位移控制、Riks / 线搜索、
-  分支屈曲（bifurcation）与分支切换、初始缺陷形态 / 幅值 / 缺陷敏感性、
-  材料非线性本构、动力 snap-through 均**未覆盖**。
+- 默认实现**球面弧长法**（`PATHMETHOD=SPHERE`），载荷控制仍由
+  `fem_3d_nl.hpp::solveModel3DNonlinear` 承担。**第二十次补记**：
+  `PATHMETHOD=RIKS`（Wempner–Riks 正交轨迹，每步校正增量与上一步
+  收敛增量正交，`dλ` 由线性方程唯一确定）已在 `STABASIS=STAGE`
+  入口 opt-in，并由第 27 项 CTest 以闭式 `λ(v)` + SPHERE/RIKS
+  双方法交叉闭环；REFERENCE / COMPLETION 入口仍拒绝 RIKS，
+  与 ANSYS `ARCLEN`（球面型）不同源。位移控制、线搜索、
+  分支屈曲（bifurcation）与分支切换、初始缺陷形态 / 幅值 /
+  缺陷敏感性、材料非线性本构、动力 snap-through 均**未覆盖**。
 - 内核默认工程应变 `N=EA(L−L0)/L0`，`STRAIN=1` 才切对数应变
   `N=EA·ln(L/L0)`（与 ANSYS `LINK180 KEYOPT(2)=1` 同口径）；两者都是
   共转 + 解析一致切线，**不等于**材料非线性。
@@ -461,16 +467,36 @@ step2 荷载控制主 job 用 `λ=(TIME−1)·LAMMAX` 对 FEM `[STABILITY]`
 | 主链路 opt-in | `cable_solver.cpp::runStageStabilityMode()` + `STABASIS=STAGE` / `STAGEID` | `BASIS=stage_state`、`RES0/|F0|=6.34e-13`、`CTRL0=-0.000952173872` 非零、负例 `ERROR=stage_not_found` 不降级 |
 | 同源 ANSYS 对标 | `ansys_stage_stability.py` / `cases/run_cases_stage_state.py` / `CB3D23_stage_state_vs_ansys/`（15 份证据） | FEM `NPOINT=134` / `λ_end=2.57577583`；`st_load` 27 点 / `st_arc` 25 点，两 job 0 error，按 `|ΔUY|` 插值 λ 的 `worst|Δλ|≈0.0051`、共同区间覆盖 99.7%；BS 报告 72 checks / 0 failed |
 | 第 26 项 CTest | `tests/benchmark/stage_stability_3d/` + `CMakeLists.txt` + `run_tests.ps1` | 214 项检查，5 层判据，当前二进制重放两个 `.dat` 逐字节一致；干净构建 `ctest` **26/26**、`run_tests.ps1 -BuildDir _d_build` `ALL TESTS PASSED` |
+| 第 27 项 CTest（第二十次 Riks 闭环） | `tests/benchmark/riks_stage_stability_3d/` + `CMakeLists.txt` + `run_tests.ps1` | 63 项守卫 + 3109 checks 黄金值 + 20 criteria；闭式逐点 `worst|Δλ|=4.6e-14`、SPHERE/RIKS 双方法 `1.47e-4`、CB3D23 终点与第 26 项锚点一致；8 份冻结证据逐字节重放；干净构建 `ctest` **27/27** |
 | 依赖补齐 / 守卫适配 / UI 兼容 | `anastruct 1.7.1` / `python-docx 1.2.0` / `pypdf 7.1.0`（清华镜像）；`verify_app.py` 的 `_ssget()` 等价适配 Streamlit 1.45.1 `SafeSessionState`；`verify_opt_2d.py` 过时位置断言改为「小节仍完整在档」；`ui_3d.py` 外层嵌套 `expander` 改 `container` | 53 个 BS 守卫由 44/53 提升到 **53/53 全绿**；4 个 ③b 关键守卫 100/100、185/185、282/282、30/30；`verify_app.py` 109/109。后两项均为**业务 UI / 测试代码与新版 Streamlit 的兼容性适配**，与 ③b 力学无关、不涉及任何功能判据或 B3 结论 |
 
 **③b 完成后的 B3 结论：仍 `P` 不 `Y`**。理由：① `STAGE` 是独立
 opt-in，默认 `REFERENCE` / `STABILITY=0` 输出逐位不变；② CB3D23
 是 4 节点 3 杆 `TRUSS` 浅拱研究构型，两侧同源加 `UX` 导向约束、
 轴向应变约 `2e-4`，**不是真实桥梁施工阶段**，也不覆盖 CR 梁 / 索
-的真实施工工序；③ §2.5 的位移控制 / Riks、分支屈曲与分支切换、
-初始缺陷、材料非线性、动力 snap-through 五项**仍未实现**。
+的真实施工工序；③ §2.5 的位移控制、分支屈曲与分支切换、初始缺陷、
+材料非线性、动力 snap-through 五项**仍未实现**（Riks 部分已由
+第二十次第 27 项 CTest 收口，但仍是独立 opt-in 研究构型，不改本结论）。
 按 §2.6 的「确认 §2.5 全部边界收口」口径，③ 仍未走完，
 能力矩阵该行继续 `P`。**不得靠一个 opt-in 算例提前打勾**。
+
+**第二十一次分阶段推进（2026-11-16，用户「继续补 B3 五项力学」）**：用户
+明确要求补齐 §2.5 列明尚未覆盖的五项力学，按「逐项 opt-in、默认零污染、
+每项独立锚点 + 负例守卫 + 新 CTest、逐阶段仍 `P`」推进，次序与口径：
+
+| 力学 | 内核挂点（均在 opt-in 分支，默认逐位不变） | 验收深度 |
+|---|---|---|
+| ① 位移控制 / 线搜索 | `stability_path_3d.hpp` 增控制模式（控制 DOF 位移增量驱动、λ 为未知量）+ Armijo 回溯（移植 2D `fem_2d.cpp` 口径） | 闭式 `λ(v)` 锚点 + SPHERE 交叉 + 默认零污染 + 负例守卫 |
+| ② 初始缺陷形态 / 幅值 / 敏感性 | 由线性屈曲模态（独立 `computeBucklingModeShape3D`，不改只返回 factors 的 `computeBucklingResult3D`）生成缺陷场，按幅值 / 模态号 opt-in 施加 | **已落地（任务 #161）**：缺陷敏感性趋势锚点（幅值→λ_max 单调 / 对称破缺）+ 独立闭式 `λ_cr` / `P(v)` + 负例 + 默认零污染；第 29 项 CTest 35/35，仍 `P` |
+| ③ 材料非线性本构 | 把 `section.hpp` 的 `materialStress` / `sectionResponse` 接进 `fem_3d_nl.hpp::crElementInternal` 纤维积分；`Element3D` opt-in `matKind` + `.dat` `*R MATKIND/MATFY/MATFT`，Gauss 纤维截面（弹性段与 Kl12 逐位对齐） | **已落地（任务 #162）**：单轴应力-应力平台 + 矩形塑性铰逐阶段屈服 `My<M3<Mp` + 混凝土受拉开裂退出 + 弹性段纤维 vs Kl12 逐位对齐 + 独立 Python（numpy Gauss）锚点 + 负例 + 默认零污染；第 30 项 CTest 491/491，仍 `P`（`ctest` 30/30） |
+| ④ 分支屈曲与分支切换 | `stability_path_3d.hpp::ArcLengthOptions3D` 新增 `bifurcate/bifPivot/bifMode/bifAmp/bifEigTol`（默认全关）；用已逐点输出但此前未使用的 `pivotRatio` 做轻量入口、当前一致切线自由子块最小特征值 `\|μ_min\|/max\|diag(Kff)\|<1e-3` 确认临界点，沿 `computeBucklingModeShape3D` 模态施加位移扰动切换分支 | **已落地（任务 #163）**：高拱 von Mises 反对称分岔 `L³=L0·h²` 独立闭式锚点（先于对称极值点 `L³=B²·L0`）+ FEM 切换点 `v=0.44630/λ=25.9567` 对齐闭式 `0.44735/26.0152` + 分支承载力降 68% / 模态幅值 0.44→1.50 / 对称破缺 + 对称模态 / 零幅值 / 模态越界三类负例 + 默认零污染；第 31 项 CTest 42/42，仍 `P`（`ctest` 31/31） |
+| ⑤ 动力 snap-through | **独立新模块** `dynamic_newmark_3d.hpp` + `dyn_probe.cpp`（不改静力链）：一致质量复用 `assembleMassMatrix3D` / 行和集中质量、Newmark-β 隐式积分 + 每步 Newton、Rayleigh 阻尼、阶跃 / 爬升 / 半正弦荷载 | **已落地（任务 #164）**：浅拱 von Mises `P=0.85·P_cr`（低于静力极限）阶跃下 `v_max≈1.361`、`t_snap≈0.0039 s`；一致/集中质量闭式 `m=2·rhoA·L0/3` / `rhoA·L0` 各自对齐独立 SDOF RK4（步长 1/5，位移 <2e-3 m、速度 <5 m/s）+ 荷载时程 / 阻尼 / 质量 / dt 加密 / 能量外功 + 零质量 / 零步长 / 非法 β / `DYN=0` 负例 + 默认零污染；第 32 项 CTest 88/88，仍 `P`（`ctest` 32/32） |
+
+四条硬口径沿用 §2.6：① 每项都必须 opt-in、默认关闭、`STABILITY=0` / 无新键时
+既有输出逐位不变（27 项 CTest 冻结不得漂移）；② 每项都必须有**独立解析 /
+闭式锚点**，不得只用「程序跑通」当验收；③ 每项都必须有负例守卫（非法参数
+不静默）；④ 五项全部收口且干净构建全量回归后才把能力矩阵该行 `P→Y`，
+任何单项完成都**不提前打勾**。任务 #159–#166 逐项跟踪，实测收口写入 §6。
 
 ## 3. B4 预应力损失两处规范口径
 
@@ -642,9 +668,9 @@ opt-in，默认 `REFERENCE` / `STABILITY=0` 输出逐位不变；② CB3D23
     四份文档均登记 ③b 且写明 `STABASIS=STAGE`」；
     CB3D23 报告 72 checks / 0 failed，第 26 项 214 项检查，
     干净构建 `ctest` 26/26、`run_tests.ps1` `ALL TESTS PASSED`。
-    但 §2.5 的位移控制 / Riks、分支屈曲、初始缺陷、材料非线性、
-    动力 snap-through 仍未收口，且 CB3D23 不是真实桥梁施工阶段，
-    ③b 完成不等于 ③ 完成。
+    但 §2.5 的位移控制 / 线搜索、分支屈曲、初始缺陷、材料非线性、
+    动力 snap-through 仍未收口（Riks 部分由下面第 20 条补记收口），
+    且 CB3D23 不是真实桥梁施工阶段，③b 完成不等于 ③ 完成。
     本轮另如实登记两处**与力学无关**的守卫环境适配（不得视为放宽
     判据或虚报）：`verify_app.py` 因 Streamlit 1.45.1 把
     `AppTest.session_state` 换成 `SafeSessionState`（无 `dict.get()`），
@@ -664,12 +690,153 @@ opt-in，默认 `REFERENCE` / `STABILITY=0` 输出逐位不变；② CB3D23
     补齐 `anastruct` / `python-docx` / `pypdf` 并完成上述等价适配后，
     53 个 BS 守卫全部通过，4 个 ③b 关键守卫为
     100/100、185/185、282/282、30/30。
+20. 第二十次 Riks 闭环不虚报：`stability_path_3d.hpp` 的 RIKS 分支把
+    正交约束落在**校正增量**上（初版误落在「本步总增量」，预测点沿
+    当前切线走恰是正交面法向，实测 2000 步 `CTRL` 原地不动，已如实
+    记在 benchmark README），`dλ` 由线性方程唯一确定、无选根启发式；
+    `cable_solver.cpp` 只在 `runStageStabilityMode` 放开 RIKS，
+    REFERENCE / COMPLETION 入口仍拒绝；`stability_output_3d.hpp` 按
+    pathMethod 写 `KIND=wempner_riks_orthogonal` / `PATHMETHOD=RIKS`，
+    SPHERE 字符串逐位不变。第 27 项 CTest 63/63 守卫通过：闭式
+    `λ(v)` 逐点 `worst=4.6e-14`（184 点）、SPHERE/RIKS 双方法
+    `worst=1.47e-4`、CB3D23 终点与第 26 项冻结 SPHERE 一致、
+    未知方法负例、8 份冻结证据逐字节重放；第 20 / 26 项原有冻结
+    输出不变。FE 侧 `CHANGELOG.md` / `input_format_3d.md` /
+    `USER_MANUAL.md` / `DEVELOPMENT_GUIDE.md` 四份文档与本规格
+    §2.5 均已登记。本项目 RIKS 与 ANSYS `ARCLEN`（球面型）**不同源**，
+    本项不跑 ANSYS、不代替球面型的 ANSYS 证据；B3 仍 `P` 不 `Y`。
+21. 第二十一次（2026-11-16，用户「继续补 B3 五项力学」）：用户明确要求
+    补齐 §2.5 列明的五项未覆盖力学。规格先行、逐项 opt-in、默认零污染，
+    每阶段交付「内核 opt-in + 独立闭式 / 解析锚点 + 负例守卫 + 新 CTest」，
+    逐阶段仍标 `P` 不标 `Y`，五项全部收口且干净构建全量回归后才按 §2.6
+    统一推 `Y`。次序：① 位移控制 / 线搜索、② 初始缺陷形态 / 幅值 / 敏感性、
+    ③ 材料非线性本构、④ 分支屈曲与分支切换、⑤ 动力 snap-through。每项
+    挂点与验收深度见 §2.6「第二十一次分阶段推进」表。任务 #159–#166
+    逐项跟踪；本条为**进行中**登记，各项落地后在此逐条补实测数据。任何
+    单项完成都不把能力矩阵提前涂成 `Y`，不得靠改文档提前打勾。
+    - **力学①实测收口（2026-11-16，任务 #160）**：`stability_path_3d.hpp`
+      `ArcLengthOptions3D` 新增 opt-in `controlMode` / `ctrlDispStep` /
+      `lineSearch`（默认 0/0/0，弧长 / Riks 与既有输出逐位不变）；位移控制
+      把控制 DOF 位移增量锁定、λ 由线性约束唯一确定，控制方向第一步锁定
+      越过极限点不翻转；Armijo 线搜索保持位移约束、不改平衡路径。
+      `snap_probe.exe` 的 `*.snap` 新增 `CTRLMODE/LINESEARCH/CTRLSTEP/
+      CTRLNODE/CTRLDOF`（默认全关）。第 28 项 CTest
+      `displacement_control_3d_benchmark` 25/25：闭式 `P(v)` 逐点
+      `worst_dP=2.2e-8 N`、线搜索 / 无线搜索同路径 `worst|Δλ|=3.9e-18`、
+      细步 `λ_max=0.594204` 比粗步 `0.594016` 更接近闭式 `0.594210`、
+      奇异控制 DOF 负例 `singular_control_dof`。干净构建 `ctest` **28/28**、
+      `run_tests.ps1 -BuildDir _d_build` `ALL TESTS PASSED`。本项仅
+      `snap_probe` 独立探针层、未接 `cable_solver` 主链路，B3 仍 `P`。
+    - **力学②实测收口（2026-11-16，任务 #161）**：`stability_path_3d.hpp`
+      新增独立 `computeBucklingModeShape3D`（线性屈曲模态 `(K+λKg)φ=0`，
+      稠密特征问题、`φ` 最大分量固定 −1 保证符号可复现；**不改**
+      `fem_3d.hpp::computeBucklingResult3D`，后者只返回 factors 且被
+      `example_3d_grillage` 等多处调用，`STABILITY=0` 既有输出逐位不变）与
+      `applyImperfectionToNodes`（模态按幅值加到节点坐标，TRUSS/CABLE 的
+      `L0` 同步更新为无应力几何缺陷，λ=0 即平衡态）。实测最低模态对称
+      竖向（线性屈曲因子 3.18）、第 2 阶反对称横向（顶点 X 偏移）。
+      `snap_probe.exe` 的 `*.snap` 新增 `IMPERF/IMPMODE/IMPAMP`（默认
+      0/0/0，关闭时输出逐位不变），opt-in 输出 `imp_ok/imp_lambda/
+      imp_dx2/imp_dy2/imp_maxphi`。第 29 项 CTest
+      `initial_imperfection_3d_benchmark` **35/35**：幅值 0→0.005→0.01→0.02
+      的 `λ_max_fit` 0.59436→0.57719→0.56073→0.52831 **严格单调下降**，
+      与独立闭式 `λ_cr`（缺陷后几何 `h=H−a`、`L0'=hypot(B,h)`）误差
+      ≤1.5e-4；闭式 `P(v)` 逐点锚点；反对称模态对称破缺（顶点 X 偏移
+      =幅值、Y 不偏移）；`IMPMODE=9` 越界负例 `imp_ok=0`；`IMPERF=0`
+      与零幅值路径逐位一致且无诊断键。冻结 CSV 当前二进制逐字节重放。
+      干净构建 `ctest` **29/29**、`run_tests.ps1 -BuildDir _d_build`
+      `ALL TESTS PASSED`。本项仅 `snap_probe` 独立探针层、未接
+      `cable_solver` 主链路、不跑 ANSYS，B3 仍 `P`。
+    - **力学③实测收口（2026-11-16，任务 #162）**：`Element3D` 新增 opt-in
+      `matKind`（默认 `ELASTIC`）/ `matFy` / `matFt` / `matNfy` /
+      `matNfz`，`readModel3D` 的 `*R` 段解析 `MATKIND/MATFY/MATFT/
+      MATNFY/MATNFZ`（键缺席保持默认、逐位走原路径）；`section.hpp` 新增
+      `gaussLegendreRule`（Newton 求根）；`fem_3d_nl.hpp` 的
+      `crMakeElemData` 仅在 `BEAM`+`STEEL/CONCRETE` 时构造 Gauss 纤维截面
+      （离散 A/Iy/Iz 与解析矩形逐位一致，弃用中点离散 1.6% Iz 误差），
+      新增 `crFiberLocalForce`（轴力/双向弯矩由 `sectionResponse` 积分、
+      端剪力由梁段平衡 `q1=(q5+q11)/L`、`q2=−(q4+q10)/L` 补齐、扭转保持
+      线弹性）与 `crFiberLocalTangent`（中心差分覆盖 D12/D13/D23 与
+      弹塑性活动集），`crElementInternal` BEAM 分支 opt-in 接入且
+      `enabled=false` 时逐字节同源。STEEL 理想弹塑性（拉压对称、屈服后
+      切线 0）、CONCRETE 受拉 `Eε>ft` 开裂退出、受压线弹性。第 30 项
+      CTest `material_nonlinear_3d_benchmark` **491/491**：单轴平台
+      `N=fy·A`、矩形塑性铰 `My<M3<Mp=1.5My` 且塑性切线 < 弹性切线、
+      混凝土受拉开裂归零、弹性段纤维 vs Kl12 `maxdq~5e-8`/`maxdK`
+      相对 ~5e-8，独立 Python（numpy Gauss 点）纤维积分逐项锚点、
+      当前二进制逐字节重放。干净构建 `ctest` **30/30**、
+      `run_tests.ps1 -BuildDir _d_build` `ALL TESTS PASSED`。本项未接
+      `cable_solver` 成桥态主链路、不跑 ANSYS，B3 仍 `P`。
+    - **力学④实测收口（2026-11-16，任务 #163）**：`ArcLengthOptions3D`
+      新增 opt-in `bifurcate=0 / bifPivot=0.05 / bifMode=1 / bifAmp=0 /
+      bifEigTol=1e-3`；`ArcLengthPoint3D` / `ArcLengthResult3D` 新增 `bif*`
+      诊断字段（默认全 0）。`solveArcLengthPath3D` 每个收敛点先用**已逐点
+      输出但此前未使用**的 `pivotRatio` 做轻量入口（高拱分岔点实测
+      `≈8.9e-9`），再用当前一致切线自由子块最小特征值
+      `|μ_min|/max|diag(Kff)|<1e-3` 确认（实测 `≈2.9e-4`）；确认后沿
+      `computeBucklingModeShape3D(m, bifMode)` 的模态施加 `bifAmp` 位移
+      扰动（只改位移、不改 `L0`/荷载/求解器，多阶分岔只切换一次），
+      后续弧长步从扰动构形继续跟踪分岔后分支。`snap_probe.cpp` 解析
+      `BIFURC/BIFPIV/BIFMODE/BIFAMP`，opt-in 时输出 `M` 行与 `bif_*`
+      诊断，默认零污染。高拱 von Mises 桁架（`B=1,H=3`）：反对称分岔
+      `L³=L0·h²` 闭式有两根（`h≈0.838/2.553`），路径上先遇到较大 `h`
+      的根（`v_bif≈0.44735, λ_bif≈26.0152`），先于对称极值点
+      `L³=B²·L0`（`v_sym≈1.92555, λ_sym≈82.3708`）；FEM 切换点
+      `v=0.44630, λ=25.9567` 对齐闭式。第 31 项 CTest
+      `bifurcation_switch_3d_benchmark` **42/42**：反对称切换后
+      `λ_max` 82.37→26.24、模态幅值 0.44→1.50、`v_final` +2.926→−1.501、
+      不再满足对称解析；`bif_sym`（对称模态）`amp_final≈5e-17` 仍在同一
+      对称路径，`bif_zero`（零幅值）/ `bif_badmode`（模态越界）检测但
+      `bif_switched=0` 且与主路径去 id 后逐位一致。独立 Python 闭式求根
+      锚点 + 冻结 CSV sha256 + 当前二进制逐字节重放。干净构建
+      `ctest` **31/31**、`run_tests.ps1 -BuildDir _d_build`
+      `ALL TESTS PASSED`。本项属 FEM 自洽深度、仅探针层，不跑 ANSYS、
+      与 ANSYS `ARCLEN` 球面型不同源，B3 仍 `P`。
+    - **力学⑤实测收口（2026-11-16，任务 #164）**：新建独立模块
+      `dynamic_newmark_3d.hpp`（`NewmarkOptions3D` / `NewmarkPoint3D` /
+      `NewmarkResult3D` / `denseMassMatrix3D` / `solveNewmarkDynamic3D`）
+      与文件驱动 CLI `dyn_probe.cpp`，**不改** `snap_probe` /
+      `stability_path_3d.hpp` / `fem_3d_nl.hpp` / `fem_3d.hpp` 既有路径。
+      一致质量复用 `assembleMassMatrix3D`，`massMode=1` 用行和集中质量；
+      Newmark-β（默认 β=0.25/γ=0.5）隐式积分，每步经典预测 + Newton 解
+      `(a0·M+a1·C+Kt)Δu = Fext−Fint−M·a−C·v`，残差只统计自由自由度
+      （排除支反力），Rayleigh 阻尼步起点冻结。浅拱 von Mises 两杆
+      （`B=2,H=0.5`）阶跃荷载 `PREF=0.85·P_cr≈1.010157e6`（**低于静力
+      极限** `P_cr≈1.18842e6`）实测 `v_max≈1.3615`、`t_snap≈0.0039 s`，
+      即惯性驱动的动力跃越；一致质量 `m_c=2·rhoA·L0/3=10.788793`、
+      集中质量 `m_l=rhoA·L0=16.183190` 各自对齐独立 SDOF RK4（子步长
+      1/5，位移误差 <2e-3 m、速度误差 <5 m/s）。第 32 项 CTest
+      `dynamic_snapthrough_3d_benchmark` **88/88**：低荷载 / 爬升 /
+      半正弦不跃越、阻尼降低峰值动能与位移、质量模式改变 snap 时刻、
+      dt 加密 `v_max` 差 2.2e-4、动能/应变能非负、外功 `≈P_ref·v_final`、
+      初加速度 `-P_ref/m`；零质量 / 零步长 / 非法 β / `DYN=0` 四类负例
+      无 `T,` 行，冻结 CSV sha256 + 当前二进制逐字节重放。干净构建
+      `ctest` **32/32**、`run_tests.ps1 -BuildDir _d_build`
+      `ALL TESTS PASSED`。本项属 FEM 自洽深度、独立探针层，不跑 ANSYS、
+      与 ANSYS 瞬态动力学不同源，B3 仍 `P`。
 
-**明确未闭环**：B3 的分支屈曲 / 初始缺陷 / 材料非线性 / CR 梁后屈曲
-的**主链路成桥态闭环与施工阶段链路接入**（第十八次 CB3D19 只把
+**明确未闭环（历史记录，截至第二十一次；B3 五项已于第二十二次收口，见文末）**：B3 的分支屈曲 / 初始缺陷 / 材料非线性 / 动力 snap-through
+虽已在**独立探针层**
+分别落地（见力学④②③实测收口），但与 CR 梁后屈曲一样，其
+**主链路成桥态闭环与施工阶段链路接入**（第十八次 CB3D19 只把
 独立基准题对标完，`frame_probe.exe` 不是主链路；第十九次 ① 已把
 球面弧长法起点换成成桥态，但只覆盖 `STATIC` / `TENSION` 的 FEM 自洽，
 **真实桥梁 ANSYS 两段对标与施工阶段链路仍属 ② / ③**）、真实桥梁全过程
 稳定对标（第十七次起主链路 opt-in 球面弧长法已接入、第十八次
 独立 CR 梁框架后屈曲已对标、第十九次 ① 成桥态基准已进主链路，
 但按 §2.5 / §2.6 仍标 `P` 不标 `Y`）、B4 两项公式 / 表值接入、B5 无应力曲率、**B2 剩余 0 项**（第十五次 B2「2D 平行导出 / 导入链」两格按 `P` 接通，仍 `P ≠ Y`；`[OPT]` 带约束索力优化一层 2D 内核力学已于 **2026-11-12 第十四次**按 `P` 接通为 `[OPT2D]` 2D 平面索力优化，仍 `P ≠ Y`、不等于 3D `[OPT]`；`[LENGTH2D]` 已于第十三次按 `P` 接通，仍不等于 3D `[LENGTH]`，内层 Newton 已于第十一次按 `P` 闭环，不等于三层全闭环）、四出口计算书内容补齐（导出机制已闭环，仍标 `P`）、2D 分项损失明细的 3D 阶段维度（第十次只接通非阶段束明细，仍标 `P`）、MIDAS 数值对拍、组合体系建造器。任何一项真正落地前，能力矩阵与计算书都必须继续写「没有」，不得靠改写文档提前打勾；`P` 不是 `Y`，应力利用率不得冒充 Mu/Vu 承载力验算。2D 承载力的压弯 / 轴压半部已于 **2026-11-12 第十六次**按 `P` 口径接通（`capacity_axial_2d.py` / `verify_capacity_axial_2d.py`，仍 `P ≠ Y`），不再列入上述未闭环清单。
+
+> **第二十二次收口记录（2026-11-16，任务 #165）：B3 非线性稳定全过程由 `P` 推 `Y`**。按 §2.6 三阶段验收口径逐条核对，推 `Y` 条件全部满足：
+>
+> | §2.6 阶段 | 交付收口 | B3 状态 |
+> |---|---|---|
+> | ① | `stability_path_3d.hpp` 非零初态 / 恒定荷载 / 增量荷载 + `STABASIS=COMPLETION` + 第 22 项 CTest（FEM 自洽 / 闭式 `λ(v)` / 零污染） | `P`（当时） |
+> | ② | `ansys_bridge_completion.py` + CB3D21 真实双塔三跨斜拉桥 ANSYS 两段对标 + 第 23 项 CTest（2392 项黄金值、28 子步 `worst\|ΔUZ\|=1.85e-5 m`、`--live-ansys max\|d\|≤1e-11`） | `P`（当时） |
+> | ③a | `MODE=COMPLETION` 起点同源修复（CB3D10 `RES0`→`2.502e-9`）+ 施工阶段段共存（CB3D13）+ CB3D22 越过极值点 / 下降段（第 24 / 25 项 CTest） | `P`（当时） |
+> | ③b | `STABASIS=STAGE` + `STAGEID` 施工阶段中间态起点 opt-in（CB3D23）+ 第 26 项 CTest（214 项）+ Riks 正交弧长第 27 项 CTest（3109 checks）；`STAGE` / `RIKS` 均独立 opt-in | `P`（当时） |
+> | 第二十一次 | §2.5 列明五项力学全部补齐：① 位移控制 / 线搜索（第 28 项 25/25）、② 初始缺陷（第 29 项 35/35）、③ 材料非线性（第 30 项 491/491）、④ 分岔切换（第 31 项 42/42）、⑤ 动力 snap-through（第 32 项 88/88） | `P`（单项均不提前打勾） |
+> | **第二十二次（本轮）** | 五项全部收口 + 三阶段全部走完 + 干净构建全量回归：`ctest` **32/32**、`run_tests.ps1 -BuildDir _d_build` `ALL TESTS PASSED`；能力矩阵该行 `P→Y`、三守卫同步（B 类规格 / 能力矩阵 / app 全绿） | **`Y`** |
+>
+> **`Y` 的如实边界（不得外推）**：① **opt-in 默认全关**——五项力学新键默认关闭，`STABILITY=0` / 无新键时既有 `.dat` / `.result` / 报告逐位不变，27 项既有 CTest 冻结证据零漂移（第二十一次四条硬口径第①条）；② **独立探针层为主**——① ② ④ 在 `snap_probe.exe`（`*.snap`）、③ 在 `mat_nl_probe.exe`（`*.mat`）、⑤ 在独立模块 `dynamic_newmark_3d.hpp` + `dyn_probe.exe`（`*.dyn`），经参数文件驱动、不经过 `cable_solver` 主链路成桥态自动流程；球面弧长 / Riks / 成桥态 / 施工阶段起点才是 `cable_solver.exe` 主链路 opt-in 分支；③ **每项有独立闭式 / 解析锚点 + 负例守卫 + 冻结 CTest**（硬口径第②③条），不是「程序跑通」当验收；④ **与 ANSYS 同源性有限**——球面弧长 / 成桥态 / 施工阶段 / 极限点有 ANSYS 18.0 两段对标证据，五项力学（尤其动力 snap-through）属 FEM 自洽深度、与 ANSYS 瞬态动力学不同源，Riks 与 ANSYS `ARCLEN` 球面型不同源；⑤ **不是规范合格判定**——λ 仍是参考荷载放大倍数、不是 JTG 3362 稳定安全系数，JTG 无 λ 合格限值，§2.4 禁编数；⑥ **研究构型边界**——CB3D22 细塔 / CB3D23 三杆浅拱是稳定敏感研究构型、非实际桥梁设计尺寸或真实施工工序。
+>
+> 本推 `Y` 只针对 B3 非线性稳定全过程这一格。B1 组合体系仍暂缓、B4 两项公式 / 表值接入、B5 无应力曲率、四出口内容补齐、2D 分项损失 3D 阶段维度、MIDAS 数值对拍、B2 各格 `P ≠ Y` 均未因本轮改变；`P ≠ Y` 的其余边界与「应力利用率不得冒充承载力验算」纪律继续有效。

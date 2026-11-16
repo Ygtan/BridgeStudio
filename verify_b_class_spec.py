@@ -221,10 +221,10 @@ def no_new_capability() -> None:
               and "Ftarget" in read(root / "fem_3d_nl.hpp"))
         check("B3 opt-in：[BUCKLING] ERROR 段仍保留",
               '"nonlinear_state_not_supported"' in cs)
-        check("B3 opt-in：独立守卫与矩阵 P≠Y 在位",
+        check("B3 opt-in：独立守卫与矩阵状态在位（第二十二次 P→Y）",
               (ROOT / "verify_stability_3d.py").is_file()
               and "stability_3d.py" in read(ROOT / "开发使用手册.md")
-              and "| 非线性稳定全过程（球面弧长法 opt-in） | N | P |"
+              and "| 非线性稳定全过程（路径跟踪 opt-in） | N | Y |"
               in read(ROOT / "能力边界矩阵.md"))
         nl = read(root / "fem_3d_nl.hpp")
         check("内核未新增第二套路径跟踪求解器（仍在独立头文件）",
@@ -583,6 +583,139 @@ def b2_fifteenth() -> None:
           and "仍 `P` 不 `Y`" in x20 and "无 GUI 入口" in x20)
 
 
+def b3_five_mechanics() -> None:
+    """第二十一次（2026-11-16）：五项力学分阶段推进登记不虚报。
+
+    只锁「规格已登记、仍 P、opt-in 默认零污染、逐项独立锚点、不得提前
+    打勾」的口径，不检查功能是否可用（那会虚报能力），也不改内核。
+    """
+    t = SPEC.read_text(encoding="utf-8")
+    five = ("位移控制", "线搜索", "初始缺陷", "材料非线性",
+            "分支屈曲", "动力 snap-through")
+    check("第21次：§0 表格新增 B3 五项力学进行中登记行",
+          "B3 非线性稳定全过程（第二十一次分阶段推进中）" in t
+          and "继续补 B3 五项力学" in t)
+    check("第21次：五项力学逐条在档",
+          all(k in t for k in five))
+    check("第21次：§2.6 分阶段推进表五力学齐全且逐项仍 P",
+          "第二十一次分阶段推进" in t
+          and "| ① 位移控制 / 线搜索 |" in t
+          and "| ② 初始缺陷形态 / 幅值 / 敏感性 |" in t
+          and "| ③ 材料非线性本构 |" in t
+          and "| ④ 分支屈曲与分支切换 |" in t
+          and "| ⑤ 动力 snap-through |" in t)
+    check("第21次：§6 第 21 条进行中登记在位",
+          "21. 第二十一次（2026-11-16" in t
+          and "任务 #159–#166 逐项跟踪" in t)
+    # 力学②已落地：只锁「如实登记实测收口 + 源码确有独立函数 + benchmark
+    # 在档」，不检查能力是否可直接用于主链路（那会虚报）。
+    fe = ROOT.parent / "FEM-Eigen"
+    sp3 = fe / "stability_path_3d.hpp"
+    bm = fe / "tests" / "benchmark" / "initial_imperfection_3d"
+    check("第21次力学②：§6 实测收口在档",
+          "力学②实测收口" in t and "任务 #161" in t
+          and "严格单调下降" in t and "35/35" in t)
+    check("第21次力学②：§2.6 表格标记已落地且仍 P",
+          "**已落地（任务 #161）**" in t and "第 29 项 CTest 35/35，仍 `P`" in t)
+    check("第21次力学②：FE 源码有独立屈曲模态 / 缺陷施加函数",
+          sp3.is_file()
+          and "computeBucklingModeShape3D" in sp3.read_text(encoding="utf-8")
+          and "applyImperfectionToNodes" in sp3.read_text(encoding="utf-8"))
+    check("第21次力学②：第 29 项 benchmark 在档",
+          (bm / "compare_imperfection_3d.py").is_file()
+          and (bm / "cases" / "cb3d26_initial_imperfection.snap").is_file()
+          and (bm / "reference" / "cb3d26_initial_imperfection.json").is_file())
+    # 力学③已落地：同样只锁「如实登记实测收口 + 源码确有纤维本构函数 +
+    # benchmark 在档」，不检查能力是否可直接用于主链路（那会虚报）。
+    bm3 = fe / "tests" / "benchmark" / "material_nonlinear_3d"
+    fnl = fe / "fem_3d_nl.hpp"
+    f3 = fe / "fem_3d.hpp"
+    sec = fe / "section.hpp"
+    check("第21次力学③：§6 实测收口在档",
+          "力学③实测收口" in t and "任务 #162" in t
+          and "491/491" in t and "30/30" in t)
+    check("第21次力学③：§2.6 表格标记已落地且仍 P",
+          "**已落地（任务 #162）**" in t
+          and "第 30 项 CTest 491/491，仍 `P`" in t)
+    check("第21次力学③：FE 源码有纤维本构 / Gauss / opt-in 字段",
+          fnl.is_file()
+          and "crFiberLocalForce" in fnl.read_text(encoding="utf-8")
+          and "crFiberLocalTangent" in fnl.read_text(encoding="utf-8")
+          and sec.is_file()
+          and "gaussLegendreRule" in sec.read_text(encoding="utf-8")
+          and f3.is_file()
+          and 'matKind = "ELASTIC"' in f3.read_text(encoding="utf-8"))
+    check("第21次力学③：第 30 项 benchmark 在档",
+          (bm3 / "compare_material_nl_3d.py").is_file()
+          and (bm3 / "cases" / "cb3d27_material_nl.mat").is_file()
+          and (bm3 / "cases" / "cb3d27_material_nl_fem.csv").is_file()
+          and (bm3 / "reference" / "cb3d27_material_nl.json").is_file())
+    # 力学④已落地：同样只锁「如实登记实测收口 + 源码确有分岔检测字段 +
+    # benchmark 在档」，不检查是否可用于主链路（那会虚报 FEM 自洽深度）。
+    bm4 = fe / "tests" / "benchmark" / "bifurcation_switch_3d"
+    check("第21次力学④：§6 实测收口在档",
+          "力学④实测收口" in t and "任务 #163" in t
+          and "42/42" in t and "31/31" in t)
+    check("第21次力学④：§2.6 表格标记已落地且仍 P",
+          "**已落地（任务 #163）**" in t
+          and "第 31 项 CTest 42/42，仍 `P`" in t)
+    check("第21次力学④：FE 源码有分岔检测 / 切换字段",
+          sp3.is_file()
+          and "bifurcate" in sp3.read_text(encoding="utf-8")
+          and "bifPivot" in sp3.read_text(encoding="utf-8")
+          and "minTangentEig" in sp3.read_text(encoding="utf-8"))
+    check("第21次力学④：第 31 项 benchmark 在档",
+          (bm4 / "compare_bifurcation_3d.py").is_file()
+          and (bm4 / "cases" / "cb3d28_bifurcation_switch.snap").is_file()
+          and (bm4 / "cases" / "cb3d28_bifurcation_switch_fem.csv").is_file()
+          and (bm4 / "reference" / "cb3d28_bifurcation_switch.json").is_file())
+    # 力学⑤已落地：独立新模块，只锁「如实登记实测收口 + 源码确有
+    # Newmark 时程函数 + benchmark 在档」，不检查主链路可用性（会虚报）。
+    bm5 = fe / "tests" / "benchmark" / "dynamic_snapthrough_3d"
+    dyn = fe / "dynamic_newmark_3d.hpp"
+    check("第21次力学⑤：§6 实测收口在档",
+          "力学⑤实测收口" in t and "任务 #164" in t
+          and "88/88" in t and "32/32" in t)
+    check("第21次力学⑤：§2.6 表格标记已落地且仍 P",
+          "**已落地（任务 #164）**" in t
+          and "第 32 项 CTest 88/88，仍 `P`" in t)
+    check("第21次力学⑤：FE 有独立 Newmark 动力模块与 CLI",
+          dyn.is_file()
+          and "solveNewmarkDynamic3D" in dyn.read_text(encoding="utf-8")
+          and "denseMassMatrix3D" in dyn.read_text(encoding="utf-8")
+          and "NewmarkOptions3D" in dyn.read_text(encoding="utf-8")
+          and (fe / "dyn_probe.cpp").is_file())
+    check("第21次力学⑤：第 32 项 benchmark 在档",
+          (bm5 / "compare_dynamic_3d.py").is_file()
+          and (bm5 / "build_reference.py").is_file()
+          and (bm5 / "cases" / "cb3d29_dynamic_snapthrough.dyn").is_file()
+          and (bm5 / "cases" / "cb3d29_dynamic_snapthrough_fem.csv").is_file()
+          and (bm5 / "reference" / "cb3d29_dynamic_snapthrough.json").is_file())
+    # 第二十二次（任务 #165）：五项全部收口 + 三阶段走完 + 全量回归后，
+    # 能力矩阵 B3 行由 P 推 Y；此项是收口后的断言，不是历史「仍 P」断言。
+    cm = ROOT / "能力边界矩阵.md"
+    if cm.is_file():
+        cmt = cm.read_text(encoding="utf-8")
+        row = [ln for ln in cmt.splitlines()
+               if ln.lstrip().startswith("|") and "非线性稳定全过程" in ln
+               and "路径跟踪 opt-in" in ln]
+        check("第22次收口：能力矩阵 B3 行已由 P 推 Y",
+              bool(row) and all("| N | Y |" in ln for ln in row),
+              f"{len(row)} 行")
+        check("第22次收口：矩阵写明 3D=Y 的 opt-in / 非主链路 / 非规范判定边界",
+              "`3D=Y` 的边界" in cmt and "不等于" in cmt
+              and "默认开启" in cmt and "规范合格判定" in cmt)
+    check("第22次收口：§6 第二十二次记录在档且写明推 Y 依据与边界",
+          "第二十二次收口记录" in t and "任务 #165" in t
+          and "ctest` **32/32**" in t and "ALL TESTS PASSED" in t
+          and "`Y` 的如实边界" in t and "不是 JTG 3362" in t)
+    # 历史硬口径（第21次）：五项各自 opt-in / 默认零污染 / 独立锚点 /
+    # 负例守卫 / 不提前打勾，收口后这些纪律依然有效，保留断言。
+    check("第21次：默认零污染 / 独立锚点 / 负例守卫口径在位",
+          "默认零污染" in t and "独立解析" in t
+          and "负例守卫" in t and "不提前打勾" in t)
+
+
 def main() -> int:
     print("=" * 78)
     print("B 类后续项接入规格守卫（纯离线）")
@@ -600,6 +733,7 @@ def main() -> int:
     b2_length_2d()
     b2_opt_2d()
     b2_fifteenth()
+    b3_five_mechanics()
     spec_rules()
     no_new_capability()
     dat_invariant()

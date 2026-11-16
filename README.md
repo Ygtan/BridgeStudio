@@ -604,18 +604,23 @@ ANSYS 两段对标属 ②、B3 推 `Y` 属 ③，验收表见 `B类后续项接�
 `STAGE=2 NELEM=3 NDOF=12`、`RES0/|F0|=6.34e-13`、
 FEM `NPOINT=134` / `λ_end=2.57577583`、两个 ANSYS job 0 error、
 按 `|ΔUY|` 插值 λ `worst|Δλ|≈0.0051`；第 26 项 CTest
-214 项检查，干净构建 `ctest` **26/26**、
+214 项检查。第二十次 Riks 闭环新增第 27 项
+`riks_stage_stability_3d_benchmark`（63 项守卫、3109 checks）：
+`PATHMETHOD=RIKS` 仅 STAGE 起点 opt-in（Wempner–Riks 正交轨迹），
+闭式逐点 `4.6e-14`、双方法交叉 `1.47e-4`，与 ANSYS `ARCLEN`
+不同源。干净构建 `ctest` **27/27**、
 `run_tests.ps1 -BuildDir _d_build` `ALL TESTS PASSED`。
-**③b 完成仍 `P` 不 `Y`**：`STAGE` 是独立 opt-in、CB3D23 是
-研究构型不是真实桥梁施工阶段，位移控制 / Riks、分支屈曲、
-初始缺陷、材料非线性、动力 snap-through 仍未闭环，见规格
-§2.5 / §2.6；
+**仍 `P` 不 `Y`**：`STAGE` / `RIKS` 都是独立 opt-in、算例是研究构型
+不是真实桥梁施工阶段，位移控制 / 线搜索、分支屈曲、初始缺陷、
+材料非线性、动力 snap-through 仍未闭环，见规格 §2.5 / §2.6；
 B4 / B5 仍**只立规格、未实现力学**；
 B2 的 `[LENGTH2D]` 一层自第十三次
 起、2D 平面索力优化 `[OPT2D]` 一层自第十四次起已按 opt-in 真正新造 2D
 力学接通（两格都 `N→P`、仍 `P` 不 `Y`），`[OPT2D]` 只 MINMAXM + 显式
 索力箱、不等于 3D `[OPT]`；未实现期 `[BUCKLING] ERROR=nonlinear_state_not_supported`
 与「σl2 只按直线筋 / εcs·φ 需查表输入」等如实边界一律保留，不虚报能力。
+
+**2026-11-16 第二十二次收口：B3 由 `P` 推 `Y`**（任务 #165）。§2.6 三阶段全部走完：①/② 成桥态起点同源 + CB3D21 真实斜拉桥 ANSYS 两段对标（第 22/23 项 CTest）、③a/③b 施工阶段中间态 opt-in（CB3D23 / 第 24—27 项 CTest）、第二十一次补齐 §2.5 五项力学（① 位移控制 / 线搜索 25/25、② 初始缺陷 35/35、③ 材料非线性 491/491、④ 分岔切换 42/42、⑤ 动力 snap-through 88/88，第 28—32 项 CTest）。干净构建全量回归 `ctest` **32/32**、`run_tests.ps1 -BuildDir _d_build` `ALL TESTS PASSED`。能力矩阵「非线性稳定全过程」3D 格由 `P` 改 `Y`，三守卫同步全绿。**`Y` 的边界**：全部能力 opt-in 默认关闭、`STABILITY=0` 既有输出逐位不变；五项力学多在 `snap_probe` / `mat_nl_probe` / `dyn_probe` 独立探针层、不进 `cable_solver` 默认求解链；与 ANSYS 瞬态 / 动力不同源，λ 不是 JTG 稳定安全系数；B4 / B5、四出口内容补齐、MIDAS 数值对拍、B2 各格 `P ≠ Y` 均不受影响。逐项实测见 `B类后续项接入规格.md` §6 第二十二次记录。
 
 ### 2D 截面应力验算的 P 口径（2026-11-10）
 

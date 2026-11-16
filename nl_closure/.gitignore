@@ -1,0 +1,19 @@
+# nl_closure 运行产物：复刻仓库根目录 cases/** 的既有口径
+# 保留 .dat / .inp / .csv / .txt / .out 作为同源导出与对拍证据
+# 忽略 ANSYS 二进制数据库 / 监控 / 结果文件与求解日志（每次运行重生成）
+
+out/**/*.rst
+out/**/*.emat
+out/**/*.esav
+out/**/*.full
+out/**/*.mntr
+out/**/*.DSP
+out/**/*.dsp
+out/**/*.err
+out/**/*.log
+out/**/*.ldhi
+out/**/*.result
+out/full_run.log
+
+__pycache__/
+*.py[cod]
