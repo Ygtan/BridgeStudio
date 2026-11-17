@@ -539,7 +539,7 @@ Newton 一层**：FE `fem_2d.hpp` 新增 `NewtonStep2D` / `NewtonTrace2D` 挂进
 
 ## 质量保障闭环（铁律）
 
-1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **52 个脚本全绿**，其中 47 个带汇总输出的脚本合计 **5108 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_capacity_axial_2d.py` 382/382、`verify_compact_dat_2d.py` 201/201、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 150/150、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 181/181、`verify_prestress_loss_2d.py` 213/213、`verify_newton_2d.py` 251/251、`verify_length_2d.py` 267/267、`verify_opt_2d.py` 286/286、`verify_2d_export_import.py` 264/264、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 92/92、`verify_capability_matrix.py` 280/280，内核侧另有 `ctest` 7/7 与 `dat_byte_regression` 37/37 黄金基线）。
+1. 改完任何 `.py` 必须重跑全部 verify 脚本再提交（当前 **54 个脚本全绿**，其中 50 个带汇总输出的脚本合计 **5443 项断言**；`verify_app.py` 109/109、`verify_cable_opt_3d.py` 119/119、`verify_cable_length_3d.py` 58/58、`verify_newton_3d.py` 52/52、`verify_report_3d.py` 149/149、`verify_view_3d.py` 69/69、`verify_envelope_3d.py` 152/152、`verify_capacity_2d.py` 271/271、`verify_capacity_axial_2d.py` 382/382、`verify_compact_dat_2d.py` 201/201、`verify_strength_2d.py` 168/168、`verify_modal_2d.py` 111/111、`verify_validate_2d.py` 83/83、`verify_report_2d.py` 150/150、`verify_modal_detail_2d.py` 133/133、`verify_b_class_spec.py` 234/234、`verify_prestress_loss_2d.py` 308/308、`verify_newton_2d.py` 251/251、`verify_length_2d.py` 267/267、`verify_opt_2d.py` 286/286、`verify_2d_export_import.py` 264/264、`verify_stage_tension_3d.py` 84/84、`verify_stage_tension_2d.py` 27/27、`verify_stage_prestress.py` 88/88、`verify_combo_system.py` 86/86、`verify_x20_contract.py` 92/92、`verify_capability_matrix.py` 286/286、`verify_curvature_3d.py` 51/51，内核侧另有 `ctest` 37/37 与 `dat_byte_regression` 37/37 黄金基线）。
 2. 任何数值新功能必须先有理论解或交叉校验（anastruct / MIDAS / 黄金基线）。
 3. 内核目录只在 `fem_eigen_export.py` 一处探测，其他模块一律复用。
 
@@ -621,6 +621,10 @@ B2 的 `[LENGTH2D]` 一层自第十三次
 与「σl2 只按直线筋 / εcs·φ 需查表输入」等如实边界一律保留，不虚报能力。
 
 **2026-11-16 第二十二次收口：B3 由 `P` 推 `Y`**（任务 #165）。§2.6 三阶段全部走完：①/② 成桥态起点同源 + CB3D21 真实斜拉桥 ANSYS 两段对标（第 22/23 项 CTest）、③a/③b 施工阶段中间态 opt-in（CB3D23 / 第 24—27 项 CTest）、第二十一次补齐 §2.5 五项力学（① 位移控制 / 线搜索 25/25、② 初始缺陷 35/35、③ 材料非线性 491/491、④ 分岔切换 42/42、⑤ 动力 snap-through 88/88，第 28—32 项 CTest）。干净构建全量回归 `ctest` **32/32**、`run_tests.ps1 -BuildDir _d_build` `ALL TESTS PASSED`。能力矩阵「非线性稳定全过程」3D 格由 `P` 改 `Y`，三守卫同步全绿。**`Y` 的边界**：全部能力 opt-in 默认关闭、`STABILITY=0` 既有输出逐位不变；五项力学多在 `snap_probe` / `mat_nl_probe` / `dyn_probe` 独立探针层、不进 `cable_solver` 默认求解链；与 ANSYS 瞬态 / 动力不同源，λ 不是 JTG 稳定安全系数；B4 / B5、四出口内容补齐、MIDAS 数值对拍、B2 各格 `P ≠ Y` 均不受影响。逐项实测见 `B类后续项接入规格.md` §6 第二十二次记录。
+
+**2026-11-16 第二十三次：B4 σl2 附录 G 反摩擦 opt-in 收口（任务 #167–#170）**。用户「同意建议的顺序」后按 σl2 → σl6 → B5 推进，本轮仅 σl2：FE 内核 `prestress_loss.hpp` 增 opt-in `L2ANTI` / `L2REPX`（默认 `0/0`），`L2ANTI=1` 按附录 G、`x=0` 张拉端峰值代表值计算（`lf≤l` / `lf>l` 两支闭式，缺参与非 x=0 代表值显式拒绝）；2D 明细段仅在启用时追加 `LF=` / `DSL2D=` / `DSL2PEAK=` / `BRANCH=`；BS 侧 22 键扩到 24 键且默认两键不写、12 格 `.dat` 哈希不变。新增第 33 项 CTest `prestress_loss_anti_2d_benchmark`（117/117 checks：独立闭式 oracle、两支交叉 / `lf=l` 连续、两个负例、默认逐位零污染、2D/3D 同参同值；3D 只读探针 `loss_probe_3d.exe` 不自带力学）。守卫 `verify_prestress_loss_2d.py` 219/219、`verify_b_class_spec.py` 211/211。**边界**：只给代表截面峰值、不输出 `σl2(x)` 沿程分布；σl6 仍需用户录入规范表值、不按龄期自动发展；不跑 ANSYS、B4 整项与能力矩阵均不推 `Y`。`lf>l` 分支 σl5 可能为负（JTG 6.2.6-1 数学行为）已如实登记。上文「σl2 只按直线筋」是历史边界文字，保留不删；默认路径仍逐位不变。
+
+**2026-11-16 第二十三次：B4 σl6 附录 C 显式表值 opt-in 收口（任务 #172–#176）**。用户「同意建议的顺序」后按 σl2 → σl6 → B5 推进，本轮仅 σl6，沿用 opt-in 默认零污染：FE 内核 `prestress_loss.hpp` 增 opt-in `C2D` / `C_SKIP`（默认 `0/0`）与 7 个附录 C 表值键 `EPS0` / `PHI0` / `C_RH` / `C_H` / `C_T0` / `C_TS` / `C_T`；默认 ECS/PHI 直给路径逐位不变，`C_SKIP=1` 显式不参与（`C_SOURCE=2`），`C2D=1` 按表 C.1.2 / C.2.2 用户核对表值 + 解析发展公式（βs/βH/βc，RH 取区间代表值 55/80）算 εcs/φ，**不查表、不调用 `code_loads.hpp` 拟合值兜底**，缺任一表值 / RH 越界 / 龄期倒挂 / 两开关冲突均显式拒绝。2D 明细段与 3D `loss_probe_3d.exe` 仅在启用时追加 `C_SOURCE=` / `ECS_DEV=` / `PHI_DEV=` / `BETAS=` / `BETAS0=` / `BETAC=` / `BETAH=` / `RHREP=`。新增第 34 项 CTest `prestress_loss_creep_2d_benchmark`（142/142 checks：独立闭式 oracle、βH 两区间切换、φ=φ0·βc / εcs=εcs0(βs−βs0) 交叉、四负例、默认零污染、C_SKIP 区分、2D/3D 同参同值；σl6≈45.4MPa 与规范算例书吻合）。**边界**：表值由用户录入、程序不查表不拟合；只给代表截面标量、不输出沿程分布；不跑 ANSYS、B4 整项与能力矩阵均不推 `Y`。上文「σl6 需用户录入、不按龄期自动发展」是 σl2 阶段历史边界文字，保留不删；默认路径仍逐位不变。
 
 ### 2D 截面应力验算的 P 口径（2026-11-10）
 
@@ -891,4 +895,71 @@ figures、没有振型 / 参与质量 / 承载力 Mu、Vu / 结构云图，默�
 - 用 `python verify_x.py | tee log.txt` 或 `> log.txt` 都是安全的；
 - 若在 cmd.exe 里直接看，建议先 `chcp 65001`（或改用 Windows Terminal）；
 - **不要**在脚本里删掉那两行 setup——删了就又回到"偶尔崩在 emoji 上"。
+
+### 第二十七次：2D 阶段有效预加力段 + B4 收口推 Y（2026-11-17，任务 #196–#200）
+
+B4 收口的最后一项可补缺口：3D 早有 `stage prestress force` 段，2D 一直没有。
+力学上 2D 一直在算 `Pe = ps.P * loss`（`processPrestress`，`loss` 已含 `LOSSREF`
+解析出的 `σpe/σcon`，并经 `cumulativeLoads` 跨阶段累积），缺的只是**结果段**。
+
+- **FE**：`PrestressStageForce2D{id, P, loss, Pe, sigmaCon}` 与 `Pe` 同一次计算填一次
+  （不重算）；`example_stage.exe --stage-prestress-force` 写独立
+  `<stem>.stage.force.txt`（`[PRESTRESSFORCE2D]` / `BASIS=2d_stage` /
+  `STAGE<n> P<id> SIGMA_CON= P= LOSS= PE=`），默认不写。
+- **BS**：`prestress_loss_2d.py` 增 `parse_stage_force_txt` / `stage_force_table` /
+  `force_status_text`（只解析、不重算、PE≠P·LOSS 显式拒绝）；
+  `solve_2d(stage_force_detail=)`、`report_2d` 新增「2D 阶段有效预加力明细」章、
+  `model_doc.solve(stage_force_2d_detail=)` 透传；两个阶段开关互不依赖。
+- **证据**：第 36 项 CTest 由 167 扩至 **269 checks**（force 段冻结证据、独立 oracle、
+  多束多阶段编号、软负例、默认不写、FE 契约）；`verify_prestress_loss_2d.py`
+  新增 `force_contract()`；`verify_capability_matrix.py` 286/286。
+- **能力矩阵**：该格由 `2D=P` 推 `2D=Y`，并把 `Y` 口径**定稿为「平面内完整」**
+  （六项公式同源 + 非阶段/阶段明细段 + 阶段维度 + 阶段有效预加力 + 独立闭式锚点）。
+  `Y` **不冒充三向空间量**；真实制造参数与分项损失 ANSYS 对拍 2D/3D 同样没有。
+
+### 第二十六次：B5 成桥态无应力曲率 FEM 自洽（2026-11-17，任务 #188–#194）
+
+用户：「先做 b5 然后一起收口」。按此前拍板「先做 FEM 自洽深度，**不接真实
+制造参数、不做 ANSYS 对拍**」，本轮只验证「给一个 κ0，FEM 是否自洽」。
+
+- FE：`Element3D` 增 `k0y`/`k0z`（1/m，默认 0），只在 `*EN` 单元行接受
+  `K0Y=`/`K0Z=`；非 `BEAM` 或值非有限 → 显式 `throw`。
+  `elementEquivalentLoad3D()` 追加固端力 `f_eq(θ₁)=−EI·κ0`、`f_eq(θ₂)=+EI·κ0`
+  （局部，`Tᵀ` 转全局）。**该函数同时供组装 `F0` 与端内力 `fl−T·fe`**，
+  故一处接入两端自洽：`K·u = f_ext + f_eq`、`M = EI(κ−κ0)`；曲率模态用
+  `Eeff` 与刚度同源，零外荷载 `K·u0 = f_eq` 精确成立；`κ0=0` 逐位不变。
+- 输出：`example_3d_report.exe --curvature-detail` 写独立
+  `<stem>.curvature.txt`（`[UNSTRESSED_CURVATURE]`），默认不写。
+- BS：`curvature_3d.py` 唯一解析口径层（`parse_curvature_txt` /
+  `curvature_table` / `status_text`），**只解析不重算**、`M0=EI·κ0` 只作同批
+  数字互核。**本轮 BS 侧不进 3D 计算书**（`example_3d_grillage` 走 summary、
+  `solver_3d` 注册表改造面大），已在规格 §4.1 如实登记。
+- 证据：FEM-Eigen 第 37 项 CTest `unstressed_curvature_3d_benchmark`
+  （111/111 checks，9 份 `.dat`、13 份冻结证据、独立闭式 oracle 自检
+  1.35e-10、两个硬负例、自平衡 / 刚度不变 / J 不变强断言、默认逐位零污染）；
+  `verify_curvature_3d.py` 51/51。
+- 边界：未覆盖共转列式 `CRElemData` 初曲率、真实制造参数、成桥态 `My`
+  全桥 ANSYS 对拍、`χφ` 与 κ0 耦合；不得把「节点预抬高 / 制造线形 `Xm`」
+  写成「无应力曲率已实现」。
+
+### 第二十五次：2D 分项预应力损失阶段维度（2026-11-17，任务 #182–#187）
+
+用户：「既然3D 侧早已是 Y，补 2D 阶段维度：让 `[PRESTRESSLOSS2D]` 支持
+STAGE、把 σl2/σl6 的选项映射到 2D」。本轮**只补 2D 缺的阶段维度**，
+**能力矩阵该格仍标 `2D=P`，B4 整项与 B4/B5 收口均未宣称完成**。
+
+- FE：`*STAGE_PRESTRESS` 支持 `LOSSREF=<表号>`（与 `LOSS` 二选一），σl2
+  `L2ANTI/L2REPX` 与 σl6 `C2D/C_SKIP/EPS0/PHI0/C_RH/C_H/C_T0/C_TS/C_T`
+  经同一张 `*PRESTRESS_LOSS` 表自动映射；`example_stage.exe
+  --stage-loss-detail` 写独立 `<stem>.stage.loss.txt`（`BASIS=2d_stage`、
+  行首 `STAGE<n> P<id>`），与旧 `<stem>.loss.txt`（`BASIS=2d_global`）
+  严格隔离，默认不写、冻结证据逐位不变。
+- BS：`StagePrestressDef.loss_ref`（默认 0 → 写 `LOSS=`，历史 `.dat` 逐位
+  不变）+ 引用完整性校验；`prestress_loss_2d.py::parse_stage_loss_txt`
+  以 `(阶段号, 束号)` 为键、只解析不重算；`solve_2d(stage_loss_detail=...)`
+  与 `ModelDoc.solve(stage_loss_2d_detail=...)` 两个 opt-in 开关；报告挂
+  `prestress_stage_loss_table`。旧 `parse_loss_txt()` 一字未改。
+- 证据：FEM-Eigen 第 36 项 CTest `stage_loss_2d_benchmark`（269/269 checks，
+  独立闭式 oracle + 冻结证据 + 硬/软负例 + 默认逐位零污染 + 2D/3D 同参同值）；
+  `verify_prestress_loss_2d.py` 扩到 269/269。
 

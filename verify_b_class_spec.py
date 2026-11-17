@@ -94,19 +94,47 @@ def fe_sources() -> None:
     check("内核没有虚报弧长法 / Riks 实现",
           "Riks" not in nl and "arc-length" not in nl)
     pl = read(root / "prestress_loss.hpp")
-    check("σl2 仍是无条件直线式（本轮未改内核）",
-          "r.sigmaL2 = in.sumDeltaL / in.tendonLength * in.Ep;" in pl)
+    check("σl2 默认仍是直线式（22 键路径逐位不变）",
+          "if (in.l2Anti == 0) {" in pl
+          and "r.sigmaL2 = in.sumDeltaL / in.tendonLength * in.Ep;" in pl)
     check("22 键表仍含 ECS / PHI 用户输入",
           'g("ECS", li.epsCs);' in pl and 'g("PHI", li.phi);' in pl)
-    check("内核没有新增 L2_ANTI 反摩擦键", "L2_ANTI" not in pl)
+    check("第二十三次：附录 G 反摩擦 opt-in 键已接入",
+          'p.find("L2ANTI")' in pl and 'p.find("L2REPX")' in pl
+          and "int l2Anti = 0" in pl)
+    check("第二十三次：非 x=0 代表截面 / 缺参显式拒绝",
+          "l2ReprX 必须为 0" in pl and "ΣΔl（DELTA_L）> 0" in pl)
+    check("第二十三次：两支闭式与中间量在档",
+          "2.0 * r.deltaSigmaD * r.lf" in pl
+          and "r.lf * r.lf / in.tendonLength + in.tendonLength" in pl
+          and "int l2Branch = 0" in pl)
     code = read(root / "code_loads.hpp")
     check("code_loads 自认规范表折减是查表用的",
           "查表用的" in code and "jtg3362NominalCreep" in code)
     um = read(root / "USER_MANUAL.md")
-    check("USER_MANUAL 如实写明 σl2 反摩擦未实现",
-          "σl2 曲线筋按附录 G 的反摩擦影响未实现" in um)
-    check("USER_MANUAL 如实写明 σl6 不按龄期自动发展",
+    check("USER_MANUAL 如实写明 σl2 反摩擦 opt-in 与代表值边界",
+          "L2ANTI=1" in um and "代表值取张拉端 x=0" in um
+          and "不输出 σl2(x) 沿程分布" in um)
+    check("USER_MANUAL 如实写明 σl6 默认不按龄期自动发展",
           "程序不自动算收缩" in um)
+    check("第二十三次：σl6 附录 C 表值 opt-in 键已接入（默认全关）",
+          "int c2d = 0" in pl and "int cSkip = 0" in pl
+          and 'p.find("C2D")' in pl and 'p.find("C_SKIP")' in pl
+          and all(f'g("{k}"' in pl for k in ("EPS0", "PHI0", "C_RH",
+                                             "C_H", "C_T0", "C_TS", "C_T")))
+    check("第二十三次：σl6 缺表值显式拒绝且不调用规范拟合兜底",
+          "缺 EPS0" in pl and "缺 PHI0" in pl
+          and "RH 必须在 40" in pl
+          # 拟合函数名只在「绝不调用」的注释里出现（各 1 次），代码中无实际调用
+          and pl.count("jtg3362NominalCreep") <= 1
+          and pl.count("jtg3362ShrinkageNominal") <= 1
+          and "return jtg3362NominalCreep" not in pl)
+    check("第二十三次：σl6 发展公式 βs/βH/βc 与 C_SKIP 互斥在档",
+          "εcs0[βs(t,ts)-βs(t0,ts)]" in pl
+          and "不能同时启用" in pl and "cHRepresentative" in pl)
+    check("USER_MANUAL 如实写明 σl6 附录 C opt-in 与拟合兜底边界",
+          "C2D=1" in um and "附录 C 显式表值" in um
+          and "不调用 `code_loads.hpp` 拟合值兜底" in um)
     em = read(root / "example_modal.cpp")
     check("2D 模态内核写 == 自振频率 == 与屈曲条件段",
           "== 自振频率 ==" in em and "computeBucklingFactors2D" in em)
@@ -117,11 +145,12 @@ def bs_boundaries() -> None:
     check("buckling_3d 保留非线性状态中文说明",
           "nonlinear_state_not_supported" in b3)
     r3 = read(ROOT / "report_3d.py")
-    check("report_3d 保留 σl2 直线筋边界",
-          "σl2 目前只按直线筋" in r3)
+    check("report_3d 如实写明 σl2 默认直线筋与 opt-in 反摩擦边界",
+          "σl2 默认按直线筋" in r3 and "L2ANTI=1" in r3)
     ms = read(ROOT / "model_spec_3d.py")
-    check("PrestressLoss3D 保留两条规范边界",
-          "σl2 目前只支持直线筋" in ms and "附录 C" in ms)
+    check("PrestressLoss3D 如实写明两条规范边界与 opt-in 键",
+          "σl2 默认按直线筋" in ms and "附录 C" in ms
+          and "l2_anti: int = 0" in ms and "l2_repr_x: int = 0" in ms)
     guide = read(ROOT / "开发使用手册.md")
     check("开发手册保留「不做非线性稳定」", "不做非线性稳定" in guide)
     mat = read(ROOT / "能力边界矩阵.md")
@@ -179,6 +208,10 @@ def spec_rules() -> None:
           "待用户拍板的口径" in t and "属设计口径选择" in t)
     check("σl6 写明表值缺席不得自动算",
           "绝不调用" in t and "表值缺席" in t and "不得凭空编数值" in t)
+    check("第25次：σl6 阶段实测收口记录在档",
+          "σl6 阶段实测收口" in t and "142/142 checks" in t
+          and "prestress_loss_creep_2d_benchmark" in t
+          and "jtg-3362.readthedocs.io" in t)
     check("B3 写明禁止拿 λ 冒充 / 保留 ERROR 段",
           "不拿线弹性 λ 冒充" in t and "必须保留" in t)
     check("B5 写明预抬高不得冒充无应力曲率",
@@ -251,12 +284,29 @@ def dat_invariant() -> None:
     from model_spec_3d import PrestressLoss3D
 
     line = PrestressLoss3D(sigma_con=1.395e9).to_dat(1)
-    check("分项损失表仍是 22 键",
+    check("分项损失表默认仍是 22 键（反摩擦键 opt-in 不写）",
           all(k + "=" in line for k in LOSS_KEYS)
-          and len(line.split()) == len(LOSS_KEYS) + 1,
+          and len(line.split()) == len(LOSS_KEYS) + 1
+          and "L2ANTI" not in line and "L2REPX" not in line,
           f"{len(line.split()) - 1} 键")
-    check("分项损失表本轮未新增反摩擦键",
-          "L2_ANTI" not in line and "L2_X" not in line)
+    check("σl6 附录 C 键默认不写出（22 键默认行不变）",
+          not any(k + "=" in line for k in ("C2D", "C_SKIP", "EPS0", "PHI0",
+                                            "C_RH", "C_H", "C_T0", "C_TS", "C_T")))
+    optin_line = PrestressLoss3D(sigma_con=1.395e9, l2_anti=1).to_dat(1)
+    check("分项损失表 opt-in 写出 L2ANTI/L2REPX（24 键）",
+          all(k + "=" in optin_line for k in ("L2ANTI", "L2REPX"))
+          and len(optin_line.split()) == len(LOSS_KEYS) + 3,
+          f"{len(optin_line.split()) - 1} 键")
+    c2d_line = PrestressLoss3D(sigma_con=1.395e9, c2d=1, eps0=3.1e-4, phi0=2.19,
+                               c_rh=75, c_h=320.7, c_t0=7, c_ts=3, c_t=97).to_dat(1)
+    check("σl6 opt-in C2D=1 写出 9 个附录 C 键",
+          all(k + "=" in c2d_line for k in ("C2D", "EPS0", "PHI0", "C_RH",
+                                            "C_H", "C_T0", "C_TS", "C_T"))
+          and "C_SKIP" not in c2d_line,
+          f"{len(c2d_line.split()) - 1} 键")
+    cskip_line = PrestressLoss3D(sigma_con=1.395e9, c_skip=1).to_dat(1)
+    check("σl6 opt-in C_SKIP=1 只写 C_SKIP（不写 C2D 组）",
+          "C_SKIP=1" in cskip_line and "C2D=" not in cskip_line)
 
 
 def doc_registration() -> None:
@@ -716,6 +766,62 @@ def b3_five_mechanics() -> None:
           and "负例守卫" in t and "不提前打勾" in t)
 
 
+def b5_curvature() -> None:
+    """第二十六次（B5）：无应力曲率 FEM 自洽接入的规格 / 源码 / 矩阵同源。
+
+    只锁「已登记、已接通、仍 P、未覆盖项如实写」四件事，不复算力学
+    （力学由 FEM-Eigen 第 37 项 CTest 与 verify_curvature_3d.py 负责）。
+    """
+    t = read(ROOT / "B类后续项接入规格.md")
+    check("B5：规格 §4.1 本轮实现范围在位",
+          "### 4.1 本轮实现范围" in t)
+    check("B5：§4.1 登记 K0Y/K0Z 与 *EN 入口",
+          "K0Y=" in t and "K0Z=" in t and "*EN" in t)
+    check("B5：§4.1 登记一处接入两端自洽的口径",
+          "elementEquivalentLoad3D" in t and "M = EI(κ − κ0)" in t)
+    check("B5：§6 第 28 条在档",
+          "第二十六次 **B5 无应力曲率" in t)
+    check("B5：如实登记未覆盖（共转列式 / 制造参数 / ANSYS 对拍）",
+          "CRElemData" in t and "真实制造参数" in t and "ANSYS 对拍" in t)
+    check("B5：保留「不得把节点预抬高写成无应力曲率」纪律",
+          "节点预抬高" in t and "无应力曲率已实现" in t)
+
+    root = fe()
+    if root:
+        hpp = read(root / "fem_3d.hpp")
+        rpt = read(root / "example_3d_report.cpp")
+        ifmt = read(root / "input_format_3d.md")
+        check("B5：FE Element3D 增 k0y/k0z（默认 0）",
+              "double k0y = 0.0, k0z = 0.0;" in hpp)
+        check("B5：FE *EN 解析 K0Y=/K0Z= 且非 BEAM 显式拒绝",
+              '"K0Y="' in hpp and '"K0Z="' in hpp
+              and "只支持 BEAM 单元" in hpp)
+        check("B5：FE 固端力并入 elementEquivalentLoad3D 且用 Eeff",
+              "e.k0y != 0.0 || e.k0z != 0.0" in hpp
+              and "-Eeff * e.Iz * e.k0z" in hpp)
+        check("B5：opt-in 输出段与 CLI 登记",
+              '"--curvature-detail"' in rpt
+              and "[UNSTRESSED_CURVATURE]" in rpt
+              and "[UNSTRESSED_CURVATURE]" in ifmt)
+        check("B5：默认不写、无曲率写显式 ERROR",
+              "if (curvatureDetail)" in rpt
+              and "ERROR=no_curvature_elements" in rpt)
+    else:
+        check("B5：FEM-Eigen 可定位", False)
+
+    check("B5：BS 解析口径层存在且只解析",
+          (ROOT / "curvature_3d.py").is_file()
+          and "def parse_curvature_txt" in read(ROOT / "curvature_3d.py"))
+    cmt = read(ROOT / "能力边界矩阵.md")
+    check("B5：矩阵新增行标 2D=N / 3D=P（不涂 Y）",
+          "成桥态无应力曲率（B5，FEM 自洽） | N | P |" in cmt)
+    check("B5：矩阵写明为什么是 P 不是 Y",
+          "为什么是 `P` 不是 `Y`" in cmt)
+    check("B5：矩阵登记 B4/B5 统一收口结论",
+          "**B4 / B5 统一收口结论" in cmt
+          and "维持 `2D=P / 3D=Y`" in cmt)
+
+
 def main() -> int:
     print("=" * 78)
     print("B 类后续项接入规格守卫（纯离线）")
@@ -734,6 +840,7 @@ def main() -> int:
     b2_opt_2d()
     b2_fifteenth()
     b3_five_mechanics()
+    b5_curvature()
     spec_rules()
     no_new_capability()
     dat_invariant()

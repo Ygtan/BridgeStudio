@@ -344,14 +344,22 @@ def gaps_and_process() -> None:
           and "2D 仍窄于 3D" in text)
     check("能力矩阵登记第七次闭环记录", "第七次闭环记录" in text)
     check("能力矩阵登记第九次闭环记录", "第九次闭环记录" in text)
-    # 2026-11-11 第十次：2D 分项损失明细按 FE opt-in 补段闭环，仍标 P。
+    # 2026-11-11 第十次：2D 分项损失明细按 FE opt-in 补段闭环，当时仍标 P。
+    # 2026-11-17 第二十七次：补阶段有效预加力段并把 Y 口径写成「平面内完整」
+    # 之后由 P 推 Y —— 只改格子不改口径必须是红的。
     loss_rows = [ln for ln in text.splitlines()
                  if ln.startswith("| 分项预应力损失")]
-    check("§2 分项损失格标 2D=P（不虚报 Y）",
-          len(loss_rows) == 1 and "| P | Y |" in loss_rows[0], str(loss_rows))
+    check("§2 分项损失格 2D 已按第二十七次推 Y（且与 3D 同为 Y）",
+          len(loss_rows) == 1 and "| Y | Y |" in loss_rows[0], str(loss_rows))
+    check("§2 写明 Y 的口径 = 平面内完整（不冒充三向）",
+          "`Y` 的口径（2D 侧）" in text and "平面内分项损失完整" in text
+          and "不等于" in text and "三向空间量" in text)
     check("§2 登记 [PRESTRESSLOSS2D] / BASIS=2d_global 防漂移",
           "[PRESTRESSLOSS2D]" in text and "BASIS=2d_global" in text)
-    check("§2 不设 STAGE 占位且不等于 3D 阶段维度",
+    check("§2 登记第二十七次阶段有效预加力段与 PE 同源",
+          "[PRESTRESSFORCE2D]" in text and "PE=" in text
+          and "processPrestress" in text)
+    check("§2 不设 STAGE 占位且不等于 3D 阶段维度（历史快照保留）",
           "不设 STAGE 占位" in text and "不等于 3D 的阶段" in text)
     check("能力矩阵登记第十次闭环记录", "第十次闭环记录" in text)
     check("§4.2 收窄为 3 个 2D=N + 4 个 2D=P",

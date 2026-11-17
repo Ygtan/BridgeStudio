@@ -199,6 +199,18 @@ class Solve2DResult:
     prestress_loss: dict[str, Any] = field(
         default_factory=lambda: {"status": "not_requested",
                                  "source": loss2d.SOURCE})
+    # 2D 阶段分项预应力损失明细（第二十五次 opt-in）：
+    # loss2d.parse_stage_loss_txt 的结果，读 <stem>.stage.loss.txt。
+    # 默认 "not_requested"；与上面的非阶段段不同文件、不同 BASIS，不互相污染。
+    prestress_stage_loss: dict[str, Any] = field(
+        default_factory=lambda: {"status": "stage_not_requested",
+                                 "source": loss2d.STAGE_SOURCE})
+    # 2D 阶段有效预加力明细（第二十七次 opt-in）：
+    # loss2d.parse_stage_force_txt 的结果，读 <stem>.stage.force.txt。
+    # 默认 "force_not_requested"；与阶段损失段不同文件、不同段名，不互相污染。
+    prestress_stage_force: dict[str, Any] = field(
+        default_factory=lambda: {"status": "force_not_requested",
+                                 "source": loss2d.FORCE_SOURCE})
     # 2D 内层 Newton 逐迭代过程量（opt-in）：newton_2d.parse_newton_txt 的结果。
     # 默认 "not_requested"；不重算 K·ΔU=R、不由位移反推残差、缺段不补零。
     newton: dict[str, Any] = field(
@@ -261,6 +273,16 @@ class Solve2DResult:
         """2D 分项损失明细表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
         t = loss2d.loss_table(self.prestress_loss)
         return {"prestress_loss_table": t} if t else {}
+
+    def prestress_stage_loss_tables(self) -> dict[str, dict[str, Any]]:
+        """2D 阶段分项损失表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
+        t = loss2d.stage_loss_table(self.prestress_stage_loss)
+        return {"prestress_stage_loss_table": t} if t else {}
+
+    def prestress_stage_force_tables(self) -> dict[str, dict[str, Any]]:
+        """2D 阶段有效预加力表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
+        t = loss2d.stage_force_table(self.prestress_stage_force)
+        return {"prestress_stage_force_table": t} if t else {}
 
     def newton_tables(self) -> dict[str, dict[str, Any]]:
         """2D 内层 Newton 过程量表：报告 / 界面唯一取数口，状态非 ok 时为空 dict。"""
@@ -484,6 +506,8 @@ def solve_2d(
     strength: bool = False,
     modal_detail: bool = False,
     loss_detail: bool = False,
+    stage_loss_detail: bool = False,
+    stage_force_detail: bool = False,
     newton_detail: bool = False,
     capacity: bool = False,
     axial_capacity: bool = False,
@@ -516,6 +540,20 @@ def solve_2d(
     Python 只解析 `[PRESTRESSLOSS2D]` 段，不重算 σl1~σl6 / σpe / RATIO。
     默认 False：不调该 exe、不写新 diagnostics、计算书一字不变；模型没有
     LOSSREF 束时写中文「不做」，不补零。
+
+    `stage_loss_detail=True` 时，对有施工阶段的模型给 `example_stage.exe`
+    追加 `--stage-loss-detail`，只读它写出的 `<stem>.stage.loss.txt`
+    （`BASIS=2d_stage` / `STAGE<n> P<id>`），由 `loss2d.parse_stage_loss_txt`
+    解析；与非阶段 `<stem>.loss.txt` 严格隔离。默认 False：命令行、输出文件、
+    diagnostics 与计算书逐位不变；没有施工阶段或没有阶段 LOSSREF 束时写
+    中文「不做」，不补零。
+
+    `stage_force_detail=True` 时给 `example_stage.exe` 追加
+    `--stage-prestress-force`，只读它写出的 `<stem>.stage.force.txt`
+    （`[PRESTRESSFORCE2D]` / `BASIS=2d_stage` / `STAGE<n> P<id> PE=`），由
+    `loss2d.parse_stage_force_txt` 解析；对应 3D 的 `stage prestress force` 段。
+    这是**有效预加力**（Pe=P·loss），不是分项损失，两者不同文件、可同时开。
+    默认 False：命令行、输出文件、diagnostics 与计算书逐位不变。
 
     `newton_detail=True` 时，只对显式 `analysis="NONLINEAR"` 的模型追加一次
     `example_mixed.exe --newton-detail-only`，只读它写出的
@@ -619,7 +657,47 @@ def solve_2d(
                 "未找到 example_stage.exe，无法做施工阶段正装。请先编译：\n"
                 "  cd D:/AI-work/FEM-Eigen && cmake --build build --target example_stage")
         res.solver = exe.name
-        stdout = _run(exe, dat_name, out, timeout)
+        # 第二十五次 opt-in：阶段分项损失明细。默认不追加任何参数，
+        # 也不删除/写出 .stage.loss.txt，命令行与既有求解逐位不变。
+        # 第二十七次 opt-in：阶段有效预加力明细，另一个开关、另一个文件，
+        # 默认同样不追加、不删除，两个开关互不依赖。
+        _stage_loss_path = out / (dat_path.stem + ".stage.loss.txt")
+        _stage_force_path = out / (dat_path.stem + ".stage.force.txt")
+        if stage_loss_detail and _stage_loss_path.exists():
+            _stage_loss_path.unlink()   # 不读上一次求解的残留
+        if stage_force_detail and _stage_force_path.exists():
+            _stage_force_path.unlink()
+        _flags: list[str] = []
+        if stage_loss_detail:
+            _flags.append("--stage-loss-detail")
+        if stage_force_detail:
+            _flags.append("--stage-prestress-force")
+        _extra = (_flags or None)
+        stdout = _run(exe, dat_name, out, timeout, extra_args=_extra)
+        if stage_loss_detail:
+            _src = loss2d.STAGE_SOURCE
+            if not _stage_loss_path.is_file():
+                res.prestress_stage_loss = {
+                    "status": "stage_no_output", "source": _src,
+                    "stdout": (stdout or "")[-500:]}
+            else:
+                res.prestress_stage_loss = loss2d.parse_stage_loss_txt(
+                    _stage_loss_path.read_text(encoding="utf-8",
+                                               errors="replace"))
+            res.diagnostics.append(
+                loss2d.stage_status_text(res.prestress_stage_loss))
+        if stage_force_detail:
+            _fsrc = loss2d.FORCE_SOURCE
+            if not _stage_force_path.is_file():
+                res.prestress_stage_force = {
+                    "status": "force_no_output", "source": _fsrc,
+                    "stdout": (stdout or "")[-500:]}
+            else:
+                res.prestress_stage_force = loss2d.parse_stage_force_txt(
+                    _stage_force_path.read_text(encoding="utf-8",
+                                                errors="replace"))
+            res.diagnostics.append(
+                loss2d.force_status_text(res.prestress_stage_force))
         stages_path = out / (dat_path.stem + "_stages.txt")
         if not stages_path.is_file():
             raise SolverUnavailable2D(

@@ -158,8 +158,8 @@ def docs() -> None:
     mat = read(ROOT / "能力边界矩阵.md")
     spec = read(ROOT / "B类后续项接入规格.md")
     guide = read(ROOT / "开发使用手册.md")
-    check("能力矩阵该行 3D=P 不是 Y",
-          "| 非线性稳定全过程（球面弧长法 opt-in） | N | P |" in mat)
+    check("能力矩阵该行已 P→Y（第二十二次收口；历史 P 文字保留）",
+          "| 非线性稳定全过程（路径跟踪 opt-in） | N | Y |" in mat)
     check("规格 §2.5 五条边界在位",
           "### 2.5 如实边界" in spec and "P ≠ Y" in spec
           and "分支屈曲" in spec and "CR 梁后屈曲" in spec

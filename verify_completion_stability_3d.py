@@ -204,8 +204,8 @@ def docs() -> None:
     guide = read(ROOT / "开发使用手册.md")
     use = read(ROOT / "使用说明.md")
     readme = read(ROOT / "README.md")
-    check("能力矩阵该行仍 3D=P 不是 Y（① 完成不推 Y）",
-          "| 非线性稳定全过程（球面弧长法 opt-in） | N | P |" in mat
+    check("能力矩阵该行已 P→Y（① 完成时仍 P 的历史口径保留不删）",
+          "| 非线性稳定全过程（路径跟踪 opt-in） | N | Y |" in mat
           and "第十九次 ①" in mat and "仍 `P ≠ Y`" in mat)
     check("规格 §2.6 三阶段表与四条硬口径在位",
           "### 2.6 a 阶段三阶段验收口径" in spec
@@ -282,8 +282,8 @@ def stage2_contract() -> None:
     check("② 算例索引登记 CB3D21 / completion_bridge_3d",
           "CB3D21" in cases_idx and "completion_bridge_3d" in cases_idx
           and "CB3D01~CB3D21" in cases_idx)
-    check("② 能力矩阵仍 | N | P | 且 §2.6 三阶段表仍在",
-          "| 非线性稳定全过程（球面弧长法 opt-in） | N | P |" in mat
+    check("② 能力矩阵已 P→Y 且 §2.6 三阶段表仍在（历史口径不删）",
+          "| 非线性稳定全过程（路径跟踪 opt-in） | N | Y |" in mat
           and "### 2.6 a 阶段三阶段验收口径" in spec
           and "| ③ |" in spec and "③ 才推 `Y`" in spec)
     check("② MODE=COMPLETION 起点不同源缺陷如实登记（不得略过）",
@@ -389,8 +389,8 @@ def stage3_contract() -> None:
           and "**B3 结论：仍 `P` 不 `Y`**" in spec
           and "不得靠改文档提前打勾" in spec
           and "分支屈曲" in spec and "施工阶段中间态全过程稳定" in spec)
-    check("③a 能力矩阵仍 | N | P | 且缺口条数不变",
-          "| 非线性稳定全过程（球面弧长法 opt-in） | N | P |" in mat
+    check("③a 能力矩阵已 P→Y 且历史缺口条数文字保留",
+          "| 非线性稳定全过程（路径跟踪 opt-in） | N | Y |" in mat
           and "第十九次 ③a 记录" in mat
           and "仍 `P ≠ Y`" in mat)
     check("③a 算例索引登记 CB3D22 / bridge_limit_point_3d",
@@ -537,8 +537,8 @@ def stage4_contract() -> None:
           and "19. 第二十次 ③b 不虚报" in spec
           and "不得靠一个 opt-in 算例提前打勾" in spec
           and "**B3 结论：仍 `P` 不 `Y`**" in spec)
-    check("③b 能力矩阵仍 | N | P | 且缺口条数不变",
-          "| 非线性稳定全过程（球面弧长法 opt-in） | N | P |" in mat
+    check("③b 能力矩阵已 P→Y 且历史缺口条数文字保留",
+          "| 非线性稳定全过程（路径跟踪 opt-in） | N | Y |" in mat
           and "第二十次 ③b 记录" in mat
           and "仍 `P ≠ Y`" in mat
           and "B2 剩余 0 项" in mat)

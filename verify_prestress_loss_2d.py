@@ -132,7 +132,10 @@ def fe_sources() -> None:
     for key in L.FIELDS:
         check(f"段字段 {key}", (key + "=") in hpp)
     check("本段用 12 位有效数字", "setprecision(12)" in hpp)
-    check("不写 STAGE 占位（不凭空造阶段号）", '"STAGE"' not in hpp)
+    # 第二十五次起同一头文件新增独立的阶段格式函数，那里必须写 STAGE<n>；
+    # 本断言只锁「全局非阶段函数」不写 STAGE，防止阶段行混进旧段。
+    _global_hpp = hpp.split("formatStagePrestressLossSection2D")[0]
+    check("不写 STAGE 占位（不凭空造阶段号）", '"STAGE"' not in _global_hpp)
     check("不重算力学（段层不调 computePrestressLosses）",
           "computePrestressLosses(" not in hpp)
     check("无 LOSSREF 束写 ERROR 不摆空表",
@@ -140,7 +143,20 @@ def fe_sources() -> None:
           and "m.prestressLossDetails.empty()" in hpp)
     check("NOTE 写明 2D 没有阶段维度", "2D 没有阶段维度" in hpp)
     check("NOTE 写明 σl3/σl5/σl6 不进 σpe", "σl3/σl5/σl6" in hpp and "不进 σpe" in hpp)
-    check("NOTE 写明 σl2 仅直线筋", "只按直线筋" in hpp)
+    check("NOTE 如实写明 σl2 默认直线筋 + opt-in 附录 G 反摩擦 x=0",
+          "σl2 默认按直线筋" in hpp and "L2ANTI=1" in hpp
+          and "代表值 x=0" in hpp and "BRANCH=1" in hpp)
+    check("数据行仅在 l2Branch≥1 时追加反摩擦中间量",
+          "if (d.l2Branch >= 1)" in hpp
+          and '" LF="' in hpp and '" DSL2D="' in hpp
+          and '" DSL2PEAK="' in hpp and '" BRANCH="' in hpp)
+    check("第二十三次：σl6 附录 C 来源与中间量仅 cSource≥1 时追加",
+          "if (d.cSource >= 1)" in hpp and '" C_SOURCE="' in hpp
+          and '" ECS_DEV="' in hpp and '" PHI_DEV="' in hpp
+          and '" BETAH="' in hpp and '" RHREP="' in hpp)
+    check("第二十三次：NOTE 如实写明 σl6 表值不拟合兜底",
+          "不调用规范拟合函数兜底" in hpp and "C_SKIP=1" in hpp
+          and "C2D=1" in hpp)
 
     cpp = read(FE / "fem_2d.cpp")
     check("数值路径零改动：loss 行仍走 effectivePrestressRatio",
@@ -249,15 +265,25 @@ def fe_runtime() -> None:
 # ---------------------------------------------------------------- BS 契约
 
 def bs_contract() -> None:
-    print("\n[3] BS 输入契约：22 键表、LOSSREF 束、引用校验、12 格哈希")
+    print("\n[3] BS 输入契约：22 键默认表 + 2 opt-in 反摩擦键、LOSSREF 束、引用校验、12 格哈希")
     src = read(ROOT / "bridge_spec.py")
     check("PrestressLoss2D 契约在位", "class PrestressLoss2D" in src)
     check("Prestress2D 契约在位", "class Prestress2D" in src)
     keys = ("SIGMA_CON", "EP", "EC", "FPK", "MU", "K", "THETA", "X",
             "DELTA_L", "L", "T1", "T2", "SIGMA_PC4", "SIGMA_PC6", "PSI",
-            "ZETA", "ECS", "PHI", "RHO", "RHOPS", "POST", "REBAR")
+            "ZETA", "ECS", "PHI", "RHO", "RHOPS", "POST", "REBAR",
+            "L2ANTI", "L2REPX")
+    check("22 键默认表 + 2 个 opt-in 反摩擦键", len(keys) == 24)
     for key in keys:
         check(f"22 键参数表含 {key}", f'"{key}"' in src)
+    # 第二十三次 σl6 附录 C opt-in 字段（默认全关，不写进默认 .dat）
+    for field in ("c2d", "c_skip", "eps0", "phi0", "c_rh", "c_h",
+                  "c_t0", "c_ts", "c_t"):
+        check(f"PrestressLoss2D 含 σl6 opt-in 字段 {field}",
+              f"{field}:" in src.split("class PrestressLoss2D")[1].split("class Prestress2D")[0])
+    check("第二十三次：σl6 opt-in 键仅启用时写出（默认表零污染）",
+          "if self.c_skip:" in src and "elif self.c2d:" in src
+          and '("C2D", self.c2d)' in src and '("C_SKIP", self.c_skip)' in src)
     tendon_cls = src.split("class Prestress2D")[1].split("class Stage2D")[0]
     check("束只给 LOSSREF，不造总损失系数",
           "LOSSREF={self.loss_ref}" in tendon_cls and "LOSS=" not in tendon_cls)
@@ -286,6 +312,16 @@ def bs_contract() -> None:
     check("opt-in .dat 写入 LOSSREF 束", "LOSSREF=1" in dat1)
     check("opt-in 前缀与默认逐位一致", dat1.startswith(dat0.split("! 自重开关")[0]))
     check("opt-in 模型 validate 无错误", not default.validate_model())
+
+    # 第二十三次：附录 G 反摩擦两个键默认不写、显式开启才写。
+    line_default = tb.to_dat(1)
+    check("默认损失表行仍是 22 键（无 L2ANTI/L2REPX）",
+          "L2ANTI" not in line_default and "L2REPX" not in line_default)
+    tb_anti = PrestressLoss2D(**dict(CFG, l2_anti=1, l2_repr_x=0))
+    line_anti = tb_anti.to_dat(1)
+    check("opt-in 损失表行写出 L2ANTI=1 / L2REPX=0",
+          "L2ANTI=1" in line_anti and "L2REPX=0" in line_anti
+          and len(line_anti.split()) == len(line_default.split()) + 2)
 
     bad = build_beam_bridge(span=10.0, n_spans=1, udl_kN=0.0, staged=False)
     bad.prestress_losses = {1: tb}
@@ -466,6 +502,144 @@ def exports() -> None:
     check("默认 HTML 出口的表与 Report 同源", "1395.00" in h and "0.8208" in h)
 
 
+# ------------------------------------------------- 第二十五次：阶段维度守卫
+
+def _stage_loss_text(basis: str = "2d_stage", np: int = 1,
+                     rows: str | None = None) -> str:
+    row = ("STAGE1 P1 SIGMA_CON=1000000 SL1=1 SL2=2 SL3=3 SL4=4 "
+           "SL5=5 SL6=6 SPE=800000 RATIO=0.8")
+    return ("[PRESTRESSLOSS2D]\n"
+            f"NPRESTRESS={np} BASIS={basis}\n"
+            "NOTE=测试用 NOTE，单位 Pa\n"
+            + (row if rows is None else rows) + "\n")
+
+
+def stage_loss_contract() -> None:
+    print("\n[6b] 第二十五次：2D 阶段分项损失契约（独立 opt-in，默认零污染）")
+    from bridge_spec import BridgeSpec, Stage2D, StagePrestressDef
+
+    # --- FE 源码契约 ---
+    hpp = read(FE / "prestress_loss_output_2d.hpp")
+    cpp = read(FE / "fem_2d.cpp")
+    fhpp = read(FE / "fem_2d.hpp")
+    check("FE 阶段格式函数独立于全局段",
+          hpp.count("formatStagePrestressLossSection2D") == 1
+          and hpp.count("formatPrestressLossSection2D") == 1)
+    check("FE 阶段段 BASIS=2d_stage / STAGE<n> P<id>",
+          "BASIS=2d_stage" in hpp and '"STAGE" << sr.stage' in hpp)
+    check("FE 阶段段 ERROR 不摆零值",
+          "ERROR=no_lossref_stage_prestress" in hpp)
+    check("FE 阶段段字段同 3D（12 位 / SL1..SL6 / SPE / RATIO）",
+          "setprecision(12)" in hpp
+          and all(f'" SL{i}="' in hpp for i in range(1, 7))
+          and '" SPE="' in hpp and '" RATIO="' in hpp)
+    check("FE *STAGE_PRESTRESS 支持 LOSSREF 且二选一",
+          "hasLossRef" in cpp and "必须且只能指定 LOSS 或 LOSSREF" in cpp)
+    check("FE 阶段束按输入顺序编号（同 3D）",
+          "m.stages[stageId - 1].prestresses.size()) + 1" in cpp)
+    check("FE StageResult 增 prestressLossDetails", "prestressLossDetails" in fhpp)
+    check("FE 阶段结果不混入非阶段明细",
+          "if (!st.prestresses.empty())" in cpp
+          and "sr.prestressLossDetails = mc.prestressLossDetails" in cpp)
+
+    # --- BS 数据模型 / .dat 映射 ---
+    ps0 = StagePrestressDef(elems=[1, 2], P=1e6, loss=0.9)
+    ps1 = StagePrestressDef(elems=[1, 2], P=1e6, loss_ref=2)
+    check("StagePrestressDef 默认 loss_ref=0 → 写 LOSS",
+          "LOSS=0.9" in ps0.to_dat(3) and "LOSSREF" not in ps0.to_dat(3),
+          ps0.to_dat(3))
+    check("StagePrestressDef loss_ref>0 → 写 LOSSREF 且不写 LOSS",
+          "LOSSREF=2" in ps1.to_dat(3) and "LOSS=" not in ps1.to_dat(3),
+          ps1.to_dat(3))
+    check("默认 .dat 行与历史逐位一致",
+          ps0.to_dat(3) == ("3 ELEM=1-2 P=1e+06 F=0 E1=0 E2=0 LOSS=0.9"),
+          ps0.to_dat(3))
+    spec = read(ROOT / "bridge_spec.py")
+    check("BS 校验阶段 LOSSREF 引用完整性",
+          "施工阶段" in spec and "预应力束引用了不存在的" in spec)
+
+    # --- 解析层（新口径与旧口径严格隔离） ---
+    src = read(ROOT / "prestress_loss_2d.py")
+    check("BS 新口径层有 stage 解析器 / 表 / 状态文案",
+          all(k in src for k in ("def parse_stage_loss_txt", "def stage_loss_table",
+                                 "def stage_status_text", "STAGE_STATUS_TEXT")))
+    check("STAGE_BASIS=2d_stage", L.STAGE_BASIS == "2d_stage")
+    ok = L.parse_stage_loss_txt(_stage_loss_text())
+    check("阶段段正例解析为 stage_ok", ok.get("status") == "stage_ok", str(ok)[:120])
+    check("阶段段键为 (阶段号, 束号)",
+          ok.get("rows") and ok["rows"][0]["stage"] == 1
+          and ok["rows"][0]["id"] == 1)
+    tb = L.stage_loss_table(ok)
+    check("阶段表 11 列（阶段+束号+九项）",
+          tb is not None and len(tb["headers"]) == 11)
+    check("阶段表行与段内数字同源（σpe 列，MPa）",
+          tb is not None and tb["rows"][0][9] == "0.80")
+    check("旧 parse_loss_txt 不收阶段段（严格隔离）",
+          L.parse_loss_txt(_stage_loss_text()).get("status") != "ok")
+    check("阶段段 basis 不符显式拒绝",
+          L.parse_stage_loss_txt(_stage_loss_text(basis="2d_global")).get("status")
+          == "stage_bad_basis")
+    check("阶段段缺 NPRESTRESS 显式拒绝",
+          L.parse_stage_loss_txt(
+              "[PRESTRESSLOSS2D]\n"
+              "STAGE1 P1 SIGMA_CON=1000000 SL1=1 SL2=2 SL3=3 SL4=4 "
+              "SL5=5 SL6=6 SPE=800000 RATIO=0.8\n")
+          .get("status") == "stage_bad_header")
+    check("阶段段行数不符显式拒绝",
+          L.parse_stage_loss_txt(_stage_loss_text(np=2)).get("status")
+          == "stage_row_count_mismatch")
+    check("阶段段 RATIO 不一致显式拒绝",
+          L.parse_stage_loss_txt(_stage_loss_text(
+              rows="STAGE1 P1 SIGMA_CON=1000000 SL1=1 SL2=2 SL3=3 SL4=4 "
+                   "SL5=5 SL6=6 SPE=800000 RATIO=0.5")).get("status")
+          == "stage_inconsistent_ratio")
+    check("旧全局格式行混进阶段段显式拒绝",
+          L.parse_stage_loss_txt(_stage_loss_text(rows=(
+              "P1 SIGMA_CON=1000000 SL1=1 SL2=2 SL3=3 SL4=4 SL5=5 SL6=6 "
+              "SPE=800000 RATIO=0.8"))).get("status") == "stage_bad_row")
+    check("无 LOSSREF 的 ERROR= 给显式中文状态",
+          L.parse_stage_loss_txt("[PRESTRESSLOSS2D]\n"
+                                 "ERROR=no_lossref_stage_prestress\n")
+          .get("status") == "stage_no_model")
+    check("阶段状态文案覆盖所有状态且无 Markdown 粗体",
+          len(L.STAGE_STATUS_TEXT) >= 12
+          and all("**" not in v for v in L.STAGE_STATUS_TEXT.values()))
+    check("阶段口径层不现算力学", "math.exp" not in src
+          and "computePrestressLosses(" not in src)
+
+    # --- Solve2DResult / 接线 / 报告 ---
+    r0 = Solve2DResult()
+    check("Solve2DResult 阶段损失默认 not_requested",
+          r0.prestress_stage_loss.get("status") == "stage_not_requested")
+    check("Solve2DResult 默认无阶段表", not r0.prestress_stage_loss_tables())
+    r1 = Solve2DResult(prestress_stage_loss=ok)
+    check("Solve2DResult 阶段表由新口径层生成",
+          "prestress_stage_loss_table" in r1.prestress_stage_loss_tables())
+    slv = read(ROOT / "solve_2d.py")
+    check("solve_2d 增 stage_loss_detail 且默认 False",
+          "stage_loss_detail: bool = False" in slv
+          and '"--stage-loss-detail"' in slv)
+    check("solve_2d 不读旧阶段文件残留（先 unlink）", ".stage.loss.txt" in slv)
+    md = read(ROOT / "model_doc.py")
+    check("ModelDoc.solve 增 stage_loss_2d_detail 形参",
+          "stage_loss_2d_detail: bool = False" in md
+          and "stage_loss_detail=bool(stage_loss_2d_detail)" in md)
+    check("报告挂阶段损失表", "prestress_stage_loss_table" in read(ROOT / "report_2d.py"))
+
+    # --- 文档 / 矩阵仍锁 P ---
+    fe_log = read(FE / "CHANGELOG.md")
+    fe_man = read(FE / "USER_MANUAL.md")
+    check("FE CHANGELOG 登记第二十五次 / 第 36 项",
+          "第二十五次" in fe_log and "stage_loss_2d_benchmark" in fe_log)
+    check("FE USER_MANUAL 登记 37 个 CTest（第 36 项仍列名）",
+          "37 个 CTest" in fe_man and "stage_loss_2d_benchmark" in fe_man)
+    check("B 类规格登记第二十五次", "第二十五次" in read(ROOT / "B类后续项接入规格.md"))
+    mat = read(ROOT / "能力边界矩阵.md")
+    check("能力矩阵该格已按第二十七次推 Y（口径=平面内完整）",
+          "第二十五次" in mat and "| Y | Y |" in mat
+          and "平面内分项损失完整" in mat)
+
+
 # ---------------------------------------------------------------- 文档对拍
 
 def docs() -> None:
@@ -501,6 +675,147 @@ def docs() -> None:
           "[PRESTRESSLOSS2D]" in read(ROOT / "verify_b_class_spec.py"))
 
 
+def _stage_force_text(basis: str = "2d_stage", np: int = 1,
+                      rows: str | None = None) -> str:
+    row = "STAGE1 P1 SIGMA_CON=1395000000 P=1500000 LOSS=0.8 PE=1200000"
+    return ("[PRESTRESSFORCE2D]\n"
+            f"NPRESTRESS={np} BASIS={basis}\n"
+            "NOTE=测试用 NOTE，PE=P*LOSS\n"
+            + (row if rows is None else rows) + "\n")
+
+
+def force_contract() -> None:
+    print("\n[6c] 第二十七次：2D 阶段有效预加力契约（独立 opt-in，默认零污染）")
+    from bridge_spec import StagePrestressDef  # noqa: F401
+
+    # --- FE 源码契约 ---
+    hpp = read(FE / "prestress_loss_output_2d.hpp")
+    cpp = read(FE / "fem_2d.cpp")
+    fhpp = read(FE / "fem_2d.hpp")
+    stage_cpp = read(FE / "example_stage.cpp")
+    check("FE 有效预加力段函数与段名独立",
+          hpp.count("formatStagePrestressForceSection2D") == 1
+          and "[PRESTRESSFORCE2D]" in hpp)
+    check("FE 有效预加力段 BASIS=2d_stage / STAGE<n> P<id>",
+          hpp.count("BASIS=2d_stage") >= 2
+          and '"STAGE" << sr.stage << " P" << pf.id' in hpp)
+    check("FE 有效预加力段字段顺序 SIGMA_CON→P→LOSS→PE",
+          hpp.find('" SIGMA_CON="') < hpp.find('" P="') < hpp.find('" LOSS="')
+          < hpp.find('" PE="'))
+    check("FE 有效预加力段不输出量纲不成立的 RATIO",
+          "RATIO" not in hpp.split("formatStagePrestressForceSection2D")[-1])
+    check("FE 无阶段束时写 ERROR 不摆零值",
+          "ERROR=no_stage_prestress" in hpp)
+    check("FE 有效预加力与 Pe 同一次计算（不重算）",
+          "m.prestressForces.push_back(PrestressStageForce2D{ps.id, ps.P, loss, Pe, sigmaCon})"
+          in cpp)
+    check("FE Model2D/StageResult 增 prestressForces 明细",
+          fhpp.count("std::vector<PrestressStageForce2D> prestressForces") == 2)
+    check("FE 有效预加力也受 !st.prestresses.empty() 守卫",
+          "sr.prestressForces = mc.prestressForces" in cpp
+          and "if (!st.prestresses.empty())" in cpp)
+    check("FE example_stage 有 --stage-prestress-force 与独立文件名",
+          '"--stage-prestress-force"' in stage_cpp
+          and '".stage.force.txt"' in stage_cpp)
+    check("FE 有效预加力段与损失段不同文件（不覆盖）",
+          '".stage.loss.txt"' in stage_cpp and '".stage.force.txt"' in stage_cpp)
+
+    # --- 解析层 ---
+    src = read(ROOT / "prestress_loss_2d.py")
+    check("BS 口径层有 force 解析器 / 表 / 状态文案",
+          all(k in src for k in ("def parse_stage_force_txt", "def stage_force_table",
+                                 "def force_status_text", "FORCE_STATUS_TEXT")))
+    check("FORCE_SECTION/FORCE_BASIS 正确",
+          L.FORCE_SECTION == "[PRESTRESSFORCE2D]" and L.FORCE_BASIS == "2d_stage")
+    ok = L.parse_stage_force_txt(_stage_force_text())
+    check("有效预加力段正例解析为 force_ok", ok.get("status") == "force_ok",
+          str(ok)[:120])
+    check("有效预加力键为 (阶段号, 束号) 且四字段齐",
+          ok.get("rows") and ok["rows"][0]["stage"] == 1
+          and ok["rows"][0]["id"] == 1
+          and all(k in ok["rows"][0] for k in L.FORCE_FIELDS))
+    tb = L.stage_force_table(ok)
+    check("有效预加力表 6 列（阶段+束号+σcon+P+系数+Pe）",
+          tb is not None and len(tb["headers"]) == 6)
+    check("有效预加力表行同源（σcon MPa / P kN / Pe kN）",
+          tb is not None and tb["rows"][0] == ["1", "1", "1395.00",
+                                              "1500.00", "0.8000", "1200.00"],
+          str(tb["rows"][0]) if tb else "None")
+    check("损失段解析器不认有效预加力段（严格隔离）",
+          L.parse_stage_loss_txt(_stage_force_text()).get("status") != "stage_ok")
+    check("有效预加力解析器不认损失段（严格隔离）",
+          L.parse_stage_force_txt(_stage_loss_text()).get("status")
+          not in ("force_ok", "stage_ok"))
+    check("basis 不符显式拒绝",
+          L.parse_stage_force_txt(_stage_force_text(basis="2d_global")).get("status")
+          == "force_bad_basis")
+    check("缺 NPRESTRESS 显式拒绝",
+          L.parse_stage_force_txt(
+              "[PRESTRESSFORCE2D]\n"
+              "STAGE1 P1 SIGMA_CON=1 P=2 LOSS=0.5 PE=1\n")
+          .get("status") == "force_bad_header")
+    check("行数不符显式拒绝",
+          L.parse_stage_force_txt(_stage_force_text(np=2)).get("status")
+          == "force_row_count_mismatch")
+    check("PE≠P·LOSS 显式拒绝",
+          L.parse_stage_force_txt(_stage_force_text(
+              rows="STAGE1 P1 SIGMA_CON=1395000000 P=1500000 LOSS=0.8 PE=999"))
+          .get("status") == "force_inconsistent_pe")
+    check("缺字段显式拒绝",
+          L.parse_stage_force_txt(_stage_force_text(
+              rows="STAGE1 P1 SIGMA_CON=1395000000 P=1500000 PE=1200000"))
+          .get("status") == "force_bad_row")
+    check("损失段行混进有效预加力段显式拒绝",
+          L.parse_stage_force_txt(_stage_force_text(rows=(
+              "STAGE1 P1 SIGMA_CON=1000000 SL1=1 SL2=2 SL3=3 SL4=4 "
+              "SL5=5 SL6=6 SPE=800000 RATIO=0.8"))).get("status") == "force_bad_row")
+    check("无阶段束 ERROR 给显式中文状态",
+          L.parse_stage_force_txt("[PRESTRESSFORCE2D]\n"
+                                 "ERROR=no_stage_prestress\n")
+          .get("status") == "force_no_model")
+    check("force 状态文案覆盖所有状态且无 Markdown 粗体",
+          len(L.FORCE_STATUS_TEXT) >= 12
+          and all("**" not in v for v in L.FORCE_STATUS_TEXT.values()))
+    check("口径层不现算力学（无 EI 反算 / 无位移反推）",
+          "math.exp" not in src and "computePrestressLosses(" not in src)
+
+    # --- Solve2DResult / 接线 / 报告 ---
+    r0 = Solve2DResult()
+    check("Solve2DResult 有效预加力默认 force_not_requested",
+          r0.prestress_stage_force.get("status") == "force_not_requested")
+    check("Solve2DResult 默认无有效预加力表",
+          not r0.prestress_stage_force_tables())
+    r1 = Solve2DResult(prestress_stage_force=ok)
+    check("Solve2DResult 有效预加力表由口径层生成",
+          "prestress_stage_force_table" in r1.prestress_stage_force_tables())
+    slv = read(ROOT / "solve_2d.py")
+    check("solve_2d 增 stage_force_detail 且默认 False",
+          "stage_force_detail: bool = False" in slv
+          and '"--stage-prestress-force"' in slv)
+    check("solve_2d 先清 .stage.force.txt 残留", ".stage.force.txt" in slv)
+    check("两个阶段开关互不依赖（各自 append）",
+          '_flags.append("--stage-loss-detail")' in slv
+          and '_flags.append("--stage-prestress-force")' in slv)
+    md = read(ROOT / "model_doc.py")
+    check("ModelDoc.solve 增 stage_force_2d_detail 形参",
+          "stage_force_2d_detail: bool = False" in md
+          and "stage_force_detail=bool(stage_force_2d_detail)" in md)
+    rp = read(ROOT / "report_2d.py")
+    check("报告挂有效预加力表",
+          "prestress_stage_force_table" in rp
+          and "2D 阶段有效预加力明细" in rp)
+    check("报告写明 PE=P·loss 只读解析", "只读解析、不重算" in rp)
+
+    # --- 文档 ---
+    fe_log = read(FE / "CHANGELOG.md")
+    check("FE CHANGELOG 登记第二十七次",
+          "第二十七次" in fe_log)
+    check("FE input_format 登记 .stage.force.txt",
+          ".stage.force.txt" in read(FE / "input_format.md"))
+    check("B 类规格登记第二十七次",
+          "第二十七次" in read(ROOT / "B类后续项接入规格.md"))
+
+
 def main() -> int:
     print("=" * 78)
     print("2D 分项预应力损失明细段守卫（B2 第十次，纯离线 + 本地内核实跑）")
@@ -511,6 +826,8 @@ def main() -> int:
     parser_cases()
     wiring_and_zero_pollution()
     exports()
+    stage_loss_contract()
+    force_contract()
     docs()
     n_pass = sum(1 for _, ok, _ in PASS if ok)
     print("\n" + "=" * 78)

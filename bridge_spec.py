@@ -207,6 +207,19 @@ class StagePrestressDef(BaseModel):
     E1: float = 0.0                # 起点偏心 m
     E2: float = 0.0                # 终点偏心 m
     loss: float = 1.0              # 总损失系数，有效预加力 Pe=P*loss
+    # 第二十五次 opt-in：阶段束引用 *PRESTRESS_LOSS 表号，走分项损失路径。
+    # 内核要求 LOSS / LOSSREF 二选一；>0 时写 LOSSREF、忽略上面的 loss，
+    # =0（默认）时写 LOSS，历史 .dat 逐位不变。
+    loss_ref: int = 0
+
+    def to_dat(self, stage_id: int) -> str:
+        """输出一行 `*STAGE_PRESTRESS`；默认 loss_ref=0 时与历史逐位一致。"""
+        loss_part = (f"LOSSREF={self.loss_ref}" if self.loss_ref > 0
+                     else f"LOSS={self.loss:.6g}")
+        return (
+            f"{stage_id} ELEM={_int_ranges(self.elems)} "
+            f"P={self.P:.6g} F={self.F:.6g} "
+            f"E1={self.E1:.6g} E2={self.E2:.6g} {loss_part}")
 
 
 class PrestressLoss2D(BaseModel):
@@ -217,9 +230,16 @@ class PrestressLoss2D(BaseModel):
     `computePrestressLosses()`，这里不另立一套计算。单位一律 SI：应力 Pa、长度 m、
     角度 rad、温度 °C。
 
-    这是 2D **非阶段** `*PRESTRESS` 束专用的 opt-in 契约，默认不写进 `.dat`。
-    σl2 只按直线筋（曲线筋反摩擦未实现），σl6 的 eps_cs / phi 需按附录 C 查表
-    输入，程序不自动按龄期发展；σl3 / σl5 / σl6 是后期损失，不进 σpe 与 Pe。
+    这是 2D opt-in 契约，默认不写进 `.dat`。第二十五次起同一张表既供非阶段
+    `*PRESTRESS ... LOSSREF=`，也供阶段 `*STAGE_PRESTRESS ... LOSSREF=`，
+    两条入口共用下方 computePrestressLosses 唯一公式，不另立 2D 阶段公式。
+    σl2 默认按直线筋 ΣΔl/l·Ep；opt-in `l2_anti=1` 时按 JTG 3362-2018 附录 G
+    考虑曲线筋反摩擦，代表值取张拉端 x=0（保守），`l2_repr_x` 非 0 由内核显式拒绝。
+    σl6 默认由 eps_cs / phi 用户直给；opt-in `c2d=1` 时用附录 C 显式表值龄期口径
+    （eps0/phi0 由用户按表 C.1.2 / C.2.2 核对录入并自行做 C50 以上 32.4/fck 折减，
+    程序只按解析发展公式组装 εcs/φ，不查表、不调用规范拟合函数兜底）；
+    `c_skip=1` 显式声明 σl6 不参与（区别于缺值报错）。σl3 / σl5 / σl6 是后期损失，
+    不进 σpe 与 Pe。
     """
 
     sigma_con: float = Field(gt=0)
@@ -244,9 +264,25 @@ class PrestressLoss2D(BaseModel):
     rho_ps: float = 1.0
     post: bool = True
     rebar: bool = False
+    l2_anti: int = 0        # 0=直线筋（默认）；1=附录 G 反摩擦
+    l2_repr_x: int = 0      # 代表截面，目前只支持 0（张拉端）
+    # σl6 附录 C 表值龄期口径（默认全关，不写进 .dat）
+    c2d: int = 0            # 1=用附录 C 显式表值龄期算 εcs/φ
+    c_skip: int = 0         # 1=显式声明 σl6 不参与（与 c2d 互斥）
+    eps0: float = 0.0       # εcs0 名义收缩系数（表 C.1.2，C50 以上用户已折减）
+    phi0: float = 0.0       # φ0 名义徐变系数（表 C.2.2，C50 以上用户已折减）
+    c_rh: float = 0.0       # 环境相对湿度 RH（%）
+    c_h: float = 0.0        # 理论厚度 h=2A/u（mm）
+    c_t0: float = 0.0       # 加载/传力锚固龄期 t0（d）
+    c_ts: float = 0.0       # 收缩开始龄期 ts（d）
+    c_t: float = 0.0        # 计算考虑龄期 t（d）
 
     def to_dat(self, table_id: int) -> str:
-        """输出 `*PRESTRESS_LOSS` 的一行；键名与 2D / 3D 共用解析器一致。"""
+        """输出 `*PRESTRESS_LOSS` 的一行；键名与 2D / 3D 共用解析器一致。
+
+        反摩擦键与 σl6 附录 C 键仅在显式启用时追加，
+        默认 22 键行与历史版本逐位一致。
+        """
         kv = [
             ("SIGMA_CON", self.sigma_con), ("EP", self.Ep), ("EC", self.Ec),
             ("FPK", self.fpk), ("MU", self.mu), ("K", self.k),
@@ -257,6 +293,16 @@ class PrestressLoss2D(BaseModel):
             ("PHI", self.phi), ("RHO", self.rho), ("RHOPS", self.rho_ps),
             ("POST", 1 if self.post else 0), ("REBAR", 1 if self.rebar else 0),
         ]
+        if self.l2_anti or self.l2_repr_x:
+            kv.extend([("L2ANTI", self.l2_anti), ("L2REPX", self.l2_repr_x)])
+        if self.c_skip:
+            kv.append(("C_SKIP", self.c_skip))
+        elif self.c2d:
+            kv.extend([
+                ("C2D", self.c2d), ("EPS0", self.eps0), ("PHI0", self.phi0),
+                ("C_RH", self.c_rh), ("C_H", self.c_h), ("C_T0", self.c_t0),
+                ("C_TS", self.c_ts), ("C_T", self.c_t),
+            ])
         return f"{table_id} " + " ".join(
             f"{key}={value:.6g}" if isinstance(value, float) else f"{key}={value}"
             for key, value in kv)
@@ -636,6 +682,12 @@ class BridgeSpec(BaseModel):
                     if eid not in elem_ids:
                         errs.append(
                             f"施工阶段 {st.id} 预应力引用了不存在的单元 {eid}")
+                # 第二十五次：阶段束 LOSSREF 必须指向已定义的损失表；
+                # 默认 0 走总损失系数 LOSS，零命中、既有模型逐位不变。
+                if ps.loss_ref and ps.loss_ref not in self.prestress_losses:
+                    errs.append(
+                        f"施工阶段 {st.id} 预应力束引用了不存在的 "
+                        f"*PRESTRESS_LOSS 表 {ps.loss_ref}")
 
         for lane in self.lanes:
             for nid in lane.nodes:
@@ -935,11 +987,7 @@ class BridgeSpec(BaseModel):
                 out.append("*STAGE_PRESTRESS")
                 for s in self.stages:
                     for ps in s.prestresses:
-                        out.append(
-                            f"{s.id} ELEM={_int_ranges(ps.elems)} "
-                            f"P={ps.P:.6g} F={ps.F:.6g} "
-                            f"E1={ps.E1:.6g} E2={ps.E2:.6g} "
-                            f"LOSS={ps.loss:.6g}")
+                        out.append(ps.to_dat(s.id))
                 out.append("")
 
         if self.lanes:

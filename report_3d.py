@@ -2050,9 +2050,11 @@ def build_document(res: SolveResult, model: Any, *, project: str = "",
             "按张拉方式取 σcon−σl1−σl2−σl4（后张）或 σcon−σl2（先张）；"
             "σl3/σl5/σl6 属后期损失，不进 σpe，也不参与等效荷载的"
             "有效预加力 Pe = P·(σpe/σcon)。表中 Pe 取自同一次求解的"
-            "阶段预加力段，可据此逐束复核。σl2 目前只按直线筋计算，"
-            "εcs 与 φ 由输入给定，程序不自动按龄期发展——这些边界不因"
-            "表里有数就被当成已覆盖。")})
+            "阶段预加力段，可据此逐束复核。σl2 默认按直线筋计算，opt-in "
+            "L2ANTI=1 按附录 G 反摩擦、代表值取张拉端 x=0（保守）；"
+            "σl6 默认由 εcs / φ 输入给定、程序不自动按龄期发展，opt-in C2D=1"
+            "用附录 C 显式表值龄期（表值用户核对、程序不查表不拟合兜底），"
+            "C_SKIP=1 显式不参与——这些边界不因表里有数就被当成已覆盖。")})
         blocks.append({"type": "table", "key": "prestress_loss_table"})
         blocks.append({"type": "note",
                        "text": tabs["prestress_loss_table"]["note"]})

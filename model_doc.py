@@ -1877,6 +1877,8 @@ class ModelDoc:
     def solve(self, out_dir: str | Path | None = None, dat_name: str | None = None,
               modal_2d: bool = False, strength_2d: bool = False,
               modal_2d_detail: bool = False, loss_2d_detail: bool = False,
+              stage_loss_2d_detail: bool = False,
+              stage_force_2d_detail: bool = False,
               newton_2d_detail: bool = False, capacity_2d: bool = False,
               axial_capacity_2d: bool = False,
               length_2d_detail: bool = False, opt_2d_detail: bool = False,
@@ -1909,6 +1911,19 @@ class ModelDoc:
         只有模型显式挂了 `*PRESTRESS_LOSS` 表 + 非阶段 `LOSSREF` 束时，
         才追加一次 `example_mixed.exe --loss-detail-only` 读
         `[PRESTRESSLOSS2D]` 段；Python 只解析、不重算 σl1~σl6 / σpe。
+        不勾时命令行、输出文件、diagnostics 与计算书逐位不变。
+
+        `stage_loss_2d_detail` 是 2D **阶段**分项损失明细的 opt-in（默认
+        False）：有施工阶段时给 `example_stage.exe` 追加
+        `--stage-loss-detail`，只读 `<stem>.stage.loss.txt` 的
+        `BASIS=2d_stage` 段；与非阶段 `<stem>.loss.txt` 严格隔离。
+        不勾时命令行、输出文件、diagnostics 与计算书逐位不变。
+
+        `stage_force_2d_detail` 是 2D **阶段有效预加力**明细的 opt-in（默认
+        False）：有施工阶段时给 `example_stage.exe` 追加
+        `--stage-prestress-force`，只读 `<stem>.stage.force.txt` 的
+        `[PRESTRESSFORCE2D]` 段（`STAGE<n> P<id> PE=`），对应 3D 的
+        `stage prestress force` 段；与阶段损失段不同文件、可同时开。
         不勾时命令行、输出文件、diagnostics 与计算书逐位不变。
 
         `newton_2d_detail` 是 2D 内层 Newton 逐迭代过程量的 opt-in（默认
@@ -1980,6 +1995,8 @@ class ModelDoc:
                         modal=bool(modal_2d), strength=bool(strength_2d),
                         modal_detail=bool(modal_2d_detail),
                         loss_detail=bool(loss_2d_detail),
+                        stage_loss_detail=bool(stage_loss_2d_detail),
+                        stage_force_detail=bool(stage_force_2d_detail),
                         newton_detail=bool(newton_2d_detail),
                         capacity=bool(capacity_2d),
                         axial_capacity=bool(axial_capacity_2d),

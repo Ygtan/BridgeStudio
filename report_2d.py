@@ -88,7 +88,9 @@ LOSS_BOUNDARY_NOTE = (
     "本次 opt-in 的 [PRESTRESSLOSS2D] 明细段由 2D 内核写出非阶段 LOSSREF "
     "束的 σl1~σl6、σpe 与 σpe/σcon；字段名与单位同 3D，但 2D 没有阶段"
     "维度，不设 STAGE 占位。σl3 / σl5 / σl6 是后期损失，不进 σpe 与 Pe；"
-    "σl2 只按直线筋；εcs / φ 需按附录 C 查表输入。分项损失是复核明细，"
+    "σl2 默认按直线筋；opt-in L2ANTI=1 按附录 G 反摩擦、代表值 x=0（张拉端保守）。"
+    "σl6 默认由 εcs / φ 用户直给；opt-in C2D=1 用附录 C 显式表值龄期（表值用户"
+    "核对录入、程序不查表不拟合兜底），C_SKIP=1 显式不参与。分项损失是复核明细，"
     "不是规范合格判定，也不是 3D 阶段分项损失。"
 )
 NEWTON_BOUNDARY_NOTE = (
@@ -395,6 +397,46 @@ def build_2d_document(res: Any, spec: Any) -> R.Report:
             blocks.append({"type": "note",
                            "text": str(loss_status_text(pl))})
         blocks.append({"type": "note", "text": LOSS_BOUNDARY_NOTE})
+
+    # ⑦b 2D 阶段分项预应力损失明细（第二十五次 opt-in）：独立阶段入口，
+    #     与非阶段 ⑦ 不同文件 / 不同 BASIS，两章互不冒充、互不混行。
+    psl = getattr(res, "prestress_stage_loss", None) or {}
+    if psl.get("status") not in ("stage_not_requested", None):
+        blocks.append({"type": "h1", "text": "2D 阶段分项预应力损失明细"})
+        pst = (res.prestress_stage_loss_tables()
+               if hasattr(res, "prestress_stage_loss_tables") else {})
+        for key, tb in pst.items():
+            add(key, tb)
+        if not pst:
+            from prestress_loss_2d import stage_status_text as psl_status
+
+            blocks.append({"type": "note", "text": str(psl_status(psl))})
+        blocks.append({"type": "note",
+                       "text": "阶段明细由内核 BASIS=2d_stage 段只读解析；"
+                               "σl2/σl6 选项经同一张 *PRESTRESS_LOSS 表映射。"
+                               "本项已按第二十七次口径（平面内完整）计入 B4 的 "
+                               "2D=Y；Y 不冒充三向空间量。"})
+
+    # ⑦c 2D 阶段有效预加力（第二十七次 opt-in）：补的是 3D
+    #     `stage prestress force` 段在 2D 侧缺失的输出能力，
+    #     与 ⑦b 不同文件（.stage.force.txt）、不同段名，两章可同时出现。
+    psf = getattr(res, "prestress_stage_force", None) or {}
+    if psf.get("status") not in ("force_not_requested", None):
+        blocks.append({"type": "h1", "text": "2D 阶段有效预加力明细"})
+        pft = (res.prestress_stage_force_tables()
+               if hasattr(res, "prestress_stage_force_tables") else {})
+        for key, tb in pft.items():
+            add(key, tb)
+        if not pft:
+            from prestress_loss_2d import force_status_text as psf_status
+
+            blocks.append({"type": "note", "text": str(psf_status(psf))})
+        blocks.append({"type": "note",
+                       "text": "有效预加力 Pe=P·loss 是内核同一次计算的过程量，"
+                               "本段只读解析、不重算、不由位移反推预应力；"
+                               "只给 LOSS= 的束未登记控制应力，σcon 记 0 而不反造。"
+                               "组织键 (阶段号, 束号) 与 3D stage prestress force "
+                               "段一致，2D 的 PE= 即 3D 的 Pe=。"})
 
     # ⑧ 2D 内层 Newton 逐迭代过程量（第十一次 opt-in）：只覆盖内层 Newton，
     #    3D 的 [LENGTH] / [OPT] 两层力学（三层迭代）仍没有移植、不造占位、

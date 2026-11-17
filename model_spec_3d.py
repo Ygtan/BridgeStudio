@@ -401,8 +401,12 @@ class PrestressLoss3D(BaseModel):
     """一张分项预应力损失参数表（JTG 3362-2018 §6.2），对应内核 `*PRESTRESS_LOSS`。
 
     单位一律 SI：应力 Pa、长度 m、角度 rad、温度 °C。字段名与内核键名的映射
-    见 :meth:`to_dat`。σl2 目前只支持直线筋（ΣΔl/l·Ep）；σl6 的 ``eps_cs`` 与
-    ``phi`` 需要按规范附录 C 查表后填入，程序不自动按龄期发展。
+    见 :meth:`to_dat`。σl2 默认按直线筋（ΣΔl/l·Ep）；opt-in ``l2_anti=1``
+    时按附录 G 考虑反摩擦，代表值取张拉端 x=0（``l2_repr_x`` 目前只支持 0）。
+    σl6 默认由 ``eps_cs`` / ``phi`` 用户直给；opt-in ``c2d=1`` 用附录 C 显式表值龄期
+    （``eps0`` / ``phi0`` 由用户按表 C.1.2 / C.2.2 核对录入并自行做 C50 以上
+    32.4/fck 折减，程序只按解析发展公式组装 εcs/φ，不查表、不拟合兜底）；
+    ``c_skip=1`` 显式声明 σl6 不参与（区别于缺值报错）。
 
     默认值不是「规范推荐值」，只是让算例能跑起来的常见量级；工程使用必须
     逐项按实际管道、锚具、材料与龄期填写。
@@ -429,9 +433,25 @@ class PrestressLoss3D(BaseModel):
     rho_ps: float = 1.0                     # σl6 ρps
     post: bool = True                       # True 后张 / False 先张
     rebar: bool = False                     # True 预应力螺纹钢筋的 σl5 口径
+    l2_anti: int = 0                        # 0=直线筋（默认）；1=附录 G 反摩擦
+    l2_repr_x: int = 0                      # 代表截面，目前只支持 0（张拉端）
+    # σl6 附录 C 表值龄期口径（默认全关，不写进 .dat）
+    c2d: int = 0                            # 1=用附录 C 显式表值龄期算 εcs/φ
+    c_skip: int = 0                         # 1=显式声明 σl6 不参与（与 c2d 互斥）
+    eps0: float = 0.0                       # εcs0（表 C.1.2，C50 以上用户已折减）
+    phi0: float = 0.0                       # φ0（表 C.2.2，C50 以上用户已折减）
+    c_rh: float = 0.0                       # 环境相对湿度 RH（%）
+    c_h: float = 0.0                        # 理论厚度 h=2A/u（mm）
+    c_t0: float = 0.0                       # 加载龄期 t0（d）
+    c_ts: float = 0.0                       # 收缩开始龄期 ts（d）
+    c_t: float = 0.0                        # 计算龄期 t（d）
 
     def to_dat(self, table_id: int) -> str:
-        """输出内核 `*PRESTRESS_LOSS` 的一行。"""
+        """输出内核 `*PRESTRESS_LOSS` 的一行。
+
+        反摩擦键与 σl6 附录 C 键仅在显式启用时追加，
+        默认 22 键行与历史版本逐位一致。
+        """
         kv = [
             ("SIGMA_CON", self.sigma_con), ("EP", self.Ep), ("EC", self.Ec),
             ("FPK", self.fpk), ("MU", self.mu), ("K", self.k),
@@ -442,6 +462,16 @@ class PrestressLoss3D(BaseModel):
             ("PHI", self.phi), ("RHO", self.rho), ("RHOPS", self.rho_ps),
             ("POST", 1 if self.post else 0), ("REBAR", 1 if self.rebar else 0),
         ]
+        if self.l2_anti or self.l2_repr_x:
+            kv.extend([("L2ANTI", self.l2_anti), ("L2REPX", self.l2_repr_x)])
+        if self.c_skip:
+            kv.append(("C_SKIP", self.c_skip))
+        elif self.c2d:
+            kv.extend([
+                ("C2D", self.c2d), ("EPS0", self.eps0), ("PHI0", self.phi0),
+                ("C_RH", self.c_rh), ("C_H", self.c_h), ("C_T0", self.c_t0),
+                ("C_TS", self.c_ts), ("C_T", self.c_t),
+            ])
         return f"{table_id} " + " ".join(f"{k}={fmt(v)}" for k, v in kv)
 
 
