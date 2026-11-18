@@ -203,4 +203,89 @@ APDL 自由度名 `UX/UY/UZ/ROTX/ROTY/ROTZ` → 数字 1~6。
 
 用户 `c，c` = 口径 C + 范围 c。实现结果：内核（线性+非线性）、`ModelSpec3D`、
 `.dat`、专用建造器、自然语言识别、独立包同步、第 39 项 CTest、守卫 30/30 全部落地。
-未包含项：APDL `CE` 读入（§4.4 标为可选，本轮未做，APDL 导入仍明确不读耦合方程）。
+**2026-11-18 收口补充（用户选 ③）**：§4.4 的 APDL `CE` 只读导入已落地——
+`apdl_io.py` 解析 `CE,id,b,node,dof,coef,...`（自由度名 UX/UY/UZ/ROTX/ROTY/
+ROTZ→1~6），写入 `ModelSpec3D.ces`，告警登记罚函数 PENALTY 依赖；UI 增
+「约束方程台账」；`verify_apdl_import.py` 由 74/74 增至 89/89（新增 15 条
+CE 断言）；独立包 `apdl_io.py`/`ui_3d.py` 已同步。`APDL导入规格.md` §2.1/
+§5-#13 同步解除「不读耦合方程」的旧表述。
+
+仍未包含项：**分级顶推 stage**（每级 Δ_i 写入第 i 阶段 constant）——调研确认
+内核 `solveModel3DStages` / `solveModel3DStagesNonlinear` 构造 `mc` 时不复制
+`m.ces`，CE 当前完全不进 stage 路径，且悬索建造器不生成 stages。要做真正的
+分级顶推需内核级改动（stage 路径注入 CE + 每阶段 constant 可变 + 建造器生成
+顶推阶段 + 求解链接入）。该周期已按用户指令立项，规格见 §8。
+
+---
+
+## 8. 分级顶推 stage（阶段二，opt-in）
+
+> 状态：**规格已定，实现中**。触发：用户 2026-11-18 选「2、3」中的第 2 项。
+> 目标：把成桥态单次顶推 Δ 扩展为**逐施工阶段顶推**——第 i 阶段顶推量 Δ_i
+> 写入该阶段 CE1 的 constant，塔顶两侧水平力随架设进度逐级平衡。
+
+### 8.1 现状调研（逐条代码依据）
+
+| 位置 | 现状 | 对分级顶推的含义 |
+|---|---|---|
+| `fem_3d.hpp::solveModel3DStages`（1450） | `mc.nodes/constraints/loads` 复制，**不复制 `mc.ces`**；每阶段解**增量**（`mc.loads = st.loads`） | 需复制 CE + 明确 constant 口径 |
+| `fem_3d_nl.hpp::solveModel3DStagesNonlinear`（2780） | 同样不复制 `mc.ces`；末尾调 `solveModel3DNonlinear(mc,...)`（2970） | 该函数内部已装配 CE（1008~1125），只要 `mc.ces` 就位 |
+| `fem_3d.hpp::constrainDisconnected3D`（1423） | 把所有孤立节点逐自由度硬约束 | **风险**：索鞍孤立节点 S 若无单元连接会被硬约束，CE 失效 |
+| `fem_3d_nl.hpp`（2008 注释） | 「不能直接调 `constrainDisconnected3D`——它会把有弹簧支承的节点也硬约束」 | 佐证 CE 引用节点必须豁免硬约束 |
+| `fem_3d_nl.hpp::2530~2611 solveCompletionState3D` | 成桥态单次顶推：`m.ces` 由主链路读入，CE 装配在 `solveModel3DNonlinear` 内 | 成桥态已验证 S−T=Δ，机制可照搬 |
+| `model_spec_3d.py::Stage3D`（478） | 有 `id/activate/deactivate/loads/tensions/unstrained/prestress/creep_dphi/time`，无 CE 字段 | 需加每阶段 CE constant 覆盖字段 |
+| `suspension_3d.py`（105/185/485） | `saddle_jack_dx` 生成每塔 6 条 CE、constant=Δ；**不生成 stages** | 需加生成顶推阶段序列 |
+| `fem_3d.hpp::readModel3D`（3463 `*CE`） | CE 用 `<id> <b> <node> <dof> <coef>...` | 每阶段常量覆盖用新键表达 |
+
+### 8.2 CE constant 口径（**关键决策**）
+
+`fem_3d.hpp` 阶段求解是**增量法**（见 1434 注释：`mc.loads = st.loads` 不是累计），
+每一步解的是「本阶段荷载在当前构型上的增量」。因此：
+
+- **CE constant 采用「增量口径」**：第 i 阶段 `*STAGE` 里的 `CE=` 写的是
+  **本阶段新增顶推量 δ_i = Δ_i − Δ_(i−1)**，不是累计 Δ_i。
+- 原因：CE 约束 `Σci·ui = b` 里的 `u` 是本阶段求解的位移向量（增量 `dU`），
+  常量写 δ_i 才使累计滑移 `Σ δ = Δ_i`；若写累计 Δ_i，塔顶会逐级过顶推。
+- 建造器负责把用户给的「分级顶推 Δ_1, Δ_2, …, Δ_n（累计目标）」差分成本阶段
+  δ_i 写进各 `*STAGE`。用户看到的仍是累计顶推量，差分是内部实现细节。
+
+### 8.3 内核最小切口（三处必须成对）
+
+1. **`Stage3D` 新增每阶段常量覆盖字段**：`std::vector<std::pair<int,double>>
+   ceConstants`（CE id → 本阶段 constant 覆盖），默认空 = 不覆盖、零污染。
+   `*STAGE` 解析新键 `CE=<id>:<b>,<id>:<b>;...`（`;` 分隔多组，`:` 分 id 与值）。
+2. **两个 stage 求解器复制 CE 并应用覆盖**：`solveModel3DStages` 与
+   `solveModel3DStagesNonlinear` 构造 `mc` 时 `mc.ces = m.ces`；对本阶段
+   `ceConstants` 中每个 id 覆盖对应 CE 的 constant。覆盖只作用于 `mc` 副本，
+   `m.ces` 原值不变。
+3. **`constrainDisconnected3D` 对 CE 引用节点豁免**：当 `m.ces` 非空时，
+   凡被任一 CE 的 term 引用的节点，不加入硬约束——让 S 靠 CE 罚刚度获得自由度。
+   线性与非线性路径各一处；`m.ces` 为空时豁免逻辑完全不触发，既有算例逐位不变。
+
+### 8.4 BridgeStudio 切口
+
+- `model_spec_3d.py::Stage3D` 新增 `ce_constants: dict[int, float]`，`to_dat()`
+  在 `CE=` 键非空时追加（按 id 排序，保证可复现）；`validate_model_3d()` 校验
+  覆盖的 id 必须在 `model.ces` 中存在，否则报错（防静默丢弃）。
+- `suspension_3d.py::build_suspension_3d` 新增 opt-in 参数
+  `jack_stages: list[float] | None = None`（累计顶推量序列）。缺省 `None` 时不生成
+  stages、行为和现在完全一致；给值时：CE 按 §3.3 生成（constant 用首个 Δ），
+  并为每个 Δ_i 生成一个 `*STAGE`，`CE=` 写差分 δ_i，其余恒载阶段照旧。
+- `model_doc.py` 自然语言识别「分级顶推 / 逐阶段顶推 + 多个 Δ」→ `jack_stages`。
+
+### 8.5 默认零污染
+
+- `jack_stages=None` 且 `saddle_jack_dx=0`：不生成 CE、不生成 stage、`.dat` 逐位不变；
+- `m.ces` 为空：两个 stage 求解器 `mc.ces` 为空，CE 段早退、`constrainDisconnected3D`
+  豁免不触发——既有施工阶段算例（CB3D13 等）与 12+37 格冻结证据不变；
+- 覆盖字段为空：stage CE constant 沿用 `*CE` 原值，行为等价单次顶推。
+
+### 8.6 验收断言（第 41 项 CTest + verify_saddle_ce.py）
+
+1. 分级顶推 `.dat` 重放：第 i 阶段末 `UX(C)−UX(T)` 累计值命中 Δ_i（容差同 §6-#4）；
+2. 每阶段 constant 增量口径：Δ=[0.01,0.02,0.03] → 三阶段 δ=[0.01,0.01,0.01]；
+3. 无 `CE=` 覆盖：stage CE 沿用 `*CE` 原常量；
+4. `constrainDisconnected3D` 豁免：S 节点未被硬约束、CE 命中；
+5. 覆盖 id 不存在 / `jack_stages` 非递增 → 显式拒绝；
+6. 默认零污染：无顶推/无 CE 的 stage 算例结果与改造前逐字节一致；
+7. 线性与非线性两条 stage 路径各自命中分级顶推量。

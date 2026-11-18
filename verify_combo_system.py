@@ -176,6 +176,43 @@ def dat_invariant() -> None:
                   f"{type(e).__name__}: {e}")
 
 
+def phase1_contract_registry() -> None:
+    print("\n[7] 阶段一内核实施契约登记（内核已闭环，契约七条 + 三条正向确认）")
+    text = SPEC.read_text(encoding="utf-8") if SPEC.is_file() else ""
+    # §3.1~§3.5 的实施契约必须在文档里齐全；守卫只确认「已登记」，
+    # 不提前写成跳过，也不提前放宽 §4 的哨兵拒绝。
+    contract_terms = (
+        ("§3.1 显式体系标识", ("cooperative", "SYSTEM=COOP", "cfg.system")),
+        ("§3.2 斜拉索目标索力保留", ("suspElems", "cfg.cables.clear()", "斜拉索目标索力")),
+        ("§3.3 三类残差分列", ("r_main", "r_stay", "r_girder")),
+        ("§3.4 专属输出段", ("[COOPERATIVE]", "coop_susp_share_pct", "coop_tower_H_residual_kN")),
+        ("§3.5 第 5 键切换条件", ("阶段一内核闭环前", "阶段一内核闭环后", "成对改写")),
+        ("§3.6 数值依据", ("dat_byte_regression", "37/37")),
+        ("§3.7 用户力学口径", ("3.7 用户确认的协作体系力学口径", "r_tower",
+                              "susp_fraction", "side_stay_ratio",
+                              "tower_height_ratio", "plane_count",
+                              "用户原话（存档，不被转写覆盖）")),
+    )
+    for label, terms in contract_terms:
+        check(f"{label} 已登记（实施契约七条齐全）",
+              all(t in text for t in terms), str([t for t in terms if t not in text]))
+    # 阶段一内核已闭环：下面的三条在闭环前是「反证内核里没有」，
+    # 现在成对改写为「正向确认内核里确实有」，断言条数不减、口径不放宽。
+    csrc = ""
+    cpp = ROOT.parent / "FEM-Eigen" / "cable_solver.cpp"
+    if cpp.is_file():
+        csrc = cpp.read_text(encoding="utf-8", errors="replace")
+    check("阶段一已闭环：cable_solver.cpp 有 cooperative 独立字段与 SYSTEM=COOP 解析",
+          "bool cooperative = false;" in csrc
+          and 'upper(val) == "COOP"' in csrc)
+    check("阶段一已闭环：cable_solver.cpp 有 [COOPERATIVE] 段且仅协作时写",
+          "[COOPERATIVE]" in csrc and "if (cfg.cooperative)" in csrc)
+    cmake = (read("..\\FEM-Eigen\\CMakeLists.txt")
+             if (ROOT.parent / "FEM-Eigen" / "CMakeLists.txt").is_file() else "")
+    check("阶段一已闭环：第 40 项 CTest 已注册",
+          "combo_system_3d_benchmark" in cmake)
+
+
 def docs_synced() -> None:
     print("\n[6] 契约 / 矩阵 / README 指向规格，且不删断言假装已补")
     for name in ("X20_接入约定.md", "能力边界矩阵.md", "README.md"):
@@ -201,6 +238,7 @@ def main() -> int:
     kernel_honesty()
     dat_invariant()
     docs_synced()
+    phase1_contract_registry()
     n_pass = sum(1 for ok, _, _ in RESULTS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(RESULTS)} 通过")

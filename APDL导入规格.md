@@ -1,6 +1,7 @@
 # APDL 只读导入规格（a + b）
 
-> 状态：规格先于实现。范围由用户 2026-11 的 `a+b` 选择限定。
+> 状态：规格先于实现，已落地。范围由用户 2026-11 的 `a+b` 选择限定；
+> 2026-11-18 增补 `CE` 约束方程只读导入（用户选 ③ 收口本轮 CE 边界）。
 > 本文只登记**读入**；APDL 导出能力（`spec_to_apdl` / `spec3d_to_apdl` /
 > `beam_spec_to_apdl` / `write_ansys_file` / `write_ansys_2d`）保持逐字节不变。
 
@@ -58,6 +59,12 @@
 | `SFBEAM,elem,face,PRES,val` | 单元面压力 | `ElemLoad3D`（**有损**，见 §3） |
 | `SFE,elem,face,PRES,val` | 单元面荷载 | `ElemLoad3D`（**有损**，见 §3） |
 | `ACE,ax,ay,az` | 重力加速度 m/s² | `ModelSpec3D.gravity` |
+| `CE,id,b,n1,dof1,c1,n2,dof2,c2,...` | 约束方程 Σcoef·u=b（**有损**：罚函数实现） | `ConstraintEquation3D`（`ces`），自由度名 UX/UY/UZ/ROTX/ROTY/ROTZ→1~6 |
+
+> CE 说明：ANSYS 的 `CE` 没有罚系数概念。导入用 FEM-Eigen 的罚函数实现，
+> 默认 `PENALTY=1e12`（与 3D `*CE_PARAMETER` 一致），结果在罚容差内满足
+> `Σcoef·u=b`。重复 id 只保留第一条并告警；引用未定义节点进 `rejected`；
+> 未知自由度名进 `rejected`。这些都在 `ImportReport` 中登记，绝不静默吞掉。
 
 ### 2.2 灰名单：忽略但必须报告
 
@@ -126,19 +133,25 @@
 | 10 | 回读模型 `to_dat()` 能被 FEM-Eigen 3D 求解器试算（或至少通过 `validate_model_3d`） |
 | 11 | 默认 12 格哈希、37 格 dat 回归不刷新；所有既有守卫不回归 |
 | 12 | 独立应用包同步后，用自带 solver 对回读 `.dat` 试算通过 |
+| 13 | `CE,301,0.05,3,UX,1,1,UX,-1` → `model.ces` 一条、b=0.05、dof=1、`.dat` 写出 `301 0.05 3 1 1 1 1 -1`；告警含罚函数 PENALTY 说明；未知自由度/重复 id 正确处理 |
 
 ## 6. 界面行为
 
 - 位置：`ui_3d.py` 三维互导区，紧邻既有 MIDAS `.mct` 只读导入面板；
 - 控件：`st.file_uploader("导入 ANSYS APDL（只读，不覆盖当前模型）", type=["ans","inp","txt"])`；
 - 导入后展示三段报告：**已读入命令 / 已忽略命令 / 显式拒绝 + 告警**；
+- LINK 初应变索力以「索力台账」展开（F=E·A·ISTRN）；APDL CE 以
+  「约束方程台账」展开（Σcoef·u=b，罚函数实现）；
 - 提供“导出 FEM-Eigen `.dat`”按钮，导出后可试算；
 - 绝不写回 `st.session_state.doc`；拒绝时只显示原因，不给半吊子模型。
 
 ## 7. 不承诺的能力
 
 - 不读 ANSYS 的几何建模链（`K`/`L`/`A`/`V` + 布尔）；
-- 不读接触、耦合、约束方程、杆单元实常数的全部字段；
+- 不读接触、MPC 耦合（如 `CP` / `CE` 中 ANSYS 特有的自由度集缩写语法）；
+  普通 `CE,id,b,node,dof,coef,...` 约束方程已按 §2.1 读入，但不是求解控制的
+  `*DO` 参数化 CE，也不含阶段相关 constant（分级顶推见
+  `索鞍顶推CE耦合规格.md`）；
 - 不读施工阶段、荷载步、`*DO` 参数化循环、求解控制；
 - 不保证任意第三方 ANSYS 命令流都能导入——**承诺范围严格限于本仓库四个
   导出器实际生成的 APDL 子集**，以及 §2.1 白名单中语义明确的命令。

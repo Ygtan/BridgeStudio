@@ -375,8 +375,8 @@ def _apdl_import_block(doc: ModelDoc) -> None:
             "支持本程序四个导出器生成的 APDL 子集：BEAM4 / BEAM188 / "
             "LINK180 / LINK10 + "
             "N / FILL / E / EN / MP / R / RMORE / SECDATA / TYPE / MAT / REAL / "
-            "D / F / SFBEAM / ACE。BEAM3 平面模型、施工阶段、求解控制与 "
-            "*DO 循环显式拒绝。")
+            "D / F / SFBEAM / ACE / CE（约束方程，罚函数实现）。"
+            "BEAM3 平面模型、施工阶段、求解控制与 *DO 循环显式拒绝。")
         return
 
     try:
@@ -421,6 +421,17 @@ def _apdl_import_block(doc: ModelDoc) -> None:
                     f"E={E / 1e9:.1f} GPa → F={F / 1e3:,.1f} kN")
             st.caption("有损项仅为「只受拉单向判定」与「W/L0 垂度几何非线性」；"
                        "需要垂度请补 W 走 nonlinear cable_solver。")
+
+    # APDL CE（约束方程）：把 Σcoef·u=b 逐条列出，便于核对罚函数约束是否读对。
+    if getattr(m, "ces", None):
+        with st.expander(f"约束方程台账（APDL CE，{len(m.ces)} 条：Σcoef·u=b）",
+                         expanded=False):
+            st.caption("APDL 的 CE 用罚函数实现（PENALTY 默认 1e12），"
+                       "结果在罚容差内满足 Σcoef·u=b。")
+            for ce in m.ces:
+                terms = " + ".join(
+                    f"{t.coef:g}·u({t.node},{t.dof})" for t in ce.terms)
+                st.caption(f"· CE {ce.id}：{terms} = {ce.constant:g}")
 
     if not rep.ok:
         st.caption("存在显式拒绝项，未生成可用模型；请按上面原因修正 APDL。")

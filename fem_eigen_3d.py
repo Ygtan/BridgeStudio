@@ -98,6 +98,10 @@ def parse_summary(path: Path) -> dict:
         "stage prestress loss",
         "modal",
         "buckling",
+        # 协作体系专属段（cable_solver SYSTEM=COOP 才写）。段头必须登记，
+        # 否则 [COOPERATIVE] 的 r_* 行会被上一段的正则收走，污染旧段。
+        # 非协作结果文件不含本段，既有段行序与取值逐位不变。
+        "cooperative",
     )
     section = ""
     re_disp = re.compile(r"^N(\d+) dof(\d+) min=(\S+) max=(\S+)$")

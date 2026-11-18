@@ -6,7 +6,8 @@ ANSYS APDL 建模命令流 **只读导入** → ``ModelSpec3D`` → FEM-Eigen ``
 
 - a：几何与拓扑（`N` / `FILL` / `E` / `EN` / `ET` / `MP` / `R` / `RMORE` /
   `SECDATA` / `TYPE` / `MAT` / `REAL`）；
-- b：荷载与边界（`D` / `F` / `SFBEAM` / `SFE` / `ACE`）。
+- b：荷载与边界（`D` / `F` / `SFBEAM` / `SFE` / `ACE`）；
+- b 补充：约束方程 `CE`（Σcoef·u=b，罚函数实现，默认 PENALTY=1e12）。
 
 不做施工阶段、求解控制、`*DO` 参数化循环。`/SOLU` 之后的一切忽略并计数。
 
@@ -35,6 +36,8 @@ from pydantic import ValidationError
 
 from model_spec_3d import (
     Boundary3D,
+    ConstraintEquation3D,
+    ConstraintEquationTerm3D,
     ElemLoad3D,
     Element3D,
     ElemTypeDef3D,
@@ -225,6 +228,46 @@ def _pair_list(args: list[str], names: dict[str, int], report: ImportReport,
     return out
 
 
+def _pair_ce(args: list[str], report: ImportReport, lineno: int,
+             cmd: str) -> tuple[list[tuple[int, int, float]], bool]:
+    """解析 `CE,id,b,n1,UX,c1,n2,UY,c2,...` 的 (node, dof, coef) 三元组序列。
+
+    返回 (terms, ok)。ANSYS 自由度名经 :data:`_DOF` 映射到 1~6。任一项
+    非法都写进 report.rejected 并把 ok 置 False，调用方据此丢弃整条 CE。
+    """
+    out: list[tuple[int, int, float]] = []
+    i = 0
+    ok = True
+    while i < len(args):
+        node = _i(args[i]); i += 1
+        if i >= len(args):
+            report.reject(lineno, cmd, "CE 项缺少自由度名")
+            ok = False
+            break
+        dof_name = args[i].upper(); i += 1
+        if i >= len(args):
+            report.reject(lineno, cmd, "CE 项缺少系数")
+            ok = False
+            break
+        coef = _f(args[i]); i += 1
+        if node is None:
+            report.reject(lineno, cmd, f"CE 项节点号非法：{args[i-3]!r}")
+            ok = False
+            continue
+        if dof_name not in _DOF:
+            report.reject(lineno, cmd, f"CE 自由度 {dof_name!r} 不支持（应 UX/UY/UZ/ROTX/ROTY/ROTZ）")
+            ok = False
+            continue
+        if coef is None:
+            report.reject(lineno, cmd, f"CE 系数不是数字：{args[i-1]!r}")
+            ok = False
+            continue
+        out.append((node, _DOF[dof_name], coef))
+    if not out:
+        ok = False
+    return out, ok
+
+
 def _merge_bounds(pairs: list[tuple[int, int, float]]) -> list[Boundary3D]:
     """同节点同值 → 连续 dof 合并成一条 Boundary3D（与 .dat 写法一致）。"""
     by_node_value: dict[tuple[int, float], list[int]] = {}
@@ -266,6 +309,8 @@ def parse_apdl(text: str, *, source: str = "<text>") -> ApdlImportResult:
     loads_raw: list[tuple[int, int, float]] = []
     elem_loads_raw: list[tuple[int, float]] = []
     gravity: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    # CE,id,b,n1,dof1,c1,n2,dof2,c2,... → (id, b, [(node,dof,coef),...])
+    ce_raw: list[tuple[int, float, list[tuple[int, int, float]]]] = []
 
     cur: dict[str, int | None] = {"type": None, "mat": None,
                                   "real": None, "sec": None}
@@ -529,6 +574,22 @@ def parse_apdl(text: str, *, source: str = "<text>") -> ApdlImportResult:
                     "强度按 1:1 使用（未乘梁宽）。请核对方向与量纲。")
             continue
 
+        # --- CE：约束方程（Σ coef·u(node,dof) = b；罚函数实现）---
+        if cmd == "CE":
+            if len(a) < 3:
+                rep.reject(lineno, cmd, "CE 至少需要 id, b 与一项 node,dof,coef")
+                continue
+            ce_id = _i(a[0])
+            b = _f(a[1])
+            if ce_id is None or b is None:
+                rep.reject(lineno, cmd, "CE 的 id 或常数 b 非法")
+                continue
+            terms, ok = _pair_ce(a[2:], rep, lineno, cmd)
+            if ok:
+                ce_raw.append((ce_id, b, terms))
+                rep.bump(rep.read, cmd)
+            continue
+
         # --- ACE：重力 ---
         if cmd == "ACE":
             vals = [_f(t) for t in a[:3]]
@@ -705,6 +766,30 @@ def parse_apdl(text: str, *, source: str = "<text>") -> ApdlImportResult:
     for eid, _v in elem_loads_raw:
         if eid not in elem_ids:
             rep.rejected.append(f"面荷载引用了未定义的单元 {eid}")
+    # CE 引用节点必须存在；重复 id 只保留第一条并告警。
+    ces: list[ConstraintEquation3D] = []
+    ce_ids_seen: set[int] = set()
+    for cid, cb, cterms in ce_raw:
+        bad = [n for n, _d, _c in cterms if n not in node_ids]
+        if bad:
+            rep.rejected.append(f"CE {cid} 引用了未定义的节点 {sorted(set(bad))}")
+            continue
+        if cid in ce_ids_seen:
+            rep.warn(f"CE 编号 {cid} 重复，只保留第一条；请检查 APDL 编号")
+            continue
+        ce_ids_seen.add(cid)
+        ces.append(ConstraintEquation3D(
+            id=cid,
+            constant=cb,
+            terms=[ConstraintEquationTerm3D(node=n, dof=d, coef=c)
+                   for n, d, c in cterms],
+        ))
+    if ces:
+        rep.warn(
+            f"已读入 {len(ces)} 条 APDL CE（约束方程），用罚函数实现"
+            "（PENALTY 默认 1e12，可由 *CE_PARAMETER 调整）："
+            "结果在罚容差内满足 Σcoef·u=b。APDL 的 CE 无罚系数概念，"
+            "罚值过大会影响条件数、过小会放宽约束，请按结构刚度量级核对。")
 
     # 悬空引用已从各列表剔除（上面已记入 rejected），避免 pydantic 抛异常；
     # parse_apdl 的契约是"始终返回报告，由调用方显式拒绝"。
@@ -727,6 +812,7 @@ def parse_apdl(text: str, *, source: str = "<text>") -> ApdlImportResult:
             loads=loads,
             elem_loads=elem_loads,
             gravity=gravity,
+            ces=ces,
         )
     except ValidationError as exc:
         # 兜底：即使契约层仍有残留问题，也返回空模型 + 完整报告，

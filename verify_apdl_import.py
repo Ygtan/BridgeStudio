@@ -359,6 +359,73 @@ def group_baseline() -> None:
           "def beam_spec_to_apdl(" in srcb)
 
 
+# ---------------------------------------------------------------- [CE] 约束方程回读
+def group_ce() -> None:
+    print("\n[CE] APDL CE（约束方程）回读")
+    # 用带完整实常数的 BEAM4 命令流，附加两条 CE：
+    #   CE,301,0.05,3,UX,1,1,UX,-1   → UX(3)−UX(1)=0.05（顶推量）
+    #   CE,302,0,2,UY,1,1,UY,-1      → UY(2)−UY(1)=0（固结）
+    text = """/PREP7
+/TITLE, CE guard
+ET,1,BEAM4
+MP,EX,1,2.1e11
+MP,PRXY,1,0.3
+R,1,0.01,1e-5,1e-5,1e-5
+RMORE,0,2e-5
+N,1,0,0,0
+N,2,1,0,0
+N,3,2,0,0
+TYPE,1
+MAT,1
+REAL,1
+E,1,2
+E,2,3
+D,1,UX,0,UY,0,UZ,0,ROTX,0,ROTY,0,ROTZ,0
+CE,301,0.05,3,UX,1,1,UX,-1
+CE,302,0,2,UY,1,1,UY,-1
+"""
+    r = parse_apdl(text, source="<CE guard>")
+    check("含 CE 的命令流无拒绝", r.report.ok,
+          "; ".join(r.report.rejected[:3]))
+    check("CE 读入计数为 2", r.report.read.get("CE") == 2,
+          str(r.report.read.get("CE")))
+    ces = {c.id: c for c in r.model.ces}
+    check("两条 CE 均进入 model.ces", len(ces) == 2, str(list(ces)))
+    ce301 = ces.get(301)
+    check("CE301 常数 b=0.05", ce301 is not None
+          and close(ce301.constant, 0.05))
+    check("CE301 项 UX(3)=+1 / UX(1)=−1",
+          ce301 is not None and len(ce301.terms) == 2
+          and any(t.node == 3 and t.dof == 1 and close(t.coef, 1.0)
+                  for t in ce301.terms)
+          and any(t.node == 1 and t.dof == 1 and close(t.coef, -1.0)
+                  for t in ce301.terms))
+    ce302 = ces.get(302)
+    check("CE302 APDL UY 名为 dof=2",
+          ce302 is not None and all(t.dof == 2 for t in ce302.terms))
+    dat = r.to_dat()
+    check(".dat 含 *CE_PARAMETER 与 2 条 *CE",
+          "*CE_PARAMETER" in dat and dat.count("*CE\n") == 2)
+    check("CE301 行格式正确（id b n dof coef ...）",
+          any(line.startswith("301 0.05 3 1 1 1 1 -1")
+              for line in dat.splitlines()))
+    check("CE 告警含罚函数 PENALTY 说明",
+          any("CE" in w and "罚函数" in w and "PENALTY" in w
+              for w in r.report.warnings))
+    # 未知自由度被拒绝
+    bad = text.replace("CE,301,0.05,3,UX,1,1,UX,-1",
+                       "CE,301,0.05,3,UX,1,1,WOBBLE,-1")
+    rb = parse_apdl(bad, source="<CE bad dof>")
+    check("CE 未知自由度被拒绝", not rb.report.ok
+          and any("CE 自由度" in x for x in rb.report.rejected))
+    # 重复编号只留一条 + 告警
+    dup = text + "\nCE,301,0.09,2,UX,1,1,UX,-1\n"
+    rd = parse_apdl(dup, source="<CE dup>")
+    check("CE 重复编号只保留一条", len(rd.model.ces) == 2)
+    check("CE 重复编号有告警",
+          any("重复" in w for w in rd.report.warnings))
+
+
 # ---------------------------------------------------------------- [12] 独立包
 def group_app() -> None:
     print("\n[12] 独立应用包同步")
@@ -373,6 +440,14 @@ def group_app() -> None:
     a = (ROOT / "apdl_io.py").read_bytes()
     b = p.read_bytes()
     check("独立包 apdl_io.py 与源一致", a == b, str(p))
+    pu = appdir / "ui_3d.py"
+    check("独立包已同步 ui_3d.py", pu.is_file(), str(pu))
+    if pu.is_file():
+        check("独立包 ui_3d.py 与源一致",
+              (ROOT / "ui_3d.py").read_bytes() == pu.read_bytes(), str(pu))
+        uitext = pu.read_text(encoding="utf-8")
+        check("独立包 ui_3d.py 含 CE 台账展示",
+              "约束方程台账" in uitext)
 
 
 def main() -> int:
@@ -382,6 +457,7 @@ def main() -> int:
     group_arch()
     group_roundtrip()
     group_link10()
+    group_ce()
     group_reject()
     group_loads_bc()
     # 用纯 BEAM4 回读模型做端到端（arch 含 TRUSS，不是 grillage 的典型工况）
