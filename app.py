@@ -199,11 +199,13 @@ def _load_text(text: str, hint: str, dim_hint: str | None) -> None:
 # ---------------------------------------------------------------- ① 输入
 st.subheader("① 自然语言输入")
 
-hint = st.selectbox(
-    "结构类型", KIND_OPTIONS, key="kind_hint",
-    help="拿不准就留「自动识别」：先按关键词判断梁/拱/桁架/梁桥，再走对应解析。"
-         "指定类型时完全跳过判断——你的选择比关键词可靠。",
-)
+with st.expander("类型纠正（仅识别不准时展开，平时不用管）", expanded=False):
+    hint = st.selectbox(
+        "结构类型", KIND_OPTIONS, key="kind_hint",
+        help="默认「自动识别」即可：按描述里的桥型关键词判断。只有描述没写桥型名"
+             "（如只给桁高/塔高/双索面）被误判成单梁时，才手动指定——"
+             "指定后完全跳过自动判断，你的选择优先。",
+    )
 
 _dim_sel = st.selectbox(
     "维度", DIM_OPTIONS, key="dim_hint",
