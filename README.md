@@ -791,6 +791,18 @@ B2 最后两格（ANSYS / Abaqus / MIDAS 多格式导出、`.mct` 反向导入�
 > MIDAS 数值对拍未做），只补界面入口、不改任何默认 `.dat`。界面守卫
 > `verify_app.py` 121/121。
 
+> **2026-11-18 补齐（APDL 只读导入，用户选 a+b）**：此前只有「导出 APDL」与
+> 「读 ANSYS CSV 结果」，不能把 APDL 命令流读回来。新增 `apdl_io.py`，按
+> **a. 几何拓扑 + b. 荷载边界**只读导入：`N`/`FILL`/`E`/`EN`/`ET`/`MP`/`R`/
+> `RMORE`/`SECDATA`/`TYPE`/`MAT`/`REAL` + `D`/`F`/`SFBEAM`/`SFE`/`ACE`，
+> 统一输出 `ModelSpec3D` → FEM-Eigen `.dat` 试算。入口在 `ui_3d.py` 互导区，
+> 与 MIDAS `.mct` 面板并列，导入后展示「已读入 / 已忽略 / 显式拒绝 + 告警」
+> 三段报告，**不覆盖当前 doc**。三条硬边界：`BEAM3`、两坐标 `N`、建模段
+> `*DO` 与未知命令显式拒绝（不产出半吊子模型）；`BEAM188→BEAM`、
+> `LINK180→TRUSS`、面荷载方向假定逐条告警；`/SOLU` 之后的求解控制忽略。
+> 默认 12 格哈希与既有黄金基线一个不刷新，四个导出器一字未动。规格见
+> `APDL导入规格.md`，守卫 `verify_apdl_import.py` 63/63、`verify_app.py` 125/125。
+
 ### 2D 压弯 / 轴压半部（2026-11-12，第十六次）
 
 B2 收官后补齐第十二次留下的承载力另一半，**纯 BridgeStudio 侧、FE 仓

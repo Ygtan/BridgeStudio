@@ -73,8 +73,13 @@ from section_lib import section_properties
 # 判定标准：目录下存在 build/example_mixed.exe（或任一求解器候选）。
 import os as _os
 
+_LOCAL_SOLVER_ROOT = Path(__file__).resolve().parent.parent / "solver"
+
 _FEM_EIGEN_DIR_CANDIDATES = [
     Path(_os.environ.get("FEM_EIGEN_DIR", "")) if _os.environ.get("FEM_EIGEN_DIR") else None,
+    # 绿色应用包自带 solver/build/*.exe：换机后不依赖外部 FEM-Eigen 源仓。
+    # 主仓中该目录不存在，自动跳过，行为与改动前一致。
+    _LOCAL_SOLVER_ROOT,
     Path(r"D:\AI-work\FEM-Eigen"),
     Path(r"C:\Users\Thinkpad\WorkBuddy AI\2026-10-06-17-19-31\FEM-Eigen"),
     Path(r"D:\AI-work\前处理\FEM-Eigen"),

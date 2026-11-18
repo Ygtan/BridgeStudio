@@ -544,6 +544,19 @@ class CableSpec3D(BaseModel):
     tension: float = 0.0            # N，拉为正；<=0 表示自动
 
 
+class SuspPlane3D(BaseModel):
+    """双索面悬索桥的**附加**索平面（第二索面及以后）。
+
+    plane 0 仍由 :class:`CableBridge3D` 的 `tower1/tower2/main_cable/hangers`
+    直接描述——旧 `.dat` 一字不变。本类只承载镜像出来的索面，输出为
+    `*SUSP_BRIDGE_PLANE_n` / `*MAINCABLE_n` / `*HANGER_n` 段；内核按 n 循环找形。
+    """
+    tower1: int
+    tower2: int
+    main_cable: list[int] = Field(default_factory=list)
+    hangers: list[int] = Field(default_factory=list)
+
+
 class CableBridge3D(BaseModel):
     """成桥态求解工况（对应内核 *CABLE_BRIDGE 段）。
 
@@ -576,6 +589,8 @@ class CableBridge3D(BaseModel):
     tower2: int = 0
     main_cable: list[int] = Field(default_factory=list)   # 主缆单元，按链序
     hangers: list[int] = Field(default_factory=list)      # 吊索单元
+    #: 附加索面（双索面时恰有 1 个）。空 = 单索面，.dat 逐字节不变。
+    planes: list[SuspPlane3D] = Field(default_factory=list)
     deck_e0: float = 0.0            # 加劲梁单元号区间（输出梁轴力用）
     deck_e1: float = 1e12
 
@@ -1025,6 +1040,18 @@ class ModelSpec3D(BaseModel):
                 L.append("*HANGER")
                 for eid in cb.hangers:
                     L.append(str(eid))
+                # 双索面附加平面：段名带平面序号，内核按序号分别找形/写回。
+                # 单索面时 planes 为空，本段一个字都不输出（冻结基线不受影响）。
+                for _pi, _pl in enumerate(cb.planes, start=2):
+                    L.append(f"*SUSP_BRIDGE_PLANE_{_pi}")
+                    L.append(f"TOWER1={_pl.tower1}")
+                    L.append(f"TOWER2={_pl.tower2}")
+                    L.append(f"*MAINCABLE_{_pi}")
+                    for eid in _pl.main_cable:
+                        L.append(str(eid))
+                    L.append(f"*HANGER_{_pi}")
+                    for eid in _pl.hangers:
+                        L.append(str(eid))
                 if cb.erection:
                     L.append("# 施工阶段：给定主缆下料长度 L0 的逐阶段找形")
                     L.append("# 空缆 → 从跨中对称吊装一期恒载 Q1 → 合拢 → 二期铺装 Q2（成桥态）")

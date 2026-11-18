@@ -66,7 +66,7 @@ import view_3d
 from result_3d import (CABLE_FPU_DEFAULT, CABLE_SAFETY_MIN,
                        CABLE_SAFETY_MIN_STAGE, Check, Metric,
                        SolveResult, _cable_area_m2, _impact_note,
-                       deck_node_ids, support_x)
+                       cable_plane_count, deck_node_ids, support_x)
 
 # ---------------------------------------------------------------- 配色
 # 与界面、Word 计算书同一套，避免"屏幕上蓝、报告里灰"
@@ -122,8 +122,9 @@ def _elem_mid_x(model: Any) -> dict[int, float]:
 def _is_plan_view(model: Any) -> bool:
     """横向（y）铺开的模型画平面图，否则画立面图。
 
-    梁格由多条纵梁 + 横梁组成，投影到立面会重叠成一坨；斜拉桥主梁在 y=0
-    一条线上，投影到平面则退化成一条直线。用模型自己的几何判定，不问类型。
+    梁格 / 双索面模型由多条纵梁 + 横梁组成，投影到立面会重叠成一坨；
+    单索面斜拉桥主梁在 y=0 一条线上，投影到平面则退化成一条直线。
+    用模型自己的几何判定，不问类型。
     """
     ys = [n.y for n in model.nodes] if model.nodes else [0.0]
     return (max(ys) - min(ys)) > 0.5
@@ -1752,10 +1753,18 @@ def _cover_facts(model: Any) -> list[tuple[str, str]]:
         facts.append(("结构体系", "半漂浮。塔梁不固结，梁端一端纵向固定。"))
     nodes = list(getattr(model, "nodes", None) or [])
     kinds = {t.id: str(t.kind) for t in getattr(model, "etypes", []) or []}
-    has_cable = any(kinds.get(e.etype) == "CABLE"
-                    for e in getattr(model, "elements", []) or [])
-    if has_cable and nodes and max(abs(n.y) for n in nodes) < 1e-6:
-        facts.append(("索面", "单索面。未建立第二索面和横梁。"))
+    # 3D 单元用 etype，2D 用 type_id；这里只判断"有没有索"，两种都兼容，
+    # 避免 2D 模型误入本函数时直接 AttributeError。
+    has_cable = any(
+        kinds.get(int(getattr(e, "etype", getattr(e, "type_id", -1)))) == "CABLE"
+        for e in getattr(model, "elements", []) or [])
+    if has_cable:
+        if cable_plane_count(model) == 2:
+            facts.append(("索面",
+                          "双索面。两片索面按 y=±B/2 对称布置，纵横梁格联结，"
+                          "桥面恒载按受荷宽度分到两片主梁线。"))
+        else:
+            facts.append(("索面", "单索面。未建立第二索面和横梁。"))
     return facts
 
 

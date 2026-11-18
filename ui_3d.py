@@ -356,6 +356,90 @@ def _interop_block(doc: ModelDoc) -> None:
         c2.caption("试算只算恒载（车道荷载不在 MCT 里），结果不参与本页的校核与组合。")
 
 
+# ---------------------------------------------------------------- APDL 只读导入
+
+
+def _apdl_import_block(doc: ModelDoc) -> None:
+    """只读导入 ANSYS APDL 建模命令流 → ``ModelSpec3D`` → `.dat` / 试算。
+
+    与 MIDAS 面板并列，但**绝不写回 doc / session doc**：导入别人的模型只是
+    "取一条建模路径"，不是替换当前工作模型。有损映射与拒绝边界逐条显示，
+    不做任何静默兜底。
+    """
+    from apdl_io import parse_apdl
+
+    up = st.file_uploader("导入 ANSYS APDL（只读，不覆盖当前模型）",
+                          type=["ans", "inp", "txt"], key="apdl_upload")
+    if up is None:
+        st.caption(
+            "支持本程序四个导出器生成的 APDL 子集：BEAM4 / BEAM188 / LINK180 + "
+            "N / FILL / E / EN / MP / R / RMORE / SECDATA / TYPE / MAT / REAL / "
+            "D / F / SFBEAM / ACE。BEAM3 平面模型、施工阶段、求解控制与 "
+            "*DO 循环显式拒绝。")
+        return
+
+    try:
+        text = up.getvalue().decode("utf-8", errors="replace")
+        result = parse_apdl(text, source=up.name)
+    except Exception as e:                          # noqa: BLE001
+        st.error(f"APDL 解析失败：{e}")
+        return
+
+    rep, m = result.report, result.model
+    st.caption(
+        f"{len(m.nodes)} 节点 / {len(m.elements)} 单元 / "
+        f"{len(m.materials)} 材料 / {len(m.reals)} 实常数 / "
+        f"{len(m.boundaries)} 约束 / {len(m.loads)} 节点力"
+        f"　｜　读入 {sum(rep.read.values())} 条 / "
+        f"忽略 {sum(rep.ignored.values())} 条 / "
+        f"拒绝 {len(rep.rejected)} 条")
+
+    for x in rep.rejected[:5]:
+        st.error(x)
+    if len(rep.rejected) > 5:
+        st.caption(f"…另有 {len(rep.rejected) - 5} 条拒绝项")
+    if rep.ignored:
+        with st.expander(f"已忽略命令（{sum(rep.ignored.values())} 条："
+                         "段控制 / 求解控制，未导入）"):
+            for k, v in sorted(rep.ignored.items()):
+                st.caption(f"· {k} ×{v}")
+    if rep.warnings:
+        with st.expander(f"告警（{len(rep.warnings)} 条：能算，但与原模型不完全一致）"):
+            for w in rep.warnings:
+                st.caption(f"· {w}")
+
+    if not rep.ok:
+        st.caption("存在显式拒绝项，未生成可用模型；请按上面原因修正 APDL。")
+        return
+
+    _c1, _c2 = st.columns(2)
+    _c1.download_button(
+        "写出 FEM-Eigen .dat", data=result.to_dat().encode("utf-8"),
+        file_name=f"{up.name.rsplit('.', 1)[0]}.dat",
+        mime="text/plain", key="apdl_dl_dat")
+    if _c2.button("用本内核试算（恒载静力）", key="apdl_solve_btn"):
+        from solver_3d import solve as _solve
+
+        with st.spinner("导入模型 → 导出 .dat → 调用内核 …"):
+            try:
+                st.session_state["apdl_result"] = _solve(
+                    m, kind="grillage3d", out_dir="out/apdl_import")
+            except Exception as e:                  # noqa: BLE001
+                st.session_state.pop("apdl_result", None)
+                st.error(f"试算失败：{e}")
+    _r = st.session_state.get("apdl_result")
+    if _r is not None and _r.final_beam and _r.final_disp:
+        _mymax = max(abs(v.get("My", 0.0)) for v in _r.final_beam.values())
+        _dz = min(v for (_n, d), v in _r.final_disp.items() if d == 3) if any(
+            d == 3 for (_n, d) in _r.final_disp) else 0.0
+        _k = st.columns(3)
+        _k[0].metric("控制弯矩 |My|", f"{_mymax / 1e3:,.0f} kN·m")
+        _k[1].metric("成桥挠度", f"{_dz * 1000:.2f} mm")
+        _k[2].metric("自由度", str(_r.stats.get("dofs", "—")))
+    st.caption("导入模型不覆盖当前 doc；求解控制（重力 / 荷载步 / SOLVE）"
+               "未导入，如需请自行施加。")
+
+
 # ---------------------------------------------------------------- 报告导出
 
 
@@ -670,6 +754,9 @@ def render(doc: ModelDoc) -> None:
     with st.container():
         st.caption("与 MIDAS 互导（.mct）：导出当前模型 / 导入 MIDAS 模型试算")
         _interop_block(doc)
+    with st.container():
+        st.caption("与 ANSYS APDL 互导（只读）：导入命令流 → FEM-Eigen .dat / 试算")
+        _apdl_import_block(doc)
 
     # ---- 求解 ----
     if doc.params.get("nonlinear_stages") and doc.params.get("staged"):

@@ -160,11 +160,14 @@ def t_beam_bridge_staged():
 
 
 def t_scope():
-    """口径：双索面拒绝、悬臂与半漂浮不能混写、能力标志跟随实际内核。"""
+    """口径：双索面 opt-in（仅双索面不切 3D）、悬臂与半漂浮不能混写、能力标志跟随实际内核。"""
     dual, _, _ = ModelDoc.from_text("双索面空间斜拉桥，主跨200米，边跨80米")
     errs = dual.validate()
-    check("双索面被拒绝", any("单索面" in e for e in errs),
-          errs[0][:42] if errs else "未拒绝")
+    check("双索面空间为 opt-in，可计算",
+          not errs and dual.info.get("cable_planes") == 2,
+          errs[0][:42] if errs else f"planes={dual.info.get('cable_planes')}")
+    dual2d, _, _ = ModelDoc.from_text("双索面斜拉桥，主跨200米，边跨80米")
+    check("仅双索面不切 3D", dual2d.dimension == "2d", dual2d.dimension)
 
     single, _, _ = ModelDoc.from_text(
         "空间单索面斜拉桥，主跨200米，边跨80米，塔高60米")

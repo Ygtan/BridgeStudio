@@ -91,6 +91,34 @@ def tower_node_groups(model: Any) -> list[list[Any]]:
     return [[nodes[i] for i in ids if abs(nodes[i].x - x) < 1e-6] for x in xs]
 
 
+def cable_plane_count(model: Any) -> int:
+    """索面数（1 或 2），由索单元端点的 ``y`` 坐标几何判定。
+
+    2026-11-18 双索面 opt-in 接入后，报告层必须**从网格本身**读出体系，
+    不能读界面参数、也不能靠编号段：单索面全部索落在 ``y≈0``；双索面镜像后
+    两片索面分别落在 ``y=±B/2``，索端点 ``y`` 同时出现显著的正、负两组。
+    判据只认几何，因此与 opt-in 开关、紧凑编号规则都解耦。
+
+    没有索单元（梁格 / 桁架）时返回 1，语气上表示"非索承体系"，报告层
+    只在确有索时调用本函数，不会误报。
+    """
+    if model is None:
+        return 1
+    nodes = {n.id: n for n in getattr(model, "nodes", ())}
+    kinds = {t.id: getattr(t, "kind", "") for t in getattr(model, "etypes", ())}
+    ys: list[float] = []
+    for e in getattr(model, "elements", ()):
+        if kinds.get(getattr(e, "etype", -1)) != "CABLE":
+            continue
+        for nid in (getattr(e, "n1", -1), getattr(e, "n2", -1)):
+            nd = nodes.get(nid)
+            if nd is not None:
+                ys.append(float(getattr(nd, "y", 0.0)))
+    if not ys:
+        return 1
+    return 2 if (any(y > 1e-3 for y in ys) and any(y < -1e-3 for y in ys)) else 1
+
+
 #: 内核键 → 中文名。界面标题、计算书章节名都取这里，不各写一份。
 KIND_LABELS: dict[str, str] = {
     "grillage3d": "三维梁格",

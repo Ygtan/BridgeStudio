@@ -369,7 +369,14 @@ def main() -> int:
                 _fu = at.get("file_uploader")
             except Exception:                       # noqa: BLE001
                 _fu = []
-            check("互导块出现 .mct 上传口", len(_fu) == 1, f"{len(_fu)} 个")
+            check("互导块出现 .mct + APDL 两个上传口", len(_fu) == 2,
+                  f"{len(_fu)} 个")
+            _u3src = (Path(__file__).resolve().parent / "ui_3d.py").read_text(
+                encoding="utf-8")
+            check("ui_3d 含 APDL 只读导入面板（不覆盖 doc）",
+                  'key="apdl_upload"' in _u3src
+                  and "parse_apdl" in _u3src
+                  and "不覆盖当前模型" in _u3src)
             if _xb is not None:
                 _xb.click().run()
                 _xp = (_ssget(at, "mi_export") or {}).get("path")

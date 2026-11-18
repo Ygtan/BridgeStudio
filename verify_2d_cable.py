@@ -5,7 +5,7 @@
 平面索面建造器。本脚本守的是这条链上的物理量，不是"能跑通"：
 
 1. **默认维度**：斜拉/悬索不写三维词 → 2d；写「空间」→ 3d。
-   「双索面」不再当成三维词，解析后由 validate() 拒绝。
+   「双索面」不当成三维词；三维双索面是 opt-in，由镜像模块生成第二索面。
 2. **斜拉桥 2D**：CABLE 以 ISTRN 预张，主梁成桥态有弯矩、索在承重（最大索力
    与桥面恒载同一量级），挠度在 L/200 内。
 3. **悬索桥 2D 地锚式**：主缆最大轴力 ≈ H0 = qL²/8f（误差 < 10%）——这是主缆
@@ -56,9 +56,15 @@ def main() -> int:
     verdicts.append(("默认维度 2d / 三维词转 3d", PASS if ok else FAIL,
                      "、".join(f"{w[0]}×{w[1]}" for _, w in cases)))
     dual, _, _ = ModelDoc.from_text("双索面空间斜拉桥，主跨200米")
-    verdicts.append(("双索面被拒绝、不静默建成",
-                     PASS if any("单索面" in e for e in dual.validate()) else FAIL,
-                     "；".join(dual.validate())[:48]))
+    _derr = dual.validate()
+    verdicts.append(("双索面空间为 opt-in，不拒绝",
+                     PASS if not _derr and dual.info.get("cable_planes") == 2 else FAIL,
+                     f"planes={dual.info.get('cable_planes')} "
+                     + ("；".join(_derr)[:36] if _derr else "validate=[]")))
+    dual2d, _, _ = ModelDoc.from_text("双索面斜拉桥，主跨200米")
+    verdicts.append(("仅写双索面不触发 3D",
+                     PASS if dual2d.dimension == "2d" else FAIL,
+                     dual2d.dimension))
 
     # ---------------- 2. 斜拉桥 2D ----------------
     cs, _, _ = ModelDoc.from_text(

@@ -938,8 +938,9 @@ def classify_dimension(text: str, kind: str) -> str:
     if kind in ("grillage3d", "arch_3d"):
         return "3d"
     # 斜拉桥/悬索桥：档三已补 2D 平面索面建造器，默认 2d；只有显式三维词
-    # （空间/偏载/扭转/横向分布…）才转 3d。「双索面」不在这份词表里：
-    # 它表示第二索面，当前建造器做不出来，由 validate() 拒绝，而不是当成三维。
+    # （空间/偏载/扭转/横向分布…）才转 3d。「双索面」不在这份词表里——
+    # 它只置 cable_planes=2（opt-in 几何开关），按用户口径**不单独触发 3d**。
+    # 三维双索面需在描述里同时出现三维词；2d 双索面仍按单索面计算。
     return "2d"
 
 
@@ -1317,6 +1318,13 @@ class ModelDoc:
             cycle_days=float(p.get("cycle_days") or 7.0),
             load_age_days=float(p.get("load_age_days") or 7.0),
         )
+        if int(p.get("cable_planes") or 1) == 2 and self.is_3d:
+            from dual_plane_3d import mirror_to_dual_plane
+
+            model, info = mirror_to_dual_plane(
+                model, info, B=float(p["B"]), kind="cable_stayed",
+                half_real_ids=(1, 2),
+            )
         # 派生量挂在外壳上：界面要支座 x 才能画红虚线，而 pydantic 契约里
         # 不该出现这种"只给界面用"的字段。
         self._info = dict(info)
@@ -1363,6 +1371,13 @@ class ModelDoc:
             lane_count=_lc,
             lane_reduction=_lr,
         )
+        if int(p.get("cable_planes") or 1) == 2 and self.is_3d:
+            from dual_plane_3d import mirror_to_dual_plane
+
+            model, info = mirror_to_dual_plane(
+                model, info, B=float(p["B"]), kind="suspension",
+                half_real_ids=(1, 2),
+            )
         self._info = dict(info)
         self._info["fpu"] = float(p.get("fpu", 1770.0)) * 1e6
         return model
@@ -1451,6 +1466,13 @@ class ModelDoc:
             q_deck=float(p["q_deck"]) * 1e3,
             q2_deck=float(p.get("q2_deck", 0.0) or 0.0) * 1e3,
         )
+        if int(p.get("cable_planes") or 1) == 2 and self.is_3d:
+            from dual_plane_3d import mirror_to_dual_plane
+
+            model, info = mirror_to_dual_plane(
+                model, info, B=float(p["deck_b"]), kind="arch_3d",
+                half_real_ids=(1,),
+            )
         self._info = dict(info)
         self._info["fpu"] = float(p.get("cable_fpu", 1860.0)) * 1e6
         return model
@@ -1562,9 +1584,11 @@ class ModelDoc:
         """
         p = self.params
         e: list[str] = []
-        if int(p.get("cable_planes") or 1) > 1:
-            e.append("当前只建立单索面。描述里的「双索面」不会生成第二索面和横梁，"
-                     "请改为「单索面」后再计算。")
+        # 双索面已作为 opt-in 几何开关接入（2 / 3 维建造器均可），不再拒绝。
+        # 仅写「双索面」不切 3d：2d 平面模型没有横向维，仍按单索面计算。
+        _cpl = int(p.get("cable_planes") or 1)
+        if _cpl not in (1, 2):
+            e.append("cable_planes 只能是 1（单索面）或 2（双索面）")
         if p.get("system_conflict"):
             e.append("悬臂施工与半漂浮成桥不能写在同一次计算里。"
                      "内核不能在合拢后解除塔梁临时固结。"
@@ -2599,11 +2623,17 @@ def extract_ps_beam_params(text: str) -> tuple[dict[str, Any], list[str]]:
 
 
 def _note_cable_planes(text: str, p: dict[str, Any], notes: list[str]) -> None:
-    """双索面不是维度开关。当前建造器只有一个索面，写了就拒绝求解。"""
+    """双索面是 opt-in 几何开关，**不是**维度开关。
+
+    用户明确口径：仅写「双索面」仍按默认 2d 分类；只有同时出现
+    「三维/空间/偏载/扭转」等词才切 3d 并真正生成第二索面。
+    """
     if _DUAL_PLANE_RE.search(text):
         p["cable_planes"] = 2
-        notes.append("描述写了双索面。当前建造器只生成单索面，不会生成第二索面和横梁。"
-                     "请改成「单索面」后再计算。")
+        notes.append(
+            "描述写了双索面：三维模式将按 y=±B/2 建双梁线+横梁+双索面。"
+            "注意「双索面」本身不切换维度；要做三维计算请同时写明"
+            "「三维/空间/偏载/扭转/横向分布」之一。")
     else:
         p["cable_planes"] = 1
 
@@ -2962,6 +2992,7 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
             if re.search(r"施工|吊装|合拢", text):
                 notes.append("2D 悬索桥暂不做施工阶段模拟（分级找形走三维 erection）")
     elif base == "arch_3d":
+        _note_cable_planes(text, p, notes)
         # 主跨：与斜拉/悬索同一套「先主跨后跨度」的优先级。
         if not grab("span", "主跨", "跨径", "主孔"):
             if not grab("span", "跨度", "总长", "全长"):

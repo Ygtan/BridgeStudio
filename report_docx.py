@@ -61,7 +61,7 @@ from docx.shared import Cm, Pt, RGBColor
 
 import code_material
 from result_3d import (CABLE_SAFETY_MIN, MAIN_CABLE_SAFETY_MIN,
-                       deck_node_ids, tower_node_groups)
+                       cable_plane_count, deck_node_ids, tower_node_groups)
 
 # ---------------------------------------------------------------- 版式常量
 
@@ -397,6 +397,7 @@ def collect_report_data(*, model, info: dict, res: dict,
         "meta": meta, "params": p,
         "counts": counts, "by_etype": by_etype,
         "n_nodes": len(model.nodes), "n_elems": len(model.elements),
+        "cable_planes": cable_plane_count(model),
         "dofs": int(meta.get("dofs", 0) or 0),
         "cables": cables, "groups": groups, "sym": sym_rows,
         "camber_rows": camber_rows,
@@ -947,7 +948,10 @@ def _cover(doc: Document, data: dict, title: str, project: str,
         ("计算内容", "恒载成桥态几何非线性分析"),
         ("结构体系", "塔梁固结。施工与成桥同一套约束，合拢后不解除。"
          if sys == "fixed" else "半漂浮。塔梁不固结，梁端一端纵向固定。"),
-        ("索面", "单索面。未建立第二索面和横梁。"),
+        ("索面", "双索面。两片索面按 y=±B/2 对称布置，纵横梁格联结，"
+         "桥面恒载按受荷宽度分到两片主梁线。"
+         if int(data.get("cable_planes") or 1) == 2
+         else "单索面。未建立第二索面和横梁。"),
         ("计算软件", "FEM-Eigen 空间刚架/索单元非线性求解器"),
         ("索力确定方法", METHOD_LABELS.get(
             str(data["tension_method"]).upper(),
@@ -1066,9 +1070,12 @@ def _sec_1_overview(w: _Writer, d: dict, title: str, project: str) -> None:
     if len(xs) >= 4:
         span_txt = (f"{xs[1] - xs[0]:.0f} + {xs[2] - xs[1]:.0f} + "
                     f"{xs[3] - xs[2]:.0f} m")
+    _dual = int(d.get("cable_planes") or 1) == 2
     w.p(f"本计算书针对{title}进行恒载成桥态计算。"
         + (f"桥跨布置为 {span_txt}，" if span_txt else "")
-        + f"主梁为单梁（梁线）计算模型，共设 {d['n_cable']} 根斜拉索，"
+        + ("双索面空间模型：两条主梁线由横梁联结，"
+           if _dual else "主梁为单梁（梁线）计算模型，")
+        + f"共设 {d['n_cable']} 根斜拉索，"
           f"全桥离散为 {d['n_nodes']} 个节点、{d['n_elems']} 个单元、"
           f"{d['dofs']} 个自由度。")
     w.p("计算目的是确定三个施工控制量：① 成桥恒载状态下的索力分布；"
@@ -1121,11 +1128,13 @@ def _sec_2_model(w: _Writer, model, d: dict, fig_elev: Path) -> None:
     cnt = d["counts"]
     by = d.get("by_etype") or {}
     n_deck, n_tower = by.get(1), by.get(2)
+    _dual = int(d.get("cable_planes") or 1) == 2
     rows = [
         ["主梁", "BEAM", str(n_deck) if n_deck is not None else "—",
-         "纵向单梁线，按索距与塔位离散"],
+         "两条纵向梁线由横梁联结，按索距与塔位离散"
+         if _dual else "纵向单梁线，按索距与塔位离散"],
         ["桥塔", "BEAM", str(n_tower) if n_tower is not None else "—",
-         "竖向悬臂柱，塔底固结"],
+         "两索面各一座塔柱，塔底固结" if _dual else "竖向悬臂柱，塔底固结"],
         ["拉索", "CABLE", str(cnt.get("CABLE", 0)), "只受拉，含垂度（弹性悬链线）"],
         ["合计", "—", str(d["n_elems"]), f'{d["n_nodes"]} 节点 / {d["dofs"]} 自由度'],
     ]
@@ -1209,10 +1218,15 @@ def _sec_2_model(w: _Writer, model, d: dict, fig_elev: Path) -> None:
         rows.append([f"S{i + 1}", tag, _f(x, 2), "竖向 + 横向", "双支座体系"])
     if len(xs) > 1:
         rows.append(["—", "桥台 S1", _f(xs[0], 2), "纵向（顺桥向）", "半漂浮体系，仅一端纵向固定"])
-    rows.append(["—", "塔底 ×2", "—", "全部 6 个自由度", "固结"])
+    _dual = int(d.get("cable_planes") or 1) == 2
+    rows.append(["—", "塔底 ×4" if _dual else "塔底 ×2", "—",
+                 "全部 6 个自由度", "固结"])
     w.table("边界条件", ["编号", "位置", "x (m)", "约束方向", "说明"], rows,
             widths=[1.4, 3.0, 2.2, 4.4, 4.5], aligns=["c", "c", "r", "l", "l"])
-    w.note("主梁为单梁线模型，另对全部主梁节点施加扭转约束以消除单梁线"
+    w.note("双索面模型含两条主梁线与横梁，各梁线沿索距与塔位离散；"
+           "单梁线的扭转定位约束在两片梁线上分别保留，横梁提供两索面间的传力路径。"
+           if _dual else
+           "主梁为单梁线模型，另对全部主梁节点施加扭转约束以消除单梁线"
            "无法自持的绕梁轴刚体转动；该项约束仅用于定位，不参与竖向受力。")
 
     w.h2("2.4　荷载")
@@ -1681,6 +1695,7 @@ def collect_susp_data(*, model, info: dict, res, params: dict | None = None) -> 
         "erection_panels": int(info.get("erection_panels") or 2),
         "node_x": node_x,
         "node_z": node_z,
+        "cable_planes": cable_plane_count(model),
         "tower_ids": {n.id for grp in tower_node_groups(model) for n in grp},
         "deck_x": [n.x for n in sorted(deck_n, key=lambda n: n.x)],
         "tables": res.tables(model),
@@ -2064,26 +2079,39 @@ def _susp_sec_1(w: _Writer, model, d: dict, title: str, project: str) -> None:
 def _susp_sec_2(w: _Writer, model, d: dict, fig_frame: Path) -> None:
     w.h1("计算模型")
     w.h2("2.1　离散与编号")
-    w.p(f"全桥离散为空间杆系：加劲梁用梁单元沿单梁线（桥轴线）离散，桥塔用"
-        f"梁单元沿塔轴离散，主缆与吊索用只受拉的索单元。模型共 "
-        f"{d['n_nodes']} 个节点、{d['n_elems']} 个单元、{d['dofs']} 个自由度，"
-        f"其中主缆 {d['n_main']} 段、吊索 {d['n_hanger']} 根、"
-        f"加劲梁 {d['n_girder']} 段。")
+    _dual = int(d.get("cable_planes") or 1) == 2
+    w.p("全桥离散为空间杆系：加劲梁用梁单元沿"
+        + ("两条梁线（y=±B/2）离散，两线间由横梁联结"
+           if _dual else "单梁线（桥轴线）离散")
+        + "，桥塔用梁单元沿塔轴离散，主缆与吊索用只受拉的索单元。模型共 "
+        + f"{d['n_nodes']} 个节点、{d['n_elems']} 个单元、{d['dofs']} 个自由度，"
+        + f"其中主缆 {d['n_main']} 段、吊索 {d['n_hanger']} 根、"
+        + f"加劲梁 {d['n_girder']} 段。")
     # 编号自紧凑分块切换后不再有固定号段（见 X20 接入约定 §5），表格按
     # 组件组顺序描述，具体号码由 BlockNumbering 在建模时动态分配。
-    rows = [
+    rows = ([
+        ["加劲梁（两片）", "原组 + 镜像组", "原组 + 镜像组", "BEAM", "钢箱梁"],
+        ["桥塔（2 塔 × 2 柱）", "原组 + 镜像组", "原组 + 镜像组", "BEAM", "混凝土"],
+        ["主缆（两根）", "原组 + 镜像组", "原组 + 镜像组", "CABLE", "高强钢丝"],
+        ["吊索（两片）", "—", "原组 + 镜像组", "CABLE", "高强钢丝"],
+        ["横梁", "镜像追加组", "镜像追加组", "BEAM", "钢箱梁"],
+        ["锚碇（仅地锚式）", "主缆端节点", "—", "—", "—"],
+    ] if _dual else [
         ["加劲梁", "第 1 组（1 起）", "第 1 组（1 起）", "BEAM", "钢箱梁"],
         ["主缆", "第 4 组", "第 4 组", "CABLE", "高强钢丝"],
         ["桥塔（塔 1/塔 2）", "第 2 / 3 组", "第 2 / 3 组", "BEAM", "混凝土"],
         ["吊索", "—", "第 5 组", "CABLE", "高强钢丝"],
         ["锚碇（仅地锚式）", "第 4 组主缆端节点", "—", "—", "—"],
-    ]
+    ])
     w.table("构件编号约定", ["构件", "节点号", "单元号", "单元类型", "材料"], rows,
             widths=[3.4, 3.4, 3.2, 2.4, 3.1], aligns=["l", "c", "c", "c", "l"])
     w.note("自紧凑分块编号起，节点号与单元号各自按组件组顺序从 1 起分配："
            "主要组按前组最大号百位取整 +1、非主要组按十位取整 +1，组内连续。"
            "编号只是拓扑标签，不进刚度矩阵与荷载向量；上表列的是组序，"
-           "不是固定号段。")
+           "不是固定号段。"
+           + ("双索面模型在单索面网格之后追加镜像索面与横梁，第二索面与主缆"
+              "在 .dat 中以 *_2 段登记，组序以输入文件为准。"
+              if _dual else ""))
     w.note("主缆节点在塔位处**直接使用塔顶节点**，不另建坐标相同的节点。"
            "若两者只是坐标重合而不共用，主缆就成了一根从锚碇到锚碇的自由索，"
            "塔不参与受力——求解照样收敛、位移倾角看着都像座桥，只有索力会掉到"
@@ -2156,9 +2184,12 @@ def _susp_sec_2(w: _Writer, model, d: dict, fig_frame: Path) -> None:
             ["节点", "x (m)", "约束自由度"], rows,
             widths=[3.4, 4.0, 8.1], aligns=["c", "c", "l"])
     w.p("自由度 1/2/3 为沿 X/Y/Z 的平动，4/5/6 为绕 X/Y/Z 的转动。"
-        "主缆与吊索落在 y=0 平面内，索单元只提供轴向刚度，主缆节点的平面外"
-        "自由度没有刚度来源，故按平面问题处理——这是单索面模型的既定假定，"
-        "真实结构的面外刚度来自另一根主缆与横撑。")
+        + ("两片主缆与吊索分列 y=±B/2，各索面自身按平面问题处理；两索面经"
+           "横梁与加劲梁联结共同工作，面外刚度由双索面与横梁提供。"
+           if int(d.get("cable_planes") or 1) == 2 else
+           "主缆与吊索落在 y=0 平面内，索单元只提供轴向刚度，主缆节点的平面外"
+           "自由度没有刚度来源，故按平面问题处理——这是单索面模型的既定假定，"
+           "真实结构的面外刚度来自另一根主缆与横撑。"))
 
     w.h2("2.4　恒载")
     w.p(f"桥面恒载以节点集中力的形式施加，按节点分担宽度分配，"
@@ -2533,8 +2564,10 @@ def _susp_sec_7_erection(w: _Writer, model, d: dict, fig_erection) -> None:
             "主缆下沉最多，是主缆下料长度与吊装顺序的校核要点。")
     w.note("本次施工阶段模拟的简化假设：边跨加劲梁在合拢阶段一次就位（不逐段"
            "吊装）；一期恒载吊装阶段按铰接处理（加劲梁不产生恒载弯矩）；"
-           "未计吊机/配重/风等施工临时荷载；单索面平面模型，双索面与横撑"
-           "不在本版范围。")
+           "未计吊机/配重/风等施工临时荷载；"
+           + ("双索面两片主缆同步找形，横梁随对应主梁段逐根激活。"
+              if int(d.get("cable_planes") or 1) == 2 else
+              "单索面平面模型，双索面与横撑不在本版范围。"))
 
     w.h2("7.5　施工阶段与成桥态的衔接")
     w.p("成桥态的恒载内力 = 各施工阶段恒载增量的叠加。主缆索力是状态量"
@@ -2581,8 +2614,11 @@ def _susp_sec_8(w: _Writer, d: dict) -> None:
                  "锚点的竖向分力过大，锚碇规模随之增加。")
     w.bullet("主缆与吊索的安全系数按标准值验算；运营期的活载效应与荷载组合"
              "需另接活载模块，本计算书不包含活载。")
-    w.bullet("本模型为单索面平面模型，未计双索面与横撑提供的面外刚度。"
-             "面外稳定（主缆横向、吊索横向、加劲梁侧向）应另行验算。")
+    w.bullet("本模型为"
+             + ("双索面空间模型，两片索面经横梁联结，已计入双索面提供的面外刚度。"
+                if int(d.get("cable_planes") or 1) == 2 else
+                "单索面平面模型，未计双索面与横撑提供的面外刚度。")
+             + "面外稳定（主缆横向、吊索横向、加劲梁侧向）应另行验算。")
 
     w.h2("8.3　附件")
     w.table("计算附件", ["文件", "说明"], [
