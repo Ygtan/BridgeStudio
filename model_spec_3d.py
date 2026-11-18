@@ -603,6 +603,20 @@ class CableBridge3D(BaseModel):
     erection_panels: int = 1        # 每次对称吊装的吊点对数（每次对称吊 2 段）
 
 
+class ConstraintEquationTerm3D(BaseModel):
+    """约束方程的一项：coef · u(node, dof) = ...。dof 为 1~6。"""
+    node: int
+    dof: int = Field(ge=1, le=6)
+    coef: float
+
+
+class ConstraintEquation3D(BaseModel):
+    """约束方程：Σ coef_i·u(node_i, dof_i) = constant（索鞍顶推等相对位移）。"""
+    id: int
+    constant: float = 0.0
+    terms: list[ConstraintEquationTerm3D] = Field(default_factory=list)
+
+
 class ModelSpec3D(BaseModel):
     """三维模型完整规范。to_dat() 输出 fem_3d.hpp 可直接读取的 .dat。"""
     title: str = "untitled_3d"
@@ -620,6 +634,10 @@ class ModelSpec3D(BaseModel):
     elem_loads: list[ElemLoad3D] = Field(default_factory=list)
     self_weights: list[SelfWeight3D] = Field(default_factory=list)
     gravity: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    # 约束方程（索鞍顶推等相对位移工况；opt-in，默认空 → 逐位不变）。
+    # 罚系数 <=0 时内核按结构最大对角刚度*1e8 自适应。
+    ces: list[ConstraintEquation3D] = Field(default_factory=list)
+    ce_penalty: float = 1e12
     stages: list[Stage3D] = Field(default_factory=list)
     # 分项预应力损失表：编号 → 参数。只有束写了 `loss_ref` 才会被引用；
     # 空表不输出任何内容，既有 .dat 逐位不变。
@@ -1064,6 +1082,18 @@ class ModelSpec3D(BaseModel):
             for c in cb.cables:
                 L.append(f"{c.elem} {c.anchor} {fmt(c.tension)}")
 
+        # 约束方程（索鞍顶推等相对位移工况）。空列表时一段都不输出，
+        # 既有 .dat 逐字节不变；非空时在 *END 前追加 *CE_PARAMETER + *CE。
+        if self.ces:
+            L.append("*CE_PARAMETER")
+            L.append(f"PENALTY={fmt(self.ce_penalty)}")
+            for ce in self.ces:
+                L.append("*CE")
+                body = f"{ce.id} {fmt(ce.constant)}"
+                for t in ce.terms:
+                    body += f" {t.node} {t.dof} {fmt(t.coef)}"
+                L.append(body)
+
         L.append("*END")
         return "\n".join(L) + "\n"
 
@@ -1165,6 +1195,34 @@ def validate_model_3d(model: ModelSpec3D) -> tuple[list[str], list[str]]:
             errors.append(f"节点荷载引用了不存在的节点 {ld.node}")
         if not (1 <= ld.dof <= 6):
             errors.append(f"节点 {ld.node} 的荷载自由度 {ld.dof} 越界（应为 1~6）")
+
+    # 约束方程（索鞍顶推等）：引用节点必须存在；自由度须该节点实际拥有
+    # （内核 buildDofMap3D：梁节点 1~6，纯桁架/索节点只有 1~3）；每条至少一项。
+    # 空 ces 时本段零开销，默认零污染。
+    if model.ces:
+        _beam_nodes: set[int] = set()
+        for e in model.elements:
+            t = et_by_id.get(e.etype)
+            if t is not None and t.kind in ("BEAM", "BEAM7"):
+                _beam_nodes.add(e.n1)
+                _beam_nodes.add(e.n2)
+        _ce_ids: set[int] = set()
+        for ce in model.ces:
+            if ce.id in _ce_ids:
+                errors.append(f"约束方程编号重复：{ce.id}")
+            _ce_ids.add(ce.id)
+            if not ce.terms:
+                errors.append(f"约束方程 {ce.id} 至少需要一个自由度项")
+            for t in ce.terms:
+                if t.node not in node_ids:
+                    errors.append(f"约束方程 {ce.id} 引用了不存在的节点 {t.node}")
+                max_dof = 6 if t.node in _beam_nodes else 3
+                if not (1 <= t.dof <= max_dof):
+                    errors.append(
+                        f"约束方程 {ce.id} 引用节点 {t.node} 的自由度 {t.dof} 越界"
+                        f"（该节点只有 1~{max_dof}）")
+        if model.ce_penalty <= 0:
+            errors.append("约束方程罚系数 ce_penalty 必须大于 0")
 
     for s in model.stages:
         for eid in list(s.activate) + list(s.deactivate):

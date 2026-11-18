@@ -859,6 +859,9 @@ _DIM_3D_RE = re.compile(
 _DUAL_PLANE_RE = re.compile(r"双索面|两索面|双缆面|双主缆")
 _FLOATING_RE = re.compile(r"半漂浮|漂浮体系|纵向漂浮")
 _FIXED_RE = re.compile(r"塔梁固结|固结体系")
+# 索鞍顶推（opt-in，仅 3D 悬索桥）：抓「顶推 50mm / 顶推量 5cm / 索鞍顶推 0.05m」。
+# 单独一个「顶推」不足以触发（转体/顶推施工也用这个词），必须带「索鞍」。
+_SADDLE_JACK_RE = re.compile(r"索鞍\s*顶推|顶推\s*索鞍|索鞍.{0,6}顶推(?:量)?")
 
 # 组合体系（X20 第 5 类桥型）：内核没有对应的成桥态求解键。识别到就拒绝，
 # 不按 `_classify_kind` 的顺序悄悄落到悬索或斜拉——那会给出「收敛但错误」的答案。
@@ -2622,6 +2625,36 @@ def extract_ps_beam_params(text: str) -> tuple[dict[str, Any], list[str]]:
     return p, notes
 
 
+def _extract_length_after(text: str, anchor_re: re.Pattern, labels: tuple[str, ...],
+                          default_unit: str = "mm") -> float | None:
+    """在锚点短语（如「索鞍顶推」）之后就近抽取一个长度，统一换算成 m。
+
+    先找紧跟锚点的「标签 + 数值 + 单位」，再退化为锚点后第一个带单位数值。
+    单位缺省时按 default_unit（顶推工程习惯是 mm）。避免把跨径等别的数值
+    误读成顶推量——只搜索锚点后 60 字以内。
+    """
+    m = anchor_re.search(text)
+    if not m:
+        return None
+    from nl_parser import _to_m
+
+    tail = text[m.end():m.end() + 60]
+    # 数值 + 可选单位（长单位优先，避免 "m" 被当成毫米前缀）
+    unit_re = r"(毫米|厘米|公分|mm|cm|米|m)\b"
+    # 带标签的显式写法优先：「顶推量 50mm」「顶推 5cm」
+    for lab in labels:
+        mm = re.search(re.escape(lab) + r"[\s:：为约]*?([0-9]+(?:\.[0-9]+)?)"
+                       r"\s*(" + unit_re + r")?", tail, re.I)
+        if mm:
+            unit = mm.group(2) or default_unit
+            return _to_m(float(mm.group(1)), unit)
+    # 退化：锚点后第一个「数值 + 单位」；无单位则按 default_unit
+    mm = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*(" + unit_re + r")", tail, re.I)
+    if mm:
+        return _to_m(float(mm.group(1)), mm.group(2))
+    return None
+
+
 def _note_cable_planes(text: str, p: dict[str, Any], notes: list[str]) -> None:
     """双索面是 opt-in 几何开关，**不是**维度开关。
 
@@ -2880,6 +2913,20 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
             p["system"] = d["system"]
             notes.append(f"未说明体系，默认{'地锚式' if d['system'] == 'EARTH' else '自锚式'}"
                          "（自锚式请写明「自锚式」）")
+        # 索鞍顶推（opt-in，仅三维悬索桥）：命中「索鞍顶推」才解析位移量。
+        # 单位默认 mm（工程习惯），也接受 m / cm；Δ>0 触发三节点 CE 耦合，
+        # 未写明量值时给一个占位正量并由提示要求用户确认，而不是静默忽略。
+        if _SADDLE_JACK_RE.search(text):
+            dx = _extract_length_after(text, _SADDLE_JACK_RE,
+                                       ("顶推量", "顶推位移", "顶推", "位移"),
+                                       default_unit="mm")
+            if dx is None or dx <= 0:
+                notes.append("识别到「索鞍顶推」但没读到正的顶推量"
+                             "（如「索鞍顶推 50 mm」）；本次不生成 CE，请补齐顶推量")
+            else:
+                p["saddle_jack_dx"] = dx
+                notes.append(f"索鞍顶推 Δ={dx * 1000:g} mm → 三维 CE 耦合（口径 C："
+                             "主缆端相对塔顶纵向滑移 Δ）")
         if not grab("Lm", "主跨", "跨径", "主孔"):
             if grab("Lm", "跨度", "总长", "全长"):
                 notes.append(f"只给了一个跨度，按主跨 {p['Lm']:g} m 处理")

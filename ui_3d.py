@@ -372,7 +372,8 @@ def _apdl_import_block(doc: ModelDoc) -> None:
                           type=["ans", "inp", "txt"], key="apdl_upload")
     if up is None:
         st.caption(
-            "支持本程序四个导出器生成的 APDL 子集：BEAM4 / BEAM188 / LINK180 + "
+            "支持本程序四个导出器生成的 APDL 子集：BEAM4 / BEAM188 / "
+            "LINK180 / LINK10 + "
             "N / FILL / E / EN / MP / R / RMORE / SECDATA / TYPE / MAT / REAL / "
             "D / F / SFBEAM / ACE。BEAM3 平面模型、施工阶段、求解控制与 "
             "*DO 循环显式拒绝。")
@@ -407,6 +408,19 @@ def _apdl_import_block(doc: ModelDoc) -> None:
         with st.expander(f"告警（{len(rep.warnings)} 条：能算，但与原模型不完全一致）"):
             for w in rep.warnings:
                 st.caption(f"· {w}")
+
+    # LINK 只拉杆靠初应变 ISTRN 表达索力（F=E·A·ISTRN）。把台账列出来，
+    # 让使用者一眼核对导入后索力完整保留，而不是笼统告警“失去索语义”。
+    if rep.cable_forces:
+        with st.expander(f"索力台账（LINK 初应变，{len(rep.cable_forces)} 根："
+                         "F=E·A·ISTRN）", expanded=True):
+            st.caption("APDL 的 LINK10 只拉杆用初应变表达索力，导入后索力完整保留：")
+            for eid, (A, istrn, E, F) in sorted(rep.cable_forces.items()):
+                st.caption(
+                    f"· 单元 {eid}：A={A:g} m²，ISTRN={istrn:g}，"
+                    f"E={E / 1e9:.1f} GPa → F={F / 1e3:,.1f} kN")
+            st.caption("有损项仅为「只受拉单向判定」与「W/L0 垂度几何非线性」；"
+                       "需要垂度请补 W 走 nonlinear cable_solver。")
 
     if not rep.ok:
         st.caption("存在显式拒绝项，未生成可用模型；请按上面原因修正 APDL。")

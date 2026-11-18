@@ -38,13 +38,14 @@
 | `ET,id,BEAM4` | 6 自由度 Euler-Bernoulli 梁 | `ElemTypeDef3D(kind="BEAM")` |
 | `ET,id,BEAM188` | Timoshenko 梁 | `kind="BEAM"`（**有损**，见 §3） |
 | `ET,id,LINK180` | 空间杆/索 | `kind="TRUSS"`（**有损**，见 §3） |
+| `ET,id,LINK8` / `ET,id,LINK10` | 空间杆 / 只受拉（或只受压）杆 | `kind="TRUSS"`（**有损**，见 §3） |
 | `MP,EX,mid,v` | 弹性模量 Pa | `Material3D.E` |
 | `MP,DENS,mid,v` | 密度 kg/m³ | `Material3D.dens` |
 | `MP,PRXY,mid,v` | 泊松比 | 仅用于反算 `G`（无 `GXY` 时） |
 | `MP,GXY,mid,v` | 剪切模量 Pa | `RealConst3D.G`（按 mat 传播） |
 | `R,rid,AREA,IZZ,IYY,TKZ,TKY,THETA` | BEAM4 实常数 | `A / IZ / IY` |
 | `RMORE,ISTRN,IXX,...` | BEAM4 附加实常数 | `ISTRN / J` |
-| `R,rid,A,ISTRN` | LINK180 实常数 | `A / ISTRN` |
+| `R,rid,A,ISTRN` | LINK180/LINK8/LINK10 实常数：A + 初应变 | `A / ISTRN`。**APDL 用 LINK 只拉杆的初应变表达索力 F=E·A·ISTRN，ISTRN 完整保留**（见 §3） |
 | `SECDATA,A,IYY,IYZ,IZZ,IW,J,...` | BEAM188 ASEC | `A / IY / IZ / IW / J` |
 | `N,id,x,y,z` | 节点 | `Node3D` |
 | `FILL,n1,n2,nfill,nstrt,ninc` | 等距插值节点 | 补 `Node3D`（线性插值） |
@@ -87,7 +88,8 @@
 | 源 | 目标 | 损失与处置 |
 |---|---|---|
 | `BEAM188` | `BEAM` | ANSYS 是 Timoshenko + 线性形函数；FEM-Eigen 3D 是 Euler-Bernoulli 三次梁。导入后 `.dat` 的位移/内力会与 BEAM188 不同（实测单单元悬臂 0.859 倍、细分后 1.0678 倍）。**不修正数值，只告警**：这正是两套内核的本征差异，强行抹平会破坏物理。 |
-| `LINK180` | `TRUSS` | 线性内核对 TRUSS/CABLE 的刚度装配相同；导入后失去“索”语义（`W` / `L0` / 只受拉）。若原意是索，用户须在 `ModelSpec3D` 上改 kind 并补 `W`。 |
+| `LINK180` / `LINK8` | `TRUSS` | 线性内核对 TRUSS/CABLE 的刚度装配相同；导入后失去“索”语义（`W` / `L0` / 只受拉）。若用初应变 ISTRN 表达索力（F=E·A·ISTRN），**ISTRN 完整保留、索力不丢**；只是 W/L0 垂度与只受拉判定有损。若原意需垂度，用户须改 `kind=CABLE` 并补 `W`。 |
+| `LINK10` | `TRUSS` | **APDL 中 LINK10 是只拉单元，索力用初应变 ISTRN 表达：F=E·A·ISTRN。** R 的 ISTRN 被完整读入 `RealConst3D.ISTRN` → `.dat`，内核按等效节点荷载施加（`fem_3d.hpp: P=Eeff·A·istrn`），**索力不丢**，`ImportReport.cable_forces` 逐根登记 A/ISTRN/E/F 供核对。映射 `TRUSS` 而非 `CABLE` 的理由：线性内核两者轴向刚度相同，而 `validate_model_3d` 对 CABLE 有「两端等高即硬拒绝」约束，LINK10 常用于水平系杆/张紧杆，映射 CABLE 会把合法水平杆误拒。**真正有损仅两点**：(1) 只受拉单向判定——线性内核按双向轴力杆，受压不退出；(2) W/L0 垂度几何非线性——需要时补 W 走 nonlinear cable_solver。不再提示用户改 `kind=CABLE`（那是错误建议）。 |
 | `SFBEAM` / `SFE` | `ElemLoad3D(dir="GZ")` | 面号 → 全局方向依赖单元局部坐标，APDL 命令流未给方向向量。统一按 GZ 记录并告警“面号未换算，须核对方向”；强度按线荷载 1:1 使用，未乘梁宽。 |
 | `KEYOPT,1,1,0` | 忽略 | BEAM188 第 7 翘曲自由度在 6 自由度梁中无处安放；按 6 自由度处理。 |
 | `MP,ALPX` | 忽略 | `ModelSpec3D` 温度荷载走 `*TEMPERATURE` 直接给温变，不存 α。 |

@@ -70,6 +70,14 @@ _ET_KIND = {
     "BEAM188": "BEAM",
     "LINK180": "TRUSS",
     "LINK8": "TRUSS",
+    # LINK10 是 ANSYS 只受拉单元；APDL 里**索力就是用初应变 ISTRN 表达的**：
+    # F = E·A·ISTRN。ISTRN 被完整读入 RealConst3D.ISTRN → .dat，内核把它转成
+    # 等效节点荷载（fem_3d.hpp: P = Eeff·A·istrn），所以索力不丢。
+    # 映射 TRUSS 而非 CABLE：线性内核下两者轴向刚度相同，但 CABLE 在
+    # validate_model_3d 有「两端等高即硬拒绝」，会把合法的 LINK10 水平系杆/
+    # 张紧杆误拒。真正丢失的只有「只受拉单向判定」和「W/L0 垂度几何非线性」，
+    # 这两点靠告警显式交代，不误导用户去改 kind=CABLE。
+    "LINK10": "TRUSS",
 }
 # 明确知道不能映射的单元（给具体理由，不落到"未知命令"的笼统提示）
 _ET_REJECT = {
@@ -107,6 +115,11 @@ class ImportReport:
     ignored: dict[str, int] = field(default_factory=dict)
     rejected: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # LINK10/LINK180/LINK8 的初应变索力台账：{单元号: (A, ISTRN, E, F=E*A*ISTRN)}。
+    # APDL 用 LINK 只拉杆表达索力、且索力就藏在初应变里，这里把它显式算出来，
+    # 让使用者一眼核对“索力没丢”。仅统计有非零 ISTRN 的杆单元，默认空。
+    cable_forces: dict[int, tuple[float, float, float, float]] = field(
+        default_factory=dict)
     _warn_seen: set[str] = field(default_factory=set, repr=False)
 
     def bump(self, bucket: dict[str, int], cmd: str) -> None:
@@ -309,10 +322,22 @@ def parse_apdl(text: str, *, source: str = "<text>") -> ApdlImportResult:
                         "BEAM188 按 6 自由度 Euler-Bernoulli BEAM 导入："
                         "FEM-Eigen 3D 与 ANSYS Timoshenko 形函数不同，"
                         "位移/端力会有本征差异，不做数值抹平。")
+                elif name == "LINK10":
+                    rep.warn(
+                        "LINK10 是 APDL 只受拉单元，索力用初应变 ISTRN 表达"
+                        "（F=E·A·ISTRN）；R 的 ISTRN 已完整导入 RealConst3D.ISTRN，"
+                        "内核按等效节点荷载施加，**索力不丢**。映射为 TRUSS 不是"
+                        " CABLE：线性内核两者轴向刚度相同，而 CABLE 的「两端等高"
+                        "即硬拒绝」会把合法的水平系杆/张紧杆误拒。真正有损的只有"
+                        "两点：(1) 只受拉单向判定——线性内核按双向轴力杆，受压时不退出；"
+                        "(2) W/L0 垂度几何非线性——需要时请补 W 并走 nonlinear "
+                        "cable_solver。索力台账见导入报告中的 cable_forces。")
                 elif name in ("LINK180", "LINK8"):
                     rep.warn(
-                        f"{name} 按 TRUSS 导入：失去索语义（W/L0/只受拉），"
-                        "若原意是索需在模型上改 kind=CABLE 并补 W。")
+                        f"{name} 按 TRUSS 导入；若用初应变 ISTRN 表达索力"
+                        "（F=E·A·ISTRN），ISTRN 已完整导入、内核按等效节点荷载"
+                        "施加，索力不丢（见 cable_forces）。有损项：只受拉判定、"
+                        "W/L0 垂度几何非线性（需要时补 W 走 nonlinear cable_solver）。")
             continue
 
         # --- MP：材料 ---
@@ -713,6 +738,26 @@ def parse_apdl(text: str, *, source: str = "<text>") -> ApdlImportResult:
     rep.rejected.extend(f"模型校验：{e}" for e in errs)
     for w in warns:
         rep.warn("模型校验：" + w)
+
+    # LINK 只拉杆的索力台账：APDL 的 LINK10 用初应变 ISTRN 表达索力
+    # F = E·A·ISTRN。这里把每个桁架/索单元（有非零 ISTRN）的索力反算出来，
+    # 让使用者一眼核对“索力没丢”。仅登记、不改模型，默认零污染。
+    if model.etypes and model.reals and model.materials:
+        _etype_by_id = {t.id: t for t in model.etypes}
+        _real_by_id = {r.id: r for r in model.reals}
+        _mat_by_id = {mm.id: mm for mm in model.materials}
+        for el in model.elements:
+            et = _etype_by_id.get(el.etype)
+            if et is None or et.kind not in ("TRUSS", "CABLE"):
+                continue
+            rconst = _real_by_id.get(et.real)
+            mat = _mat_by_id.get(et.mat)
+            if rconst is None or mat is None:
+                continue
+            if not rconst.ISTRN:
+                continue
+            rep.cable_forces[el.id] = (
+                rconst.A, rconst.ISTRN, mat.E, mat.E * rconst.A * rconst.ISTRN)
 
     return ApdlImportResult(model=model, report=rep)
 

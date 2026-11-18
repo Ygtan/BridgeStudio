@@ -45,6 +45,8 @@ from block_numbering import BlockNumbering
 from model_spec_3d import (
     Boundary3D,
     CableBridge3D,
+    ConstraintEquation3D,
+    ConstraintEquationTerm3D,
     Element3D,
     ElemTypeDef3D,
     Lane3D,
@@ -100,6 +102,7 @@ def build_suspension_3d(
     lane_count: int = 3,                  # 横向设计车道数
     lane_reduction: float = 0.78,         # 多车道横向折减系数（JTG D60 表 4.3.1-5）
     eccentricity: float = 1.15,           # 偏载增大系数（横向偏载放大，需按实际确认）
+    saddle_jack_dx: float = 0.0,          # 索鞍顶推量 Δ（m，沿 +X）；>0 触发三节点 CE 耦合
     title: str = "",
 ) -> tuple[ModelSpec3D, dict]:
     """生成悬索桥 ModelSpec3D（成桥态工况）与派生量字典。"""
@@ -178,6 +181,20 @@ def build_suspension_3d(
     nn = BlockNumbering()
     deck_nids = nn.allocate(len(xs))                                # 加劲梁节点
     tower_nids = [nn.allocate(n_tower_seg + 1) for _ in range(2)]   # 塔1 / 塔2 节点
+    # 索鞍顶推 opt-in（口径 C，见 索鞍顶推CE耦合规格.md）：
+    # 默认 saddle_jack_dx=0 → 不分配、不分节点、不写 CE，下面全部走原路径。
+    # >0 时每塔新分配两个节点：
+    #   T = 塔顶结构节点（塔身最顶单元改连它，6 自由度）；
+    #   S = 索鞍孤立节点（靠 CE 罚刚度，3 平动自由度）。
+    # 原塔顶节点 tid(n_tower_seg) 保留为主缆端 C（主缆链、cable_bridge 全不动）。
+    jack_on = saddle_jack_dx > 0.0
+    jack_tower_top: list[int] = []     # T：塔顶结构节点
+    jack_saddle: list[int] = []        # S：索鞍孤立节点
+    if jack_on:
+        for _ in range(2):
+            jack_tower_top.append(nn.allocate(1)[0])
+        for _ in range(2):
+            jack_saddle.append(nn.allocate(1)[0])
     gid = lambda i: deck_nids[i]
     deck_ids = [gid(i) for i in range(len(xs))]
     x_to_deck = {round(x, 9): gid(i) for i, x in enumerate(xs)}
@@ -268,13 +285,20 @@ def build_suspension_3d(
         for k in range(n_tower_seg + 1):
             nodes.append(Node3D(id=tid(k), x=xt, y=0.0,
                                 z=z_base + (z_top - z_base) * k / n_tower_seg))
-        tower_tops.append(tid(n_tower_seg))
+        tower_tops.append(tid(n_tower_seg))   # C：主缆端节点（顶推时主缆仍连它）
+        if jack_on:
+            # T（塔顶结构）与 S（索鞍）坐标都与塔顶重合；T 取代原塔顶承接塔身，
+            # S 孤立只靠 CE 传力，C 原塔顶节点留给主缆。
+            nodes.append(Node3D(id=jack_tower_top[ti], x=xt, y=0.0, z=z_top))
+            nodes.append(Node3D(id=jack_saddle[ti], x=xt, y=0.0, z=z_top))
         te = tower_eids[ti]
         seg = (z_top - z_base) / n_tower_seg
         w_tower = tower_A * tower_dens * G
         for k in range(n_tower_seg):
-            elements.append(Element3D(id=te[k], etype=2,
-                                      n1=tid(k), n2=tid(k + 1)))
+            n2 = tid(k + 1)
+            if jack_on and k == n_tower_seg - 1:
+                n2 = jack_tower_top[ti]       # 塔身最顶单元改连结构塔顶 T
+            elements.append(Element3D(id=te[k], etype=2, n1=tid(k), n2=n2))
 
     # ---------------------------------------------------------- 主缆链
     # 链上的水平位置：锚 → 边跨各吊点 → 塔1 → 主跨各吊点 → 塔2 → 边跨吊点 → 锚
@@ -451,6 +475,43 @@ def build_suspension_3d(
         erection_panels=erection_panels,
     )
 
+    # ---------------------------------------------------------- 索鞍顶推 CE
+    # 口径 C（索鞍顶推CE耦合规格.md §3.3）：每塔 6 条 CE。
+    #   CE1 UX(S)−UX(T)=Δ  索鞍相对塔顶结构顶推 Δ
+    #   CE2 UX(C)−UX(S)=0  主缆端随索鞍滑移（缆鞍固结，无相对滑移）
+    #   CE3/4 UY(S)−UY(T)=0、UZ(S)−UZ(T)=0  索鞍随塔（孤立节点获刚度）
+    #   CE5/6 UY(C)−UY(T)=0、UZ(C)−UZ(T)=0  主缆竖向/横向力经索鞍传塔
+    # 净效果：主缆端相对塔顶纵向滑移 Δ（UX(C)−UX(T)=Δ），即索鞍顶推。
+    ces: list[ConstraintEquation3D] = []
+    if jack_on:
+        ce_id = 1
+        for ti in range(2):
+            C = tower_tops[ti]           # i_top1 / i_top2：主缆端（原塔顶节点）
+            T = jack_tower_top[ti]       # 塔顶结构节点
+            S = jack_saddle[ti]          # 索鞍孤立节点
+            ces.append(ConstraintEquation3D(
+                id=ce_id, constant=saddle_jack_dx,
+                terms=[ConstraintEquationTerm3D(node=S, dof=1, coef=1.0),
+                       ConstraintEquationTerm3D(node=T, dof=1, coef=-1.0)]))
+            ce_id += 1
+            ces.append(ConstraintEquation3D(
+                id=ce_id, constant=0.0,
+                terms=[ConstraintEquationTerm3D(node=C, dof=1, coef=1.0),
+                       ConstraintEquationTerm3D(node=S, dof=1, coef=-1.0)]))
+            ce_id += 1
+            for dof in (2, 3):
+                ces.append(ConstraintEquation3D(
+                    id=ce_id, constant=0.0,
+                    terms=[ConstraintEquationTerm3D(node=S, dof=dof, coef=1.0),
+                           ConstraintEquationTerm3D(node=T, dof=dof, coef=-1.0)]))
+                ce_id += 1
+            for dof in (2, 3):
+                ces.append(ConstraintEquation3D(
+                    id=ce_id, constant=0.0,
+                    terms=[ConstraintEquationTerm3D(node=C, dof=dof, coef=1.0),
+                           ConstraintEquationTerm3D(node=T, dof=dof, coef=-1.0)]))
+                ce_id += 1
+
     if not title:
         title = f"双塔三跨{SYSTEM_LABELS[system]}　主跨 {L_main:.0f} m"
     model = ModelSpec3D(
@@ -463,6 +524,8 @@ def build_suspension_3d(
         boundaries=boundaries,
         loads=loads,
         cable_bridge=cable_bridge,
+        # 索鞍顶推 CE（opt-in；默认空列表 → .dat 无新增段，逐位不变）
+        ces=ces,
         # 车道：加劲梁纵向节点序列，按 JTG D60 自动生成 qk/Pk。
         # 索承体系内核在成桥态切线刚度上算活载梁内力包络（见 cable_solver）。
         # 横向布载用横向分布系数法：m = lane_count·lane_reduction·eccentricity。
@@ -481,6 +544,11 @@ def build_suspension_3d(
         "anchor_nodes": [cable_ids[0], cable_ids[-1]],
         "main_cable_elems": main_cable_elems,
         "hangers": hangers,
+        "saddle_jack_dx": saddle_jack_dx,
+        "saddle_jack_on": jack_on,
+        "saddle_nodes": list(jack_saddle),
+        "saddle_tower_top_nodes": list(jack_tower_top),
+        "n_ce": len(ces),
         "n_hanger": len(hangers),
         "sag": f_sag,
         "sag_ratio": sag_ratio,

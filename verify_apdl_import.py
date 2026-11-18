@@ -135,6 +135,74 @@ def group_roundtrip() -> None:
                   and any("KEYOPT" in w for w in r.report.warnings))
 
 
+# ---------------------------------------------------------------- [LINK10]
+def group_link10() -> None:
+    print("\n[LINK10] BEAM4 + LINK10 混合读入（含水平只受拉杆）")
+    text = """/PREP7
+ET,1,BEAM4
+ET,2,LINK10
+MP,EX,1,2.06e11
+MP,PRXY,1,0.3
+R,1,1,1,1,1,1,0
+RMORE,0,1,0,0,0,0
+R,2,0.01,0
+N,1,0,0,0
+N,2,1,0,0
+N,3,2,0,-1
+N,4,3,0,-1
+TYPE,1
+MAT,1
+REAL,1
+E,1,2
+TYPE,2
+MAT,1
+REAL,2
+E,2,3
+E,3,4
+D,1,ALL,0
+FINISH""".replace("R,2,0.01,0\n", "R,2,0.01,0.0005\n")
+    r = parse_apdl(text, source="<BEAM4+LINK10>")
+    check("BEAM4 + LINK10 混合流无拒绝", r.report.ok,
+          "; ".join(r.report.rejected[:3]))
+    m = r.model
+    check("LINK10 映射为 TRUSS",
+          [(t.id, t.kind) for t in m.etypes] == [(1, "BEAM"), (2, "TRUSS")],
+          str([(t.id, t.kind) for t in m.etypes]))
+    check("LINK10 单元斜杆与水平杆都读入",
+          {(e.id, e.n1, e.n2, e.etype) for e in m.elements}
+          == {(1, 1, 2, 1), (2, 2, 3, 2), (3, 3, 4, 2)},
+          str([(e.id, e.n1, e.n2, e.etype) for e in m.elements]))
+    check("LINK10 水平杆未被 CABLE 等高规则拒绝",
+          any(e.n1 == 3 and e.n2 == 4 for e in m.elements))
+    rc = next((x for x in m.reals if x.id == 2), None)
+    check("LINK10 实常数 A / ISTRN 读入",
+          rc is not None and close(rc.A, 0.01) and close(rc.ISTRN, 0.0005),
+          f"A={rc.A:g} ISTRN={rc.ISTRN:g}" if rc else "无实常数 2")
+    check("LINK10 tension-only 语义有告警",
+          any("LINK10" in w and "只受拉" in w for w in r.report.warnings))
+    # APDL 中 LINK10 用初应变表达索力 F=E·A·ISTRN；告警必须明确"索力不丢"，
+    # 不再误导用户改 kind=CABLE，且逐根登记索力台账供核对。
+    check("LINK10 告警明确索力不丢（F=E·A·ISTRN）",
+          any("LINK10" in w and "ISTRN" in w and "不丢" in w
+              for w in r.report.warnings))
+    check("LINK10 告警不再误导改 kind=CABLE",
+          not any("改 kind=CABLE" in w or "改 kind = CABLE" in w
+                  for w in r.report.warnings))
+    cfin = r.report.cable_forces
+    check("LINK10 索力台账登记两根杆（斜杆+水平杆）",
+          len(cfin) == 2, str(cfin))
+    # E=2.06e11, A=0.01, ISTRN=0.0005 → F=2.06e11*0.01*0.0005=1.03e6 N
+    _expF = 2.06e11 * 0.01 * 0.0005
+    check("LINK10 索力数值 F=E·A·ISTRN 正确",
+          all(close(v[3], _expF) and close(v[0], 0.01)
+              and close(v[1], 0.0005) and close(v[2], 2.06e11)
+              for v in cfin.values()), str(cfin))
+    # 台账只统计非零 ISTRN 的杆；BEAM4（ET=1）不应进入。
+    check("索力台账不含 BEAM 单元",
+          all(next((t.kind for t in m.etypes if t.id == e.etype), None) == "TRUSS"
+              for e in m.elements if e.id in cfin))
+
+
 # ---------------------------------------------------------------- [4][5] 拒绝
 def group_reject() -> None:
     print("\n[4][5] 显式拒绝边界")
@@ -313,6 +381,7 @@ def main() -> int:
     print("=" * 70)
     group_arch()
     group_roundtrip()
+    group_link10()
     group_reject()
     group_loads_bc()
     # 用纯 BEAM4 回读模型做端到端（arch 含 TRUSS，不是 grillage 的典型工况）
