@@ -20,8 +20,9 @@
 
 编号规范（B1，统一约定见 X20_接入约定.md §5）
 ------------------------------------------------
-下表是该规范在本建造器内的落地实例（同模型内不得撞号，新增段先登记契约 §5）：
-- 节点：左片下弦 1+i、左片上弦 101+i、右片下弦 201+i、右片上弦 301+i
+紧凑分块编号（§5.1，2026-11-18 全量切换）：节点 / 单元各自独立按组件组
+顺序分配，第一组从 1 起；≥50 的组按百位跳转，<50 的组按十位跳转。
+- 节点组顺序：左片下弦、右片下弦、左片上弦、右片上弦
 - 单元：按生成顺序从 1 连续编号（弦杆 / 腹杆 / 横向联系按 etype 分组）
 - 实常数：1=弦杆，2=腹杆，3=横向联系；材料：1=钢材
 
@@ -43,6 +44,7 @@ from model_spec_3d import (
     RealConst3D,
     Stage3D,
 )
+from block_numbering import BlockNumbering
 
 
 def build_truss_3d(
@@ -72,11 +74,16 @@ def build_truss_3d(
     panel = span / n_panel
     half = width / 2.0
 
-    # ---- 节点编号 ----
-    loL = lambda i: 1 + i            # 左片下弦 i=0..n_panel
-    upL = lambda i: 101 + i          # 左片上弦 i=0..n_panel-1
-    loR = lambda i: 201 + i          # 右片下弦 i=0..n_panel
-    upR = lambda i: 301 + i          # 右片上弦 i=0..n_panel-1
+    # ---- 节点编号（紧凑分块，契约 §5.1；单元已连续从 1，不用分配器）----
+    nn = BlockNumbering()
+    loL_nids = nn.allocate(n_panel + 1)   # 左片下弦
+    upL_nids = nn.allocate(n_panel)       # 左片上弦
+    loR_nids = nn.allocate(n_panel + 1)   # 右片下弦
+    upR_nids = nn.allocate(n_panel)       # 右片上弦
+    loL = lambda i: loL_nids[i]
+    upL = lambda i: upL_nids[i]
+    loR = lambda i: loR_nids[i]
+    upR = lambda i: upR_nids[i]
 
     nodes: list[Node3D] = []
     for i in range(n_panel + 1):

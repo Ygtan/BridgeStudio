@@ -654,9 +654,6 @@ def render(doc: ModelDoc) -> None:
     # ---- 模型摘要 ----
     st.markdown("**模型**")
     st.text("\n".join(doc.summary()["lines"]))
-    with st.expander("查看结构化参数（params / 派生量）"):
-        st.json(doc.to_dict())
-        st.json(doc.info or {})
 
     hints = doc.hints_3d()
     if hints:

@@ -60,7 +60,8 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 import code_material
-from result_3d import CABLE_SAFETY_MIN, MAIN_CABLE_SAFETY_MIN
+from result_3d import (CABLE_SAFETY_MIN, MAIN_CABLE_SAFETY_MIN,
+                       deck_node_ids, tower_node_groups)
 
 # ---------------------------------------------------------------- 版式常量
 
@@ -362,8 +363,9 @@ def collect_report_data(*, model, info: dict, res: dict,
                              "dev_max": max(devs) if devs else 0.0,
                              "dev_mean": sum(devs) / len(devs) if devs else 0.0})
 
-    # ---- 主梁节点（预抬高表 / 成桥位移）
-    deck = sorted((n for n in model.nodes if 1000 < n.id < 2000), key=lambda n: n.x)
+    # ---- 主梁节点（预抬高表 / 成桥位移）；按几何判定，不依赖编号段 ----
+    _deck_ids = deck_node_ids(model)
+    deck = sorted((n for n in model.nodes if n.id in _deck_ids), key=lambda n: n.x)
     camber_rows = []
     for n in deck:
         dz = res["camber"].get(n.id, (0, 0, 0))[2]
@@ -459,9 +461,9 @@ def plot_elevation(model, data: dict, path: Path) -> Path:
     plt = _mpl()
     nodes = {n.id: n for n in model.nodes}
     kind_of = {t.id: t.kind for t in model.etypes}
-    deck = sorted((n for n in model.nodes if 1000 < n.id < 2000), key=lambda n: n.x)
-    towers = [[n for n in model.nodes if 2000 < n.id < 3000],
-              [n for n in model.nodes if 3000 < n.id < 4000]]
+    _deck_ids = deck_node_ids(model)
+    deck = sorted((n for n in model.nodes if n.id in _deck_ids), key=lambda n: n.x)
+    towers = tower_node_groups(model)
     cables = [(nodes[e.n1], nodes[e.n2]) for e in model.elements
               if kind_of.get(e.etype) == "CABLE"]
 
@@ -1611,9 +1613,10 @@ def collect_susp_data(*, model, info: dict, res, params: dict | None = None) -> 
     mains = [float(r["T"]) for r in chain]
     hangs = [float(r["T"]) for r in res.hangers]
 
-    deck_n = [n for n in model.nodes if 1000 < n.id < 2000]
+    _deck_ids = deck_node_ids(model)
+    deck_n = [n for n in model.nodes if n.id in _deck_ids]
     gir = list(res.girder)
-    camber_deck = [v[2] for n, v in res.camber.items() if 1000 < n < 2000]
+    camber_deck = [v[2] for n, v in res.camber.items() if n in _deck_ids]
 
     # ---- 自锚式的梁体轴向缩短 -------------------------------------------
     # 主缆锚在梁端，H 直接压进加劲梁，成桥态梁比无应力状态短 Δ = H·L/EA。
@@ -1678,6 +1681,7 @@ def collect_susp_data(*, model, info: dict, res, params: dict | None = None) -> 
         "erection_panels": int(info.get("erection_panels") or 2),
         "node_x": node_x,
         "node_z": node_z,
+        "tower_ids": {n.id for grp in tower_node_groups(model) for n in grp},
         "deck_x": [n.x for n in sorted(deck_n, key=lambda n: n.x)],
         "tables": res.tables(model),
         "checks": res.checks(model),
@@ -1710,9 +1714,11 @@ def plot_susp_frame(model, d: dict, path: Path) -> Path:
     cb = _cb(model)
     nodes = {n.id: n for n in model.nodes}
     elems = {e.id: e for e in model.elements}
-    deck = sorted((n for n in model.nodes if 1000 < n.id < 2000), key=lambda n: n.x)
-    tw1 = sorted((n for n in model.nodes if 3000 < n.id < 4000), key=lambda n: n.z)
-    tw2 = sorted((n for n in model.nodes if 4000 < n.id < 5000), key=lambda n: n.z)
+    _deck_ids = deck_node_ids(model)
+    deck = sorted((n for n in model.nodes if n.id in _deck_ids), key=lambda n: n.x)
+    _towers = tower_node_groups(model)
+    tw1 = sorted(_towers[0], key=lambda n: n.z) if len(_towers) > 0 else []
+    tw2 = sorted(_towers[1], key=lambda n: n.z) if len(_towers) > 1 else []
     shape = d.get("cable_shape") or {}
 
     def xy(nid: int) -> tuple[float, float]:
@@ -1755,7 +1761,7 @@ def plot_susp_frame(model, d: dict, path: Path) -> Path:
             solid_capstyle="butt", zorder=6, label="加劲梁")
     # 支承符号
     supp = sorted({b.node for b in model.boundaries
-                   if 1000 < b.node < 2000 and 3 in getattr(b, "dofs", ())})
+                   if b.node in _deck_ids and 3 in getattr(b, "dofs", ())})
     for nid in supp:
         x, z = nodes[nid].x, nodes[nid].z
         ax.plot([x], [z], marker="^", ms=7, color="#1f4e79", zorder=7,
@@ -1844,8 +1850,9 @@ def plot_susp_camber(model, d: dict, path: Path) -> Path:
     """图 6-1 制造线形预变形（加劲梁竖向预抬高）。"""
     plt = _mpl()
     xs, dz = [], []
+    _deck_ids = deck_node_ids(model)
     for nid in sorted(d["camber"], key=lambda n: d["node_x"].get(n, 0.0)):
-        if not (1000 < nid < 2000):
+        if nid not in _deck_ids:
             continue
         xs.append(d["node_x"].get(nid, 0.0))
         dz.append(d["camber"][nid][2] * 1000.0)
@@ -2062,15 +2069,21 @@ def _susp_sec_2(w: _Writer, model, d: dict, fig_frame: Path) -> None:
         f"{d['n_nodes']} 个节点、{d['n_elems']} 个单元、{d['dofs']} 个自由度，"
         f"其中主缆 {d['n_main']} 段、吊索 {d['n_hanger']} 根、"
         f"加劲梁 {d['n_girder']} 段。")
+    # 编号自紧凑分块切换后不再有固定号段（见 X20 接入约定 §5），表格按
+    # 组件组顺序描述，具体号码由 BlockNumbering 在建模时动态分配。
     rows = [
-        ["加劲梁", "1000+i", "100+i", "BEAM", "钢箱梁"],
-        ["主缆", "2000+k", "3000+k", "CABLE", "高强钢丝"],
-        ["桥塔（塔 1/塔 2）", "3000+m / 4000+m", "800+m / 900+m", "BEAM", "混凝土"],
-        ["吊索", "—", "6000+j", "CABLE", "高强钢丝"],
-        ["锚碇（仅地锚式）", "主缆端节点", "—", "—", "—"],
+        ["加劲梁", "第 1 组（1 起）", "第 1 组（1 起）", "BEAM", "钢箱梁"],
+        ["主缆", "第 4 组", "第 4 组", "CABLE", "高强钢丝"],
+        ["桥塔（塔 1/塔 2）", "第 2 / 3 组", "第 2 / 3 组", "BEAM", "混凝土"],
+        ["吊索", "—", "第 5 组", "CABLE", "高强钢丝"],
+        ["锚碇（仅地锚式）", "第 4 组主缆端节点", "—", "—", "—"],
     ]
     w.table("构件编号约定", ["构件", "节点号", "单元号", "单元类型", "材料"], rows,
             widths=[3.4, 3.4, 3.2, 2.4, 3.1], aligns=["l", "c", "c", "c", "l"])
+    w.note("自紧凑分块编号起，节点号与单元号各自按组件组顺序从 1 起分配："
+           "主要组按前组最大号百位取整 +1、非主要组按十位取整 +1，组内连续。"
+           "编号只是拓扑标签，不进刚度矩阵与荷载向量；上表列的是组序，"
+           "不是固定号段。")
     w.note("主缆节点在塔位处**直接使用塔顶节点**，不另建坐标相同的节点。"
            "若两者只是坐标重合而不共用，主缆就成了一根从锚碇到锚碇的自由索，"
            "塔不参与受力——求解照样收敛、位移倾角看着都像座桥，只有索力会掉到"
@@ -2224,8 +2237,9 @@ def _susp_sec_3(w: _Writer, model, d: dict) -> None:
             "拔锚碇）是常态，锚碇设计按抗拔与抗滑验算即可。因此地锚式的边跨"
             "可按常规取 1/3 主跨。")
     if d["is_self"]:
+        _deck_ids = deck_node_ids(model)
         v_anchor = [v for (n, dd), v in d["reaction"].items()
-                    if dd == 3 and 1000 < n < 2000]
+                    if dd == 3 and n in _deck_ids]
         if v_anchor:
             w.p(f"本次计算得到的梁端竖向反力最小值为 "
                 f"{_f(min(v_anchor) / 1e3, 1)} kN（负值表示需下拉）。"
@@ -2345,7 +2359,7 @@ def _susp_sec_4(w: _Writer, d: dict, *, fig_tension: Path, fig_girder: Path) -> 
 
     w.h2("4.6　桥塔内力")
     towers = sorted({n for (n, dd), _v in d["reaction"].items()
-                     if dd == 3 and 3000 < n < 5000})
+                     if dd == 3 and n in d.get("tower_ids", set())})
     w.p("塔柱轴力 = 塔顶主缆竖向分力之和 + 塔柱自重。塔顶主缆竖向分力可由"
         "主缆在该处的斜率与 H 直接得到；塔底竖向反力则直接取 4.5 节的支座"
         "反力结果。")

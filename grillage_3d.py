@@ -13,15 +13,17 @@
 - 荷载：桥面均布 q（全宽 N/m）→ 纵梁线均摊 → 节点集中力（dof=3 向下），
   梁端节点取半段。全部挂入施工阶段 1（一次性成桥）。
 
-组件分块编号（B1，统一约定见 X20_接入约定.md §5）
+组件分块编号（B1，统一约定见 X20_接入约定.md §5.1）
 ----------------------------------------------------
-下表是统一编号规范在本建造器内的落地实例，不是第二份规范；同模型内不得撞号，
-新增编号段须先登记契约 §5。
-- 默认（legacy）编号：节点 (i+1)*1000 + 序号；纵梁单元 (i+1)*100 + 序号；
-  横梁从 500 起。**默认参数下逐位不变**，不刷新 .dat 黄金基线。
-- 宽编号（wide）：n_lines ≥ 5 或总梁段数 > 99 时自动切换到
-  `NumberingPlan` 的大号段，段间留 stride，保证同一模型内不撞号；
-  阶段激活与张拉链按元素元数据查表，不再从单元号反解，见契约 §5。
+本建造器用 `block_numbering.BlockNumbering.allocate()` 分配编号（唯一入口，
+组顺序见契约 §5.2）：
+- 节点：按纵梁线逐线分配，每条线 len(xs) 个节点；
+- 单元：先逐线分配纵梁单元（每线 len(xs)-1 个），再一次性分配全部横梁
+  单元（(n_lines-1)*len(xs) 个）。
+第一个组从 1 起；后续组按数量 ≥50 / <50 分别按百位 / 十位跳转，组内连续。
+阶段激活与逐跨张拉链按元素元数据（线号+段号 / 断面 x）查表，不从单元号反解。
+编号只是标签，不进刚度矩阵与荷载向量；本次切换刷新了默认 .dat 黄金哈希
+（见契约 §5.3），力学结果不变。
 
 单位：m / N / Pa。
 """
@@ -29,8 +31,8 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 
+from block_numbering import BlockNumbering
 from model_spec_3d import (
     Boundary3D,
     Element3D,
@@ -46,61 +48,6 @@ from model_spec_3d import (
     RebarSpec3D,
     Stage3D,
 )
-
-
-@dataclass(frozen=True)
-class NumberingPlan:
-    """梁格编号方案：legacy 逐位不变，wide 自动扩容。
-
-    ``n_seg`` 是每条纵梁线的梁段数（节点序号最大 = n_seg）。三段号空间
-    互不重叠的条件：
-
-    - 节点 ``(li+1)*node_stride + i``，需 ``node_stride > n_seg``；
-    - 纵梁 ``(li+1)*elem_stride + i+1``，需 ``elem_stride > n_seg``；
-    - 横梁 ``cross_base + seq``，需 ``cross_base > n_lines*elem_stride + n_seg``。
-
-    legacy 常量是历史契约（``(li+1)*1000`` / ``(li+1)*100`` / ``500`` 起）：
-    只有 ``n_lines <= 4`` 且 ``n_seg <= 99`` 才安全，此时纵梁最大号
-    ``n_lines*100 + n_seg <= 499 < 500``。默认参数必须落在这档，否则
-    会改变既有 ``.dat`` 黄金基线（契约 §9 禁止静默换号）。
-    """
-
-    legacy: bool
-    node_stride: int
-    elem_stride: int
-    cross_base: int
-
-    def node(self, line: int, i: int) -> int:
-        return (line + 1) * self.node_stride + i
-
-    def girder(self, line: int, i: int) -> int:
-        return (line + 1) * self.elem_stride + i + 1
-
-    def cross(self, seq: int) -> int:
-        return self.cross_base + seq
-
-
-def numbering_plan(n_lines: int, n_seg: int) -> NumberingPlan:
-    """按容量选编号方案；返回对象是节点 / 单元编号的唯一入口。
-
-    不做「超限就静默换号」：`legacy` 只在默认容量内使用，`wide` 的号段
-    在 `X20_接入约定.md` §5 登记，且三段不重叠在这里硬校验。
-    """
-    if n_lines < 3 or n_seg < 1:
-        raise ValueError("编号方案要求 n_lines ≥ 3 且总梁段数 ≥ 1")
-    if n_lines <= 4 and n_seg <= 99:
-        plan = NumberingPlan(legacy=True, node_stride=1000,
-                             elem_stride=100, cross_base=500)
-    else:
-        stride = max(10000, n_seg + 2)
-        plan = NumberingPlan(legacy=False, node_stride=stride,
-                             elem_stride=stride,
-                             cross_base=(n_lines + 1) * stride)
-    if not (plan.node_stride > n_seg
-            and plan.elem_stride > n_seg
-            and plan.cross_base > n_lines * plan.elem_stride + n_seg):
-        raise ValueError("梁格编号段容量不足，无法保证单元号唯一")
-    return plan
 
 
 def box_section(B: float, h: float, tf: float, tw: float) -> dict:
@@ -216,9 +163,9 @@ def build_box_grillage_3d(
     if stage_tension_kN > 0.0:
         if not staged:
             raise ValueError("3D 梁格逐跨张拉要求 staged=True")
-        # 编号容量不再在这里硬拦：`numbering_plan()` 按 n_lines / 总梁段数
-        # 自动选 legacy 或 wide 号段，阶段激活与张拉链都按元素元数据查表。
-        # 默认参数仍走 legacy，.dat 逐位不变；扩容走 wide，无需刷新黄金基线。
+        # 编号统一走 BlockNumbering（契约 §5.1），按组件组顺序分配，
+        # 不再按 n_lines / 总梁段数切 legacy/wide；阶段激活与张拉链都按
+        # 元素元数据查表。改编号会刷新默认 .dat 哈希，力学结果不变（§5.3）。
         if not 0.0 < stage_tension_loss <= 1.0:
             raise ValueError("stage_tension_loss 必须在 (0, 1]")
         if abs(stage_tension_e) > h / 2:
@@ -242,10 +189,10 @@ def build_box_grillage_3d(
             xs.append(xs[-1] + s / n_seg)
         support_idx.append(len(xs) - 1)
     dx_mean = L_tot / (len(xs) - 1)
-    # 编号方案在节点/单元生成之前定死：默认参数落 legacy（与黄金基线逐位一致），
-    # 超出容量自动落 wide。之后所有编号都走 plan，不再散写 `*100` / `500` 起。
-    n_seg_total = len(xs) - 1
-    plan = numbering_plan(n_lines, n_seg_total)
+    # 编号统一走 BlockNumbering（契约 §5.1）：节点、单元各持一个分配器，
+    # 按组件组顺序 allocate，不散写 `*100` / `500` 之类大段常量。
+    nn = BlockNumbering()
+    en = BlockNumbering()
 
     # ---- 断面几何 ----
     box = box_section(B, h, tf, tw)
@@ -269,9 +216,10 @@ def build_box_grillage_3d(
     # ---- 纵梁线位置（对称，边线在腹板处）----
     ys = [-B / 2 + i * B / (n_lines - 1) for i in range(n_lines)]
 
-    # ---- 节点（组件分块：plan.node(线号, 序号)）----
+    # ---- 节点：按纵梁线逐线分配（组件组顺序见契约 §5.2）----
+    node_rows = [nn.allocate(len(xs)) for _ in range(n_lines)]
+    node_id = lambda li, i: node_rows[li][i]
     nodes = []
-    node_id = plan.node
     for li in range(n_lines):
         for i, x in enumerate(xs):
             nodes.append(Node3D(id=node_id(li, i), x=x, y=ys[li], z=0.0))
@@ -298,15 +246,17 @@ def build_box_grillage_3d(
         ElemTypeDef3D(id=3, kind="BEAM", mat=1, real=3),   # 支承断面横隔板
     ]
 
-    # ---- 单元：纵梁 + 横梁，编号统一走 plan，同时登记定位元数据 ----
-    # 阶段激活要按「线号 + 段号 / 断面 x」定位，不能从单元号反解：
-    # wide 号段不再是 (li+1)*100+序号，反解会静默指错单元。
+    # ---- 单元：先逐线分配纵梁单元，再一次性分配横梁单元（契约 §5.2）----
+    # 阶段激活要按「线号 + 段号 / 断面 x」定位，不从单元号反解。
+    girder_rows = [en.allocate(len(xs) - 1) for _ in range(n_lines)]
+    girder_id = lambda li, i: girder_rows[li][i]
+    cross_ids = en.allocate((n_lines - 1) * len(xs))
     elements = []
     girder_meta: list[tuple[int, int, int]] = []   # (eid, 线号, 段号)
     cross_meta: list[tuple[int, float]] = []       # (eid, 断面 x)
     for li in range(n_lines):
         for i in range(len(xs) - 1):
-            eid = plan.girder(li, i)
+            eid = girder_id(li, i)
             elements.append(Element3D(id=eid, etype=1,
                                       n1=node_id(li, i), n2=node_id(li, i + 1)))
             girder_meta.append((eid, li, i))
@@ -315,13 +265,13 @@ def build_box_grillage_3d(
     for i in range(len(xs)):
         et = 3 if i in support_set else 2    # 支承断面用横隔板刚度
         for li in range(n_lines - 1):
-            eid = plan.cross(cross_seq)
+            eid = cross_ids[cross_seq]
             elements.append(Element3D(id=eid, etype=et,
                                       n1=node_id(li, i), n2=node_id(li + 1, i)))
             cross_meta.append((eid, xs[i]))
             cross_seq += 1
     if len({e.id for e in elements}) != len(elements):
-        raise ValueError("梁格单元编号重复：编号方案容量不足，请核对契约 §5 号段")
+        raise ValueError("梁格单元编号重复：请核对契约 §5.1 分配器")
 
     # ---- 边界：双支座 + 一个纵向固定点 ----
     boundaries = []
@@ -354,8 +304,8 @@ def build_box_grillage_3d(
         stages = []
         for k in range(len(spans)):
             act = []
-            # 按元数据定位（不再 `e.id < 500` 反解）；顺序仍是先纵梁后横梁，
-            # 与旧实现一致 → legacy 默认 .dat 的 ACTIVE= 逐位不变。
+            # 按元数据定位（不再从单元号反解）；顺序仍是先纵梁后横梁，
+            # ACTIVE= 顺序与旧实现一致，仅编号数值按 §5.1 变化。
             for eid, _li, i in girder_meta:
                 xm = (xs[i] + xs[i + 1]) / 2
                 if span_of_x(xm) == k:
@@ -381,15 +331,15 @@ def build_box_grillage_3d(
                         loads_k.append(NodalLoad3D(node=node_id(li, i), dof=3,
                                                    value=-q_line * w))
             # 逐跨张拉：本跨每条纵梁线各挂一束直线/曲线筋。链用
-            # `plan.girder(li, i)` 取号（i 从本跨左支承断面到前一格），
-            # legacy/wide 都对；这些单元在同一阶段激活、首尾相接成开链，
+            # `girder_id(li, i)` 取号（i 从本跨左支承断面到前一格），
+            # 这些单元在同一阶段激活、首尾相接成开链，
             # 内核的 PRESTRESS= 链校验才过。
             ps_list = []
             if stage_tension_kN > 0.0:
                 act_set = set(act)
                 i0, i1 = support_idx[k], support_idx[k + 1]
                 for li in range(n_lines):
-                    chain = [plan.girder(li, i) for i in range(i0, i1)]
+                    chain = [girder_id(li, i) for i in range(i0, i1)]
                     missing = [eid for eid in chain if eid not in act_set]
                     if missing or len(chain) < 1:
                         raise ValueError(

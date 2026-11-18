@@ -968,7 +968,7 @@ class ModelDoc:
         if errs := doc.validate():
             ...
         doc.to_dat()                       # 交给 FEM-Eigen
-        doc.capability()["anastruct"]      # 能否本地草算
+        doc.capability()["fem_eigen"]       # 内核是否可用
     """
 
     def __init__(self, kind: str, params: dict[str, Any] | None = None,
@@ -1810,7 +1810,7 @@ class ModelDoc:
         from fem_eigen_export import fem_eigen_available
 
         if self.is_3d:
-            # 三维只有一条路：三维内核。没有 anastruct 草算，也没有第三方互校。
+            # 三维只有一条路：三维内核，不做草算也不做第三方互校。
             try:
                 from solver_3d import capabilities, detect_kind
 
@@ -1829,10 +1829,8 @@ class ModelDoc:
                 # 文档层不再自己拼 exe 路径（少一处硬编码补位）。
                 ok3d = bool(capabilities().get("stage_nl"))
             return {
-                "anastruct": False,
                 "fem_eigen": ok3d,          # 实际内核是否可用
                 "matplotlib": False,
-                "cross_check": False,
                 "solve3d": ok3d,
                 "cable": has_cable,
                 "nonlinear": nonlinear,
@@ -1843,11 +1841,8 @@ class ModelDoc:
         from solve_2d import modal_solver_available, solve_2d_available
 
         return {
-            "anastruct": is_beam,          # anastruct 只有梁单元
             "fem_eigen": fem,
             "matplotlib": is_beam,         # 截面/变形/弯矩图只对梁画
-            # 互校的前提：梁（两边都能算）且不计自重（anastruct 无重力项）
-            "cross_check": is_beam and fem and not self.params.get("self_weight", False),
             "solve3d": False,
             # 二维桥型（梁桥/拱桥/桁架）走 solve_2d 链：施工阶段 + 车道 + 组合
             "solve2d": (not is_beam) and solve_2d_available(),

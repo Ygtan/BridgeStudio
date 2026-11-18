@@ -5,7 +5,7 @@
 2. 桥路径的 .dat 与直接调建造器**逐字节相同**；
 3. 改参数后拓扑真的重建（C 方案的核心承诺，不是把模型冻住）；
 4. 工程文件可存可读，往返不丢参数；
-5. capability() 如实反映能力边界（尤其"计入自重就不能互校"）。
+5. capability() 如实反映能力边界（只报 FEM-Eigen 内核，不再声明草算/互校）。
 """
 
 from __future__ import annotations
@@ -122,18 +122,13 @@ def t_validate():
 def t_capability():
     beam, _, _ = ModelDoc.from_text(BEAM_TXT)
     cap = beam.capability()
-    check("能力：梁可草算+可互校",
-          cap["anastruct"] and cap["cross_check"], str(cap))
-
-    beam.params["self_weight"] = True
-    beam.build()
-    check("能力：计自重后关掉互校",
-          beam.capability()["cross_check"] is False, "anastruct 无重力项")
+    check("能力：梁可走 FEM-Eigen", cap["fem_eigen"] is True, str(cap))
+    check("能力：不再声明草算/互校",
+          "anastruct" not in cap and "cross_check" not in cap, str(cap))
 
     arch, _, _ = ModelDoc.from_text("跨度100米的拱桥，矢高20米")
     cap_a = arch.capability()
-    check("能力：桥只能走 FEM-Eigen",
-          cap_a["anastruct"] is False and cap_a["fem_eigen"] is True, str(cap_a))
+    check("能力：桥只能走 FEM-Eigen", cap_a["fem_eigen"] is True, str(cap_a))
 
 
 def t_classify():

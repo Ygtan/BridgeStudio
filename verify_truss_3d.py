@@ -93,17 +93,40 @@ def main() -> int:
           f"{len(info['lat_elems'])}")
 
     # 支座：左端两片纵向固定、右端释放纵向 u；上弦两端各锁一个横向 y。
+    # 按几何位置定位，不依赖节点号——紧凑分块后旧的 1/201/9/209/101/301
+    # 等大段编号已全部失效（编号只是拓扑标签，见 X20 契约 §5.1）。
+    half = info["width"] / 2.0
+    panel = info["panel"]
+    n_panel = info["n_panel"]
+
+    def nid(x: float, y: float, z: float) -> int:
+        hits = [n.id for n in m.nodes
+                if abs(n.x - x) < 1e-6 and abs(n.y - y) < 1e-6
+                and abs(n.z - z) < 1e-6]
+        if len(hits) != 1:
+            raise AssertionError(f"几何点 ({x},{y},{z}) 命中 {hits}")
+        return hits[0]
+
+    loL0 = nid(0.0, -half, 0.0)
+    loR0 = nid(0.0, +half, 0.0)
+    loLe = nid(info["span"], -half, 0.0)
+    loRe = nid(info["span"], +half, 0.0)
+    upL0 = nid(panel / 2.0, -half, info["depth"])
+    upR0 = nid(panel / 2.0, +half, info["depth"])
+    upLe = nid((n_panel - 0.5) * panel, -half, info["depth"])
+    upRe = nid((n_panel - 0.5) * panel, +half, info["depth"])
+
     bs = {b.node: b.dofs for b in m.boundaries}
-    check("左端左片 u/v/w + 左端右片 u/v/w",
-          bs.get(1) == (1, 3) and bs.get(201) == (1, 3),
-          f"{bs.get(1)} / {bs.get(201)}")
+    check("左端两片 u/v/w",
+          bs.get(loL0) == (1, 3) and bs.get(loR0) == (1, 3),
+          f"{bs.get(loL0)} / {bs.get(loR0)}")
     check("右端两片释放纵向（v/w）",
-          bs.get(9) == (2, 3) and bs.get(209) == (2, 3),
-          f"{bs.get(9)} / {bs.get(209)}")
+          bs.get(loLe) == (2, 3) and bs.get(loRe) == (2, 3),
+          f"{bs.get(loLe)} / {bs.get(loRe)}")
     check("上弦两端各锁横向 y（门架/端横联）",
-          bs.get(101) == (2, 2) and bs.get(301) == (2, 2)
-          and bs.get(108) == (2, 2) and bs.get(308) == (2, 2),
-          f"{bs.get(101)} / {bs.get(108)}")
+          bs.get(upL0) == (2, 2) and bs.get(upR0) == (2, 2)
+          and bs.get(upLe) == (2, 2) and bs.get(upRe) == (2, 2),
+          f"{bs.get(upL0)} / {bs.get(upLe)}")
 
     # ---------------------------------------------------------------- 2 意图
     print("\n[2] 自然语言识别")

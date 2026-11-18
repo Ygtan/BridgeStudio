@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from cable_stayed_3d import build_cable_stayed_3d, cable_break_load
 from fem_eigen_cable import cable_solver_available, solve_cable_bridge
 from model_spec_3d import CableBridge3D
+from result_3d import deck_node_ids
 
 RESULTS: list[tuple[bool, str, str]] = []
 
@@ -126,7 +127,8 @@ def main() -> int:
 
     # camber 与 u 互为反号
     cam, u = res["camber"], res["u"]
-    dz_pairs = [(cam[n][2], u.get((n, 3), 0.0)) for n in cam if 1000 < n < 2000]
+    _deck_ids = deck_node_ids(m)
+    dz_pairs = [(cam[n][2], u.get((n, 3), 0.0)) for n in cam if n in _deck_ids]
     worst_rev = max(abs(a + b) for a, b in dz_pairs)
     zmax = max(abs(a) for a, _ in dz_pairs)
     check("成桥位移 = −预抬高", worst_rev < 1e-6,
@@ -134,7 +136,7 @@ def main() -> int:
 
     # 制造线形 + 成桥位移 = 设计线形（设计 z 全为 0）
     worst_z = max(abs(res["erected"][n][2] + u.get((n, 3), 0.0))
-                  for n in res["erected"] if 1000 < n < 2000)
+                  for n in res["erected"] if n in _deck_ids)
     check("制造标高 + 成桥位移 = 设计标高", worst_z < 1e-6,
           f"max 残差 {worst_z:.2e} m")
 

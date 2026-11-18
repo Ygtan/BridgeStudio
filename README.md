@@ -51,7 +51,8 @@ X20 原型只作**器官库**，不做骨架、不做数据源。三条铁律（
 ## 融合来源（两版前处理器优缺点结论）
 
 - **NL-FE（骨架）**：ModelDoc 统一外壳、规则+LLM 双通道、单位哨兵、
-  8 个 verify 回归脚本约 150 项断言、anastruct 交叉校验。
+  8 个 verify 回归脚本约 150 项断言、FEM-Eigen 内核独立回归；
+  界面已移除 anastruct 草算与互校，开发期仍保留 anastruct 作独立 oracle。
 - **X20（器官库）**：5 种桥型建造器（含斜拉/悬索/组合体系）、BEAM/TRUSS/CABLE
   2D/3D 六种单元表达、组件分块编号规范（SKILL.md）、ANSYS/Abaqus/MIDAS/自研
   四格式导出器、严格 validate_model。
@@ -79,7 +80,8 @@ cd /d D:\AI-work\BridgeStudio
 C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe run app.py
 ```
 
-依赖见 `requirements.txt`（streamlit / anastruct / matplotlib / pydantic / numpy）。
+依赖见 `requirements.txt`（运行依赖：streamlit / matplotlib / pydantic / numpy；
+anastruct 仅用于开发期独立校验 oracle，界面运行时不加载）。
 无 DeepSeek API Key 时自动走规则解析，完全离线可用。
 
 ## 路线图
@@ -439,16 +441,15 @@ C:\Users\Thinkpad\.workbuddy\binaries\python\envs\default\Scripts\streamlit.exe 
       `solve()` 用同源中文文案拒绝。`verify_combo_system.py` **86/86**
       锁住拒绝路径、正常语料不误伤、注册表仍是 4 键、12 格默认 `.dat`
       逐位不变。契约 §7 `B2` 仍如实标「部分」—— 2026-11-10
-- [x] **P1 梁格编号容量放开，默认 `.dat` 逐位不变**：`grillage_3d.numbering_plan()`
-      按 `n_lines` / 总梁段数自动选 legacy（默认容量，黄金基线原样）或
-      wide（`S=max(10000, 段数+2)`，三段不重叠硬校验）号段；阶段激活与
-      张拉链改按元素元数据查表，不再 `e.id < 500` 反解。顺带校正契约 §5
-      与模块头陈旧的斜拉塔单元号段（200/300 → 800/900）。12 格默认 `.dat`
-      的 sha256 黄金哈希在 `verify_stage_tension_3d.py::DEFAULT_DAT_SHA`；
-      wide 的节点/单元唯一、阶段覆盖、张拉链引用与 live
-      `N = −P·loss/n_lines` 全绿。**未改任何默认输出行，`dat_byte_regression`
-      37/37 基线无需刷新**；能力矩阵 §4 缺口由 5 条减为 4 条并留闭环记录
-      —— 2026-11-10
+- [x] **P1 全部建造器切换紧凑分块编号，默认 `.dat` 哈希已刷新**：唯一分配入口
+      `block_numbering.BlockNumbering.allocate()`；节点与单元各自按组件组顺序
+      分配，首组从 1 起，后续组数量 ≥50 按百位 +1 起、<50 按十位 +1 起，组内
+      连续（规则与组顺序见 `X20_接入约定.md` §5.1/§5.2）。阶段激活与张拉链按
+      元素元数据查表，不再从单元号反解。12 格默认 `.dat` 的 sha256 黄金哈希
+      已在 `verify_stage_tension_3d.py::DEFAULT_DAT_SHA` 按新字节刷新；
+      wide 的唯一性/阶段覆盖/张拉链/live `N = −P·loss/n_lines` 全绿。**只改编号
+      标签、不改力学输出行，`dat_byte_regression` 37/37 基线不受影响**；能力矩阵
+      §4 缺口由 5 条减为 4 条并留闭环记录 —— 2026-11-18
 - [x] **P4 前半：3D 活载包络结构云图**（纯展示层，零内核改动、零 `.dat` 改动）。
       新增 `envelope_3d.py` 作两套内核口径的唯一真源：线性梁格读
       `live_beam`（My/Vz，`live beam envelope`），索承体系读 `girder_live`

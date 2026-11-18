@@ -377,6 +377,8 @@ def run_fem_eigen(
     exe_viz: str | None = None,
     make_svg: bool = True,
     timeout: float | None = 120.0,
+    show_node_labels: bool = True,
+    show_elem_labels: bool = False,
 ) -> dict:
     """
     把 .dat 交给 FEM-Eigen：跑数值求解（.result）+ 可选出图（.svg）。
@@ -390,6 +392,11 @@ def run_fem_eigen(
     沿用本函数"不抛异常、用 ok 标志说话"的既有契约：超时不抛，而是把
     原因写进 stdout 并置 `timed_out=True`，界面照常显示日志。
     传 `timeout=None` 可关掉限制（批处理里跑超大模型时用）。
+
+    **编号显示**：`show_node_labels`（默认 True，保持旧行为）与
+    `show_elem_labels`（默认 False，新增不污染旧图）只透传给
+    `example_viz.exe` 的 `--node-labels=1|0` / `--elem-labels=1|0`，
+    不改 `.dat`、`.result` 或任何冻结证据；旧 exe 忽略未知参数仍可出图。
     """
     dat_path = Path(dat_path)
     tmp = None
@@ -407,10 +414,12 @@ def run_fem_eigen(
                   "timed_out": False}
     logs = []
 
-    def _run(exe: Path, label: str):
+    def _run(exe: Path, label: str, extra: tuple[str, ...] = ()):
         """跑一个子进程；超时返回 None 并把原因记进 logs。"""
         try:
-            return subprocess.run([str(exe), work_dat.name], cwd=str(workdir),
+            cmd = [str(exe), work_dat.name]
+            cmd.extend(extra)
+            return subprocess.run(cmd, cwd=str(workdir),
                                   capture_output=True, text=True,
                                   encoding="utf-8", errors="replace",
                                   timeout=timeout)
@@ -439,7 +448,11 @@ def run_fem_eigen(
     if make_svg and not info["timed_out"]:
         exe_v = _find_exe(EXE_VIZ_CANDIDATES, exe_viz, "viz")
         if exe_v:
-            p = _run(exe_v, "出图")
+            viz_flags = (
+                f"--node-labels={1 if show_node_labels else 0}",
+                f"--elem-labels={1 if show_elem_labels else 0}",
+            )
+            p = _run(exe_v, "出图", extra=viz_flags)
             if p is not None:
                 logs.append(p.stdout or "")
                 info["svgs"] = sorted(workdir.glob(f"{dat_path.stem}_*.svg"))

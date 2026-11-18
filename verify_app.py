@@ -21,6 +21,8 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
+from result_3d import deck_node_ids
+
 PASS: list[tuple[str, bool, str]] = []
 
 # AppTest 的墙钟超时是**环境性**的：机器休眠、后台调度、首次冷启动都可能让
@@ -152,13 +154,22 @@ def main() -> int:
 
     print("\n[首次加载]")
     check("无异常", not _errors(at), _errors(at)[:1])
-    _marks = "①②③④⑤"
-    check("区块①②③④⑤齐全",
+    _marks = "①②③④"
+    check("区块①②③④齐全",
           all(any(m in s for s in [s.value for s in at.subheader]) for m in _marks),
           _subs(at)[:60])
     check("默认模型是单梁", at.session_state["doc"].kind == "beam",
           at.session_state["doc"].summary()["title"])
     check("默认不显示三维区块", "模型与求解" not in _subs(at))
+
+    # SVG 编号开关 + 调试 JSON 展示块（前处理界面整改）
+    _cb_labs = [c.label for c in at.checkbox]
+    check("图中节点编号开关存在", any("图中显示节点编号" in s for s in _cb_labs),
+          str(_cb_labs)[:80])
+    check("图中单元编号开关存在", any("图中显示单元编号" in s for s in _cb_labs))
+    _exp_labs = [e.label for e in at.expander]
+    check("结构化模型 JSON 展示块已移除",
+          not any("查看结构化模型" in s for s in _exp_labs))
 
     # ---- 建模后导出：单梁 ModelSpec 专用 APDL 链（旧契约链不再无出口）----
     _eb1 = next((b for b in at.button if b.key == "e2d_export_btn"), None)
@@ -182,8 +193,9 @@ def main() -> int:
     check("无异常", not _errors(at), _errors(at)[:1])
     check("类型切换为 arch", at.session_state["doc"].kind == "arch",
           at.session_state["doc"].summary()["lines"][0][:36])
-    _info = " ".join(str(i.value) for i in at.info)
-    check("④提示走FEM", "FEM-Eigen" in _info, "桥型无草算")
+    check("④区为 FEM-Eigen 求解",
+          any("FEM-Eigen" in s.value for s in at.subheader),
+          "桥型走 FEM-Eigen 单内核")
 
     # ---- 建模后导出：2D 桥型平行导出链 ----
     _eb2 = next((b for b in at.button if b.key == "e2d_export_btn"), None)
@@ -229,7 +241,7 @@ def main() -> int:
     check("荷载值 50 未被污染",
           abs(at.session_state["doc"].params["loads"][0]["value"] - 50.0) < 1e-6,
           f"value={at.session_state['doc'].params['loads'][0]['value']}")
-    check("⑤二维求解按钮存在", bool([b for b in at.button if "FEM-Eigen" in b.label]))
+    check("④二维求解按钮存在", bool([b for b in at.button if "FEM-Eigen" in b.label]))
 
     # ============================================================ 三维
     print("\n[三维 · 梁格]")
@@ -239,7 +251,7 @@ def main() -> int:
           at.session_state["doc"].kind == "beam_bridge"
           and at.session_state["doc"].dimension == "3d", _subs(at)[:50])
     check("出现三维区块", "模型与求解 · 梁桥（三维）" in _subs(at), _subs(at)[:80])
-    check("二维区块⑤不再出现", "FEM-Eigen 二维求解" not in _subs(at))
+    check("二维区块④不再出现", "FEM-Eigen 二维求解" not in _subs(at))
 
     _btn = next((b for b in at.button if b.key == "r3d_solve"), None)
     check("三维求解按钮存在", _btn is not None)
@@ -454,7 +466,8 @@ def main() -> int:
             _bad = [c.name for c in _r.checks(at.session_state["doc"].model)
                     if not c.passed]
             check("工程校核全通过", not _bad, "、".join(_bad))
-            _cam = [n for n in _r.camber if 1000 < n < 2000]
+            _deck_ids = deck_node_ids(at.session_state["doc"].model)
+            _cam = [n for n in _r.camber if n in _deck_ids]
             check("预抬高含梁节点", len(_cam) > 40, f"{len(_cam)} 个节点")
             check("明细表含索表与制造线形",
                   {"cable_table", "camber_table"} <= set(_r.tables(
@@ -588,7 +601,7 @@ def main() -> int:
     _exbtn(at, "梁 · 简支钢梁").click().run()
     check("无异常", not _errors(at), _errors(at)[:1])
     check("类型回到 beam", at.session_state["doc"].kind == "beam", _subs(at)[:50])
-    check("⑤二维区块回来了", "FEM-Eigen 二维求解" in _subs(at), _subs(at)[:80])
+    check("④二维区块回来了", "FEM-Eigen 二维求解" in _subs(at), _subs(at)[:80])
     check("三维区块消失", "模型与求解" not in _subs(at))
 
     n_pass = sum(1 for _, ok, _ in PASS if ok)

@@ -220,7 +220,11 @@ def validate(modal: dict[str, Any], f1_vertical: float | None = None,
             break
     if f1_vertical and f1_vertical > 0.0:
         hit = min(fs, key=lambda f: abs(f - f1_vertical)) if fs else 0.0
-        if abs(hit - f1_vertical) / f1_vertical > tol:
+        # f1_vertical 由内核按 6 位小数写进车道影响线段，模态频率则保留完整
+        # 精度：同源的两个数天然有 ≤ 5e-7 Hz 的打印截断误差。判据取
+        # 「绝对 1e-5 Hz（20 倍余量）或 tol·f1 取大」，既能吸收截断，又能
+        # 拦住真正不同源（频率差远大于此）的情况——不因打印精度误报 warn。
+        if abs(hit - f1_vertical) > max(1e-5, tol * f1_vertical):
             issues.append(f"冲击系数基频 f1_vertical={f1_vertical:.6g} Hz 不在"
                           f"模态频率序列里（最近 {hit:.6g} Hz），两套结果不同源")
     return issues

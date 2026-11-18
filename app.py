@@ -6,15 +6,15 @@ C 方案改造后的界面结构：**一条输入，六种结构，两条内核�
     ② 参数面板（按当前类型的字段元数据自动渲染）
     ── 二维链路 ──────────────────────────────────────
     ③ 模型（梁：截面图 + 模型图；桥：节点单元简图）
-    ④ 计算结果（梁：anastruct 草算；桥：指向⑤）
-    ⑤ FEM-Eigen 二维求解与可视化（7 张 SVG）
+    ④ FEM-Eigen 二维求解与可视化（7 张 SVG）
+    ⑤ 施工阶段与规范组合（JTG D60）
     ── 三维链路（ui_3d.py）───────────────────────────
     ③④ 模型与求解（SolveResult：指标卡 / 工程校核 / 图 / 明细表 / 计算书）
 
 与改造前的关键差别：
 - 界面不持有 ModelSpec / ModelSpec3D / BridgeSpec，只持有 `ModelDoc`；
-- "能不能草算""有没有互校""走哪个内核"由 `doc.capability()` 与
-  `doc.solve()` 自述，界面里没有 `if 是梁格 / if 是斜拉桥`；
+- "走哪个内核"由 `doc.capability()` 与 `doc.solve()` 自述，
+  界面里没有 `if 是梁格 / if 是斜拉桥`；
 - 三维结果统一是 `SolveResult`（result_3d.py），界面/Word/CSV 共用一份。
 
 运行：streamlit run app.py
@@ -30,14 +30,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import streamlit as st
 
-from fe_solver import solve
 from llm_parser import LLMConfig, probe
 from model_doc import DIM_LABELS, KIND_LABELS, ModelDoc
 from viz import (
     draw_bridge_geometry,
-    draw_deformed,
     draw_model,
-    draw_moment,
     draw_section_fig,
 )
 
@@ -421,15 +418,7 @@ if doc.is_3d:
     import ui_3d
 
     ui_3d.render(doc)
-    st.stop()          # 三维没有 anastruct 草算与 2D 七张 SVG，后面的区块不适用
-
-# 单梁：anastruct 草算（便宜，每次 rerun 都算）；桥型没有这个能力
-_ana = None
-if _cap["anastruct"]:
-    try:
-        _ana = solve(doc.model)
-    except Exception as _e:
-        st.error(f"anastruct 求算失败：{_e}")
+    st.stop()          # 三维走 ui_3d 独立分支，后面的 2D 区块不适用
 
 # ---------------------------------------------------------------- ③ 模型
 st.subheader("③ 模型")
@@ -498,10 +487,11 @@ if _cap["matplotlib"]:
         _fig = draw_section_fig(doc.model)
         st.pyplot(_fig)
         plt.close(_fig)
-        if _ana is not None:
-            st.markdown("**截面属性**")
-            st.write(f"面积 A = {_ana['props']['A']:.4f} m²")
-            st.write(f"惯性矩 I = {_ana['props']['I']:.5e} m⁴")
+        from section_lib import section_properties as _section_properties
+        _props = _section_properties(doc.model.section)
+        st.markdown("**截面属性**")
+        st.write(f"面积 A = {_props['A']:.4f} m²")
+        st.write(f"惯性矩 I = {_props['I']:.5e} m⁴")
     with _mcol:
         _fig = draw_model(doc.model)
         st.pyplot(_fig)
@@ -512,49 +502,10 @@ else:
     plt.close(_fig)
 
 st.text("\n".join(doc.summary()["lines"]))
-with st.expander("查看结构化模型（ModelDoc → params）"):
-    st.json(doc.to_dict())
 
 
-# ---------------------------------------------------------------- ④ 结果
-st.subheader("④ 计算结果")
-if _ana is not None:
-    _spec = doc.model
-    _total = sum(
-        (ld.value * (ld.end - ld.start if ld.end is not None else _spec.length))
-        if ld.type == "udl" else ld.value
-        for ld in _spec.loads
-    )
-    # 支座对梁的力 = -Fy
-    _reac = -sum(v.get("Fy", 0) for v in _ana["reactions"].values()) / 1000.0
-
-    _k1, _k2, _k3, _k4 = st.columns(4)
-    _k1.metric("最大挠度", f"{_ana['max_deflection'] * 1000:.2f} mm")
-    _k2.metric("最大弯矩", f"{_ana['max_moment'] / 1000:.1f} kN·m")
-    _k3.metric("总竖向荷载", f"{_total:.1f} kN")
-    _k4.metric("支座反力合计", f"{_reac:.1f} kN")
-    st.caption(
-        f"平衡校验：荷载合计 {_total:.1f} kN ≈ 反力合计 {_reac:.1f} kN"
-        f"（差异 {abs(_total - _reac):.2f} kN）"
-    )
-
-    _d1, _d2 = st.columns(2)
-    with _d1:
-        _fig = draw_deformed(_spec, _ana)
-        st.pyplot(_fig)
-        plt.close(_fig)
-    with _d2:
-        _fig = draw_moment(_spec, _ana)
-        st.pyplot(_fig)
-        plt.close(_fig)
-else:
-    st.info(
-        "**桥型模型只走 FEM-Eigen**（anastruct 没有索/桁架单元），"
-        "请在下方 ⑤ 求解后查看结果。"
-    )
-
-# ---------------------------------------------------------------- ⑤ FEM-Eigen
-st.subheader("⑤ FEM-Eigen 二维求解与可视化")
+# ---------------------------------------------------------------- ④ FEM-Eigen
+st.subheader("④ FEM-Eigen 二维求解与可视化")
 
 if not _cap["fem_eigen"]:
     st.warning(
@@ -568,6 +519,16 @@ else:
 
     _dat_now = doc.to_dat()
 
+    # SVG 编号显示：只影响出图，不改 .dat / .result / 冻结证据。
+    _vncol, _vecol = st.columns(2)
+    _show_node_no = _vncol.checkbox(
+        "图中显示节点编号", value=True, key="viz_node_labels",
+        help="模型图/位移图/弯矩图/剪力图/轴力图/应力图统一开关；改后需重新点下方求解。")
+    _show_elem_no = _vecol.checkbox(
+        "图中显示单元编号（E 前缀）", value=False, key="viz_elem_labels",
+        help="默认关闭。单元号用蓝色 E+编号 标在单元中点，与黑色节点号区分。")
+    _viz_fp = f"{int(_show_node_no)}{int(_show_elem_no)}"
+
     if st.button("导出 .dat 并调用 FEM-Eigen 求解", type="primary"):
         _outdir = Path("out/gui_run")
         _outdir.mkdir(parents=True, exist_ok=True)
@@ -575,10 +536,13 @@ else:
         _dat_path.write_text(_dat_now, encoding="utf-8")
         with st.spinner("FEM-Eigen 求解中…"):
             try:
-                _info = run_fem_eigen(_dat_path, workdir=_outdir)
+                _info = run_fem_eigen(_dat_path, workdir=_outdir,
+                                      show_node_labels=_show_node_no,
+                                      show_elem_labels=_show_elem_no)
                 st.session_state.fe_result = {
                     "dat_text": _dat_now,
                     "dat_path": str(_dat_path),
+                    "viz_fp": _viz_fp,
                     "result": str(_info["result"]) if _info["result"] else None,
                     "svgs": [str(x) for x in _info["svgs"]],
                     "stdout": _info["stdout"],
@@ -589,62 +553,35 @@ else:
                 st.error(f"FEM-Eigen 求解失败：{_e}")
 
     _fr = st.session_state.get("fe_result")
-    _stale = bool(_fr) and _fr.get("dat_text") != _dat_now
+    # 旧缓存没有 viz_fp，按默认「显示节点号、不显示单元号」(10) 处理。
+    _stale = bool(_fr) and (_fr.get("dat_text") != _dat_now
+                           or _fr.get("viz_fp", "10") != _viz_fp)
 
     if _fr and _stale:
-        st.warning("模型参数已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
+        st.warning("模型参数或编号显示选项已修改，下方结果来自上一次求解，已隐藏。请重新点上方按钮。")
 
     if _fr and not _stale and not _fr["ok"]:
         st.error("FEM-Eigen 未产出任何结果，请查看下方日志。")
         st.code(_fr["stdout"][-2000:] or "（无输出）", language="text")
 
     if _fr and not _stale and _fr["ok"]:
-        # --- 与 anastruct 交叉比对（仅单梁且不计自重）---
-        # anastruct 侧没有重力项：勾了自重还去比，会得到几百个百分点的
-        # "假误差"（实测 277%），毫无意义。capability() 已经把这个条件算好了。
-        if _cap["cross_check"] and _fr["result"] and _ana is not None:
-            try:
-                _rr = parse_result(_fr["result"])
+        # --- FEM-Eigen 单内核结果（已移除 anastruct 草算交叉比对）---
+        try:
+            _rr = parse_result(_fr["result"]) if _fr["result"] else None
+            if _rr:
                 _v_fem = min((n["v"] for n in _rr["nodes"].values()), default=0.0)
                 _m_fem = max((max(abs(e["M1"]), abs(e["M2"]))
                               for e in _rr["elements"].values()), default=0.0)
-                # FEM-Eigen 反力以 +y 向上为正，与向下荷载直接平衡，不取负
                 _r_fem = sum(v["value"] for v in _rr["reactions"].values()
                              if v["dof"] == 2)
-                _m_ana = abs(_ana["max_moment"])
-                _v_ana = _ana["max_deflection"]
-                _dm = abs(_m_fem - _m_ana) / _m_ana * 100 if _m_ana else 0.0
-                _dv = abs(_v_fem - _v_ana) / abs(_v_ana) * 100 if _v_ana else 0.0
-
                 _c1, _c2, _c3, _c4 = st.columns(4)
-                _c1.metric("FEM 最大挠度", f"{_v_fem * 1000:.3f} mm", f"草算差 {_dv:.4f}%")
-                _c2.metric("FEM 最大弯矩", f"{_m_fem / 1000:.2f} kN·m", f"草算差 {_dm:.4f}%")
-                _c3.metric("FEM 反力合计", f"{_r_fem / 1000:.2f} kN")
-                _c4.metric("与草算最大差异", f"{max(_dm, _dv):.4f} %")
-                st.caption(
-                    "两个独立求解器（Python/anastruct 与 C++/Eigen）在同一模型上互校，"
-                    "差异主要来自网格密度，通常 < 0.05%。"
-                )
-            except Exception as _e:
-                st.warning(f"结果解析失败（SVG 仍可用）：{_e}")
-        elif not _cap["cross_check"]:
-            # 桥型：只有一个内核，别让人误以为也校验过了
-            try:
-                _rr = parse_result(_fr["result"]) if _fr["result"] else None
-                if _rr:
-                    _v_fem = min((n["v"] for n in _rr["nodes"].values()), default=0.0)
-                    _m_fem = max((max(abs(e["M1"]), abs(e["M2"]))
-                                  for e in _rr["elements"].values()), default=0.0)
-                    _r_fem = sum(v["value"] for v in _rr["reactions"].values()
-                                 if v["dof"] == 2)
-                    _c1, _c2, _c3, _c4 = st.columns(4)
-                    _c1.metric("最大挠度", f"{_v_fem * 1000:.3f} mm")
-                    _c2.metric("最大弯矩", f"{_m_fem / 1000:.2f} kN·m")
-                    _c3.metric("支反力合计", f"{_r_fem / 1000:.2f} kN")
-                    _c4.metric("单元数", f"{len(_rr['elements'])}")
-                    st.caption("本模型只走 FEM-Eigen 单内核，无交叉校验（如实标注）。")
-            except Exception as _e:
-                st.warning(f"结果解析失败（SVG 仍可用）：{_e}")
+                _c1.metric("最大挠度", f"{_v_fem * 1000:.3f} mm")
+                _c2.metric("最大弯矩", f"{_m_fem / 1000:.2f} kN·m")
+                _c3.metric("支反力合计", f"{_r_fem / 1000:.2f} kN")
+                _c4.metric("单元数", f"{len(_rr['elements'])}")
+                st.caption("结果来自 FEM-Eigen 单内核；anastruct 草算与交叉比对已移除。")
+        except Exception as _e:
+            st.warning(f"结果解析失败（SVG 仍可用）：{_e}")
 
         # --- SVG ---
         st.markdown("**FEM-Eigen 生成的可视化**")
@@ -664,11 +601,11 @@ else:
             st.code(_fr["dat_text"], language="text")
             st.code(_fr["stdout"][-1500:] or "（无输出）", language="text")
 
-# ---------------------------------------------------------------- ⑥ 施工阶段 + 规范组合
+# ---------------------------------------------------------------- ⑤ 施工阶段 + 规范组合
 # 档二：二维桥型的施工阶段正装 + 车道活载 + JTG D60 组合（solve_2d 链）。
 # 只有桥型（非单梁）才进这里；三维桥走 ui_3d 的 SolveResult，不经过本段。
 if doc.kind != "beam" and _cap.get("solve2d"):
-    st.subheader("⑥ 施工阶段与规范组合（JTG D60）")
+    st.subheader("⑤ 施工阶段与规范组合（JTG D60）")
     st.caption(
         "二维施工正装（`example_stage.exe`）→ 成桥态累计内力 + 车道活载影响线"
         "包络（`example_influence.exe`）→ 基本/频遇/准永久三种组合。"

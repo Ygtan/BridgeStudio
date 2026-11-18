@@ -17,9 +17,9 @@ BridgeStudio 却既没有建造器参数、也没有控件，用户只能手写 
    自平衡轴压力对，全宽 P 按 n_lines 均分），loss / e / s 各自生效。
 4. 结果→报告：`SolveResult.stage_prestress`、`stage_prestress_table` 明细表、
    两条工程校核、报告「施工阶段预应力」专章与 HTML 出口同源。
-5. 编号容量：默认参数走 legacy 号段（与改动前 `.dat` 逐位一致，不刷新
-   黄金基线）；`n_lines ≥ 5` 或总梁段数 > 99 自动切 wide 大号段，节点/单元
-   号唯一、张拉链引用完整，live 闭式解仍是 ``−P·loss/n_lines``。
+5. 编号：全部建造器统一走紧凑分块（契约 §5.1），默认 `.dat` 黄金哈希
+   已按新字节刷新；各宽参数下节点/单元号唯一、张拉链引用完整，
+   live 闭式解仍是 ``−P·loss/n_lines``。
 
 理论口径：等效荷载法把 Pe=P·loss 换成轴向缩短与端部偏心弯矩（曲线筋再加
 跨内均布与锚固竖向力），不是 TENDON 的筋-混凝土协同，也不含 JTG 3362
@@ -38,8 +38,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from block_numbering import BlockNumbering
 from fem_eigen_3d import fem_eigen_3d_available, solve_3d
-from grillage_3d import build_box_grillage_3d, numbering_plan
+from grillage_3d import build_box_grillage_3d
 from model_doc import BUILDERS, DEFAULTS, ModelDoc
 from model_spec_3d import validate_model_3d
 
@@ -79,7 +80,7 @@ def prestress_tokens(dat: str, sid: int) -> list[str]:
 
 
 def longitudinal_elements(m) -> list[int]:
-    """纵梁单元按 etype 判定，不按 `e.id < 500` 反解（wide 号段会失效）。"""
+    """纵梁单元按 etype 判定，不从单元号反解（编号规则可能变化）。"""
     return [e.id for e in m.elements if e.etype == 1]
 
 
@@ -104,12 +105,12 @@ def offline() -> None:
           all(len(prestress_tokens(dat, k)) == 3 for k in (1, 2, 3)),
           str([len(prestress_tokens(dat, k)) for k in (1, 2, 3)]))
     check("直线筋走位置模式且写 loss",
-          prestress_tokens(dat, 1)[0] == "PRESTRESS=101-112:1000000:-0.4:0.85",
+          prestress_tokens(dat, 1)[0] == "PRESTRESS=1-12:1000000:-0.4:0.85",
           prestress_tokens(dat, 1)[0])
     check("三跨单元链连续不重叠",
           [t.split(":")[0].replace("PRESTRESS=", "")
            for k in (1, 2, 3) for t in prestress_tokens(dat, k)][::3]
-          == ["101-112", "113-132", "133-144"],
+          == ["1-12", "13-32", "33-44"],
           " ".join(t.split(":")[0] for t in prestress_tokens(dat, 1)))
 
     # 链校验：全部在本阶段激活、首尾相接成开链（内核 solveModel3DStages 的
@@ -160,16 +161,19 @@ def offline() -> None:
             check(f"非法参数硬报错：{label}", False, "静默通过了")
         except ValueError as e:
             check(f"非法参数硬报错：{label}", True, str(e)[:38])
-    p0, p99 = numbering_plan(3, 44), numbering_plan(3, 99)
-    p100, p5 = numbering_plan(3, 100), numbering_plan(5, 44)
-    check("默认 (3,44) 走 legacy 号段（黄金基线不变）",
-          p0.legacy and (p0.node_stride, p0.elem_stride, p0.cross_base)
-          == (1000, 100, 500))
-    check("边界 (3,99) 仍是 legacy；(3,100)/(5,44) 切 wide",
-          p99.legacy and not p100.legacy and not p5.legacy)
-    check("wide 号段留足段间空隙",
-          p100.node_stride > 100 and p100.elem_stride > 100
-          and p5.cross_base > 5 * p5.elem_stride + 44)
+    n = BlockNumbering()
+    g1 = n.allocate(120)          # 主要构件：首组从 1 起
+    g2 = n.allocate(150)          # 主要构件：按百位跳转
+    g3 = n.allocate(10)           # 非主要构件：按十位跳转
+    check("紧凑分块首组从 1 起", g1[0] == 1 and g1[-1] == 120,
+          f"{g1[0]}~{g1[-1]}")
+    check("主要构件按百位跳转", g2[0] == 201 and g2[-1] == 350,
+          f"{g2[0]}~{g2[-1]}")
+    check("非主要构件按十位跳转", g3[0] == 361 and g3[-1] == 370,
+          f"{g3[0]}~{g3[-1]}")
+    n2 = BlockNumbering()
+    n2.allocate(412)
+    check("契约示例：412 后非主要组从 421 起", n2.allocate(10)[0] == 421)
 
 
 def doc_chain() -> None:
@@ -294,18 +298,18 @@ def live() -> None:
           bool(my) and max(my) > 1.0e3, f"max|My|={max(my, default=0):.3g} N·m")
 
     # 曲线筋：s<0 → 跨内上拱（uz>0），且不改变轴压闭式解。
-    uz = [r3["final_disp"].get((2000 + i, 3), 0.0) for i in (6, 22, 38)]
+    uz = [r3["final_disp"].get((51 + i, 3), 0.0) for i in (6, 22, 38)]
     check("s<0 → 跨内上拱（uz>0）", all(u > 0 for u in uz),
           " ".join(f"{u*1e3:.3f}mm" for u in uz))
     check("直线筋 s=0 无外荷载时不产生竖向位移",
-          all(abs(r1["final_disp"].get((2000 + i, 3), 0.0)) < 1e-12
+          all(abs(r1["final_disp"].get((51 + i, 3), 0.0)) < 1e-12
               for i in (6, 22, 38)))
     check("曲线筋不破坏轴压闭式解",
           all(abs(r3["final_beam"][(e, "i")]["N"] + P_LINE) < 1e-6 * P_LINE
               for e in lon))
     check("横向对称：边线与中线跨中上拱一致",
-          abs(r3["final_disp"].get((1006, 3), 0.0)
-              - r3["final_disp"].get((3006, 3), 0.0)) < 1e-8)
+          abs(r3["final_disp"].get((7, 3), 0.0)
+              - r3["final_disp"].get((107, 3), 0.0)) < 1e-8)
 
     # 结果层 → 报告层：明细表、校核、专章、HTML 出口。
     import solver_3d
@@ -350,28 +354,28 @@ def live() -> None:
                       model_0).blocks))
 
 
-#: 12 个建造器默认 `.dat` 的 sha256 前 16 位（2026-11-10 基线）。
-#: 这是「编号方案切换后默认输出逐位不变」的黄金对拍：改默认输出行 /
-#: 包络乘子 / 积分权重必须刷新本表，并在 FEM-Eigen/CHANGELOG.md 写数值依据。
+#: 12 个建造器默认 `.dat` 的 sha256 前 16 位（2026-11-18 全量切换后刷新）。
+#: 这是默认输出的黄金对拍：改默认输出行 / 包络乘子 / 积分权重必须刷新本表，
+#: 并在 FEM-Eigen/CHANGELOG.md 写数值依据。
 DEFAULT_DAT_SHA = {
     "beam": "63093dbf87e2c54a",
     "ps_beam": "ea8ee5edf8ad36e0",
     "arch": "cdf5d3175778c56a",
-    "arch_3d": "a2291d7f2a6d66b5",
+    "arch_3d": "96147d9fa5c86443",
     "truss": "de23ea23554569ff",
-    "truss_3d": "8f5a779919a66681",
+    "truss_3d": "6a5749b5907096d6",
     "beam_bridge": "5771177801ba2730",
-    "grillage3d": "a806a48d86cbb56c",
+    "grillage3d": "fbd10208e5a52f96",
     "cable_stayed_2d": "e3c8d2f735ab89d9",
-    "cable_stayed": "ea74801fc392d992",
+    "cable_stayed": "8a1f870f5e286412",
     "suspension_2d": "bab979987f61d4ee",
-    "suspension": "acebaabcda72c45e",
+    "suspension": "97c755c84c75d155",
 }
 
 
 def wide_numbering() -> None:
-    """编号容量放开：默认哈希不变、wide 号段自洽、live 闭式解同源。"""
-    print("\n[5] 编号容量：默认 .dat 黄金哈希 + wide 自洽 + live 闭式解")
+    """紧凑分块编号：默认哈希已刷新、宽参数号段自洽、live 闭式解同源。"""
+    print("\n[5] 紧凑编号：默认 .dat 黄金哈希 + 宽参数自洽 + live 闭式解")
     for (kind, dim), b in BUILDERS.items():
         dat = ModelDoc(kind, dict(DEFAULTS[b]), dimension=dim).to_dat()
         h = hashlib.sha256(dat.encode()).hexdigest()[:16]
@@ -392,39 +396,39 @@ def wide_numbering() -> None:
         act = [x for s in m.stages for x in s.activate]
         chains = [ps for s in m.stages for ps in s.prestress]
         errs, _ = validate_model_3d(m)
-        check(f"wide {name}：节点/单元号唯一",
+        check(f"宽参 {name}：节点/单元号唯一",
               len(set(nids)) == len(nids) and len(set(eids)) == len(eids),
               f"{len(nids)} 节点 / {len(eids)} 单元")
-        check(f"wide {name}：引用完整性无硬错误", not errs, str(errs[:1])[:80])
-        check(f"wide {name}：阶段激活恰好覆盖全部单元一次",
+        check(f"宽参 {name}：引用完整性无硬错误", not errs, str(errs[:1])[:80])
+        check(f"宽参 {name}：阶段激活恰好覆盖全部单元一次",
               sorted(act) == sorted(eids), f"{len(act)} / {len(eids)}")
-        check(f"wide {name}：每跨每线一束且链引用完整",
+        check(f"宽参 {name}：每跨每线一束且链引用完整",
               len(chains) == len(m.stages) * nl
               and all(all(e in eset for e in ps.elems) for ps in chains),
               f"{len(chains)} 束")
 
     if not fem_eigen_3d_available():
-        check("3D 内核可用（wide live）", False, "未找到 example_3d_grillage.exe")
+        check("3D 内核可用（宽参 live）", False, "未找到 example_3d_grillage.exe")
         return
     for name, kw, nl in cases[:2]:
         m = build_box_grillage_3d(**{**BASE, **kw})
         try:
             r = solve_3d(m, out_dir=OUT / "wide" / name, dat_name="wide.dat")
         except Exception as e:                   # noqa: BLE001 - 要打印内核报错
-            check(f"wide {name} live 求解不抛异常", False,
+            check(f"宽参 {name} live 求解不抛异常", False,
                   f"{type(e).__name__}: {str(e)[:160]}")
             continue
-        check(f"wide {name} live 求解不抛异常", True)
+        check(f"宽参 {name} live 求解不抛异常", True)
         p_line = P_TOTAL_KN * 1e3 / nl
         sp = r["stage_prestress"]
-        check(f"wide {name} 内核回传 {len(m.stages)*nl} 束有效预加力",
+        check(f"宽参 {name} 内核回传 {len(m.stages)*nl} 束有效预加力",
               len(sp) == len(m.stages) * nl
               and all(abs(v["Pe"] - p_line) < 1e-6 for v in sp.values()),
               f"{len(sp)} 束")
         lon = longitudinal_elements(m)
         ns = [r["final_beam"][(e, "i")]["N"] for e in lon
               if (e, "i") in r["final_beam"]]
-        check(f"wide {name} 成桥态纵梁轴力 = −P/n_lines",
+        check(f"宽参 {name} 成桥态纵梁轴力 = −P/n_lines",
               bool(ns) and max(abs(x + p_line) for x in ns) < 1e-6 * p_line,
               f"N∈[{min(ns, default=0):.0f}, {max(ns, default=0):.0f}] N")
 

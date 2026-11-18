@@ -26,9 +26,10 @@
 
 编号规范（B1，统一约定见 X20_接入约定.md §5）
 ------------------------------------------------
-下表是该规范在本建造器内的落地实例（同模型内不得撞号，新增段先登记契约 §5）：
-- 节点：加劲梁 1000+i，主缆 2000+k，塔1 3000+m，塔2 4000+m，锚碇 5001/5002
-- 单元：加劲梁 100+i，塔1 800+m，塔2 900+m，主缆 3000+k，吊索 6000+j
+紧凑分块编号（§5.1，2026-11-18 全量切换）：节点 / 单元各自独立按组件组
+顺序分配，第一组从 1 起；≥50 的组按百位跳转，<50 的组按十位跳转。
+- 节点组顺序：加劲梁、塔1、塔2、主缆自建节点
+- 单元组顺序：加劲梁、塔1、塔2、主缆、吊索
 - 实常数：1=加劲梁，2=桥塔，3=主缆，4=吊索
 - 材料：1=加劲梁（钢），2=桥塔（混凝土），3=主缆与吊索（高强钢丝）
 
@@ -40,6 +41,7 @@ from __future__ import annotations
 import math
 
 from grillage_3d import box_section
+from block_numbering import BlockNumbering
 from model_spec_3d import (
     Boundary3D,
     CableBridge3D,
@@ -171,7 +173,12 @@ def build_suspension_3d(
                for k in range(1, n_side + 1)]                            # … L
     i_t1 = n_side                       # 塔1 对应的梁节点下标
     i_t2 = n_side + n_main              # 塔2
-    gid = lambda i: 1000 + i + 1
+    # 紧凑分块编号（契约 §5.1）：节点 / 单元各自独立按组件组顺序分配。
+    # 主缆自建节点数要等 chain_x 算完才知道，故节点分两批 allocate。
+    nn = BlockNumbering()
+    deck_nids = nn.allocate(len(xs))                                # 加劲梁节点
+    tower_nids = [nn.allocate(n_tower_seg + 1) for _ in range(2)]   # 塔1 / 塔2 节点
+    gid = lambda i: deck_nids[i]
     deck_ids = [gid(i) for i in range(len(xs))]
     x_to_deck = {round(x, 9): gid(i) for i, x in enumerate(xs)}
 
@@ -244,26 +251,29 @@ def build_suspension_3d(
     ]
 
     # ---------------------------------------------------------- 加劲梁单元
+    en = BlockNumbering()
+    deck_eids = en.allocate(len(xs) - 1)
+    tower_eids = [en.allocate(n_tower_seg) for _ in range(2)]
     elements: list[Element3D] = [
-        Element3D(id=100 + i + 1, etype=1, n1=gid(i), n2=gid(i + 1))
+        Element3D(id=deck_eids[i], etype=1, n1=gid(i), n2=gid(i + 1))
         for i in range(len(xs) - 1)
     ]
-    deck_e0, deck_e1 = 101, 100 + len(xs) - 1
+    deck_e0, deck_e1 = deck_eids[0], deck_eids[-1]
 
     # ---------------------------------------------------------- 桥塔
     tower_tops: list[int] = []
     for ti, xt in enumerate((L_side, L_side + L_main)):
-        base = 3000 if ti == 0 else 4000
-        tid = lambda k, _b=base: _b + k + 1
+        tn = tower_nids[ti]
+        tid = lambda k: tn[k]
         for k in range(n_tower_seg + 1):
             nodes.append(Node3D(id=tid(k), x=xt, y=0.0,
                                 z=z_base + (z_top - z_base) * k / n_tower_seg))
         tower_tops.append(tid(n_tower_seg))
-        ebase = 800 if ti == 0 else 900
+        te = tower_eids[ti]
         seg = (z_top - z_base) / n_tower_seg
         w_tower = tower_A * tower_dens * G
         for k in range(n_tower_seg):
-            elements.append(Element3D(id=ebase + k + 1, etype=2,
+            elements.append(Element3D(id=te[k], etype=2,
                                       n1=tid(k), n2=tid(k + 1)))
 
     # ---------------------------------------------------------- 主缆链
@@ -299,6 +309,11 @@ def build_suspension_3d(
     cable_ids: list[int] = []
     cable_own: list[int] = []          # 由本建造器新建的主缆节点（需加横向约束）
     last_k = len(chain_x) - 1
+    # 主缆链里塔顶 / 自锚式梁端复用既有节点，只有其余位置才新建。
+    n_own = sum(1 for k in range(len(chain_x))
+                if k not in (idx_t1, idx_t2)
+                and not (system == "SELF" and k in (0, last_k)))
+    cable_nids = iter(nn.allocate(n_own))
     for k, xc in enumerate(chain_x):
         if k == idx_t1:
             cable_ids.append(i_top1)
@@ -312,31 +327,35 @@ def build_suspension_3d(
         if system == "SELF" and k == last_k:
             cable_ids.append(gid(len(xs) - 1))
             continue
-        nid = 2000 + k + 1
+        nid = next(cable_nids)
         nodes.append(Node3D(id=nid, x=xc, y=0.0,
                             z=_initial_cable_z(xc, L_side, L_main, z_top, f_sag,
                                                z_anchor, system, anchor_offset)))
         cable_ids.append(nid)
         cable_own.append(nid)
 
+    main_cable_eids = iter(en.allocate(len(cable_ids) - 1))
     main_cable_elems: list[int] = []
     for k in range(len(cable_ids) - 1):
-        eid = 3000 + k + 1
+        eid = next(main_cable_eids)
         elements.append(Element3D(id=eid, etype=3,
                                   n1=cable_ids[k], n2=cable_ids[k + 1]))
         main_cable_elems.append(eid)
 
     # ---------------------------------------------------------- 吊索
     # 塔顶与两端锚点不挂吊索：塔顶是主缆的转折点，锚点本身就是支承。
+    hanger_eids = iter(en.allocate(sum(
+        1 for k, xc in enumerate(chain_x)
+        if k not in (0, len(chain_x) - 1, idx_t1, idx_t2)
+        and round(xc, 9) in x_to_deck)))
     hangers: list[int] = []
-    eid_h = 6000
     for k, xc in enumerate(chain_x):
         if k in (0, len(chain_x) - 1, idx_t1, idx_t2):
             continue
         key = round(xc, 9)
         if key not in x_to_deck:
             continue                      # 锚跨（地锚式的桥台外侧）没有梁节点
-        eid_h += 1
+        eid_h = next(hanger_eids)
         elements.append(Element3D(id=eid_h, etype=4,
                                   n1=cable_ids[k], n2=x_to_deck[key]))
         hangers.append(eid_h)
@@ -353,13 +372,12 @@ def build_suspension_3d(
     ]
     # 塔柱自重（两端各半，与斜拉桥建造器一致）
     for ti in range(2):
-        base = 3000 if ti == 0 else 4000
-        tid = lambda k, _b=base: _b + k + 1
+        tn = tower_nids[ti]
         seg = (z_top - z_base) / n_tower_seg
         w_tower = tower_A * tower_dens * G
         for k in range(n_tower_seg):
-            loads.append(NodalLoad3D(node=tid(k), dof=3, value=-w_tower * seg / 2))
-            loads.append(NodalLoad3D(node=tid(k + 1), dof=3, value=-w_tower * seg / 2))
+            loads.append(NodalLoad3D(node=tn[k], dof=3, value=-w_tower * seg / 2))
+            loads.append(NodalLoad3D(node=tn[k + 1], dof=3, value=-w_tower * seg / 2))
 
     # ---------------------------------------------------------- 约束
     boundaries: list[Boundary3D] = []
@@ -410,9 +428,9 @@ def build_suspension_3d(
         boundaries.append(Boundary3D(node=gid(i_mid), dofs=(1, 1)))
 
     for ti in range(2):
-        base = 3000 if ti == 0 else 4000
+        tn = tower_nids[ti]
         for d in range(1, 7):
-            boundaries.append(Boundary3D(node=base + 1, dofs=(d, d)))  # 塔底固结
+            boundaries.append(Boundary3D(node=tn[0], dofs=(d, d)))  # 塔底固结
 
     # ---------------------------------------------------------- 成桥态工况
     cable_bridge = CableBridge3D(

@@ -69,16 +69,13 @@ def offline_checks(m) -> None:
     check("总荷载守恒", abs(total_load - expect) / expect < 1e-9,
           f"{total_load:.0f} N = q×L ({expect:.0f} N)")
 
-    # 支承断面位置
-    node_pos = {n.id: n.x for n in m.nodes}
+    # 支承断面位置：中梁线 y≈0，按 x 排序取断面索引（紧凑分块后旧
+    # 1000+i / 2000+i 大段编号已失效，编号只是拓扑标签）。
+    mid = sorted((n for n in m.nodes if abs(n.y) < 1e-9), key=lambda n: n.x)
     support_x = [0.0, SPANS[0], SPANS[0] + SPANS[1], sum(SPANS)]
-    n_line = 3
-    ok_pos = True
-    for i in (0, 12, 32, 44):
-        x = node_pos[1000 + i]
-        if not any(abs(x - sx) < 1e-6 for sx in support_x):
-            ok_pos = False
-    check("支承断面精确落点", ok_pos, "节点 i=0/12/32/44 ↔ x=0/30/80/110")
+    ok_pos = all(any(abs(mid[i].x - sx) < 1e-6 for sx in support_x)
+                 for i in (0, 12, 32, 44))
+    check("支承断面精确落点", ok_pos, "中梁 i=0/12/32/44 ↔ x=0/30/80/110")
 
     # .dat 文本检查（按节解析，避免把 STAGE_LOAD 行误计为节点）
     # 完整性用**逐行版**核对（1 行 = 1 个单元，最直白）；压缩版另行核对
@@ -144,10 +141,11 @@ def online_checks() -> None:
 
     oracle = anastruct_oracle()
 
-    # 中梁线节点 2000+i；i=6 → x=15（边跨跨中）；i=22 → x=55（中跨跨中）
+    # 中梁线 y≈0，按 x 排序（旧 2000+i 已随紧凑分块编号失效）
+    mid = sorted((n for n in m.nodes if abs(n.y) < 1e-9), key=lambda n: n.x)
     # 容差：相对 2% 与绝对 0.3mm 取大（边跨跨中挠度本身仅 ~0.1mm 量级）
     for label, i, xq in [("边跨跨中挠度", 6, 15.0), ("中跨跨中挠度", 22, 55.0)]:
-        fem = res["disp"][(2000 + i, 3)][0]          # min（向下为负）
+        fem = res["disp"][(mid[i].id, 3)][0]          # min（向下为负）
         ref = oracle[min(oracle, key=lambda k: abs(k - xq))]
         tol = max(0.02 * abs(ref), 3e-4)
         err_abs = abs(fem - ref)

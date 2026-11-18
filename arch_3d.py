@@ -35,9 +35,10 @@
 
 编号规范（B1，统一约定见 X20_接入约定.md §5）
 ------------------------------------------------
-下表是该规范在本建造器内的落地实例（同模型内不得撞号，新增段先登记契约 §5）：
-- 节点：主梁 1000+i，拱肋 3000+j，塔顶锚点 4000（左）/ 5000（右）
-- 单元：拱肋 100+j，主梁 200+i，吊杆 500+j，扣索 9000+t（左）/ 9100+t（右）
+紧凑分块编号（§5.1，2026-11-18 全量切换）：节点 / 单元各自独立按组件组
+顺序分配，第一组从 1 起；≥50 的组按百位跳转，<50 的组按十位跳转。
+- 节点组顺序：主梁、拱肋、塔顶锚点（2 个）
+- 单元组顺序：拱肋、主梁、吊杆、左扣索、右扣索
 - 实常数：1=主梁，2=拱肋，3=吊杆(TRUSS)，4=扣索(CABLE)
 - 材料：1=钢材
 
@@ -60,6 +61,7 @@ from model_spec_3d import (
     Stage3D,
 )
 from grillage_3d import box_section
+from block_numbering import BlockNumbering
 
 G = 9.81
 
@@ -111,10 +113,26 @@ def build_arch_3d(
     xs = [L * j / n_arch for j in range(n_arch + 1)]
     zs = [_arch_z(x, L, f) for x in xs]
 
-    deck_nid = lambda i: 1000 + i               # 主梁节点 i=0..2N
-    arch_nid = lambda j: 3000 + j               # 拱肋节点 j=0..2N
-    topL = 4000                                  # 左塔顶锚点
-    topR = 5000                                  # 右塔顶锚点
+    # 紧凑分块编号（契约 §5.1）：节点 / 单元各自独立分配，第一组从 1 起。
+    nn = BlockNumbering()
+    deck_nids = nn.allocate(n_arch + 1)      # 主梁节点
+    arch_nids = nn.allocate(n_arch + 1)      # 拱肋节点
+    top_ids = nn.allocate(2)                 # 塔顶锚点（非主要）
+    topL, topR = top_ids
+    deck_nid = lambda i: deck_nids[i]
+    arch_nid = lambda j: arch_nids[j]
+
+    en = BlockNumbering()
+    arch_eids = en.allocate(n_arch)          # 拱肋单元
+    deck_eids = en.allocate(n_arch)          # 主梁单元
+    hanger_eids = en.allocate(n_hanger)      # 吊杆单元
+    cable_left_ids = en.allocate(max(N - 2, 0))
+    cable_right_ids = en.allocate(max(N - 2, 0))
+    arch_eid = lambda j: arch_eids[j - 1]
+    deck_eid = lambda i: deck_eids[i - 1]
+    hanger_eid = lambda j: hanger_eids[j - 1]
+    cable_left_eid = lambda t: cable_left_ids[t - 1]
+    cable_right_eid = lambda t: cable_right_ids[t - 1]
 
     nodes: list[Node3D] = []
     for i in range(n_arch + 1):
@@ -152,13 +170,13 @@ def build_arch_3d(
     # ---------------------------------------------------------- 单元
     elements: list[Element3D] = []
     for j in range(1, n_arch + 1):
-        elements.append(Element3D(id=100 + j, etype=2,
+        elements.append(Element3D(id=arch_eid(j), etype=2,
                                   n1=arch_nid(j - 1), n2=arch_nid(j)))
     for i in range(1, n_arch + 1):
-        elements.append(Element3D(id=200 + i, etype=1,
+        elements.append(Element3D(id=deck_eid(i), etype=1,
                                   n1=deck_nid(i - 1), n2=deck_nid(i)))
     for j in range(1, n_hanger + 1):
-        elements.append(Element3D(id=500 + j, etype=3,
+        elements.append(Element3D(id=hanger_eid(j), etype=3,
                                   n1=arch_nid(j), n2=deck_nid(j)))
     # 扣索：左扣索 t=1..N-2 锚到左段 (1+t) 自由端（节点 2..N-1，朝跨中端），
     #       右扣索 t=1..N-2 锚到对称右段自由端（节点 2N-1-t，即 14..9，朝跨中端）。
@@ -168,8 +186,8 @@ def build_arch_3d(
     cable_right: list[int] = []
     cable_anchor: dict[int, int] = {}   # 扣索 id → 拱肋节点 id
     for t in range(1, N - 1):
-        cl = 9000 + t
-        cr = 9100 + t
+        cl = cable_left_eid(t)
+        cr = cable_right_eid(t)
         elements.append(Element3D(id=cl, etype=4,
                                   n1=topL, n2=arch_nid(1 + t)))
         elements.append(Element3D(id=cr, etype=4,
@@ -242,9 +260,9 @@ def build_arch_3d(
     # ---------------------------------------------------------- 施工阶段
     stages: list[Stage3D] = []
     if not staged:
-        all_struct = ([100 + j for j in range(1, n_arch + 1)] +
-                      [200 + i for i in range(1, n_arch + 1)] +
-                      [500 + j for j in range(1, n_hanger + 1)])
+        all_struct = ([arch_eid(j) for j in range(1, n_arch + 1)] +
+                      [deck_eid(i) for i in range(1, n_arch + 1)] +
+                      [hanger_eid(j) for j in range(1, n_hanger + 1)])
         loads = arch_loads(list(range(1, n_arch + 1))) + \
             deck_loads(list(range(1, n_arch + 1)))
         stages = [Stage3D(id=1, activate=all_struct, loads=loads)]
@@ -252,35 +270,35 @@ def build_arch_3d(
         # ---- 阶段 1：拱脚段（左段1 + 右段2N）----
         stages.append(Stage3D(
             id=1,
-            activate=[100 + 1, 100 + n_arch],
+            activate=[arch_eid(1), arch_eid(n_arch)],
             loads=arch_loads([1, n_arch]),
         ))
         # ---- 阶段 2..N-1：对称吊装 + 扣索张拉 ----
         for t in range(2, N):
             seg_left = t
             seg_right = n_arch + 1 - t
-            cl = 9000 + (t - 1)
-            cr = 9100 + (t - 1)
+            cl = cable_left_eid(t - 1)
+            cr = cable_right_eid(t - 1)
             stages.append(Stage3D(
                 id=t,
-                activate=[100 + seg_left, 100 + seg_right, cl, cr],
+                activate=[arch_eid(seg_left), arch_eid(seg_right), cl, cr],
                 loads=arch_loads([seg_left, seg_right]),
                 tensions={cl: cable_target(cl), cr: cable_target(cr)},
             ))
         # ---- 阶段 N：拱顶合拢（段 N + 段 N+1 在跨中会合，拱圈闭合）----
         stages.append(Stage3D(
             id=N,
-            activate=[100 + N, 100 + (N + 1)],
+            activate=[arch_eid(N), arch_eid(N + 1)],
             loads=arch_loads([N, N + 1]),
         ))
         # ---- 阶段 N+1：拆除全部扣索 ----
         stages.append(Stage3D(id=N + 1, deactivate=cable_ids))
         # ---- 阶段 N+2 .. 2N+1：安装吊杆 + 主梁段（从两端向跨中）----
         for t in range(1, N + 1):
-            s_deck = [200 + t, 200 + (n_arch + 1 - t)]
-            s_hang = [500 + t]
+            s_deck = [deck_eid(t), deck_eid(n_arch + 1 - t)]
+            s_hang = [hanger_eid(t)]
             if t < N:
-                s_hang.append(500 + (n_arch - t))
+                s_hang.append(hanger_eid(n_arch - t))
             s_hang = sorted(set(s_hang))
             stages.append(Stage3D(
                 id=N + 1 + t,
@@ -319,13 +337,13 @@ def build_arch_3d(
         "n_seg_half": N,
         "arch_node_ids": [arch_nid(j) for j in range(n_arch + 1)],
         "deck_node_ids": [deck_nid(i) for i in range(n_arch + 1)],
-        "hanger_ids": [500 + j for j in range(1, n_hanger + 1)],
+        "hanger_ids": [hanger_eid(j) for j in range(1, n_hanger + 1)],
         "cable_ids": cable_ids,
         "cable_left": cable_left,
         "cable_right": cable_right,
         "cable_anchor": cable_anchor,
-        "arch_elems": [100 + j for j in range(1, n_arch + 1)],
-        "deck_elems": [200 + i for i in range(1, n_arch + 1)],
+        "arch_elems": [arch_eid(j) for j in range(1, n_arch + 1)],
+        "deck_elems": [deck_eid(i) for i in range(1, n_arch + 1)],
         "w_arch": w_arch,
         "q_deck": q_deck,
         "q2_deck": q2_deck,

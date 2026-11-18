@@ -20,9 +20,10 @@
 
 编号规范（B1，统一约定见 X20_接入约定.md §5）
 ------------------------------------------------
-下表是该规范在本建造器内的落地实例（同模型内不得撞号，新增段先登记契约 §5）：
-- 节点：主梁 1000+i，塔1 2000+k，塔2 3000+k
-- 单元：主梁 100+i，塔1 800+k，塔2 900+k，索 9000+j
+紧凑分块编号（§5.1，2026-11-18 全量切换）：节点 / 单元各自独立按组件组
+顺序分配，第一组从 1 起；≥50 的组按百位跳转，<50 的组按十位跳转。
+- 节点组顺序：主梁、塔1、塔2
+- 单元组顺序：主梁、塔1、塔2、拉索
 - 实常数：1=主梁，2=桥塔，3=拉索；材料：1=混凝土，2=索
 
 单位：m / N / Pa。
@@ -48,6 +49,7 @@ from model_spec_3d import (
     Stage3D,
 )
 from grillage_3d import box_section
+from block_numbering import BlockNumbering
 
 G = 9.81
 # 悬臂每一段的工期。程序拟定，不是规范规定的施工周期。
@@ -145,7 +147,11 @@ def build_cable_stayed_3d(
         for j in range(1, n_seg + 1):
             xs.append(x_start + span * j / n_seg)
         support_idx.append(len(xs) - 1)
-    gid = lambda i: 1000 + i + 1
+    # 紧凑分块编号（契约 §5.1）：节点 / 单元各自独立按组件组顺序分配。
+    nn = BlockNumbering()
+    deck_nids = nn.allocate(len(xs))                       # 主梁节点
+    tower_nids = [nn.allocate(n_tower_seg + 1) for _ in range(2)]  # 塔1 / 塔2 节点
+    gid = lambda i: deck_nids[i]
 
     nodes: list[Node3D] = [Node3D(id=gid(i), x=x, y=0.0, z=0.0)
                            for i, x in enumerate(xs)]
@@ -215,9 +221,15 @@ def build_cable_stayed_3d(
     ]
 
     # ---------------------------------------------------------- 主梁单元 + 荷载
+    en = BlockNumbering()
+    deck_eids = en.allocate(len(xs) - 1)
+    tower_eids = [en.allocate(n_tower_seg) for _ in range(2)]
+    cable_eids = en.allocate(4 * n_cable)
+    cable_iter = iter(cable_eids)
+
     elements: list[Element3D] = []
     for i in range(len(xs) - 1):
-        elements.append(Element3D(id=100 + i + 1, etype=1,
+        elements.append(Element3D(id=deck_eids[i], etype=1,
                                   n1=gid(i), n2=gid(i + 1)))
 
     def trib(i: int) -> float:
@@ -233,19 +245,16 @@ def build_cable_stayed_3d(
     # ---------------------------------------------------------- 桥塔
     tower_tops: list[int] = []
     for ti, xT in enumerate((xT1, xT2)):
-        base = 2000 if ti == 0 else 3000
-        tid = lambda k, _b=base: _b + k + 1
+        tn = tower_nids[ti]
+        tid = lambda k: tn[k]
         for k in range(n_tower_seg + 1):
             nodes.append(Node3D(id=tid(k), x=xT, y=0.0,
                                 z=tower_height * k / n_tower_seg))
         tower_tops.append(tid(n_tower_seg))
-        # 塔单元从 800 起：主梁单元按 100+i 递增，主跨加密后可能越过 200，
-        # 原先塔从 200 起会与主梁撞号（n_cable=20 时主梁到 206，实测报
-        # "单元编号重复: 201"）。索仍从 9000 起，三者互不重叠。
-        ebase = 800 if ti == 0 else 900
+        te = tower_eids[ti]
         w_tower = tower_A * dens_conc * G
         for k in range(n_tower_seg):
-            elements.append(Element3D(id=ebase + k + 1, etype=2,
+            elements.append(Element3D(id=te[k], etype=2,
                                       n1=tid(k), n2=tid(k + 1)))
             # 塔柱自重：两端各半
             seg = tower_height / n_tower_seg
@@ -290,16 +299,15 @@ def build_cable_stayed_3d(
 
     def tower_anchor(ti: int, j: int, k_total: int) -> int:
         """第 j 根索（0=最低）在塔上的锚固节点。"""
-        base = 2000 if ti == 0 else 3000
+        tn = tower_nids[ti]
         lo = anchor_low
         hi = 1.0
         frac = lo if k_total <= 1 else lo + (hi - lo) * j / (k_total - 1)
         seg = round(frac * n_tower_seg)
         seg = min(max(seg, 1), n_tower_seg)
-        return base + seg + 1
+        return tn[seg]
 
     cable_ids: list[int] = []
-    eid_cable = 9000
     # 主跨每侧只覆盖 main_cover×Lm：两侧索在跨中留出无索区（实际斜拉桥
     # 的无索区约占主跨 1/5~1/3）。若两侧都铺满全跨，锚点会交错，
     # 同一 x 附近同时有短索与长索，索力沿桥呈锯齿——那不是索力分布，
@@ -317,10 +325,10 @@ def build_cable_stayed_3d(
         picks = pick_even(anchors_for_span(x_lo, x_hi, xT, seg), n_cable)
         # 索按"离塔近 → 塔上锚点低"配对：短索锚得低，长索锚得高（扇形）
         for j, node in enumerate(picks):
-            eid_cable += 1
-            elements.append(Element3D(id=eid_cable, etype=3,
+            eid = next(cable_iter)
+            elements.append(Element3D(id=eid, etype=3,
                                       n1=tower_anchor(ti, j, len(picks)), n2=node))
-            cable_ids.append(eid_cable)
+            cable_ids.append(eid)
 
     # ---------------------------------------------------------- 约束
     # 悬臂施工必须塔梁固结才能在每个阶段保持稳定，而三维约束不能中途释放。
@@ -342,9 +350,9 @@ def build_cable_stayed_3d(
     for i in range(len(xs)):
         boundaries.append(Boundary3D(node=gid(i), dofs=(4, 4)))    # 扭转定位（单梁线）
     for ti in range(2):
-        base = 2000 if ti == 0 else 3000
+        tn = tower_nids[ti]
         for d in range(1, 7):
-            boundaries.append(Boundary3D(node=base + 1, dofs=(d, d)))  # 塔底固结
+            boundaries.append(Boundary3D(node=tn[0], dofs=(d, d)))  # 塔底固结
 
     # ---------------------------------------------------------- 成桥态工况
     trib_map = {gid(i): trib(i) for i in range(len(xs))}
@@ -372,8 +380,8 @@ def build_cable_stayed_3d(
         q1 = q_deck - q2_deck                      # 一期恒载（主梁自重等）
         iT1 = min(range(len(xs)), key=lambda i: abs(xs[i] - xT1))
         iT2 = min(range(len(xs)), key=lambda i: abs(xs[i] - xT2))
-        tower1_elems = [800 + k + 1 for k in range(n_tower_seg)]
-        tower2_elems = [900 + k + 1 for k in range(n_tower_seg)]
+        tower1_elems = tower_eids[0]
+        tower2_elems = tower_eids[1]
         seg_t = tower_height / n_tower_seg
 
         # 主梁单元一期恒载（两端各半，与建造器 trib 分配严格等价）
@@ -386,12 +394,13 @@ def build_cable_stayed_3d(
             return out
 
         # 塔柱自重（两端各半）
-        def tower_loads(base: int) -> list[NodalLoad3D]:
+        def tower_loads(ti: int) -> list[NodalLoad3D]:
             out = []
             w = tower_A * dens_conc * G * seg_t
+            tn = tower_nids[ti]
             for k in range(n_tower_seg):
-                out.append(NodalLoad3D(node=base + k + 1, dof=3, value=-w / 2))
-                out.append(NodalLoad3D(node=base + k + 2, dof=3, value=-w / 2))
+                out.append(NodalLoad3D(node=tn[k], dof=3, value=-w / 2))
+                out.append(NodalLoad3D(node=tn[k + 1], dof=3, value=-w / 2))
             return out
 
         node_of = {n.id: n for n in nodes}
@@ -417,8 +426,8 @@ def build_cable_stayed_3d(
         zero = [iT1 - 1, iT1, iT2 - 1, iT2]
         stages.append(Stage3D(
             id=1,
-            activate=tower1_elems + tower2_elems + [100 + i + 1 for i in zero],
-            loads=tower_loads(2000) + tower_loads(3000) + deck_loads(zero),
+            activate=tower1_elems + tower2_elems + [deck_eids[i] for i in zero],
+            loads=tower_loads(0) + tower_loads(1) + deck_loads(zero),
         ))
         active.update(zero)
 
@@ -438,7 +447,7 @@ def build_cable_stayed_3d(
                 t_j[groups[dname][j]] = tensions[groups[dname][j]]
             stages.append(Stage3D(
                 id=2 + j,
-                activate=[100 + i + 1 for i in new_elems] + list(t_j.keys()),
+                activate=[deck_eids[i] for i in new_elems] + list(t_j.keys()),
                 loads=deck_loads(new_elems),
                 tensions=t_j,
             ))
@@ -447,7 +456,7 @@ def build_cable_stayed_3d(
         rest = [i for i in range(len(xs) - 1) if i not in active]
         stages.append(Stage3D(
             id=2 + n,
-            activate=[100 + i + 1 for i in rest],
+            activate=[deck_eids[i] for i in rest],
             loads=deck_loads(rest),
         ))
         active.update(rest)

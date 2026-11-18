@@ -117,8 +117,9 @@ def main() -> int:
     print("[在线检查 · FEM-Eigen 3D]")
     res = solve_3d(m, out_dir="out/p2_verify", dat_name="grillage_staged.dat")
 
-    # 边跨跨中 = 中梁线 2006；包络 min 应为阶段 1 简支挠度
-    fem_dead = res["disp"][(2006, 3)][0]
+    # 边跨跨中（x=15）：中梁线 y≈0 按 x 排序取索引 6（旧 2006 已随紧凑编号失效）
+    mid = sorted((n for n in m.nodes if abs(n.y) < 1e-9), key=lambda n: n.x)
+    fem_dead = res["disp"][(mid[6].id, 3)][0]
     err = abs(fem_dead - (-d_dead)) / d_dead * 100
     check("阶段1简支挠度 vs 理论", err < 5.0,
           f"FEM={fem_dead*1000:.2f}mm  理论={-d_dead*1000:.2f}mm  误差={err:.1f}%")

@@ -65,7 +65,8 @@ import newton_3d
 import view_3d
 from result_3d import (CABLE_FPU_DEFAULT, CABLE_SAFETY_MIN,
                        CABLE_SAFETY_MIN_STAGE, Check, Metric,
-                       SolveResult, _cable_area_m2, _impact_note, support_x)
+                       SolveResult, _cable_area_m2, _impact_note,
+                       deck_node_ids, support_x)
 
 # ---------------------------------------------------------------- 配色
 # 与界面、Word 计算书同一套，避免"屏幕上蓝、报告里灰"
@@ -885,7 +886,8 @@ def figure_camber(res: SolveResult, model: Any, path: Path) -> Path:
     """主梁预抬高（制造线形相对设计线形）。"""
     plt = _plt()
     x_of = _deck_x(model)
-    deck = sorted((n for n in res.camber if 1000 < n < 2000),
+    _deck_ids = deck_node_ids(model)
+    deck = sorted((n for n in res.camber if n in _deck_ids),
                   key=lambda n: x_of.get(n, 0.0)) or sorted(res.camber)
     fig, ax = plt.subplots(figsize=(7.2, 2.8))
     if deck:
@@ -1739,8 +1741,9 @@ def _cover_facts(model: Any) -> list[tuple[str, str]]:
     """从网格本身读出封面必须写明的体系，不靠界面参数。"""
     bounds = list(getattr(model, "boundaries", None) or [])
     facts: list[tuple[str, str]] = []
+    _deck_ids = deck_node_ids(model)
     deck_fixed = any(tuple(getattr(b, "dofs", ())) == (1, 6)
-                     and 1000 <= int(b.node) < 2000 for b in bounds)
+                     and int(b.node) in _deck_ids for b in bounds)
     semi = any(tuple(getattr(b, "dofs", ())) == (1, 1) for b in bounds)
     if deck_fixed:
         facts.append(("结构体系",

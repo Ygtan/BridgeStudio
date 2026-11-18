@@ -19,6 +19,7 @@ import sys
 from cable_stayed_3d import build_cable_stayed_3d
 from model_spec_3d import (CableSpec3D, Boundary3D, Element3D, NodalLoad3D,
                            Node3D, RealConst3D, validate_model_3d)
+from result_3d import deck_node_ids, tower_node_groups
 
 PASS: list[tuple[str, bool, str]] = []
 
@@ -35,8 +36,10 @@ def has(items: list[str], *words: str) -> bool:
 def main() -> int:
     base, info = build_cable_stayed_3d()
     cable_ids = list(info["cable_ids"])
-    deck_node = next(n.id for n in base.nodes if 1000 < n.id < 2000)
-    tower_node = next(n.id for n in base.nodes if n.id == 2001)
+    _deck_ids = deck_node_ids(base)
+    deck_node = min(_deck_ids)
+    _tower_ids = {n.id for grp in tower_node_groups(base) for n in grp}
+    tower_node = min(_tower_ids) if _tower_ids else 0
 
     # 基线：干净模型不应有错误
     print("\n[0] 基线")

@@ -7,7 +7,7 @@
 1. 离线（建模）
    - 节点/单元/阶段规模与拓扑（拱肋 16 段、吊杆 15、扣索 12、阶段 18）
    - 扣索张拉目标左右对称、且 ≤ 0.7·A·fpu（不撞截断）
-   - 编号规范（拱肋 100+、主梁 200+、吊杆 500+、扣索 9000+/9100+）
+   - 编号规范（紧凑分块：主梁/拱肋/吊杆/扣索按组件组顺序，见 X20 §5）
    - 约束正确：拱脚固结、塔顶锚点固定、主梁端纵向滑动
 2. 自然语言识别（意图分类 + 参数解析）
    - 「拱肋分段吊装 / 斜拉扣索 / 合拢」→ arch_3d（不是 arch / cable_stayed）
@@ -61,21 +61,28 @@ def main() -> int:
           and len(info["cable_ids"]) == 12,
           f"{info['n_arch_seg']} / {info['n_hanger']} / {len(info['cable_ids'])}")
 
-    # 扣索张拉目标左右对称
+    # 扣索张拉目标左右对称（cable_left / cable_right 按 t 一一对应；
+    # 旧 l+100 偏移来自 9000+/9100+ 大段编号，紧凑分块后已失效）
     tgt = info["cable_targets"]
-    sym = all(abs(tgt[l] - tgt[l + 100]) < 1e-6
-              for l in info["cable_left"])
+    sym = all(abs(tgt[l] - tgt[r]) < 1e-6
+              for l, r in zip(info["cable_left"], info["cable_right"]))
     cap = 0.7 * 8000e-6 * 1860e6
     under = all(t <= cap for t in tgt.values())
     check("扣索目标左右对称", sym, f"左 {[round(tgt[l]/1e3) for l in info['cable_left']]} kN")
     check("扣索目标 ≤ 0.7·A·fpu", under, f"max {max(tgt.values())/1e3:.0f} / {cap/1e3:.0f} kN")
 
-    # 约束：拱脚固结 + 塔顶锚点固定（dofs 为闭区间 [a,b]）
+    # 约束：拱脚固结 + 塔顶锚点固定（dofs 为闭区间 [a,b]）。
+    # 按几何位置判定，不依赖旧 3000/3016/4000/5000 大段编号。
     bs = {b.node: b.dofs for b in m.boundaries}
-    check("拱脚固结 (DOF 1-6)", bs.get(3000) == (1, 6) and bs.get(3016) == (1, 6),
-          str(bs.get(3000)))
-    check("塔顶锚点固定 (DOF 1-3)", bs.get(4000) == (1, 3) and bs.get(5000) == (1, 3),
-          str(bs.get(4000)))
+    nodes = {n.id: n for n in m.nodes}
+    foot = [n for n, d in bs.items() if d == (1, 6)]
+    check("拱脚固结 (DOF 1-6)",
+          len(foot) == 2
+          and sorted(round(nodes[n].x, 6) for n in foot)
+          == sorted((0.0, info["span"])),
+          str(foot))
+    tops = [n for n, d in bs.items() if d == (1, 3) and nodes[n].z > 1e-6]
+    check("塔顶锚点固定 (DOF 1-3)", len(tops) == 2, str(tops))
 
     # ---------------------------------------------------------------- 2 意图
     print("\n[2] 自然语言识别")

@@ -48,6 +48,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from fem_eigen_cable import cable_solver_available, find_cable_solver
+from result_3d import deck_node_ids, tower_node_groups
 from solver_3d import detect_kind, solve
 from suspension_3d import build_suspension_3d
 
@@ -148,10 +149,11 @@ def stage1(model_build) -> None:
         #
         # 少了它，塔位梁节点承担的桥面荷载只能靠相邻跨"扛过去"，
         # 凭空造出上万 kN·m 的弯矩——数值上完全合法，力学上是假的。
+        _deck_ids = deck_node_ids(m)
         for t in (t1, t2):
             xb = x_of[t]
             deck_at = [n.id for n in m.nodes
-                       if 1000 < n.id < 2000 and abs(x_of[n.id] - xb) < 1e-6]
+                       if n.id in _deck_ids and abs(x_of[n.id] - xb) < 1e-6]
             ok = bool(deck_at) and all(3 in _support_dofs(m, n) for n in deck_at)
             check(f"[{tag}] 塔位（x={xb:.0f}）加劲梁有竖向支座", ok,
                   f"节点 {deck_at} 约束 dof {[_support_dofs(m, n) for n in deck_at]}")
@@ -159,7 +161,7 @@ def stage1(model_build) -> None:
         # --- 主缆端节点：必须锚得住 ---
         ends = (chain_nodes[0], chain_nodes[-1])
         if sys_name == "SELF":
-            ok = all(1000 < n < 2000 for n in ends)
+            ok = all(n in _deck_ids for n in ends)
             check(f"[{tag}] 主缆两端锚在加劲梁端节点", ok, f"{ends}")
             # 梁端纵向必须自由，纵向约束放跨中
             free = all(1 not in _support_dofs(m, n) for n in ends)
@@ -170,7 +172,8 @@ def stage1(model_build) -> None:
             check(f"[{tag}] 主缆两端锚在锚碇（非梁节点）", ok, f"{ends}")
 
         # --- 平面外自由度：主缆自建节点必须约束 dof 2 ---
-        own = [n.id for n in m.nodes if 2000 < n.id < 3000]
+        _tower_ids = {n.id for grp in tower_node_groups(m) for n in grp}
+        own = [n.id for n in m.nodes if n.z > 1e-6 and n.id not in _tower_ids]
         unconstrained = [n for n in own if 2 not in _support_dofs(m, n)]
         check(f"[{tag}] 主缆自建节点约束平面外 dof 2", not unconstrained,
               f"{len(own)} 个节点，缺约束 {unconstrained[:3]}"
@@ -321,7 +324,7 @@ def stage3(got: dict) -> None:
     # 自锚式梁体缩短量级：Δ ≈ H·L/EA（**梁的** EA，不是主缆的）
     rc_gir = next(r for r in m.reals if r.id == 1)          # 实常数 1 = 加劲梁
     EA_gir = rc_gir.A * next(mm for mm in m.materials if mm.id == 1).E
-    deck = sorted((n for n in m.nodes if 1000 < n.id < 2000), key=lambda n: n.x)
+    deck = sorted((n for n in m.nodes if n.id in deck_node_ids(m)), key=lambda n: n.x)
     ua = res.disp.get((deck[0].id, 1), (0.0, 0.0))[0]
     ub = res.disp.get((deck[-1].id, 1), (0.0, 0.0))[0]
     short_mm = abs(ua - ub) * 1000
@@ -397,7 +400,8 @@ def stage5() -> None:
     #
     # 这正是最初把主缆做成"锚到锚自由索"的那一类错：TOWER1 指到一个只在
     # 主缆链上出现的节点。求解照样能收敛，所以必须在入口拦住。
-    own = next(n.id for n in m.nodes if 2000 < n.id < 3000)
+    _tower_ids = {n.id for grp in tower_node_groups(m) for n in grp}
+    own = next(n.id for n in m.nodes if n.z > 1e-6 and n.id not in _tower_ids)
     bad = dat_txt.replace(f"TOWER1={info['tower_nodes'][0]}", f"TOWER1={own}", 1)
     p = (OUT / "neg_tower.dat").resolve()
     p.write_text(bad, encoding="utf-8")

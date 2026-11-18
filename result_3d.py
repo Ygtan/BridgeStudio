@@ -50,6 +50,47 @@ import modal_3d
 import newton_3d
 import section_strength
 
+
+def deck_node_ids(model: Any) -> set[int]:
+    """主梁（加劲梁 / 梁格纵梁 / 桁架下弦）节点 id 集合。
+
+    2026-11-18 建造器统一切换到紧凑分块编号后，旧「1000~2000 是主梁号段」
+    的假设已失效（主梁第一组现在从 1 起）。改为按几何判定：``z≈0`` 的节点
+    位于主梁/下弦线；塔、索、吊杆、拱肋节点 ``z>0``。梁格与双片桁架的全部
+    纵向节点也在 ``z≈0``，符合主梁语义。这是**几何身份**而非编号标签判定，
+    与编号规则解耦。
+    """
+    if model is None:
+        return set()
+    return {int(n.id) for n in getattr(model, "nodes", ())
+            if abs(float(getattr(n, "z", 0.0))) < 1e-6}
+
+
+def tower_node_groups(model: Any) -> list[list[Any]]:
+    """塔柱节点，按 x 位置分组（通常是两塔），与编号段解耦。
+
+    判据：单元 ``kind == "BEAM"`` 且至少一端 ``z>0``。主梁单元两端都在
+    ``z≈0``，索单元 ``kind == "CABLE"``，都不会被误收。返回的每组按 x
+    聚类，组内是塔柱从底到顶的节点。
+    """
+    if model is None:
+        return []
+    nodes = {n.id: n for n in getattr(model, "nodes", ())}
+    kinds = {t.id: getattr(t, "kind", "") for t in getattr(model, "etypes", ())}
+    ids: set[int] = set()
+    for e in getattr(model, "elements", ()):
+        if kinds.get(getattr(e, "etype", -1)) != "BEAM":
+            continue
+        a = nodes.get(getattr(e, "n1", -1))
+        b = nodes.get(getattr(e, "n2", -1))
+        if a is None or b is None:
+            continue
+        if abs(float(a.z)) > 1e-6 or abs(float(b.z)) > 1e-6:
+            ids.update((a.id, b.id))
+    xs = sorted({nodes[i].x for i in ids if i in nodes})
+    return [[nodes[i] for i in ids if abs(nodes[i].x - x) < 1e-6] for x in xs]
+
+
 #: 内核键 → 中文名。界面标题、计算书章节名都取这里，不各写一份。
 KIND_LABELS: dict[str, str] = {
     "grillage3d": "三维梁格",
@@ -1968,7 +2009,8 @@ class SolveResult:
         # 数字，现场就会照大数起拱，反而错。实测值直接取 [U] 里两端节点
         # 的纵向位移，不靠 H·L/EA 反推（反推要猜 EA，模型里的实常数才是准的）。
         if is_self and model is not None:
-            ds = sorted((n for n in model.nodes if 1000 < n.id < 2000),
+            _deck_ids = deck_node_ids(model)
+            ds = sorted((n for n in model.nodes if n.id in _deck_ids),
                         key=lambda n: n.x)
             if len(ds) >= 2:
                 ua = float(self.disp.get((ds[0].id, 1), (0.0, 0.0))[0])
@@ -1985,7 +2027,8 @@ class SolveResult:
         return out
 
     def _camber_check(self, model: Any) -> Check:
-        vals = [v[2] for n, v in self.camber.items() if 1000 < n < 2000]
+        _deck_ids = deck_node_ids(model)
+        vals = [v[2] for n, v in self.camber.items() if n in _deck_ids]
         if not vals:
             vals = [v[2] for v in self.camber.values()]
         if not vals:
@@ -2397,7 +2440,8 @@ class SolveResult:
                 }
 
         if self.camber:
-            deck = sorted((n for n in self.camber if 1000 < n < 2000),
+            _deck_ids = deck_node_ids(model)
+            deck = sorted((n for n in self.camber if n in _deck_ids),
                           key=lambda n: x_of.get(n, 0.0)) or sorted(self.camber)
             out["camber_table"] = {
                 "title": "制造线形（预抬高）",
@@ -2938,7 +2982,7 @@ def support_x(model: Any) -> list[float]:
     if model is None:
         return []
     try:
-        deck_ids = {n.id for n in model.nodes if n.id < 2000}
+        deck_ids = deck_node_ids(model)
 
         def covers(dofs, target: int) -> bool:
             # dofs 是闭区间 [a, b]，不是自由度列表。(1, 4) 含竖向 3。
