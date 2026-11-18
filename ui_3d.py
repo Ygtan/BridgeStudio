@@ -492,17 +492,20 @@ def _report_block(doc: ModelDoc, res: SolveResult) -> None:
 
 
 def _export_block(doc: ModelDoc, res: SolveResult, *, out_dir: str,
-                  stem: str, key: str) -> None:
+                  stem: str, key: str,
+                  caption: str | None = None) -> None:
     """三方复核导出（ANSYS / Abaqus / MIDAS）。
 
-    斜拉桥与悬索桥共用这一段，但 `out_dir` 与 `stem` **必须各给各的**：
-    悬索桥若沿用 `out/cable/export` + `stem="cable"`，两种桥型互相覆盖，
-    而且导出的悬索桥模型在第三方软件里叫 "cable"——打开的人无从判断这是
-    哪一座桥、哪一次求解。两个参数是必填而不是默认值，就是为了让调用点
+    所有三维桥型共用这一段：斜拉桥 / 悬索桥在各自专属出口调用，梁格 / 桁架 /
+    拱桥在 `render()` 的通用出口调用（"建模后导出 APDL"）。`out_dir` 与 `stem`
+    **必须各给各的**：悬索桥若沿用 `out/cable/export` + `stem="cable"`，两种
+    桥型互相覆盖，而且导出的模型在第三方软件里叫 "cable"——打开的人无从
+    判断这是哪一座桥、哪一次求解。两个参数必填而非默认，就是为了让调用点
     必须显式表态。
 
     `key` 是 widget key 前缀：同一次会话里只会有一种桥型渲染，但 key 撞了
     会在切换桥型时留下旧状态（Streamlit 按 key 复用 widget），所以分开。
+    `caption` 是未导出时的提示语；不传则用通用文案，索承桥型传专属文案。
     """
     c3, c4 = st.columns([1.2, 2.0])
     if c3.button("导出 ANSYS / Abaqus / MIDAS", key=f"{key}_export_btn"):
@@ -528,9 +531,11 @@ def _export_block(doc: ModelDoc, res: SolveResult, *, out_dir: str,
         for _w in _ex.get("warnings", [])[:4]:
             st.caption(f"· {_w}")
         st.caption("导出的是同一套节点/单元/实常数；惯矩按「绕哪根轴」同名映射，"
-                   "泊松比由 G 反算。三格式均只建模、不含求解控制。")
+                   "泊松比由 G 反算。三格式均只建模、不含求解控制。"
+                   "ANSYS 的 .ans 即 APDL 命令流，可直接由 ANSYS180.exe -b 读入。")
     else:
-        c4.caption("导出后可在第三方软件里独立建算，核对索力与线形。")
+        c4.caption(caption or "建模后导出 ANSYS APDL (.ans) / Abaqus / MIDAS，"
+                              "可在第三方软件里独立建算复核。")
 
 
 def _cable_extras(doc: ModelDoc, res: SolveResult) -> None:
@@ -703,6 +708,17 @@ def render(doc: ModelDoc) -> None:
     if res.is_stale(doc.to_dat()):
         st.warning("模型参数已修改，结果来自上一次求解，已隐藏。请重新点求解。")
         return
+
+    # ---- 三方复核导出（ANSYS APDL / Abaqus / MIDAS）--------------------
+    # 求解完成后立刻可见：放在指标卡之前，避免用户只看到 FEM-Eigen 的 .dat
+    # 而找不到 APDL 入口。索承体系走各自专属出口（保留 cb/susp 的 widget key
+    # 与目录），其余桥型（梁格 / 桁架 / 拱桥）统一接通用出口。
+    if res.kind not in ("cable_stayed", "suspension"):
+        with st.container():
+            st.markdown("**三方复核导出（ANSYS APDL / Abaqus / MIDAS）**")
+            _export_block(doc, res,
+                          out_dir=f"out/{doc.kind}/export",
+                          stem=doc.kind, key=f"{doc.kind}")
 
     # ---- 指标卡 ----
     # 超过 5 张就换行：梁格现在有 7 张（含组合控制弯矩），一线排 7 列时

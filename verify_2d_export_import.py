@@ -666,10 +666,20 @@ def group_h() -> None:
     # 第十五次：四个业务文件零引用平行链。第十六次起这些文件因 opt-in
     # 2D 压弯 / 轴压链接入而有改动，故不再要求「零改动」，改为锁住更本质
     # 的契约：对它们的任何改动都不得回流第十五次平行链 / 3D 唯一转换点。
+    # 2026-11-17：app.py 现在有 2D 建模后导出 GUI 入口，是平行链的**调用方**
+    # 而非重新实现——允许它 import/call export_2d_formats.export_2d_all，
+    # 但仍禁止把平行链内部（to_plane / plane_frame_2d/v1）或 3D 唯一转换点
+    # （to_canonical / mct_io）搬进 app.py。其余三个文件维持零引用。
     biz = ("bridge_spec.py", "solve_2d.py", "app.py", "export_html.py")
-    for f in biz:
+    for f in ("bridge_spec.py", "solve_2d.py", "export_html.py"):
         check(f"{f} 源码无 export_2d_formats 引用",
               "export_2d_formats" not in read(ROOT / f))
+    _app_src = read(ROOT / "app.py")
+    check("app.py 的 2D 导出是调用方而非重实现",
+          "export_2d_all" in _app_src
+          and "to_plane" not in _app_src
+          and "write_ansys_2d" not in _app_src
+          and "plane_frame_2d/v1" not in _app_src)
     r = subprocess.run(
         ["git", "-C", str(ROOT), "diff", "--"] + list(biz),
         capture_output=True, text=True)
@@ -677,7 +687,7 @@ def group_h() -> None:
     check("四个业务文件的改动不触碰第十五次平行链 / 3D 唯一转换点",
           r.returncode == 0
           and not any(t in dtxt for t in
-                      ("export_2d_formats", "to_canonical", "mct_io",
+                      ("to_canonical", "mct_io",
                        "plane_frame_2d/v1", "PlaneMctImport")),
           repr(dtxt[:80]))
 

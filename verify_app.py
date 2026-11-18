@@ -160,6 +160,23 @@ def main() -> int:
           at.session_state["doc"].summary()["title"])
     check("默认不显示三维区块", "模型与求解" not in _subs(at))
 
+    # ---- 建模后导出：单梁 ModelSpec 专用 APDL 链（旧契约链不再无出口）----
+    _eb1 = next((b for b in at.button if b.key == "e2d_export_btn"), None)
+    check("单梁建模后也有 ANSYS APDL 导出按钮", _eb1 is not None)
+    if _eb1 is not None:
+        _eb1.click().run()
+        _ex1 = _ssget(at, "e2d_export") or {}
+        _p1 = _ex1.get("paths", {})
+        check("单梁 ANSYS 导出是 .ans（APDL）",
+              bool(_p1.get("ansys")) and str(_p1["ansys"]).endswith(".ans"),
+              str(_p1.get("ansys")))
+        _apdl1 = (Path(_p1["ansys"]).read_text(encoding="utf-8")
+                  if _p1.get("ansys") and Path(_p1["ansys"]).exists() else "")
+        _solve_cmds = [ln for ln in _apdl1.splitlines()
+                       if ln.strip().upper().startswith("SOLVE")]
+        check("单梁 APDL 只建模（/PREP7 + BEAM3，无 SOLVE 命令）",
+              "/PREP7" in _apdl1 and "BEAM3" in _apdl1 and not _solve_cmds)
+
     print("\n[点示例：拱桥]")
     _exbtn(at, "桥 · 拱桥").click().run()
     check("无异常", not _errors(at), _errors(at)[:1])
@@ -167,6 +184,22 @@ def main() -> int:
           at.session_state["doc"].summary()["lines"][0][:36])
     _info = " ".join(str(i.value) for i in at.info)
     check("④提示走FEM", "FEM-Eigen" in _info, "桥型无草算")
+
+    # ---- 建模后导出：2D 桥型平行导出链 ----
+    _eb2 = next((b for b in at.button if b.key == "e2d_export_btn"), None)
+    check("2D 拱桥建模后有 ANSYS APDL 导出按钮", _eb2 is not None)
+    if _eb2 is not None:
+        _eb2.click().run()
+        _ex2 = _ssget(at, "e2d_export") or {}
+        _p2 = _ex2.get("paths", {})
+        check("2D 导出三格式齐备（ANSYS/Abaqus/MIDAS）",
+              {"ansys", "abaqus", "midas"} <= set(_p2), "、".join(sorted(_p2)))
+        check("2D ANSYS 导出是 .ans（APDL）",
+              bool(_p2.get("ansys")) and str(_p2["ansys"]).endswith(".ans"),
+              str(_p2.get("ansys")))
+        check("2D 导出有有损项告警（平面平行链如实登记）",
+              bool(_ex2.get("warnings")), f"{len(_ex2.get('warnings', []))} 条")
+        check("2D 导出无异常", not _errors(at), _errors(at)[:1])
 
     print("\n[改参数：吊杆数 9 → 15]")
     _doc = at.session_state["doc"]
@@ -222,6 +255,21 @@ def main() -> int:
                   _r.stats.get("elements") == 222 and _r.stats.get("stages") == 3,
                   f"{_r.stats.get('elements')} / {_r.stats.get('stages')}")
             check("活载包络 3 阶段", len(_r.live) == 3, str(sorted(_r.live)))
+            # ---- 建模后导出：3D 通用出口（梁格等非索承桥型）----
+            _eb3 = next((b for b in at.button
+                         if b.key == f"{at.session_state['doc'].kind}_export_btn"), None)
+            check("梁格建模后有 ANSYS APDL 导出按钮", _eb3 is not None)
+            if _eb3 is not None:
+                _eb3.click().run()
+                _ex3 = _ssget(at, f"{at.session_state['doc'].kind}_export") or {}
+                _p3 = _ex3.get("paths", {})
+                check("梁格导出三格式齐备（ANSYS/Abaqus/MIDAS）",
+                      {"ansys", "abaqus", "midas"} <= set(_p3),
+                      "、".join(sorted(_p3)))
+                check("梁格 ANSYS 导出是 .ans（APDL）",
+                      bool(_p3.get("ansys")) and str(_p3["ansys"]).endswith(".ans"),
+                      str(_p3.get("ansys")))
+                check("梁格导出无异常", not _errors(at), _errors(at)[:1])
             _mvd = _r.max_vertical_deflection()
             check("中跨跨中挠度合理", bool(_mvd) and -0.03 < _mvd[1] < -0.001,
                   f"{_mvd[1] * 1000:.2f} mm（节点 {_mvd[0]}）" if _mvd else "—")

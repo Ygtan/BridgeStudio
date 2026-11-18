@@ -431,6 +431,65 @@ if _cap["anastruct"]:
 
 # ---------------------------------------------------------------- ③ 模型
 st.subheader("③ 模型")
+
+# ------------------------------------------------- 建模后：三方复核导出 ---
+# 三条导出链输入契约不同，互不冒充：
+#   ModelSpec(单梁)    -> export_beam_apdl.py::export_beam_apdl  (.ans)
+#   BridgeSpec(2D桥型) -> export_2d_formats.py::export_2d_all   (.ans/.inp/.mct)
+#   ModelSpec3D(3D)    -> ui_3d.py::_export_block              (.ans/.inp/.mct)
+# 按钮放在模型区最前面，不要藏在 JSON 结构文件之后导致看不到。
+try:
+    from bridge_spec import BridgeSpec as _BridgeSpec2D
+except Exception:                                  # noqa: BLE001
+    _BridgeSpec2D = ()
+_is_bridge2d = isinstance(doc.model, _BridgeSpec2D) if _BridgeSpec2D else False
+_e2a, _e2b = st.columns([1.2, 2.0])
+_btn_label = ("导出 ANSYS APDL (.ans) / Abaqus / MIDAS" if _is_bridge2d
+              else "导出 ANSYS APDL (.ans)")
+if _e2a.button(_btn_label, key="e2d_export_btn"):
+    try:
+        if _is_bridge2d:
+            from export_2d_formats import export_2d_all as _export_2d_all
+            _r2 = _export_2d_all(
+                doc.model, out_dir=f"out/{doc.kind}/export", stem=doc.kind)
+            _r2["kind"] = doc.kind
+            st.session_state["e2d_export"] = _r2
+        else:
+            from export_beam_apdl import export_beam_apdl as _export_beam_apdl
+            _apdl = _export_beam_apdl(
+                doc.model, Path(f"out/{doc.kind}/export/{doc.kind}.ans"))
+            st.session_state["e2d_export"] = {
+                "kind": doc.kind,
+                "paths": {"ansys": str(_apdl)}, "warnings": [],
+            }
+    except Exception as e:                          # noqa: BLE001
+        st.session_state.pop("e2d_export", None)
+        st.error(f"导出失败：{e}")
+_e2d = st.session_state.get("e2d_export")
+if _e2d and _e2d.get("kind") != doc.kind:   # 换桥型后旧结果立即失效，不能再拿旧键取新格式
+    _e2d = None
+if _e2d:
+    _fmts = ((("ansys", "ANSYS (.ans)"), ("abaqus", "Abaqus (.inp)"),
+              ("midas", "MIDAS (.mct)")) if _is_bridge2d
+             else (("ansys", "ANSYS (.ans)"),))
+    _dcols = _e2b.columns(len(_fmts))
+    for _i, (_fmt, _lab) in enumerate(_fmts):
+        _dp = Path(_e2d["paths"][_fmt])
+        if _dp.exists():
+            _dcols[_i].download_button(_lab, data=_dp.read_bytes(),
+                                       file_name=_dp.name,
+                                       key=f"e2d_ex_{_fmt}")
+    if _is_bridge2d:
+        for _w in _e2d.get("warnings", [])[:4]:
+            st.caption(f"· {_w}")
+        st.caption("2D 导出只含 x/y 平面、3 个自由度、单一惯矩；"
+                   "车道 / 影响线 / 成桥态 / 施工阶段 / 预应力等有损项只登记、不还原。"
+                   "ANSYS 的 .ans 即 APDL 命令流。")
+    else:
+        st.caption("单梁 APDL 与 FEM-Eigen .dat 同源（同一网格与截面口径），"
+                   "只含建模命令流，求解控制请按需要在 ANSYS 内添加。")
+else:
+    _e2b.caption("建模后点左侧按钮导出 ANSYS APDL；桥型还可导出 Abaqus / MIDAS。")
 if _cap["matplotlib"]:
     _scol, _mcol = st.columns([1, 3])
     with _scol:
@@ -453,6 +512,7 @@ else:
 st.text("\n".join(doc.summary()["lines"]))
 with st.expander("查看结构化模型（ModelDoc → params）"):
     st.json(doc.to_dict())
+
 
 # ---------------------------------------------------------------- ④ 结果
 st.subheader("④ 计算结果")
