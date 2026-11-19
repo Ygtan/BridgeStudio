@@ -37,6 +37,8 @@ from model_spec_3d import (
     Boundary3D,
     Element3D,
     ElemTypeDef3D,
+    Influence3D,
+    Lane3D,
     Material3D,
     ModelSpec3D,
     NodalLoad3D,
@@ -58,6 +60,7 @@ def build_truss_3d(
     q_deck: float = 100e3,         # 桥面均布恒载 (N/m)，含自重
     E_steel: float = 206e9,
     dens_steel: float = 7850.0,
+    lane_code: str = "",              # "JTG_D60"=车道荷载+跨中竖向影响线（opt-in）
     title: str | None = None,
 ) -> tuple[ModelSpec3D, dict]:
     """生成矩形断面空间钢桁架桥 ModelSpec3D + 派生量字典。
@@ -194,6 +197,19 @@ def build_truss_3d(
     all_elems = [e.id for e in elements]
     stages = [Stage3D(id=1, activate=all_elems, loads=loads)]
 
+    # ---- 车道（opt-in）----
+    # 默认 lane_code="" 不写任何 *LANE_3D / *INFLUENCE_3D，冻结 .dat 逐位不变。
+    # 桥面无中梁线：沿左片下弦布一条车道，影响点取跨中下弦节点竖向自由度。
+    lanes: list[Lane3D] = []
+    influences: list[Influence3D] = []
+    if lane_code:
+        mid_i = n_panel // 2
+        influences.append(Influence3D(node=loL(mid_i), dof=3))
+        lanes.append(Lane3D(
+            nodes=[loL(i) for i in range(n_panel + 1)],
+            dof=3, code=lane_code,
+        ))
+
     model = ModelSpec3D(
         title=title or f"{span:.0f}m 空间钢桁架桥（{n_panel}节间，桁高{depth:.0f}m）",
         nodes=nodes,
@@ -205,6 +221,8 @@ def build_truss_3d(
         loads=[],
         stages=stages,
         cable_bridge=None,
+        influences=influences,
+        lanes=lanes,
     )
 
     info = {
@@ -225,5 +243,8 @@ def build_truss_3d(
         "lat_elems": lat_elems,
         "lower_node_ids": [loL(i) for i in range(n_panel + 1)]
         + [loR(i) for i in range(n_panel + 1)],
+        "lane_code": lane_code,
+        "lane_nodes": [loL(i) for i in range(n_panel + 1)] if lane_code else [],
+        "influence_node": loL(n_panel // 2) if lane_code else 0,
     }
     return model, info

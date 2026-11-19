@@ -53,6 +53,8 @@ from model_spec_3d import (
     Boundary3D,
     Element3D,
     ElemTypeDef3D,
+    Influence3D,
+    Lane3D,
     Material3D,
     ModelSpec3D,
     Node3D,
@@ -91,6 +93,7 @@ def build_arch_3d(
     E_steel: float = 206e9,
     dens_steel: float = 7850.0,
     staged: bool = True,            # 生成施工阶段序列（本建造器仅支持 staged）
+    lane_code: str = "",            # "JTG_D60"=车道荷载+跨中竖向影响线（opt-in）
     title: str = "500m 钢箱拱桥（拱肋分段吊装 + 斜拉扣索辅助）",
 ) -> tuple[ModelSpec3D, dict]:
     """生成下承式钢箱拱桥 ModelSpec3D + 施工阶段序列。
@@ -314,6 +317,19 @@ def build_arch_3d(
                 q2_loads.append(NodalLoad3D(node=deck_nid(i), dof=3, value=-w / 2))
         stages.append(Stage3D(id=2 * N + 2, loads=q2_loads))
 
+    # ---------------------------------------------------------- 车道（opt-in）
+    # 默认 lane_code=""：一个 *LANE_3D / *INFLUENCE_3D 都不写，冻结 .dat 逐位不变。
+    # 显式开启时沿主梁纵列布一条规范车道，影响点取跨中主梁节点竖向自由度。
+    lanes: list[Lane3D] = []
+    influences: list[Influence3D] = []
+    if lane_code:
+        mid_i = n_arch // 2
+        influences.append(Influence3D(node=deck_nid(mid_i), dof=3))
+        lanes.append(Lane3D(
+            nodes=[deck_nid(i) for i in range(n_arch + 1)],
+            dof=3, code=lane_code,
+        ))
+
     model = ModelSpec3D(
         title=title,
         nodes=nodes,
@@ -325,6 +341,8 @@ def build_arch_3d(
         loads=[],
         stages=stages,
         cable_bridge=None,
+        influences=influences,
+        lanes=lanes,
     )
 
     model_meta = {
@@ -350,5 +368,8 @@ def build_arch_3d(
         "n_stages": len(stages),
         "staged": staged,
         "cable_targets": {cid: cable_target(cid) for cid in cable_ids},
+        "lane_code": lane_code,
+        "lane_nodes": [deck_nid(i) for i in range(n_arch + 1)] if lane_code else [],
+        "influence_node": deck_nid(n_arch // 2) if lane_code else 0,
     }
     return model, model_meta

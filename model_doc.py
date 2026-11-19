@@ -195,6 +195,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "A_chord": 20000.0, "A_diag": 12000.0, "A_lat": 10000.0,   # mm²
         "q_deck": 100.0,                     # 桥面均布恒载 (kN/m，含自重)
         "material": "钢材 Q345",
+        # 同 arch_3d：lane 不进 DEFAULTS，默认 .dat 哈希逐位不变。
     },
     "beam_bridge": {
         "span": 40.0, "n_spans": 1, "udl": 20.0, "point": 0.0,
@@ -326,6 +327,9 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "cable_fpu": 1860.0,                # 扣索破断强度 (MPa)
         "q_deck": 200.0,                    # 一期恒载 (kN/m，主梁+桥面系)
         "q2_deck": 60.0,                    # 二期恒载 (kN/m，铺装+护栏)
+        # 车道活载不进 DEFAULTS：ModelDoc 直接构造的默认 .dat 哈希必须逐位不变。
+        # from_text 自然语言入口默认开启 lane=True（见 from_text 三维分支），
+        # 建造器 lane_code 仍默认空，只有显式传 JTG_D60 才写 *LANE_3D。
     },
 }
 
@@ -482,6 +486,8 @@ FIELDS: dict[str, list[list[Field]]] = {
         [
             {"key": "material", "label": "材料", "type": "choice",
              "choices": MATERIAL_NAMES},
+            {"key": "lane", "label": "JTG D60 车道活载", "type": "bool",
+             "default": False},
         ],
     ],
     "beam_bridge": [
@@ -878,6 +884,10 @@ FIELDS: dict[str, list[list[Field]]] = {
             {"key": "q2_deck", "label": "二期恒载 (kN/m)", "type": "float",
              "min": 0.0, "max": 200.0, "step": 5.0},
         ],
+        [
+            {"key": "lane", "label": "JTG D60 车道活载", "type": "bool",
+             "default": False},
+        ],
     ],
 }
 
@@ -908,23 +918,30 @@ _FIXED_RE = re.compile(r"塔梁固结|固结体系")
 # 单独一个「顶推」不足以触发（转体/顶推施工也用这个词），必须带「索鞍」。
 _SADDLE_JACK_RE = re.compile(r"索鞍\s*顶推|顶推\s*索鞍|索鞍.{0,6}顶推(?:量)?")
 
-# 组合体系（X20 第 5 类桥型）。阶段二已放行**斜拉-悬索协作**：
-# 命中StaySusp 的走 combo_3d.py（复用悬索主体 + 塔顶斜拉索 + 目标索力），
-# 由第 5 个求解键 combo 求解；梁拱/拱梁组合仍无独立建造器，显式拒绝。
-# 实施规格与验收断言见《组合体系接入规格.md》。
+# 组合体系（X20 第 5 类桥型）。阶段二已放行两类：
+# - 斜拉-悬索协作：命中 StaySusp 走 combo_3d.py（复用悬索主体 + 塔顶斜拉索
+#   + 目标索力），由第 5 个求解键 combo 求解；
+# - 梁拱/拱梁组合：命中 Arch 走 beam_arch_3d.py（线性共同受力，不新增内核
+#   键），复用 arch kind + arch_3d 建造键，BUILDERS 仍 12 格。
+# 其余无法识别的组合体系仍显式拒绝。实施规格见《组合体系接入规格.md》。
 _COMBO_ARCH_RE = re.compile(r"梁拱组合|拱梁组合|梁\s*[-—－]\s*拱|拱\s*[-—－]\s*梁", re.I)
 _COMBO_STAY_SUSP_RE = re.compile(
     r"斜拉\s*[-—－+]\s*悬索|悬索\s*[-—－+]\s*斜拉"
     r"|斜拉悬索|悬索斜拉|组合体系|协作体系|协作桥|组合桥", re.I)
 COMBO_SYSTEM_MSG = (
-    "描述是梁拱/拱梁组合体系。本版组合体系建造器仅支持斜拉-悬索协作体系"
+    "描述是无法识别的组合体系。本版仅放行两类：斜拉-悬索协作体系"
     "（combo_3d.py：复用悬索主体 + 塔顶斜拉索 + 目标索力，走第 5 个求解键 "
-    "combo）；梁拱组合尚无独立建造器，按单一体系建模会给出看似收敛、"
-    "实则力学错误的结果。请拆成两个单一体系分别计算"
+    "combo）与梁拱/拱梁组合体系（beam_arch_3d.py：线性共同受力，走既有 "
+    "三维线性内核）。其它组合体系按单一体系建模会给出看似收敛、实则力学"
+    "错误的结果。请拆成两个单一体系分别计算"
     "（实施规格与验收断言见《组合体系接入规格.md》）。")
 COMBO_STAY_SUSP_NOTE = (
     "识别为斜拉-悬索协作体系：按 combo_3d.py 建造（悬索主体 + 塔顶斜拉索"
     " + 目标索力），由第 5 个求解键 combo 做协作成桥态找形。")
+COMBO_BEAM_ARCH_NOTE = (
+    "识别为梁拱 / 拱梁组合体系：按 beam_arch_3d.py 建造（拱肋 BEAM + 主梁 "
+    "BEAM + 吊杆 TRUSS 线性共同受力），按 arch_type 切换系杆拱自锚 / 拱梁"
+    "外部推力，走既有三维线性内核；不做成桥态找形与协作残差。")
 
 
 def _classify_kind(text: str, hint: str | None = None) -> str:
@@ -952,7 +969,8 @@ def _classify_kind(text: str, hint: str | None = None) -> str:
     t = text.strip()
     # 组合体系（斜拉-悬索协作）按悬索主体建模：kind 仍复用 suspension，
     # 由 combo_kind=STAY_SUSP 触发 combo_3d.py，不新增第 7 格。梁拱组合
-    # 不能伪装成悬索——它走原分类后被 validate() 显式拒绝。
+    # 不能伪装成悬索——它走 arch 分类（arch_3d 建造键），由 combo_kind=
+    # BEAM_ARCH 触发 beam_arch_3d.py，BUILDERS 仍 12 格。
     if (_COMBO_STAY_SUSP_RE.search(t)
             and not _COMBO_ARCH_RE.search(t)):
         return "suspension"
@@ -1082,7 +1100,12 @@ class ModelDoc:
             else:
                 self._model = self._build_suspension()
         elif bk == "arch_3d":
-            self._model = self._build_arch_3d()
+            # 梁拱/拱梁组合复用 arch kind + arch_3d 建造键（12 格不变），
+            # 由 combo_kind=BEAM_ARCH 触发 beam_arch_3d.py 线性共同受力。
+            if self.params.get("combo_kind") == "BEAM_ARCH":
+                self._model = self._build_beam_arch()
+            else:
+                self._model = self._build_arch_3d()
         elif bk == "cable_stayed_2d":
             self._model = self._build_cable_stayed_2d()
         elif bk == "suspension_2d":
@@ -1304,6 +1327,7 @@ class ModelDoc:
             A_lat_mm2=float(p["A_lat"]),
             q_deck=float(p["q_deck"]) * 1e3,
             E_steel=E, dens_steel=dens,
+            lane_code="JTG_D60" if p.get("lane", False) else "",
         )
         self._info = dict(info)
         return model
@@ -1589,6 +1613,7 @@ class ModelDoc:
             cable_fpu=float(p.get("cable_fpu", 1860.0)) * 1e6,
             q_deck=float(p["q_deck"]) * 1e3,
             q2_deck=float(p.get("q2_deck", 0.0) or 0.0) * 1e3,
+            lane_code="JTG_D60" if p.get("lane", False) else "",
         )
         if int(p.get("cable_planes") or 1) == 2 and self.is_3d:
             from dual_plane_3d import mirror_to_dual_plane
@@ -1601,15 +1626,45 @@ class ModelDoc:
         self._info["fpu"] = float(p.get("cable_fpu", 1860.0)) * 1e6
         return model
 
+    def _build_beam_arch(self):
+        """梁拱 / 拱梁组合（线性共同受力，``beam_arch_3d.py``）。
+
+        复用 arch kind + arch_3d 建造键（BUILDERS 仍 12 格），不新增内核键、
+        不写 ``[COOPERATIVE]`` 段。``arch_type`` 由 params 切换系杆拱自锚 /
+        拱梁外部推力；界面 q_deck / q2_deck 单位 kN/m，建造器契约 N/m。
+        """
+        from beam_arch_3d import build_beam_arch_3d, TIED_ARCH
+
+        p = self.params
+        model, info = build_beam_arch_3d(
+            span=float(p["span"]), rise=float(p["rise"]),
+            n_seg_half=int(p.get("n_seg_half", 8)),
+            arch_type=str(p.get("arch_type", TIED_ARCH)).upper(),
+            arch_h=float(p["arch_h"]), arch_b=float(p["arch_b"]),
+            arch_tf=float(p["arch_tf"]), arch_tw=float(p["arch_tw"]),
+            deck_h=float(p["deck_h"]), deck_b=float(p["deck_b"]),
+            deck_tf=float(p.get("deck_tf", 0.03)),
+            deck_tw=float(p.get("deck_tw", 0.022)),
+            hanger_area_mm2=float(p["hanger_area_mm2"]),
+            q_deck=float(p["q_deck"]) * 1e3,
+            q2_deck=float(p.get("q2_deck", 0.0) or 0.0) * 1e3,
+            lane_code="JTG_D60" if p.get("lane", False) else "",
+            title=str(p.get("title") or ""),
+        )
+        self._info = dict(info)
+        return model
+
     # ------------------------------------------------------------ 校验
 
     def validate(self) -> list[str]:
         """返回中文问题列表；空列表表示可以安全求解。**不抛异常**。"""
         errs: list[str] = []
-        # 梁拱/拱梁组合没有对应建造器：先拦在参数校验层。斜拉-悬索协作
-        # 已放行（combo_kind=STAY_SUSP → combo_3d.py + 第 5 求解键 combo）。
+        # 两类组合体系已放行：斜拉-悬索协作（combo_kind=STAY_SUSP →
+        # combo_3d.py + 第 5 求解键 combo）、梁拱/拱梁组合（combo_kind=
+        # BEAM_ARCH → beam_arch_3d.py + 既有线性 3D 内核）。其余组合体系
+        # 仍拦在参数校验层，不静默按单一体系求解。
         if (self.params.get("combo_system")
-                and self.params.get("combo_kind") != "STAY_SUSP"):
+                and self.params.get("combo_kind") not in ("STAY_SUSP", "BEAM_ARCH")):
             return [COMBO_SYSTEM_MSG]
         # 逐跨张拉的参数问题先给中文提示：建造器也会硬拦，但若等它抛出来，
         # 界面只会看到一句「模型参数不完整或非法」，看不出是哪个控件填错了。
@@ -2105,10 +2160,12 @@ class ModelDoc:
         它是**求解选项**而不是模型参数：不进 DEFAULTS / FIELDS，三维与单梁
         分支忽略。默认 False 时写盘 `.dat` / `.result` / 默认 HTML 逐位不变。
         """
-        # 即使调用方绕过界面校验，也不允许把梁拱组合偷偷送进单一体系内核。
-        # 斜拉-悬索协作已放行，走 detect_kind → combo 第 5 键。
+        # 即使调用方绕过界面校验，也不允许把未知组合体系偷偷送进单一体系
+        # 内核。两类已放行：斜拉-悬索协作走 detect_kind → combo 第 5 键；
+        # 梁拱/拱梁组合（BEAM_ARCH）走既有线性 3D 内核（detect_kind 落
+        # grillage3d，cable_bridge=None，不产生协作键）。
         if (self.params.get("combo_system")
-                and self.params.get("combo_kind") != "STAY_SUSP"):
+                and self.params.get("combo_kind") not in ("STAY_SUSP", "BEAM_ARCH")):
             raise ValueError(COMBO_SYSTEM_MSG)
         if self.is_3d:
             from solver_3d import solve as solve_3d_model
@@ -2202,9 +2259,15 @@ class ModelDoc:
             lines = self._model.summary().splitlines()
             return {"title": KIND_LABELS[self.kind], "lines": lines}
         if self.is_3d:
-            title = ("斜拉-悬索协作体系桥"
-                     if self.params.get("combo_kind") == "STAY_SUSP"
-                     else KIND_LABELS[self.kind])
+            ck = self.params.get("combo_kind")
+            if ck == "STAY_SUSP":
+                title = "斜拉-悬索协作体系桥"
+            elif ck == "BEAM_ARCH":
+                at = str(self.params.get("arch_type", "TIED")).upper()
+                title = ("梁拱组合（系杆拱自锚）" if at == "TIED"
+                         else "梁拱组合（拱梁外部推力）")
+            else:
+                title = KIND_LABELS[self.kind]
             return {"title": title,
                     "lines": self._summary_3d().splitlines()}
         spec = self._model
@@ -2342,14 +2405,55 @@ class ModelDoc:
         返回值与 `nl_parser.parse_nl` 同构（doc, source, diag），界面不必分叉。
         `dim_hint` 是界面维度下拉（"二维"/"三维"）；给了就覆盖描述判定。
 
-        组合体系的斜拉-悬索协作在这里放行（combo_kind=STAY_SUSP，交给
-        combo_3d.py + 第 5 求解键）；梁拱/拱梁组合仍记进 params 与 notes，
-        由 `validate()` / `solve()` 明确拒绝，避免静默按单一体系求解。
+        两类组合体系在这里放行：斜拉-悬索协作（combo_kind=STAY_SUSP，交给
+        combo_3d.py + 第 5 求解键）与梁拱/拱梁组合（combo_kind=BEAM_ARCH，
+        交给 beam_arch_3d.py + 既有线性 3D 内核）。其余组合体系仍记进 params
+        与 notes，由 `validate()` / `solve()` 拒绝，避免静默按单一体系求解。
         """
         doc, source, diag = cls._parse_text(text, prev, llm_config, hint, dim_hint)
         if _COMBO_ARCH_RE.search(text or ""):
             doc.params["combo_system"] = True
-            diag.notes.append(COMBO_SYSTEM_MSG)
+            doc.params["combo_kind"] = "BEAM_ARCH"
+            if doc.dimension == "2d":
+                # 梁拱建造器是三维（arch_3d 建造键）；2D arch 只解析出 span /
+                # rise 等少量参数，补齐 arch_3d 缺省后改三维，不静默降级。
+                doc.dimension = "3d"
+                for k, v in DEFAULTS["arch_3d"].items():
+                    doc.params.setdefault(k, v)
+                diag.notes.append("梁拱组合只有三维建造器，已按三维建模。")
+            # 2D arch 解析器认「跨度」不认「主跨」，而梁拱措辞习惯写「主跨
+            # N m」；这里补一次显式提取，避免静默按默认 60 m 建模。
+            m_span = re.search(r"主跨\s*(?:为|约)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:米|m|M)",
+                               text or "")
+            if m_span:
+                doc.params["span"] = float(m_span.group(1))
+            m_rise = re.search(r"矢高\s*(?:为|约)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:米|m|M)",
+                               text or "")
+            if m_rise:
+                doc.params["rise"] = float(m_rise.group(1))
+            elif m_span:
+                # 2D arch 默认 rise=12 是配 60 m 跨度的；主跨一改必须按默认
+                # 矢跨比 1/5 同步重算，否则 span/rise 会畸变到 2~8 之外。
+                doc.params["rise"] = doc.params["span"] / 5.0
+                diag.notes.append(
+                    f"梁拱未说明矢高，按默认矢跨比 1/5 取 {doc.params['rise']:g} m")
+            # 体系型式：明确的「系杆/自锚/无推力」与「外部推力/有推力/地锚」
+            # 决定 arch_type；其余沿用默认 TIED（系杆拱自锚）。
+            if re.search(r"系杆|自锚|无推力", text or ""):
+                doc.params["arch_type"] = "TIED"
+            elif re.search(r"外部推力|有推力|地锚", text or ""):
+                doc.params["arch_type"] = "EXTERNAL"
+            # 梁拱走专属解析分支（不经过三维通用分支），车道开关要在这里补：
+            # 自然语言入口默认开启，让系杆拱 / 拱梁组合的组合表含活载项。
+            doc.params["lane"] = not bool(re.search(
+                r"(?:不计|不考虑|不含|不参与|无|仅恒载|只考虑恒载)"
+                r"[^。；;]{0,8}(?:车道|汽车|活载)"
+                r"|(?:车道|汽车|活载)[^。；;]{0,8}(?:不计|不考虑|不参与)",
+                text or ""))
+            if doc.params["lane"]:
+                diag.notes.append("梁拱组合按 JTG D60 布车道活载并取跨中影响线，"
+                                  "组合含活载项；可显式关闭")
+            diag.notes.append(COMBO_BEAM_ARCH_NOTE)
         elif _COMBO_STAY_SUSP_RE.search(text or ""):
             doc.params["combo_system"] = True
             doc.params["combo_kind"] = "STAY_SUSP"
@@ -2403,6 +2507,22 @@ class ModelDoc:
             # cable_stayed/suspension 分支，不是按 6 值 kind。
             bk = BUILDERS.get((kind, dimension), kind)
             params, notes = extract_3d_params(text, bk)
+            # 车道活载：自然语言入口对 arch_3d / truss_3d（含梁拱复用的
+            # arch_3d 建造键）默认开启，让组合真正含活载项——这正是用户
+            # 看到"组合只有恒载项"的根因。ModelDoc 直接构造默认仍关闭，
+            # 12 个建造器默认 .dat 哈希逐位不变（冻结基线不动）。
+            # 只有文本明确"不计/不考虑车道活载"才关掉。
+            if bk in ("arch_3d", "truss_3d"):
+                params["lane"] = True
+                if re.search(
+                        r"(?:不计|不考虑|不含|不参与|无|仅恒载|只考虑恒载)"
+                        r"[^。；;]{0,8}(?:车道|汽车|活载)"
+                        r"|(?:车道|汽车|活载)[^。；;]{0,8}(?:不计|不考虑|不参与)", text):
+                    params["lane"] = False
+                    notes.append("文本明确不计车道活载：组合只含恒载项（非组合值）")
+                else:
+                    notes.append("三维桥型默认按 JTG D60 布车道活载并取跨中影响线，"
+                                 "组合含活载项；可在参数里关闭")
             params = _keep_solver_opts(prev, kind, params)
             return cls(kind, params, dimension=dimension), "rule(三维)", Diag(notes=notes)
 

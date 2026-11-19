@@ -147,8 +147,14 @@ def _adapt_grillage(model: Any, raw: dict, res: SolveResult) -> None:
             "荷载组合取「成桥态」单值（各施工阶段内力累加），不取阶段包络："
             "阶段包络里含未浇筑完成的悬臂临时内力，与运营期活载不属同一构型。")
     if not res.live_beam:
-        res.diagnostics.append(
-            "模型未定义车道荷载（LANE_3D），无活载内力，荷载组合只出恒载项。")
+        if res.live:
+            res.diagnostics.append(
+                "模型已定义车道荷载并产出活载位移包络，但无梁单元活载内力包络"
+                "（[LIVE_BEAM] 缺失；纯 TRUSS 模型属物理预期）。组合按活载位移"
+                "包络参与，不按梁内力组合。")
+        else:
+            res.diagnostics.append(
+                "模型未定义车道荷载（LANE_3D），无活载内力，荷载组合只出恒载项。")
     elif res.meta.get("f1_vertical"):
         res.diagnostics.append(_impact_note(res.meta).lstrip("，") + "。")
     if any(t.kind == "CABLE" for t in getattr(model, "etypes", [])):

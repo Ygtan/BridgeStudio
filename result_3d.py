@@ -808,10 +808,17 @@ class SolveResult:
                           "结果里没有成桥态梁内力，无法形成组合值", level="error")]
         out: list[Check] = []
         if not self.live_beam:
-            out.append(Check(
-                "活载效应", False,
-                "模型未定义车道荷载（LANE_3D）：组合里只有恒载项乘系数，"
-                "这不是组合值", level="warn"))
+            if getattr(self, "live", None):
+                out.append(Check(
+                    "活载效应", True,
+                    "模型已定义车道荷载并产出活载位移包络；纯 TRUSS 模型没有"
+                    "梁内力包络（[LIVE_BEAM] 缺失属物理预期），组合按活载位移"
+                    "包络参与，不是恒载单项。", level="info"))
+            else:
+                out.append(Check(
+                    "活载效应", False,
+                    "模型未定义车道荷载（LANE_3D）：组合里只有恒载项乘系数，"
+                    "这不是组合值", level="warn"))
         else:
             g = max((abs(v.get("My", 0.0)) for v in self.final_beam.values()),
                     default=0.0)

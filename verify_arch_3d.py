@@ -128,6 +128,30 @@ def main() -> int:
     check("截面正应力 ≤ fd", all(c.passed for c in c_sig),
           f"{len(c_sig)} 项")
 
+    # ---------------------------------------------------------------- 4 车道组合
+    print("\n[4] 车道活载参与组合（用户反馈回归）")
+    m_lane, _ = build_arch_3d(lane_code="JTG_D60")
+    check("建造器默认无车道（冻结 .dat 不变）",
+          not m.lanes and not m.influences
+          and "*LANE_3D" not in m.to_dat(),
+          f"默认 lanes={len(m.lanes)}")
+    check("opt-in 写 LANE_3D + INFLUENCE_3D",
+          len(m_lane.lanes) == 1 and len(m_lane.influences) == 1
+          and "*LANE_3D" in m_lane.to_dat()
+          and "*INFLUENCE_3D" in m_lane.to_dat())
+    d_lane, _, _ = ModelDoc.from_text(
+        "大跨度拱桥500米，矢高100米，拱肋分段吊装，合拢后铺装")
+    check("from_text 默认带车道",
+          len(d_lane.model.lanes) == 1, f"lanes={len(d_lane.model.lanes)}")
+    res_lane = solve(d_lane.model, out_dir="out/verify_arch_3d_lane",
+                     dat_name="arch_lane.dat")
+    check("内核产出活载内力包络（组合含活载项）",
+          bool(res_lane.live_beam), f"live_beam={len(res_lane.live_beam)}")
+    bad = [c for c in res_lane.checks(d_lane.model)
+           if "模型未定义车道" in str(c.detail) or "这不是组合值" in str(c.detail)]
+    check("不再误报「未定义车道」", not bad,
+          str([(c.name, c.detail[:50]) for c in bad])[:80])
+
     print("\n" + "=" * 66)
     n_fail = sum(1 for ok, _, _ in RESULTS if not ok)
     print(f"  {len(RESULTS)} 项校验，{len(RESULTS) - n_fail} 通过，{n_fail} 失败")

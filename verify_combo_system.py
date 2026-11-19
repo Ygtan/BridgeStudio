@@ -108,7 +108,7 @@ def spec_doc() -> None:
 
 
 def guard_paths() -> None:
-    print("\n[2] 阶段二放行：协作体系端到端；梁拱组合仍显式拒绝")
+    print("\n[2] 阶段二放行：协作体系与梁拱组合均端到端")
     msg = md.COMBO_SYSTEM_MSG
     check("文案唯一真源含建造器与规格引用",
           "combo_3d.py" in msg and "组合体系接入规格.md" in msg
@@ -141,18 +141,47 @@ def guard_paths() -> None:
             ok = False
         check(f"协作措辞 {i} build/路由/.dat 一致", ok)
 
-    # 梁拱/拱梁组合没有独立建造器：三处拒绝继续锁住，不许降级。
+    # 梁拱/拱梁组合已由 beam_arch_3d.py 放行（线性共同受力）：原先「触发
+    # 哨兵 + validate/solve 拒绝」是未实现期反证，现成对改写为 build/路由/
+    # .dat/求解的正向确认，断言只增不减。
     for i, text in enumerate((COMBO_TEXTS[3], COMBO_TEXTS[4]), 1):
         doc, _src2, diag = md.ModelDoc.from_text(text)
-        check(f"梁拱措辞 {i} 触发哨兵", doc.params.get("combo_system") is True)
-        check(f"梁拱措辞 {i} notes 含文案", msg in diag.notes)
-        check(f"梁拱措辞 {i} validate 直接拒绝", doc.validate() == [msg])
+        check(f"梁拱措辞 {i} 标记 combo_system",
+              doc.params.get("combo_system") is True)
+        check(f"梁拱措辞 {i} 路由 BEAM_ARCH",
+              doc.params.get("combo_kind") == "BEAM_ARCH")
+        check(f"梁拱措辞 {i} 强制三维建造器", doc.dimension == "3d")
+        check(f"梁拱措辞 {i} notes 含放行说明",
+              md.COMBO_BEAM_ARCH_NOTE in diag.notes)
+        check(f"梁拱措辞 {i} validate 不含拒绝文案", msg not in doc.validate())
+        try:
+            model = doc.model
+            dat = doc.to_dat()
+            ok = (model.cable_bridge is None
+                  and solver_3d.detect_kind(model) == "grillage3d"
+                  and "BEAM" in dat and "TRUSS" in dat)
+        except Exception:                                   # noqa: BLE001
+            ok = False
+        check(f"梁拱措辞 {i} build/路由/.dat 一致", ok)
         try:
             doc.solve()
-            raised = False
-        except ValueError as e:
-            raised = str(e) == msg
-        check(f"梁拱措辞 {i} solve 抛 ValueError(同源文案)", raised)
+            solved = True
+        except Exception:                                   # noqa: BLE001
+            solved = False
+        check(f"梁拱措辞 {i} 端到端可求解", solved)
+
+    # 未知组合体系仍须拒绝：放行两类不等于放行全部，防止逻辑写成"一律放行"。
+    unk = md.ModelDoc("arch",
+                      {**md.DEFAULTS["arch_3d"],
+                       "combo_system": True, "combo_kind": "UNKNOWN"},
+                      dimension="3d")
+    check("未知 combo_kind 被 validate 拒绝", unk.validate() == [msg])
+    try:
+        unk.solve()
+        raised = False
+    except ValueError as e:
+        raised = str(e) == msg
+    check("未知 combo_kind 被 solve 拒绝（同源文案）", raised)
 
 
 def no_false_positive() -> None:
@@ -258,6 +287,34 @@ def docs_synced() -> None:
           "B2 如实标注部分落地" in read("verify_x20_contract.py"))
 
 
+def beam_arch_lane() -> None:
+    print("\n[7] 梁拱组合车道活载参与组合（用户反馈回归）")
+    from beam_arch_3d import build_beam_arch_3d
+    from solver_3d import solve
+
+    m_default, _ = build_beam_arch_3d()
+    m_lane, _ = build_beam_arch_3d(lane_code="JTG_D60")
+    check("梁拱建造器默认无车道（第 44 项冻结不变）",
+          not m_default.lanes and not m_default.influences
+          and "*LANE_3D" not in m_default.to_dat())
+    check("梁拱 opt-in 写 LANE_3D + INFLUENCE_3D",
+          len(m_lane.lanes) == 1 and len(m_lane.influences) == 1
+          and "*LANE_3D" in m_lane.to_dat()
+          and "*INFLUENCE_3D" in m_lane.to_dat())
+    d, _src, _diag = md.ModelDoc.from_text("主跨300米的系杆拱桥，矢高60米，梁拱组合")
+    model = d.model
+    check("梁拱 from_text 默认带车道",
+          len(getattr(model, "lanes", [])) == 1,
+          f"combo_kind={d.params.get('combo_kind')} lanes={len(getattr(model, 'lanes', []))}")
+    res = solve(model, out_dir="out/verify_beam_arch_lane", dat_name="beam_arch_lane.dat")
+    check("梁拱内核产出活载内力包络（组合含活载项）",
+          bool(res.live_beam), f"live_beam={len(res.live_beam)}")
+    bad = [c for c in res.checks(model)
+           if "模型未定义车道" in str(c.detail) or "这不是组合值" in str(c.detail)]
+    check("梁拱不再误报「未定义车道」", not bad,
+          str([(c.name, c.detail[:50]) for c in bad])[:80])
+
+
 def main() -> int:
     print("=" * 78)
     print("组合体系接入规格：能力诚实 / 显式拒绝 / 默认 .dat 不变")
@@ -269,6 +326,7 @@ def main() -> int:
     dat_invariant()
     docs_synced()
     phase1_contract_registry()
+    beam_arch_lane()
     n_pass = sum(1 for ok, _, _ in RESULTS if ok)
     print("\n" + "=" * 78)
     print(f"  {n_pass}/{len(RESULTS)} 通过")

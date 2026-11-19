@@ -199,6 +199,28 @@ def main() -> int:
           abs(max(Nb) - N_ref) / N_ref <= 0.15,
           f"{max(Nb) / 1e3:.0f} vs {N_ref / 1e3:.0f} kN")
 
+    # ---------------------------------------------------------------- 车道组合
+    print("\n[车道] 车道活载参与组合（用户反馈回归）")
+    m_lane, _ = build_truss_3d(lane_code="JTG_D60")
+    check("建造器默认无车道（冻结 .dat 不变）",
+          not m.lanes and not m.influences and "*LANE_3D" not in m.to_dat())
+    check("opt-in 写 LANE_3D + INFLUENCE_3D",
+          len(m_lane.lanes) == 1 and len(m_lane.influences) == 1
+          and "*LANE_3D" in m_lane.to_dat()
+          and "*INFLUENCE_3D" in m_lane.to_dat())
+    d_lane, _, _ = ModelDoc.from_text("跨度60米空间桁架桥，8个节间，桁高6米")
+    check("from_text 默认带车道",
+          len(d_lane.model.lanes) == 1, f"lanes={len(d_lane.model.lanes)}")
+    res_lane = solve(d_lane.model, out_dir="out/verify_truss_3d_lane",
+                     dat_name="truss_lane.dat")
+    # 纯 TRUSS 只有 [LIVE] 位移包络、无 [LIVE_BEAM] 梁内力包络（物理预期）。
+    check("内核产出活载位移包络",
+          bool(res_lane.live), f"live={len(res_lane.live)}")
+    bad = [c for c in res_lane.checks(d_lane.model)
+           if "模型未定义车道" in str(c.detail) or "这不是组合值" in str(c.detail)]
+    check("纯 TRUSS 不再误报「未定义车道」", not bad,
+          str([(c.name, c.detail[:50]) for c in bad])[:80])
+
     print("\n" + "=" * 66)
     n_fail = sum(1 for ok, _, _ in RESULTS if not ok)
     print(f"  {len(RESULTS)} 项校验，{len(RESULTS) - n_fail} 通过，{n_fail} 失败")

@@ -108,6 +108,9 @@ class BeamCombo:
     rows: dict[tuple[int, str], dict[str, float]] = field(default_factory=dict)
     has_live: bool = True
     has_axial_live: bool = False
+    # 车道是否真的定义过。纯 TRUSS 模型有 [LIVE] 位移包络但没有 [LIVE_BEAM]
+    # 梁内力包络：has_live=False 只说明本表没活载项，不能据此说"没定义车道"。
+    lane_defined: bool = True
 
     def worst(self, comp: str = "My") -> tuple[tuple[int, str], float] | None:
         """|分量| 最大的截面 → ((单元, 端), 值)。
@@ -246,7 +249,8 @@ def beam_combinations(res: Any) -> list[BeamCombo]:
                 "VzMax": spec.gamma_g * g.get("Vz", 0.0) + spec.gamma_q * q.get("VzMax", 0.0),
             }
         out.append(BeamCombo(spec=spec, rows=rows, has_live=has_live,
-                             has_axial_live=has_axial_live))
+                             has_axial_live=has_axial_live,
+                             lane_defined=bool(getattr(res, "live", None) or live)))
     return out
 
 
@@ -344,7 +348,10 @@ def beam_table(combo: BeamCombo, limit: int = 0) -> dict[str, Any]:
                  "i 端还是 j 端。活载侧取自 JTG D60 车道荷载影响线包络"
                  "（一辆车队沿桥逐位置布载后取最不利）。轴力 N 在同一截面上"
                  "是单值、且只含恒载项，故不在此表逐行列，见汇总表。"
-                 + ("模型未定义车道荷载，表中只有恒载项。" if not combo.has_live else "")),
+                 + (("模型定义了车道荷载，但纯 TRUSS 模型无梁内力包络，表中只有恒载项。"
+                     if combo.lane_defined else
+                     "模型未定义车道荷载，表中只有恒载项。")
+                    if not combo.has_live else "")),
         "headers": ["单元", "MyMin 端", "MyMin (kN·m)", "MyMax 端",
                     "MyMax (kN·m)", "VzMin (kN)", "VzMax (kN)"],
         "rows": [[r[0], r[1], round(r[2] / 1e3, 1), r[3], round(r[4] / 1e3, 1),
@@ -376,8 +383,13 @@ def summary_table(combos: list[BeamCombo], disps: list[DispCombo]) -> dict[str, 
     # 缺活载时这张表最容易被误读成"组合已经做完了"：它看起来和正常时
     # 一模一样，只是数值小一圈。必须在表注里说死。
     if combos and not combos[0].has_live:
-        note += ("本模型未定义车道荷载（*LANE_3D），表中组合值只有恒载项，"
-                 "不是组合值。")
+        if combos[0].lane_defined:
+            note += ("本模型已定义车道荷载（*LANE_3D），纯 TRUSS 无梁内力活载"
+                     "包络，表中弯矩/剪力组合值只有恒载项；活载效应以位移包络"
+                     "参与，参考「活载效应」诊断。")
+        else:
+            note += ("本模型未定义车道荷载（*LANE_3D），表中组合值只有恒载项，"
+                     "不是组合值。")
     elif combos and not combos[0].has_axial_live:
         note += ("轴力列只含恒载贡献（γ_G·N_G）：本内核的活载包络只输出弯矩"
                  "与剪力，不输出活载轴力。对自锚式悬索桥、系杆拱这类靠轴力"
