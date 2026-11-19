@@ -103,6 +103,8 @@ EXAMPLES: list[tuple[str, str]] = [
      "空间单索面地锚式悬索桥，主跨300米，矢跨比1/10，桥面恒载100kN/m"),
     ("三维 · 自锚式悬索桥",
      "空间单索面自锚式悬索桥，主跨300米，矢跨比1/10，桥面恒载100kN/m"),
+    ("三维 · 组合体系",
+     "斜拉-悬索协作体系桥，主跨1000米，悬索段占50%，塔高1/6主跨，每塔每侧2根斜拉索"),
     ("二维 · 斜拉桥", "双塔三跨斜拉桥，主跨200米，边跨80米，塔高60米，每塔每侧12根索"),
     ("二维 · 地锚式悬索桥",
      "地锚式悬索桥，主跨300米，矢跨比1/10，桥面恒载100kN/m"),
@@ -248,8 +250,10 @@ if st.button("解析并更新模型", type="primary"):
 doc: ModelDoc = st.session_state.doc
 ver: int = st.session_state.doc_version
 
+_kind_label = ("斜拉-悬索协作体系" if doc.params.get("combo_kind") == "STAY_SUSP"
+               else KIND_LABELS[doc.kind])
 st.caption(
-    f"识别结果：**{KIND_LABELS[doc.kind]}（{DIM_LABELS[doc.dimension]}）**"
+    f"识别结果：**{_kind_label}（{DIM_LABELS[doc.dimension]}）**"
     f"　｜　解析来源：**{st.session_state.source}**"
 )
 

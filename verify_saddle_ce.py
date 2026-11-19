@@ -9,7 +9,9 @@
    constant 符号/量值正确，引用节点存在，validate 无 error；
 3. .dat 输出：*CE_PARAMETER + 12 条 *CE，dof 1~6、格式正确；
 4. 自然语言识别：「索鞍顶推 50mm」→ saddle_jack_dx=0.05，Delta>0 才触发；
-5. 独立包一致性：BridgeStudio-App/app 下核心 .py 逐字节一致（若目录存在）。
+5. 独立包一致性：BridgeStudio-App/app 下核心 .py 逐字节一致（若目录存在）；
+6. 分级顶推 stage：jack_stages 差分为 δ_i、每阶段覆盖两塔顶推 CE、拒绝路径
+   与默认零污染，自然语言「分级顶推」识别。
 
 纯离线可回归：不需要 ANSYS/网络。内核端到端试算因需成桥态找形+非线性，
 交给 FEM-Eigen 侧 CTest（第 39 项）覆盖，本守卫只校验模型契约。
@@ -172,6 +174,63 @@ def group_nl() -> None:
 
 
 # ---------------------------------------------------------------- [5] 独立包
+# ------------------------------------------------------------ [6] 分级顶推
+def group_stage_jack() -> None:
+    print("\n[6] 分级顶推 stage（opt-in）")
+    m, meta = build_suspension_3d(
+        system="EARTH", main_span=300.0, panel=30.0, n_tower_seg=3,
+        jack_stages=[0.01, 0.02, 0.03], title="ce_stage")
+    dat = m.to_dat()
+    errs, _ = validate_model_3d(m)
+
+    check("jack_stages 生成 3 个 stage", len(m.stages) == 3,
+          f"got={len(m.stages)}")
+    check("stage 差分 δ 口径：Δ=[.01,.02,.03] → δ=[.01,.01,.01]",
+          all(close(d, 0.01) for d in meta["jack_stage_deltas"]),
+          f"got={meta['jack_stage_deltas']}")
+    check("每 stage 覆盖两塔顶推 CE（id=1,7）",
+          all(set(s.ce_constants) == {1, 7} for s in m.stages))
+    check("首个 stage 激活全部单元，后续不增删",
+          bool(m.stages[0].activate) and all(not s.activate and not s.deactivate
+                                             for s in m.stages[1:]))
+    check("stage CE= 按 id 排序输出（可复现）",
+          dat.count("CE=1:0.01,7:0.01") == 3)
+    check("分级顶推模型 validate 无 error", not errs, f"n={len(errs)}")
+
+    # 拒绝路径：非递增 / 负值 / 少于两级 / 与 saddle_jack_dx 不一致
+    for bad, tag in [
+        ([0.02, 0.01], "非递增"),
+        ([0.01, -0.01], "负值"),
+        ([0.01], "少于两级"),
+    ]:
+        threw = False
+        try:
+            build_suspension_3d(main_span=300.0, jack_stages=bad)
+        except ValueError:
+            threw = True
+        check(f"jack_stages {tag} 被拒绝", threw)
+    threw = False
+    try:
+        build_suspension_3d(main_span=300.0, saddle_jack_dx=0.05,
+                            jack_stages=[0.01, 0.02])
+    except ValueError:
+        threw = True
+    check("saddle_jack_dx 与 jack_stages 末值不一致被拒绝", threw)
+
+    # 默认零污染：不传 jack_stages 时无 stage、.dat 无 *STAGE
+    m0, _ = build_suspension_3d(main_span=300.0, panel=30.0, n_tower_seg=3)
+    check("无 jack_stages → 无 stage", not m0.stages)
+    check("无 jack_stages → .dat 无 *STAGE 段", "*STAGE" not in m0.to_dat())
+
+    # 自然语言 → jack_stages
+    p, _ = extract_3d_params("地锚式悬索桥 主跨 300m 分级顶推 10、20、30 mm",
+                             "suspension")
+    js = p.get("jack_stages")
+    check("自然语言「分级顶推 10、20、30 mm」→ [0.01,0.02,0.03]",
+          js is not None and len(js) == 3 and all(close(a, b) for a, b in
+          zip(js, [0.01, 0.02, 0.03])), f"got={js}")
+
+
 def group_app() -> None:
     print("\n[5] 独立包一致性")
     if not APP_ROOT.exists():
@@ -190,6 +249,7 @@ def main() -> int:
     group_structure()
     group_dat()
     group_nl()
+    group_stage_jack()
     group_app()
     passed = sum(1 for ok, _, _ in RESULTS if ok)
     total = len(RESULTS)

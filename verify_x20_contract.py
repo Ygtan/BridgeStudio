@@ -146,8 +146,9 @@ def asset_table() -> None:
                   if not all(c[i] for i in (1, 2, 4, 5, 6))]
     check("每项都有资产 / 来源 / 落点 / 回归 / 状态", not incomplete,
           str(incomplete))
-    check("B2 如实标注部分落地（组合体系待搬）",
-          "B2" in rows and "部分" in rows.get("B2", [""] * 7)[6])
+    check("B2 如实标注部分落地（斜拉-悬索已放行，梁拱仍待搬）",
+          "B2" in rows and "部分" in rows.get("B2", [""] * 7)[6]
+          and "combo_3d.py" in rows.get("B2", [""] * 7)[6])
     for cid in ("C1", "C2", "C3"):
         check(f"{cid} 标注为明确不借",
               cid in rows and "明确不借" in rows.get(cid, [""] * 7)[6])

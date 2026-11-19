@@ -102,6 +102,11 @@ _SCALARS: dict[str, dict[str, tuple[float, float, str, str, str]]] = {
         "q": (BEAM_MAX_UDL, 1000.0, "N/m", "桥面恒载", "kN/m"),
         "panel": (BEAM_MAX_SECTION, 1000.0, "mm", "吊索间距", "m"),
         "clear": (BEAM_MAX_SECTION, 1000.0, "mm", "跨中净空", "m"),
+        # 斜拉-悬索协作（§3.7）：索力按 kN 录入，误写成 N（如 2000000）时
+        # 自动折算回 kN；susp_fraction / side_stay_ratio / tower_height_ratio
+        # / plane_count / coop_boundary_node 均无量纲，不进换算表。
+        "stay_tension_main": (BEAM_MAX_POINT, 1000.0, "N", "主跨侧目标索力", "kN"),
+        "stay_tension_side": (BEAM_MAX_POINT, 1000.0, "N", "边跨侧目标索力", "kN"),
     },
     # 空间桁架桥：桁高/桥宽沿用桁架/宽幅桥阈值，恒载按 kN/m 哨兵。
     # 弦杆/腹杆/横联面积是 mm²，不是长度，不登记（避免被当 mm→m 误换算）。

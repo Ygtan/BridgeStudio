@@ -56,6 +56,7 @@ from model_spec_3d import (
     NodalLoad3D,
     RealConst3D,
     RebarSpec3D,
+    Stage3D,
 )
 
 G = 9.81
@@ -103,12 +104,31 @@ def build_suspension_3d(
     lane_reduction: float = 0.78,         # 多车道横向折减系数（JTG D60 表 4.3.1-5）
     eccentricity: float = 1.15,           # 偏载增大系数（横向偏载放大，需按实际确认）
     saddle_jack_dx: float = 0.0,          # 索鞍顶推量 Δ（m，沿 +X）；>0 触发三节点 CE 耦合
+    jack_stages: list[float] | None = None,  # 分级顶推累计目标序列 [Δ1,Δ2,...]；None=不分级
     title: str = "",
 ) -> tuple[ModelSpec3D, dict]:
     """生成悬索桥 ModelSpec3D（成桥态工况）与派生量字典。"""
     system = (system or "EARTH").upper()
     if system not in SYSTEM_LABELS:
         raise ValueError(f"system 只能是 EARTH / SELF，收到 {system!r}")
+
+    # ---- 分级顶推参数校验（opt-in；None 时下面完全走原路径）----
+    # jack_stages 是用户视角的**累计**顶推目标 [Δ1,Δ2,...]，必须严格递增且为正；
+    # 建造器内部差分为每阶段增量 δ_i = Δ_i − Δ_(i−1) 写进各 *STAGE 的 CE=。
+    # 给了 jack_stages 就要求顶推生效：未同时给 saddle_jack_dx 时取其末值。
+    if jack_stages is not None:
+        if len(jack_stages) < 2:
+            raise ValueError("jack_stages 至少需要 2 级累计顶推目标（分级才有意义）")
+        if any(x <= 0 for x in jack_stages):
+            raise ValueError("jack_stages 每级累计顶推目标必须为正")
+        if any(b <= a for a, b in zip(jack_stages, jack_stages[1:])):
+            raise ValueError("jack_stages 累计目标必须严格递增（后一级大于前一级）")
+        if saddle_jack_dx <= 0.0:
+            saddle_jack_dx = float(jack_stages[-1])
+        elif abs(saddle_jack_dx - jack_stages[-1]) > 1e-9:
+            raise ValueError(
+                f"saddle_jack_dx={saddle_jack_dx} 与 jack_stages 末值 "
+                f"{jack_stages[-1]} 不一致（CE 基准常量须等于累计顶推终值）")
     if main_span <= 0 or side_span < 0:
         raise ValueError("主跨必须为正、边跨不能为负")
     if not 0.02 <= sag_ratio <= 0.30:
@@ -512,6 +532,25 @@ def build_suspension_3d(
                            ConstraintEquationTerm3D(node=T, dof=dof, coef=-1.0)]))
                 ce_id += 1
 
+    # ---- 分级顶推 stages（opt-in）：累计目标 Δ_i 差分为阶段增量 δ_i ----
+    # 每塔顶推 CE（CE1/CE7，id=1 与 7）在每阶段覆盖为本阶段新增 δ_i；其余
+    # CE 不覆盖，沿用 *CE 原常量。内核线性路径直接写 δ、非线性路径累加为
+    # Δ_i（见 索鞍顶推CE耦合规格.md §8.2）。首个 stage 激活全部单元，后续
+    # stage 结构不变（分级顶推是在同一成桥态上逐级滑移，不增删构件）。
+    stages: list[Stage3D] = []
+    if jack_stages is not None:
+        jack_ce_ids = [1 + 6 * ti for ti in range(2)]   # 每塔 6 条，CE1/CE7 为顶推
+        all_elems = [e.id for e in elements]
+        prev = 0.0
+        for si, cum in enumerate(jack_stages):
+            delta = cum - prev
+            prev = cum
+            st = Stage3D(id=si + 1)
+            if si == 0:
+                st.activate = list(all_elems)
+            st.ce_constants = {cid: delta for cid in jack_ce_ids}
+            stages.append(st)
+
     if not title:
         title = f"双塔三跨{SYSTEM_LABELS[system]}　主跨 {L_main:.0f} m"
     model = ModelSpec3D(
@@ -526,6 +565,8 @@ def build_suspension_3d(
         cable_bridge=cable_bridge,
         # 索鞍顶推 CE（opt-in；默认空列表 → .dat 无新增段，逐位不变）
         ces=ces,
+        # 分级顶推 stages（opt-in；默认空列表，.dat 无 *STAGE 段，逐位不变）
+        stages=stages,
         # 车道：加劲梁纵向节点序列，按 JTG D60 自动生成 qk/Pk。
         # 索承体系内核在成桥态切线刚度上算活载梁内力包络（见 cable_solver）。
         # 横向布载用横向分布系数法：m = lane_count·lane_reduction·eccentricity。
@@ -546,6 +587,10 @@ def build_suspension_3d(
         "hangers": hangers,
         "saddle_jack_dx": saddle_jack_dx,
         "saddle_jack_on": jack_on,
+        "jack_stages": list(jack_stages) if jack_stages is not None else None,
+        "jack_stage_deltas": (
+            [b - a for a, b in zip([0.0] + list(jack_stages), jack_stages)]
+            if jack_stages is not None else None),
         "saddle_nodes": list(jack_saddle),
         "saddle_tower_top_nodes": list(jack_tower_top),
         "n_ce": len(ces),

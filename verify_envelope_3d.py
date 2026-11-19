@@ -17,6 +17,13 @@
 
 from __future__ import annotations
 
+import os
+
+# 本脚本未走 console_utf8.setup_console()，需自行兜底 matplotlib 后端：
+# 无 Tcl 环境下 TkAgg 会在出图时抛 TclError。须在业务模块（间接导入
+# pyplot）之前设置；setdefault 尊重外部显式选择。
+os.environ.setdefault("MPLBACKEND", "Agg")
+
 import hashlib
 import io
 import sys

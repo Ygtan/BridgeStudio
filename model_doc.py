@@ -282,6 +282,16 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "erection_panels": 2,               # 每次对称吊装的吊点对数
         "lane_count": 3,                    # 横向设计车道数
         "lane_reduction": 0.78,             # 多车道横向折减系数（JTG D60 表 4.3.1-5）
+        # ---- 斜拉-悬索协作（opt-in，仅 combo_kind=STAY_SUSP 时生效）----
+        # 缺省只多几个参数键，不改变悬索默认 .dat；§3.7 定性词全部参数化。
+        "susp_fraction": 0.5,               # 主跨悬索段占比（居中）
+        "side_stay_ratio": 0.5,             # 边跨斜拉段 / 主跨单侧斜拉段
+        "tower_height_ratio": 0.0,          # 塔高/主跨；0=沿用悬索自动塔高
+        "plane_count": 1,                   # 1=单索面（与内核冻结算例一致）
+        "coop_boundary_node": 0,            # 0=自动取最远主跨斜拉锚点
+        "stay_per_side": 1,                 # 每塔每侧斜拉索根数
+        "stay_tension_main": 2000.0,        # 主跨侧目标索力 (kN)
+        "stay_tension_side": 3000.0,        # 边跨侧目标索力 (kN)
     },
     # 2D 平面悬索桥：与三维共用工程参数（system/Lm/Ls/sag/clear/q/A/Ah），主缆按
     # 抛物线初值、恒载水平力 H=qL²/8f 以 ISTRN 预张。2D 只做成桥态一次静力，无
@@ -741,6 +751,41 @@ FIELDS: dict[str, list[list[Field]]] = {
              "help": "JTG D60 表 4.3.1-5；留默认 0.78 且改了车道数时，"
                      "建造器会按车道数自动跟正。"},
         ],
+        # ---- 斜拉-悬索协作（§3.7 口径参数，仅识别到协作体系时显示）----
+        [
+            {"key": "susp_fraction", "label": "主跨悬索段占比", "type": "float",
+             "min": 0.05, "max": 0.95, "step": 0.05,
+             "when": lambda p: p.get("combo_kind") == "STAY_SUSP",
+             "help": "§3.7：主跨中间悬索段占比，默认 0.5，两端各留斜拉段。"},
+            {"key": "side_stay_ratio", "label": "边跨/主跨斜拉段比", "type": "float",
+             "min": 0.1, "max": 1.0, "step": 0.05,
+             "when": lambda p: p.get("combo_kind") == "STAY_SUSP",
+             "help": "默认 0.5（边跨约为主跨单侧斜拉段一半略短）。"},
+            {"key": "tower_height_ratio", "label": "塔高/主跨（0=自动）", "type": "float",
+             "min": 0.0, "max": 0.3, "step": 0.01,
+             "when": lambda p: p.get("combo_kind") == "STAY_SUSP",
+             "help": "介于悬索 1/10 与斜拉 1/4 之间；0 = 沿用悬索自动塔高。"},
+            {"key": "stay_per_side", "label": "每塔每侧斜拉索数", "type": "int",
+             "min": 1, "max": 8, "step": 1,
+             "when": lambda p: p.get("combo_kind") == "STAY_SUSP"},
+        ],
+        [
+            {"key": "plane_count", "label": "索面数", "type": "choice",
+             "choices": [1, 2],
+             "fmt": {1: "单索面（当前放行，与内核冻结算例一致）",
+                     2: "双索面（需先扩镜像建造与内核 benchmark，显式拒绝）"},
+             "when": lambda p: p.get("combo_kind") == "STAY_SUSP"},
+            {"key": "coop_boundary_node", "label": "协作分界节点（0=自动）",
+             "type": "int", "min": 0, "max": 100000, "step": 1,
+             "when": lambda p: p.get("combo_kind") == "STAY_SUSP",
+             "help": "必须是实际梁节点且与索锚点离散对齐。"},
+            {"key": "stay_tension_main", "label": "主跨侧目标索力 (kN)",
+             "type": "float", "min": 100.0, "max": 20000.0, "step": 100.0,
+             "when": lambda p: p.get("combo_kind") == "STAY_SUSP"},
+            {"key": "stay_tension_side", "label": "边跨侧目标索力 (kN)",
+             "type": "float", "min": 100.0, "max": 20000.0, "step": 100.0,
+             "when": lambda p: p.get("combo_kind") == "STAY_SUSP"},
+        ],
     ],
     "suspension_2d": [
         [
@@ -863,20 +908,23 @@ _FIXED_RE = re.compile(r"塔梁固结|固结体系")
 # 单独一个「顶推」不足以触发（转体/顶推施工也用这个词），必须带「索鞍」。
 _SADDLE_JACK_RE = re.compile(r"索鞍\s*顶推|顶推\s*索鞍|索鞍.{0,6}顶推(?:量)?")
 
-# 组合体系（X20 第 5 类桥型）：内核没有对应的成桥态求解键。识别到就拒绝，
-# 不按 `_classify_kind` 的顺序悄悄落到悬索或斜拉——那会给出「收敛但错误」的答案。
+# 组合体系（X20 第 5 类桥型）。阶段二已放行**斜拉-悬索协作**：
+# 命中StaySusp 的走 combo_3d.py（复用悬索主体 + 塔顶斜拉索 + 目标索力），
+# 由第 5 个求解键 combo 求解；梁拱/拱梁组合仍无独立建造器，显式拒绝。
 # 实施规格与验收断言见《组合体系接入规格.md》。
-_COMBO_SYSTEM_RE = re.compile(
-    r"组合体系|协作体系|协作桥|组合桥"
-    r"|斜拉\s*[-—－+]\s*悬索|悬索\s*[-—－+]\s*斜拉"
-    r"|斜拉悬索|悬索斜拉|梁拱组合|拱梁组合", re.I)
+_COMBO_ARCH_RE = re.compile(r"梁拱组合|拱梁组合|梁\s*[-—－]\s*拱|拱\s*[-—－]\s*梁", re.I)
+_COMBO_STAY_SUSP_RE = re.compile(
+    r"斜拉\s*[-—－+]\s*悬索|悬索\s*[-—－+]\s*斜拉"
+    r"|斜拉悬索|悬索斜拉|组合体系|协作体系|协作桥|组合桥", re.I)
 COMBO_SYSTEM_MSG = (
-    "描述是组合体系（斜拉-悬索协作 / 梁拱组合）。当前内核只有 "
-    "grillage3d / cable_stayed / suspension / stage_nl 四种求解键，"
-    "detect_kind 只能在斜拉与悬索之间二选一，没有协作体系的成桥态找形；"
-    "按单一体系建模会给出看似收敛、实则力学错误的结果。"
-    "请拆成两个单一体系分别计算，或等内核侧补第 5 个求解键"
+    "描述是梁拱/拱梁组合体系。本版组合体系建造器仅支持斜拉-悬索协作体系"
+    "（combo_3d.py：复用悬索主体 + 塔顶斜拉索 + 目标索力，走第 5 个求解键 "
+    "combo）；梁拱组合尚无独立建造器，按单一体系建模会给出看似收敛、"
+    "实则力学错误的结果。请拆成两个单一体系分别计算"
     "（实施规格与验收断言见《组合体系接入规格.md》）。")
+COMBO_STAY_SUSP_NOTE = (
+    "识别为斜拉-悬索协作体系：按 combo_3d.py 建造（悬索主体 + 塔顶斜拉索"
+    " + 目标索力），由第 5 个求解键 combo 做协作成桥态找形。")
 
 
 def _classify_kind(text: str, hint: str | None = None) -> str:
@@ -902,6 +950,12 @@ def _classify_kind(text: str, hint: str | None = None) -> str:
         if hits:
             return KIND_HINTS[max(hits, key=len)]
     t = text.strip()
+    # 组合体系（斜拉-悬索协作）按悬索主体建模：kind 仍复用 suspension，
+    # 由 combo_kind=STAY_SUSP 触发 combo_3d.py，不新增第 7 格。梁拱组合
+    # 不能伪装成悬索——它走原分类后被 validate() 显式拒绝。
+    if (_COMBO_STAY_SUSP_RE.search(t)
+            and not _COMBO_ARCH_RE.search(t)):
+        return "suspension"
     if re.search(r"悬索|主缆|吊索", t):
         return "suspension"
     # 大跨拱桥施工必须先于「斜拉」判：拱肋吊装用的「斜拉扣索」含「斜拉」二字，
@@ -1020,7 +1074,13 @@ class ModelDoc:
         elif bk == "cable_stayed":
             self._model = self._build_cable_stayed()
         elif bk == "suspension":
-            self._model = self._build_suspension()
+            # 组合体系（斜拉-悬索协作）复用 suspension kind 与同一套参数，
+            # 由 combo_kind=STAY_SUSP 触发 combo_3d.py；不新增第 7 个 kind，
+            # 12 格 BUILDERS 与既有 .dat 基线保持逐位不变。
+            if (self.params.get("combo_kind") == "STAY_SUSP" and self.is_3d):
+                self._model = self._build_combo()
+            else:
+                self._model = self._build_suspension()
         elif bk == "arch_3d":
             self._model = self._build_arch_3d()
         elif bk == "cable_stayed_2d":
@@ -1373,6 +1433,11 @@ class ModelDoc:
             erection_panels=int(p.get("erection_panels", 2)),
             lane_count=_lc,
             lane_reduction=_lr,
+            # 索鞍顶推（opt-in）：自然语言识别的 Δ 与分级顶推序列接入建造器。
+            # 缺省时这两个键不在 p 中，传 None/0 → 建造器走原路径零污染。
+            saddle_jack_dx=float(p.get("saddle_jack_dx", 0.0) or 0.0),
+            jack_stages=(list(p["jack_stages"])
+                         if p.get("jack_stages") is not None else None),
         )
         if int(p.get("cable_planes") or 1) == 2 and self.is_3d:
             from dual_plane_3d import mirror_to_dual_plane
@@ -1381,6 +1446,62 @@ class ModelDoc:
                 model, info, B=float(p["B"]), kind="suspension",
                 half_real_ids=(1, 2),
             )
+        self._info = dict(info)
+        self._info["fpu"] = float(p.get("fpu", 1770.0)) * 1e6
+        return model
+
+    def _build_combo(self):
+        """斜拉-悬索协作体系：复用悬索主体 + 塔顶斜拉索（``combo_3d.py``）。
+
+        参数映射与 `_build_suspension()` 完全一致（kind 仍是 suspension，
+        12 格 BUILDERS 不变），§3.7 协作参数从 params 读取。建造器必置
+        ``cooperative=True``，求解器据此路由到第 5 键 combo；缺省参数仍按
+        规格转写口径建协作体系，不静默降级成单体系悬索/斜拉。
+        """
+        from combo_3d import build_combo_3d
+
+        p = self.params
+        n_sag = float(p.get("sag", 10.0))
+        _lc = int(p.get("lane_count", 3))
+        _lr = float(p.get("lane_reduction", 0.78))
+        if _lc != 3 and abs(_lr - 0.78) < 1e-9:
+            _lr = _LANE_REDUCTION.get(_lc, _lr)
+        tr = p.get("tower_height_ratio")
+        model, info = build_combo_3d(
+            main_span=float(p["Lm"]),
+            susp_fraction=float(p.get("susp_fraction", 0.5)),
+            side_stay_ratio=float(p.get("side_stay_ratio", 0.5)),
+            tower_height_ratio=(float(tr) if tr not in (None, "", 0.0) else None),
+            plane_count=int(p.get("plane_count", 1)),
+            coop_boundary_node=int(p.get("coop_boundary_node", 0) or 0),
+            stay_per_side=int(p.get("stay_per_side", 1)),
+            # 界面以 kN 为单位，建造器契约是 N
+            stay_tension_main=float(p.get("stay_tension_main", 2000.0)) * 1e3,
+            stay_tension_side=float(p.get("stay_tension_side", 3000.0)) * 1e3,
+            # 透传悬索主体参数（与 _build_suspension 同一套映射）
+            system=str(p.get("system", "EARTH")).upper(),
+            side_span=float(p.get("Ls", 0.0) or 0.0),
+            sag_ratio=(1.0 / n_sag) if n_sag > 0 else 0.10,
+            clearance=float(p.get("clear", 5.0)),
+            panel=float(p.get("panel", 10.0)),
+            side_hangers=bool(p.get("sh", True)),
+            B=float(p["B"]), h=float(p["h"]),
+            tf=float(p.get("tf", 0.028)), tw=float(p.get("tw", 0.020)),
+            tower_b=float(p.get("tower_b", 3.0)),
+            tower_h=float(p.get("tower_h", 4.0)),
+            n_tower_seg=int(p.get("tp", 6)),
+            q_deck=float(p["q"]) * 1e3,
+            q2_deck=float(p.get("q2_deck", 0.0) or 0.0) * 1e3,
+            main_area_mm2=float(p.get("A", 60000.0)),
+            hanger_area_mm2=float(p.get("Ah", 3000.0)),
+            erection=bool(p.get("erection", False)),
+            erection_panels=int(p.get("erection_panels", 2)),
+            lane_count=_lc,
+            lane_reduction=_lr,
+            saddle_jack_dx=float(p.get("saddle_jack_dx", 0.0) or 0.0),
+            jack_stages=(list(p["jack_stages"])
+                         if p.get("jack_stages") is not None else None),
+        )
         self._info = dict(info)
         self._info["fpu"] = float(p.get("fpu", 1770.0)) * 1e6
         return model
@@ -1485,9 +1606,10 @@ class ModelDoc:
     def validate(self) -> list[str]:
         """返回中文问题列表；空列表表示可以安全求解。**不抛异常**。"""
         errs: list[str] = []
-        # 组合体系没有对应内核键：先拦在参数校验层，避免界面把它当成
-        # 「一点小问题」继续求解。文案与 from_text 的 notes 同源。
-        if self.params.get("combo_system"):
+        # 梁拱/拱梁组合没有对应建造器：先拦在参数校验层。斜拉-悬索协作
+        # 已放行（combo_kind=STAY_SUSP → combo_3d.py + 第 5 求解键 combo）。
+        if (self.params.get("combo_system")
+                and self.params.get("combo_kind") != "STAY_SUSP"):
             return [COMBO_SYSTEM_MSG]
         # 逐跨张拉的参数问题先给中文提示：建造器也会硬拦，但若等它抛出来，
         # 界面只会看到一句「模型参数不完整或非法」，看不出是哪个控件填错了。
@@ -1843,7 +1965,7 @@ class ModelDoc:
 
                 sk = detect_kind(self.model)
                 ok3d = bool(capabilities().get(sk))
-                nonlinear = sk in ("cable_stayed", "suspension")
+                nonlinear = sk in ("cable_stayed", "suspension", "combo")
             except Exception:
                 ok3d = False
                 nonlinear = False
@@ -1983,8 +2105,10 @@ class ModelDoc:
         它是**求解选项**而不是模型参数：不进 DEFAULTS / FIELDS，三维与单梁
         分支忽略。默认 False 时写盘 `.dat` / `.result` / 默认 HTML 逐位不变。
         """
-        # 即使调用方绕过界面校验，也不允许把组合体系偷偷送进单一体系内核。
-        if self.params.get("combo_system"):
+        # 即使调用方绕过界面校验，也不允许把梁拱组合偷偷送进单一体系内核。
+        # 斜拉-悬索协作已放行，走 detect_kind → combo 第 5 键。
+        if (self.params.get("combo_system")
+                and self.params.get("combo_kind") != "STAY_SUSP"):
             raise ValueError(COMBO_SYSTEM_MSG)
         if self.is_3d:
             from solver_3d import solve as solve_3d_model
@@ -2078,7 +2202,10 @@ class ModelDoc:
             lines = self._model.summary().splitlines()
             return {"title": KIND_LABELS[self.kind], "lines": lines}
         if self.is_3d:
-            return {"title": KIND_LABELS[self.kind],
+            title = ("斜拉-悬索协作体系桥"
+                     if self.params.get("combo_kind") == "STAY_SUSP"
+                     else KIND_LABELS[self.kind])
+            return {"title": title,
                     "lines": self._summary_3d().splitlines()}
         spec = self._model
         lines = spec.summary().splitlines()
@@ -2215,13 +2342,23 @@ class ModelDoc:
         返回值与 `nl_parser.parse_nl` 同构（doc, source, diag），界面不必分叉。
         `dim_hint` 是界面维度下拉（"二维"/"三维"）；给了就覆盖描述判定。
 
-        组合体系不在这里分类（没有对应建造器），而是记进 params 与 notes，
+        组合体系的斜拉-悬索协作在这里放行（combo_kind=STAY_SUSP，交给
+        combo_3d.py + 第 5 求解键）；梁拱/拱梁组合仍记进 params 与 notes，
         由 `validate()` / `solve()` 明确拒绝，避免静默按单一体系求解。
         """
         doc, source, diag = cls._parse_text(text, prev, llm_config, hint, dim_hint)
-        if _COMBO_SYSTEM_RE.search(text or ""):
+        if _COMBO_ARCH_RE.search(text or ""):
             doc.params["combo_system"] = True
             diag.notes.append(COMBO_SYSTEM_MSG)
+        elif _COMBO_STAY_SUSP_RE.search(text or ""):
+            doc.params["combo_system"] = True
+            doc.params["combo_kind"] = "STAY_SUSP"
+            diag.notes.append(COMBO_STAY_SUSP_NOTE)
+            if doc.dimension == "2d":
+                # 协作体系是空间体系（塔两侧水平力平衡、斜拉与悬索分属不同
+                # 索面），没有二维建造器；不静默按单体系二维降级。
+                doc.dimension = "3d"
+                diag.notes.append("组合体系只有三维建造器，已按三维建模。")
         return doc, source, diag
 
     @classmethod
@@ -2655,6 +2792,33 @@ def _extract_length_after(text: str, anchor_re: re.Pattern, labels: tuple[str, .
     return None
 
 
+# 分级顶推（opt-in）：命中「分级/逐级/逐阶段 顶推」才解析为一个累计目标序列。
+# 多个 Δ 用「、/,/→/;/然后/再」分隔，每个可带单位（缺省 mm，与单次顶推一致）。
+_STAGE_JACK_RE = re.compile(
+    r"(?:分级|逐级|逐阶段|分阶段|分步)\s*顶推|顶推\s*(?:分[级阶]|逐[级阶])")
+
+
+def _extract_stage_jack(text: str) -> list[float] | None:
+    """抽取分级顶推的累计目标序列（m）；未命中或非递增返回 None。"""
+    m = _STAGE_JACK_RE.search(text)
+    if not m:
+        return None
+    from nl_parser import _to_m
+
+    tail = text[m.end():m.end() + 120]
+    unit_re = r"(?:毫米|厘米|公分|mm|cm|米|m)"
+    # 抓所有「数值 + 可选单位」；分隔符只用来切词，这里按数值序列取。
+    found = re.findall(r"([0-9]+(?:\.[0-9]+)?)\s*(" + unit_re + r")?", tail, re.I)
+    vals: list[float] = []
+    for num, unit in found:
+        v = _to_m(float(num), unit or "mm")
+        if not vals or v > vals[-1]:       # 严格递增去重（同值重复无意义）
+            vals.append(v)
+    if len(vals) < 2:
+        return None
+    return vals
+
+
 def _note_cable_planes(text: str, p: dict[str, Any], notes: list[str]) -> None:
     """双索面是 opt-in 几何开关，**不是**维度开关。
 
@@ -2916,7 +3080,17 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
         # 索鞍顶推（opt-in，仅三维悬索桥）：命中「索鞍顶推」才解析位移量。
         # 单位默认 mm（工程习惯），也接受 m / cm；Δ>0 触发三节点 CE 耦合，
         # 未写明量值时给一个占位正量并由提示要求用户确认，而不是静默忽略。
-        if _SADDLE_JACK_RE.search(text):
+        # 分级顶推（opt-in）：命中「分级/逐级顶推 + 多个 Δ」时生成累计目标序列，
+        # 差分为阶段增量 δ_i 写进 *STAGE CE=（见 索鞍顶推CE耦合规格.md §8）。
+        # 单次「索鞍顶推 50mm」仍走上面的 saddle_jack_dx 路径，互不影响。
+        stages_dx = _extract_stage_jack(text)
+        if stages_dx is not None:
+            p["jack_stages"] = stages_dx
+            notes.append(
+                f"识别到分级顶推：{len(stages_dx)} 级累计目标 "
+                f"{[round(x * 1000, 3) for x in stages_dx]} mm → 逐阶段 CE 耦合"
+                "（建造器内部差分为每阶段增量 δ）")
+        elif _SADDLE_JACK_RE.search(text):
             dx = _extract_length_after(text, _SADDLE_JACK_RE,
                                        ("顶推量", "顶推位移", "顶推", "位移"),
                                        default_unit="mm")
@@ -3038,6 +3212,41 @@ def extract_3d_params(text: str, kind: str) -> tuple[dict[str, Any], list[str]]:
                     "不是成桥切线刚度，不含 Ernst 与几何刚度。")
             if re.search(r"施工|吊装|合拢", text):
                 notes.append("2D 悬索桥暂不做施工阶段模拟（分级找形走三维 erection）")
+        # ---- 斜拉-悬索协作（§3.7 口径参数）----
+        # 不放在 `if not is_2d:` 内：from_text 对未写「三维」的协作描述先按
+        # 2d 解析、再自动切 3d，参数必须在切换前就落到 params 里。
+        # 默认值源固定用 3D 的 DEFAULTS["suspension"]（suspension_2d 无这些键）。
+        if _COMBO_STAY_SUSP_RE.search(text) and not _COMBO_ARCH_RE.search(text):
+            d3 = DEFAULTS["suspension"]
+            p["combo_kind"] = "STAY_SUSP"
+            m = re.search(r"悬索段\s*(?:占|为|占比)?\s*"
+                          r"([0-9]+(?:\.[0-9]+)?)\s*[%％]?", text)
+            if m:
+                v = float(m.group(1))
+                p["susp_fraction"] = v / 100.0 if v > 1.0 else v
+            else:
+                p["susp_fraction"] = d3["susp_fraction"]
+                notes.append("未说明主跨悬索段占比，默认 "
+                             f"{d3['susp_fraction']:g}（§3.7 口径）")
+            m = re.search(r"塔高\s*(?:约|为)?\s*1\s*[/:：]\s*(\d+(?:\.\d+)?)", text)
+            p["tower_height_ratio"] = (
+                round(1.0 / max(float(m.group(1)), 1e-6), 4) if m
+                else d3["tower_height_ratio"])
+            m = re.search(r"每侧\s*(\d+)\s*根\s*斜拉索", text)
+            p["stay_per_side"] = int(m.group(1)) if m else d3["stay_per_side"]
+            p["plane_count"] = int(p.get("cable_planes") or d3["plane_count"])
+            p["coop_boundary_node"] = d3["coop_boundary_node"]
+            p["stay_tension_main"] = d3["stay_tension_main"]
+            p["stay_tension_side"] = d3["stay_tension_side"]
+            p["side_stay_ratio"] = (
+                0.5 if re.search(r"边跨[^，。；;]{0,16}?(?:一半|0\.5|1/2)", text)
+                else d3["side_stay_ratio"])
+            notes.append(
+                "协作体系 §3.7 口径：悬索段占比 "
+                f"{p['susp_fraction']:g}、边跨比 {p['side_stay_ratio']:g}、"
+                f"塔高比 {p['tower_height_ratio']:g}（0=自动）、"
+                f"索面数 {p['plane_count']}；主跨/边跨斜拉目标索力取默认 "
+                f"{p['stay_tension_main']:g}/{p['stay_tension_side']:g} kN")
     elif base == "arch_3d":
         _note_cable_planes(text, p, notes)
         # 主跨：与斜拉/悬索同一套「先主跨后跨度」的优先级。

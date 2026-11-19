@@ -54,13 +54,11 @@ def main() -> int:
     # ---------------------------------------------------------- ① 注册表
     print("\n[① 注册表]")
     keys = solver_keys()
-    # 四个内核：梁格、斜拉桥成桥态、悬索桥成桥态、非线性施工阶段。
-    # 中间两个共用 cable_solver.exe，但 adapt 与出口不同，仍各占一键；
-    # stage_nl 独立 exe，以前靠 ModelDoc 旁路，现在也正式登记。
-    # "同一个 exe"不等于"同一个内核"，混成一个键会让 detect_kind 的分支
-    # 无处落地。
-    expected = {"grillage3d", "cable_stayed", "suspension", "stage_nl"}
-    check("注册表含四个内核", set(keys) == expected, str(keys))
+    # 五个内核：梁格、斜拉桥成桥态、悬索桥成桥态、协作体系（斜拉-悬索）、
+    # 非线性施工阶段。中间三个共用 cable_solver.exe，但 adapt 与出口不同，
+    # 仍各占一键；combo 靠 SYSTEM=COOP 走协作找形，是阶段二放行的第 5 键。
+    expected = {"grillage3d", "cable_stayed", "suspension", "combo", "stage_nl"}
+    check("注册表含五个内核（含 combo）", set(keys) == expected, str(keys))
     caps = capabilities()
     check("capabilities 与注册表同键", set(caps) == set(keys), str(caps))
     check("降级提示与注册表同键", set(_fallback_hints()) == set(keys),

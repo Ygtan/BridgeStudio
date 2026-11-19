@@ -503,6 +503,10 @@ class Stage3D(BaseModel):
     creep_dphi: float = 0.0
     # 阶段末龄期（天）。>0 且模型写了徐变曲线时，内核用 φ(t)−φ(上一阶段) 代替 creep_dphi。
     time: float = 0.0
+    # 分级顶推 CE constant 覆盖（opt-in）：CE 编号 → 本阶段顶推量。
+    # 线性 stage 解增量，写本阶段新增 δ_i；非线性 stage 由内核累加为累计 Δ_i。
+    # 空 = 不覆盖，stage 沿用 *CE 原常量，既有阶段算例逐位不变。
+    ce_constants: dict[int, float] = Field(default_factory=dict)
 
 
 class Influence3D(BaseModel):
@@ -584,6 +588,9 @@ class CableBridge3D(BaseModel):
 
     # ---- 悬索桥（*SUSP_BRIDGE / *MAINCABLE / *HANGER）----
     system: Literal["", "EARTH", "SELF"] = ""   # 地锚式 / 自锚式；空 = 斜拉桥
+    # 协作体系（斜拉-悬索组合）opt-in：*CABLE_BRIDGE SYSTEM=COOP。
+    # 与 system（锚固类型）独立存储、互不覆盖；默认 false → 走既有单体系路径。
+    cooperative: bool = False
     sag: float = 0.0                # 主跨矢高 m（>0 时优先于矢跨比）
     tower1: int = 0                 # 塔顶节点（必须在主缆链上）
     tower2: int = 0
@@ -970,6 +977,11 @@ class ModelSpec3D(BaseModel):
                 parts.append(f"DPHI={fmt(s.creep_dphi)}")
             if s.time:
                 parts.append(f"TIME={fmt(s.time)}")
+            # 分级顶推 CE 覆盖：按 CE 编号排序输出，与 TENSION=/L0= 同理保证
+            # 同一模型两次导出文本逐位一致（.dat 对拍的前提）。
+            if s.ce_constants:
+                parts.append("CE=" + ",".join(
+                    f"{k}:{fmt(s.ce_constants[k])}" for k in sorted(s.ce_constants)))
             # 张拉规格按单元号排序输出：dict 的插入顺序取决于调用方怎么建的，
             # 同一份模型两次导出得到不同文本会让 .dat 对拍失去意义。
             if s.tensions:
@@ -1042,6 +1054,10 @@ class ModelSpec3D(BaseModel):
                 # 哪些是吊索、塔顶在哪里——它无法从几何自行分辨
                 # （斜拉索与吊索都是 CABLE 单元，形状也都能斜能竖）。
                 L.append("# 悬索桥：主缆找形的定位信息（地锚式/自锚式仅边界不同）")
+                # 协作体系 opt-in：SYSTEM=COOP 属于 *CABLE_BRIDGE（与下面的
+                # *SUSP_BRIDGE SYSTEM=EARTH/SELF 锚固类型独立），默认 false 不写。
+                if cb.cooperative:
+                    L.append("SYSTEM=COOP")
                 L.append("*SUSP_BRIDGE")
                 L.append(f"SYSTEM={cb.system}")
                 L.append(f"TOWER1={cb.tower1}")
@@ -1224,10 +1240,22 @@ def validate_model_3d(model: ModelSpec3D) -> tuple[list[str], list[str]]:
         if model.ce_penalty <= 0:
             errors.append("约束方程罚系数 ce_penalty 必须大于 0")
 
+    _declared_ce_ids = {ce.id for ce in model.ces}
     for s in model.stages:
         for eid in list(s.activate) + list(s.deactivate):
             if eid not in {e.id for e in model.elements}:
                 errors.append(f"阶段 {s.id} 激活/去激活了不存在的单元 {eid}")
+        # 分级顶推 CE 覆盖：引用的 CE 编号必须在模型中声明，否则内核会
+        # 显式拒绝（防静默丢弃）。这里提前在前端给出同样的报错。
+        for cid in s.ce_constants:
+            if cid not in _declared_ce_ids:
+                errors.append(
+                    f"阶段 {s.id} 的 CE= 覆盖了未声明的约束方程 {cid}"
+                    f"（模型共有 {len(_declared_ce_ids)} 条 CE）")
+            if s.ce_constants[cid] == 0.0:
+                warnings.append(
+                    f"阶段 {s.id} 的 CE {cid} 覆盖值为 0：等价于本阶段不额外顶推，"
+                    f"请确认是否有意")
 
     # ---------------------------------------------------------- 索专用检查
     # 索的两端若等高，竖向分量 ez = Δz/L = 0，目标索力 T = q·t/ez 会除零。

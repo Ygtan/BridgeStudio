@@ -323,6 +323,19 @@ def _registry() -> dict[str, SolverSpec]:
             adapt=_adapt_suspension,
             build_hint="cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver",
         ),
+        # 第 5 键：组合体系（斜拉-悬索协作）。与 suspension 共用 cable_solver.exe
+        # 与同一套共转列式成桥态内核，差别只在 *CABLE_BRIDGE SYSTEM=COOP 触发的
+        # 斜拉索目标力保留 + 四类残差判据 + [COOPERATIVE] 输出段。分成独立键
+        # 是为了能力自述、编译提示与 detect_kind 的协作路由有落点。
+        "combo": SolverSpec(
+            key="combo",
+            exe_name="cable_solver.exe",
+            available=cable_solver_available,
+            find=find_cable_solver,
+            run=lambda m, d, n: solve_cable_bridge(m, out_dir=d, dat_name=n),
+            adapt=_adapt_suspension,
+            build_hint="cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver",
+        ),
         # 非线性施工阶段：以前靠 ModelDoc.solve() 直接调
         # fem_eigen_stage_nl.solve_staged_result() 旁路，注册表里查不到它，
         # capabilities()/require() 也管不到。现在正式登记，链路选择仍由
@@ -366,6 +379,10 @@ def detect_kind(model: Any) -> str:
     cb = getattr(model, "cable_bridge", None)
     if cb is None:
         return "grillage3d"
+    # 组合体系（斜拉-悬索协作）优先：cooperative 是独立标识，与悬索锚固类型
+    # system 互不覆盖。只有两者同时给出才算协作，走第 5 键 combo。
+    if getattr(cb, "cooperative", False) and str(getattr(cb, "system", "") or ""):
+        return "combo"
     return "suspension" if str(getattr(cb, "system", "") or "") else "cable_stayed"
 
 
@@ -396,7 +413,7 @@ def _fallback_hints() -> dict[str, SolverSpec]:
     """模块都导不进来时，至少把各内核的编译命令说清楚。
 
     键必须与真注册表一致（`grillage3d` / `cable_stayed` / `suspension` /
-    `stage_nl`）：少一个键，用户在那种情况下会看到"未知内核键"而不是
+    `combo` / `stage_nl`）：少一个键，用户在那种情况下会看到"未知内核键"而不是
     "请先编译"，提示就白写了。`result_kind` 也要跟着填，否则降级提示里的
     编译命令对得上、结果口径却对不上。
     """
@@ -426,6 +443,11 @@ def _fallback_hints() -> dict[str, SolverSpec]:
             # 悬索桥与斜拉桥共用 cable_solver.exe，但同样是独立的一个键：
             # adapt 与出口不同，键合并会让 detect_kind 的分支无处落地。
             ("suspension", "cable_solver.exe",
+             "cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver",
+             None),
+            # 协作体系（斜拉-悬索）第 5 键：与悬索共用 cable_solver.exe，
+            # 但靠 SYSTEM=COOP 走协作找形，result_kind 仍按悬索图渲染。
+            ("combo", "cable_solver.exe",
              "cd D:/AI-work/FEM-Eigen && cmake --build build --target cable_solver",
              None),
             ("stage_nl", "example_3d_stage_nl.exe",

@@ -225,13 +225,17 @@ def spec_rules() -> None:
 
 
 def no_new_capability() -> None:
-    check("solver_3d._registry() 仍 4 键",
-          len(solver_3d._registry()) == 4, str(sorted(solver_3d._registry())))
+    check("solver_3d._registry() 已放行 5 键（含 combo）",
+          len(solver_3d._registry()) == 5
+          and "combo" in solver_3d._registry(),
+          str(sorted(solver_3d._registry())))
     check("BUILDERS 仍 12 格", len(model_doc.BUILDERS) == 12,
           str(len(model_doc.BUILDERS)))
     src_combo = read(ROOT / "model_doc.py")
-    check("组合体系仍显式拒绝（未偷偷放行）",
-          "COMBO_SYSTEM_MSG" in src_combo)
+    check("斜拉-悬索协作已放行且梁拱组合仍拒绝",
+          "COMBO_SYSTEM_MSG" in src_combo
+          and "combo_kind" in src_combo
+          and "_COMBO_ARCH_RE" in src_combo)
     root = fe()
     if root:
         cs = read(root / "cable_solver.cpp")

@@ -108,30 +108,51 @@ def spec_doc() -> None:
 
 
 def guard_paths() -> None:
-    print("\n[2] 拒绝路径：解析 / 校验 / 求解三处同源")
+    print("\n[2] 阶段二放行：协作体系端到端；梁拱组合仍显式拒绝")
     msg = md.COMBO_SYSTEM_MSG
-    check("文案唯一真源含内核键与规格引用",
-          "detect_kind" in msg and "组合体系接入规格.md" in msg and
-          "第 5 个求解键" in msg)
-    check("from_text 是薄包装且注入哨兵",
-          "_parse_text" in inspect.getsource(md.ModelDoc.from_text)
-          and "combo_system" in inspect.getsource(md.ModelDoc.from_text))
+    check("文案唯一真源含建造器与规格引用",
+          "combo_3d.py" in msg and "组合体系接入规格.md" in msg
+          and "第 5 个求解键" in msg)
+    src = inspect.getsource(md.ModelDoc.from_text)
+    check("from_text 是薄包装且分发两类组合体系",
+          "_parse_text" in src and "combo_system" in src and "combo_kind" in src)
     check("validate / solve 都引用同一文案",
           all("COMBO_SYSTEM_MSG" in inspect.getsource(getattr(md.ModelDoc, f))
               for f in ("validate", "solve")))
 
-    for i, text in enumerate(COMBO_TEXTS, 1):
+    # 斜拉-悬索协作：已放行。原先「措辞触发哨兵 + validate/solve 拒绝」是
+    # 未实现期的反证，现成对改写为 build/路由/.dat 的正向确认，断言只增不减。
+    stay_texts = [COMBO_TEXTS[i] for i in (0, 1, 2, 5, 6)]
+    for i, text in enumerate(stay_texts, 1):
         doc, _src, diag = md.ModelDoc.from_text(text)
-        check(f"组合措辞 {i} 触发哨兵", doc.params.get("combo_system") is True)
-        check(f"组合措辞 {i} notes 含文案", msg in diag.notes)
-        check(f"组合措辞 {i} validate 直接拒绝",
-              doc.validate() == [msg], str(doc.validate())[:80])
+        check(f"协作措辞 {i} 标记 combo_system",
+              doc.params.get("combo_system") is True)
+        check(f"协作措辞 {i} 路由 STAY_SUSP",
+              doc.params.get("combo_kind") == "STAY_SUSP")
+        check(f"协作措辞 {i} notes 含放行说明",
+              md.COMBO_STAY_SUSP_NOTE in diag.notes)
+        check(f"协作措辞 {i} validate 不含拒绝文案", msg not in doc.validate())
+        try:
+            model = doc.model
+            ok = (model.cable_bridge.cooperative is True
+                  and solver_3d.detect_kind(model) == "combo"
+                  and "SYSTEM=COOP" in doc.to_dat())
+        except Exception:                                   # noqa: BLE001
+            ok = False
+        check(f"协作措辞 {i} build/路由/.dat 一致", ok)
+
+    # 梁拱/拱梁组合没有独立建造器：三处拒绝继续锁住，不许降级。
+    for i, text in enumerate((COMBO_TEXTS[3], COMBO_TEXTS[4]), 1):
+        doc, _src2, diag = md.ModelDoc.from_text(text)
+        check(f"梁拱措辞 {i} 触发哨兵", doc.params.get("combo_system") is True)
+        check(f"梁拱措辞 {i} notes 含文案", msg in diag.notes)
+        check(f"梁拱措辞 {i} validate 直接拒绝", doc.validate() == [msg])
         try:
             doc.solve()
             raised = False
         except ValueError as e:
             raised = str(e) == msg
-        check(f"组合措辞 {i} solve 抛 ValueError(同源文案)", raised)
+        check(f"梁拱措辞 {i} solve 抛 ValueError(同源文案)", raised)
 
 
 def no_false_positive() -> None:
@@ -151,13 +172,21 @@ def no_false_positive() -> None:
 
 
 def kernel_honesty() -> None:
-    print("\n[4] 规格未实现前：内核不许出现假的第 5 个键")
+    print("\n[4] 阶段二已放行：注册表第 5 键与 detect_kind 协作路由")
     keys = set(solver_3d._registry())
-    check("注册表恰好 4 键", keys == {"grillage3d", "cable_stayed",
-                                    "suspension", "stage_nl"}, str(sorted(keys)))
-    check("detect_kind 不产生协作键",
-          "cooperative" not in inspect.getsource(solver_3d.detect_kind)
-          and not any("combo" in k for k in keys))
+    # 阶段二放行后：注册表由 4 键增至 5 键（新增 combo）， detect_kind
+    # 凭 cooperative 标识路由到 combo。原先「不许出现假的第 5 键」是未实现期
+    # 的反证，现在成对改写为「真第 5 键已落地」，断言条数不减、口径不放宽。
+    check("注册表恰好 5 键（含 combo）",
+          keys == {"grillage3d", "cable_stayed", "suspension", "stage_nl", "combo"},
+          str(sorted(keys)))
+    det_src = inspect.getsource(solver_3d.detect_kind)
+    check("detect_kind 凭 cooperative 路由到 combo",
+          "cooperative" in det_src and 'return "combo"' in det_src
+          and "combo" in keys)
+    reg_src = inspect.getsource(solver_3d._registry)
+    check("combo 键复用 cable_solver.exe 且独立 adapt", 
+          '"combo": SolverSpec' in reg_src and 'key="combo"' in reg_src)
     check("BUILDERS 仍是 6 kind × 2 维度 12 格",
           len(md.BUILDERS) == 12 and len(md.KIND_LABELS) == 6,
           f"BUILDERS={len(md.BUILDERS)} KIND={len(md.KIND_LABELS)}")
@@ -218,8 +247,9 @@ def docs_synced() -> None:
     for name in ("X20_接入约定.md", "能力边界矩阵.md", "README.md"):
         check(f"{name} 指向组合体系接入规格.md",
               "组合体系接入规格.md" in read(name))
-    check("契约 B2 仍如实标「部分」",
-          "部分：X20「组合体系」" in read("X20_接入约定.md"))
+    check("契约 B2 状态与阶段二放行同步（保留原关键词）",
+          "部分：X20「组合体系」" in read("X20_接入约定.md")
+          and "combo_3d.py" in read("X20_接入约定.md"))
     check("矩阵 §4.1 缺口关键词保留",
           "组合体系桥型没有独立建造器" in read("能力边界矩阵.md"))
     check("矩阵守卫仍对拍该缺口关键词（不许删断言）",

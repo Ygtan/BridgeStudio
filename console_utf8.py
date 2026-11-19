@@ -27,10 +27,16 @@
 
 `errors="replace"` 是刻意的：万一目标流真的收不了 UTF-8，宁可印一个 `?`
 也不要崩。
+
+另外，Windows 上若未安装 Tcl（缺 `init.tcl`），matplotlib 默认 TkAgg
+后端会在首个 figure 创建时抛 `_tkinter.TclError`，让离线守卫脚本误报
+失败。守卫只校验数据与逻辑、不需要图形窗口，因此这里一并把后端兜底为
+Agg：所有调用本入口的脚本都无需再手工设 `MPLBACKEND=Agg`。
 """
 
 from __future__ import annotations
 
+import os
 import sys
 
 __all__ = ["setup_console"]
@@ -42,7 +48,12 @@ def setup_console(encoding: str = "utf-8") -> None:
     幂等、永不抛：`reconfigure` 在 Python 3.7+ 才有，被包装过的流
     （某些 IDE、pytest 捕获、Streamlit 的 ScriptRunner）可能没有这个方法，
     或者已经关闭——这些情况都直接跳过，把流保持原样。
+
+    同时把 matplotlib 后端兜底为 Agg（``setdefault``：若外部已显式指定
+    则尊重外部选择）。必须在任何 pyplot 导入前调用；守卫脚本都在模块顶部
+    调用本函数，因此可覆盖无 Tcl 环境下 TkAgg 崩溃的问题。
     """
+    os.environ.setdefault("MPLBACKEND", "Agg")
     for stream in (sys.stdout, sys.stderr):
         if stream is None:                     # pythonw.exe 下是 None
             continue
